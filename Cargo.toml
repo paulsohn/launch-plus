@@ -12,6 +12,7 @@ rust-version = "1.85"
 [workspace.dependencies]
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
 
 # CLI
 clap = { version = "4.5", features = ["derive"] }
@@ -19,6 +20,12 @@ clap = { version = "4.5", features = ["derive"] }
 # Error handling
 thiserror = "2.0"
 anyhow = "1.0"
+
+# XML parsing
+quick-xml = { version = "0.37", features = ["serialize"] }
+
+# Archive handling
+tar = "0.4"
 
 # Logging
 tracing = "0.1"

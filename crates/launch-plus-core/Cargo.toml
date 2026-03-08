@@ -9,8 +9,12 @@ rust-version.workspace = true
 
 [dependencies]
 serde.workspace = true
+serde_yaml.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
+quick-xml.workspace = true
+tracing.workspace = true
+tar.workspace = true
 
 [lib]
 name = "launch_plus_core"

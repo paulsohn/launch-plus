@@ -1,0 +1,11 @@
+repositories:
+  core/sample_msgs:
+    type: git
+    url: https://github.com/example/sample_msgs.git
+    version: 1.0.0
+    branch: main
+
+  universe/sample_pkg:
+    type: git
+    url: https://github.com/example/sample_pkg.git
+    version: abc123def456

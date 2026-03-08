@@ -1,0 +1,50 @@
+version: 1
+
+repos:
+  example/sample_msgs:
+    url: https://github.com/example/sample_msgs.git
+    version: "1.0.0"
+    sha: abc123def456789012345678901234567890abcd
+    branch: main
+    workspace_path: core/sample_msgs
+    packages:
+      - sample_msgs
+      - sample_interfaces
+
+  example/sample_pkg:
+    url: https://github.com/example/sample_pkg.git
+    version: abc123def456
+    sha: abc123def456789012345678901234567890abcd
+    workspace_path: universe/sample_pkg
+    packages:
+      - sample_pkg
+
+packages:
+  sample_msgs:
+    repo: example/sample_msgs
+    path: sample_msgs
+    dependencies:
+      build:
+        - rosidl_default_generators
+      exec:
+        - rosidl_default_runtime
+
+  sample_interfaces:
+    repo: example/sample_msgs
+    path: sample_interfaces
+    dependencies:
+      build:
+        - rosidl_default_generators
+      exec:
+        - rosidl_default_runtime
+
+  sample_pkg:
+    repo: example/sample_pkg
+    path: sample_pkg
+    dependencies:
+      build:
+        - sample_msgs
+        - rclcpp
+      exec:
+        - sample_msgs
+        - rclcpp

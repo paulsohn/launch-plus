@@ -22,6 +22,13 @@ cd launch-plus
 cargo build --bin launch-plus --release
 ```
 
+## Key commands
+
+| Command | Description |
+|---|---|
+| `index <manifest.repos>` | Parse `.repos` file and generate a lockfile |
+| `update [REPOS...]` | Re-resolve refs and update lockfile SHAs |
+
 ## Development
 
 ```bash

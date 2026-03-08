@@ -8,6 +8,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Errors that can occur in launch-plus operations
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Failed to parse YAML file
+    #[error("failed to parse YAML: {0}")]
+    YamlParse(#[from] serde_yaml::Error),
+
     /// Failed to parse XML file
     #[error("failed to parse XML: {0}")]
     XmlParse(String),

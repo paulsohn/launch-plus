@@ -3,6 +3,14 @@
 //! This crate provides the core functionality for launch-plus, a Bazel-like
 //! build and run system for ROS 2 that enables lazy, on-demand package
 //! fetching and building based on actual launch-time dependencies.
+//!
+//! # Modules
+//!
+//! - `indexer`: Parse .repos files and generate lockfiles
+//! - `resolver`: Parse launch files and resolve dependencies
+//! - `fetcher`: Partial git clone via sparse-checkout
+//! - `builder`: Selective colcon build orchestration
+//! - `executor`: Process spawning and lifecycle management
 
 pub mod builder;
 pub mod error;
@@ -16,12 +24,6 @@ pub mod resolver;
 // Re-export common types
 pub use error::{Error, Result};
 
-// Re-export indexer types for lockfile access
-pub use indexer::{
-    compute_build_order, resolve_dependencies,
-    Dependencies, DependencyGraph, DependencyMode, Lockfile, PackageLock, RepoLock,
-};
-
 // Re-export resolver types for convenience
 pub use resolver::{
     extract_file_dependency, parse_launch_xml, parse_launch_yaml, render_resolved_xml,
@@ -34,14 +36,20 @@ pub use resolver::{
 // Re-export locator types
 pub use locator::{locator_from_lockfile, locator_from_workspace, PackageLocator};
 
+// Re-export indexer types for lockfile access
+pub use indexer::{
+    compute_build_order, resolve_dependencies,
+    Dependencies, DependencyGraph, DependencyMode, Lockfile, PackageLock, RepoLock,
+};
+
 // Re-export fetcher types
 pub use fetcher::{fetch_packages, FetchOptions, FetchedPackage};
 
-// Re-export orchestrator for resolve workflow
-pub use orchestrator::{resolve_launch_recursive, ResolveResult, ResolveWorkflowOptions};
-
 // Re-export builder types
 pub use builder::{execute_build, plan_build_from_packages, BuildOptions, BuildPlan};
+
+// Re-export orchestrator for resolve workflow
+pub use orchestrator::{resolve_launch_recursive, ResolveResult, ResolveWorkflowOptions};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

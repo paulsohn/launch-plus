@@ -27,6 +27,9 @@ quick-xml = { version = "0.37", features = ["serialize"] }
 # Archive handling
 tar = "0.4"
 
+# Testing
+tempfile = "3.16"
+
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

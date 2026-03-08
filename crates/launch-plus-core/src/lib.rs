@@ -7,6 +7,7 @@
 pub mod error;
 pub mod fetcher;
 pub mod indexer;
+pub mod locator;
 pub mod parser;
 
 // Re-export common types
@@ -17,6 +18,9 @@ pub use indexer::{
     compute_build_order, resolve_dependencies,
     Dependencies, DependencyGraph, DependencyMode, Lockfile, PackageLock, RepoLock,
 };
+
+// Re-export locator types
+pub use locator::{locator_from_lockfile, locator_from_workspace, PackageLocator};
 
 // Re-export fetcher types
 pub use fetcher::{fetch_packages, FetchOptions, FetchedPackage};

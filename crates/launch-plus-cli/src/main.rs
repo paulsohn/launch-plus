@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use launch_plus_core::fetcher::{fetch_packages, FetchOptions, WorkspaceState};
 use launch_plus_core::indexer::{
     blobless_clone, discover_packages, generate_lockfile, parse_lockfile, parse_repos,
     resolve_version_local, serialize_lockfile, Lockfile,
@@ -77,6 +78,43 @@ enum Commands {
         #[arg(long)]
         diff: bool,
     },
+
+    /// Fetch packages from lockfile using sparse-checkout
+    #[command(override_usage = "launch-plus fetch [OPTIONS] <PACKAGES>...")]
+    Fetch {
+        /// Package names to fetch
+        #[arg(required = true)]
+        packages: Vec<String>,
+
+        /// Lockfile path (default: manifest.lock.repos)
+        #[arg(short, long, default_value = "manifest.lock.repos")]
+        lockfile: String,
+
+        /// Fetch directory (default: src)
+        #[arg(long, default_value = "src")]
+        src: String,
+
+        /// Disable recursive submodule fetching
+        #[arg(long)]
+        no_recurse_submodules: bool,
+
+        /// Use shallow clone (depth=1) when fetching new repositories.
+        /// Off by default; useful in CI where clone history is not needed.
+        /// Has no effect on repositories already cloned.
+        #[arg(long)]
+        shallow: bool,
+    },
+
+    /// Clean fetched packages
+    Clean {
+        /// Source directory to clean (default: src)
+        #[arg(long, default_value = "src")]
+        src: String,
+
+        /// Keep .git directories for faster re-fetch
+        #[arg(long)]
+        keep_git: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -114,6 +152,18 @@ fn main() -> Result<()> {
             diff,
         } => {
             cmd_update(&repos, &input, output.as_deref(), &src, diff)?;
+        }
+        Commands::Fetch {
+            packages,
+            lockfile,
+            src,
+            no_recurse_submodules,
+            shallow,
+        } => {
+            cmd_fetch(&packages, &lockfile, &src, !no_recurse_submodules, shallow)?;
+        }
+        Commands::Clean { src, keep_git } => {
+            cmd_clean(&src, keep_git)?;
         }
     }
 
@@ -439,4 +489,103 @@ fn cmd_update(
     );
 
     Ok(())
+}
+
+/// Execute the fetch command: fetch packages from lockfile using sparse-checkout
+fn cmd_fetch(
+    packages: &[String],
+    lockfile_path: &str,
+    fetch_dir: &str,
+    recurse_submodules: bool,
+    shallow: bool,
+) -> Result<()> {
+    let content = fs::read_to_string(lockfile_path)
+        .with_context(|| format!("failed to read lockfile: {lockfile_path}"))?;
+    let lockfile = parse_lockfile(&content)
+        .with_context(|| format!("failed to parse lockfile: {lockfile_path}"))?;
+
+    let fetch_path = Path::new(fetch_dir);
+    let options = FetchOptions {
+        recurse_submodules,
+        shallow,
+        workspace_state: WorkspaceState::Clean,
+    };
+
+    tracing::info!("Fetching {} packages into {}", packages.len(), fetch_dir);
+
+    let fetched = fetch_packages(packages, &lockfile, fetch_path, &options)
+        .with_context(|| "failed to fetch packages")?;
+
+    println!("Fetched {} packages:", fetched.len());
+    for pkg in &fetched {
+        println!("  {} -> {}", pkg.name, pkg.path.display());
+    }
+
+    Ok(())
+}
+
+/// Execute the clean command: remove fetched packages
+fn cmd_clean(src_dir: &str, keep_git: bool) -> Result<()> {
+    let src_path = Path::new(src_dir);
+
+    if !src_path.exists() {
+        println!("Nothing to clean: {} does not exist", src_dir);
+        return Ok(());
+    }
+
+    if keep_git {
+        tracing::info!("Cleaning {} (keeping .git directories)", src_dir);
+        clean_directory_keep_git(src_path)?;
+        println!("Cleaned {} (kept .git directories for faster re-fetch)", src_dir);
+    } else {
+        tracing::info!("Cleaning {} (removing everything)", src_dir);
+        fs::remove_dir_all(src_path)
+            .with_context(|| format!("failed to remove {}", src_dir))?;
+        println!("Cleaned {}", src_dir);
+    }
+
+    Ok(())
+}
+
+fn clean_directory_keep_git(dir: &Path) -> Result<()> {
+    for entry in fs::read_dir(dir).with_context(|| format!("failed to read {}", dir.display()))? {
+        let entry = entry.with_context(|| "failed to read directory entry")?;
+        let path = entry.path();
+        let file_name = entry.file_name();
+
+        if file_name == ".git" {
+            continue;
+        }
+
+        if path.is_dir() {
+            if contains_git_dir(&path) {
+                clean_directory_keep_git(&path)?;
+            } else {
+                fs::remove_dir_all(&path)
+                    .with_context(|| format!("failed to remove {}", path.display()))?;
+            }
+        } else {
+            fs::remove_file(&path)
+                .with_context(|| format!("failed to remove {}", path.display()))?;
+        }
+    }
+
+    Ok(())
+}
+
+fn contains_git_dir(dir: &Path) -> bool {
+    if dir.join(".git").exists() {
+        return true;
+    }
+
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() && contains_git_dir(&path) {
+                return true;
+            }
+        }
+    }
+
+    false
 }

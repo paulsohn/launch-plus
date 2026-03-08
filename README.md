@@ -28,6 +28,8 @@ cargo build --bin launch-plus --release
 |---|---|
 | `index <manifest.repos>` | Parse `.repos` file and generate a lockfile |
 | `update [REPOS...]` | Re-resolve refs and update lockfile SHAs |
+| `fetch <pkg>...` | Sparse-checkout specific packages from the lockfile |
+| `clean` | Remove fetched packages |
 
 ## Development
 

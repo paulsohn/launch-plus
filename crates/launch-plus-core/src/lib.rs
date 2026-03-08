@@ -5,6 +5,7 @@
 //! fetching and building based on actual launch-time dependencies.
 
 pub mod error;
+pub mod fetcher;
 pub mod indexer;
 
 // Re-export common types
@@ -15,6 +16,9 @@ pub use indexer::{
     compute_build_order, resolve_dependencies,
     Dependencies, DependencyGraph, DependencyMode, Lockfile, PackageLock, RepoLock,
 };
+
+// Re-export fetcher types
+pub use fetcher::{fetch_packages, FetchOptions, FetchedPackage};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

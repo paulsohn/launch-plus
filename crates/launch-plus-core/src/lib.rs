@@ -9,6 +9,7 @@ pub mod fetcher;
 pub mod indexer;
 pub mod locator;
 pub mod parser;
+pub mod resolver;
 
 // Re-export common types
 pub use error::{Error, Result};
@@ -17,6 +18,15 @@ pub use error::{Error, Result};
 pub use indexer::{
     compute_build_order, resolve_dependencies,
     Dependencies, DependencyGraph, DependencyMode, Lockfile, PackageLock, RepoLock,
+};
+
+// Re-export resolver types for convenience
+pub use resolver::{
+    extract_file_dependency, parse_launch_xml, parse_launch_yaml, render_resolved_xml,
+    resolve_launch, semantic_eq,
+    Condition, ConditionKind, DependencyKind, FileDependency, IncludeArgContext, LaunchElement,
+    LaunchFile, LaunchInclude, ParsedLaunchFile, ResolveOptions, ResolvedLaunch, ResolvedNode,
+    SemanticNode, SubstitutionContext,
 };
 
 // Re-export locator types

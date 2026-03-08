@@ -7,6 +7,7 @@
 pub mod error;
 pub mod fetcher;
 pub mod indexer;
+pub mod parser;
 
 // Re-export common types
 pub use error::{Error, Result};

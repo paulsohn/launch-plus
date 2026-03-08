@@ -43,7 +43,11 @@ pub enum LaunchElement {
     /// <let name="x" value="b" unless="$(var flag)"/>
     /// ```
     /// requires condition support to produce the correct value.
-    Let { name: String, value: String, condition: Option<Condition> },
+    Let {
+        name: String,
+        value: String,
+        condition: Option<Condition>,
+    },
     /// Group with optional condition: `<group if="...">`
     Group {
         condition: Option<Condition>,
@@ -79,9 +83,16 @@ pub enum LaunchElement {
         unknown_attrs: Vec<String>,
     },
     /// Set environment variable: `<set_env name="..." value="..."/>`
-    SetEnv { name: String, value: String, condition: Option<Condition> },
+    SetEnv {
+        name: String,
+        value: String,
+        condition: Option<Condition>,
+    },
     /// Unset environment variable: `<unset_env name="..."/>`
-    UnsetEnv { name: String, condition: Option<Condition> },
+    UnsetEnv {
+        name: String,
+        condition: Option<Condition>,
+    },
     /// Namespace push: `<push-ros-namespace namespace="..."/>`
     ///
     /// Prepends a namespace component to all nodes resolved within the enclosing
@@ -294,10 +305,7 @@ fn raw_to_launch(raw: RawElement) -> crate::Result<Option<LaunchElement>> {
         }
         "group" => {
             let condition = raw.condition()?;
-            let scoped = raw
-                .get("scoped")
-                .map(|v| v == "true")
-                .unwrap_or(true);
+            let scoped = raw.get("scoped").map(|v| v == "true").unwrap_or(true);
             let children = raw_to_launch_elements(raw.children)?;
             Ok(Some(LaunchElement::Group {
                 condition,
@@ -334,8 +342,16 @@ fn raw_to_launch(raw: RawElement) -> crate::Result<Option<LaunchElement>> {
             let respawn_delay = raw.get("respawn_delay");
             let condition = raw.condition()?;
             let unknown_attrs = raw.unknown_attrs(&[
-                "pkg", "exec", "name", "namespace", "if", "unless",
-                "output", "args", "respawn", "respawn_delay",
+                "pkg",
+                "exec",
+                "name",
+                "namespace",
+                "if",
+                "unless",
+                "output",
+                "args",
+                "respawn",
+                "respawn_delay",
             ]);
             let (params, remaps, envs) = extract_node_children(&raw.children)?;
             Ok(Some(LaunchElement::Node {
@@ -355,8 +371,14 @@ fn raw_to_launch(raw: RawElement) -> crate::Result<Option<LaunchElement>> {
             }))
         }
         "node_container" | "composable_node_container" => {
-            let pkg = raw.get("pkg").or_else(|| raw.get("package")).unwrap_or_default();
-            let exec = raw.get("exec").or_else(|| raw.get("executable")).unwrap_or_default();
+            let pkg = raw
+                .get("pkg")
+                .or_else(|| raw.get("package"))
+                .unwrap_or_default();
+            let exec = raw
+                .get("exec")
+                .or_else(|| raw.get("executable"))
+                .unwrap_or_default();
             if pkg.is_empty() {
                 return Err(crate::Error::LaunchParse(format!(
                     "missing required attribute 'pkg' on <{}>",
@@ -443,9 +465,7 @@ fn raw_to_launch(raw: RawElement) -> crate::Result<Option<LaunchElement>> {
                 condition,
             }))
         }
-        _ => Ok(Some(LaunchElement::UnknownElement {
-            tag_name: raw.tag,
-        })),
+        _ => Ok(Some(LaunchElement::UnknownElement { tag_name: raw.tag })),
     }
 }
 
@@ -497,9 +517,7 @@ fn extract_node_children(
 }
 
 /// Extract `<composable_node>` children from a raw element's child list.
-fn extract_composable_nodes(
-    children: &[RawElement],
-) -> crate::Result<Vec<ComposableNode>> {
+fn extract_composable_nodes(children: &[RawElement]) -> crate::Result<Vec<ComposableNode>> {
     let mut nodes = Vec::new();
 
     for child in children {

@@ -28,8 +28,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// Flag set by the SIGINT handler so the builder knows the child was interrupted.
 static INTERRUPTED: AtomicBool = AtomicBool::new(false);
 
-use crate::fetcher::{fetch_packages, FetchOptions};
-use crate::indexer::{compute_build_order, resolve_dependencies, DependencyMode, Lockfile};
+use crate::fetcher::{FetchOptions, fetch_packages};
+use crate::indexer::{DependencyMode, Lockfile, compute_build_order, resolve_dependencies};
 
 /// Everything colcon needs to build the launch target.
 #[derive(Debug, Clone)]
@@ -125,6 +125,7 @@ pub fn plan_build_from_packages(
 /// Execute `colcon build --packages-select <packages>`.
 ///
 /// When `options.dry_run` is true, prints the command to stdout without running it.
+#[allow(unsafe_code)]
 pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<()> {
     if plan.packages.is_empty() {
         tracing::info!("No packages to build.");
@@ -168,21 +169,22 @@ pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<
     // Install a SIGINT handler that sets the flag instead of killing our process.
     // The default SIGINT behaviour is restored after the child exits.
     #[cfg(unix)]
-    let prev_handler = unsafe {
-        libc::signal(libc::SIGINT, sigint_handler as libc::sighandler_t)
-    };
+    let prev_handler = unsafe { libc::signal(libc::SIGINT, sigint_handler as libc::sighandler_t) };
 
-    let status = child.wait()
+    let status = child
+        .wait()
         .map_err(|e| crate::Error::ProcessExecution(format!("failed to wait for colcon: {e}")))?;
 
     // Restore previous signal handler.
     #[cfg(unix)]
-    unsafe { libc::signal(libc::SIGINT, prev_handler); }
+    unsafe {
+        libc::signal(libc::SIGINT, prev_handler);
+    }
 
     if INTERRUPTED.load(Ordering::SeqCst) {
         // Child was killed by our forwarded signal; propagate as an error.
         return Err(crate::Error::ProcessExecution(
-            "build interrupted by Ctrl+C".to_string()
+            "build interrupted by Ctrl+C".to_string(),
         ));
     }
 

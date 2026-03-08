@@ -199,7 +199,10 @@ fn fetch_repo_sparse(
     if repo_dir.exists() && repo_dir.join(".git").exists() {
         if options.workspace_state == WorkspaceState::Dirty {
             // Dirty mode: never touch existing repos — use whatever is on disk.
-            debug!("Skipping git operations for {} (--dirty)", repo_dir.display());
+            debug!(
+                "Skipping git operations for {} (--dirty)",
+                repo_dir.display()
+            );
         } else {
             // Clean mode: reset to pinned SHA.
             update_sparse_checkout(repo_dir, sha, paths, options)?;
@@ -239,12 +242,7 @@ fn sparse_clone(
     );
 
     // Build clone arguments
-    let mut clone_args = vec![
-        "clone",
-        "--filter=blob:none",
-        "--sparse",
-        "--single-branch",
-    ];
+    let mut clone_args = vec!["clone", "--filter=blob:none", "--sparse", "--single-branch"];
 
     if options.shallow {
         clone_args.push("--depth=1");
@@ -322,7 +320,10 @@ fn update_sparse_checkout(
                 );
                 checkout_sha(repo_dir, sha, options)?;
             } else {
-                debug!("Already at SHA {} (non-sparse repo), skipping checkout", sha);
+                debug!(
+                    "Already at SHA {} (non-sparse repo), skipping checkout",
+                    sha
+                );
             }
             return Ok(());
         }
@@ -358,7 +359,10 @@ fn update_sparse_checkout(
     if !sha_matches || !paths_to_add.is_empty() {
         checkout_sha(repo_dir, sha, options)?;
     } else {
-        debug!("Already at SHA {} with correct paths, skipping checkout", sha);
+        debug!(
+            "Already at SHA {} with correct paths, skipping checkout",
+            sha
+        );
     }
 
     Ok(())
@@ -476,9 +480,7 @@ fn get_sparse_checkout_paths(repo_dir: &Path) -> crate::Result<Vec<String>> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
-        .map_err(|e| {
-            crate::Error::Git(format!("failed to run git sparse-checkout list: {}", e))
-        })?;
+        .map_err(|e| crate::Error::Git(format!("failed to run git sparse-checkout list: {}", e)))?;
 
     if !output.status.success() {
         // sparse-checkout list may fail if not initialized, return empty
@@ -519,10 +521,14 @@ fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Re
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(crate::Error::Git(format!(
                 "git fetch of {} failed and commit is not available locally: {}",
-                sha, stderr.trim()
+                sha,
+                stderr.trim()
             )));
         }
-        debug!("git fetch {} failed but commit is already available locally", sha);
+        debug!(
+            "git fetch {} failed but commit is already available locally",
+            sha
+        );
     }
 
     // Checkout the SHA.  In Clean mode use -f to discard local modifications.

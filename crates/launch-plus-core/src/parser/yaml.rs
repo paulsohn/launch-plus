@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use super::{raw_to_launch_elements, LaunchFile, RawElement};
+use super::{LaunchFile, RawElement, raw_to_launch_elements};
 
 /// Parse a ROS 2 YAML launch file into the same `LaunchFile` AST as XML parsing.
 ///
@@ -52,10 +52,7 @@ use super::{raw_to_launch_elements, LaunchFile, RawElement};
 /// their `<arg>` defaults and `<let>` assignments become visible to subsequent siblings.
 pub fn parse_launch_yaml(content: &str, path: &std::path::Path) -> crate::Result<LaunchFile> {
     let yaml: serde_yaml::Value = serde_yaml::from_str(content).map_err(|e| {
-        crate::Error::LaunchParse(format!(
-            "YAML parse error in '{}': {e}",
-            path.display()
-        ))
+        crate::Error::LaunchParse(format!("YAML parse error in '{}': {e}", path.display()))
     })?;
 
     let entries = yaml

@@ -12,8 +12,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub use crate::parser::xml::parse_launch_xml;
-pub use crate::parser::yaml::parse_launch_yaml;
 use crate::parser::yaml::expand_ros_params_yaml;
+pub use crate::parser::yaml::parse_launch_yaml;
 
 // Re-export AST types from the parser module (canonical home).
 pub use crate::parser::{
@@ -49,7 +49,10 @@ pub enum ParamFile {
     /// Pre-expanded at resolve time (when `--inline-params` is active).
     /// Renderer emits `<!-- params from: display -->`, individual `<param>` elements,
     /// and `<!-- end params from: display -->`.
-    Inlined { display: String, params: Vec<(String, String)> },
+    Inlined {
+        display: String,
+        params: Vec<(String, String)>,
+    },
 }
 
 /// How a `ResolvedNode` should be rendered in the output XML.
@@ -66,7 +69,10 @@ pub enum NodeKind {
     /// A dynamic plugin load into a running container (`<load_composable_node>`).
     ///
     /// `package`/`executable` on the parent `ResolvedNode` are empty (not a process).
-    LoadComposable { target: String, plugins: Vec<ComposablePlugin> },
+    LoadComposable {
+        target: String,
+        plugins: Vec<ComposablePlugin>,
+    },
     /// An included file that contributed no executable nodes.
     ///
     /// Rendered as an inline `<!-- source: pkg://path -->` / `<!-- end: pkg://path -->`
@@ -90,7 +96,11 @@ pub enum NodeKind {
     /// An external process: `<executable cmd="..." name="..." shell="true/false"/>`.
     ///
     /// Equivalent to Python `ExecuteProcess`.  Included in semantic comparison.
-    Executable { cmd: String, name: Option<String>, shell: bool },
+    Executable {
+        cmd: String,
+        name: Option<String>,
+        shell: bool,
+    },
 }
 
 // ============================================================================
@@ -154,8 +164,14 @@ impl std::fmt::Debug for SubstitutionContext {
             .field("args", &self.args)
             .field("vars", &self.vars)
             .field("launch_file_dir", &self.launch_file_dir)
-            .field("pkg_share_resolver", &self.pkg_share_resolver.as_ref().map(|_| "<fn>"))
-            .field("pkg_prefix_resolver", &self.pkg_prefix_resolver.as_ref().map(|_| "<fn>"))
+            .field(
+                "pkg_share_resolver",
+                &self.pkg_share_resolver.as_ref().map(|_| "<fn>"),
+            )
+            .field(
+                "pkg_prefix_resolver",
+                &self.pkg_prefix_resolver.as_ref().map(|_| "<fn>"),
+            )
             .field("preview_mode", &self.preview_mode)
             .finish()
     }
@@ -202,7 +218,9 @@ impl SubstitutionResult {
     /// after the call (e.g. when `value` is referenced in multiple downstream expressions).
     #[inline]
     pub fn propagate_diagnostics(&self, result: &mut ResolvedLaunch) {
-        result.required_packages.extend(self.package_deps.iter().cloned());
+        result
+            .required_packages
+            .extend(self.package_deps.iter().cloned());
         result.warnings.extend(self.warnings.iter().cloned());
         result.errors.extend(self.errors.iter().cloned());
     }
@@ -216,7 +234,10 @@ pub enum Substitution {
     /// $(var name)
     Var(String),
     /// $(env NAME) or $(env NAME default)
-    Env { name: String, default: Option<String> },
+    Env {
+        name: String,
+        default: Option<String>,
+    },
     /// $(find-pkg-share package)
     FindPkgShare(String),
     /// $(find-pkg-prefix package)
@@ -250,7 +271,7 @@ pub fn parse_substitutions(input: &str) -> crate::Result<Vec<Substitution>> {
             // Read until matching ')'
             let mut expr = String::new();
             let mut depth = 1;
-            while let Some(c) = chars.next() {
+            for c in chars.by_ref() {
                 if c == '(' {
                     depth += 1;
                     expr.push(c);
@@ -295,21 +316,18 @@ fn parse_substitution_expr(expr: &str) -> crate::Result<Substitution> {
 
     match cmd {
         "arg" => {
-            let name = arg.ok_or_else(|| {
-                crate::Error::LaunchParse("$(arg) requires a name".to_string())
-            })?;
+            let name =
+                arg.ok_or_else(|| crate::Error::LaunchParse("$(arg) requires a name".to_string()))?;
             Ok(Substitution::Arg(name.to_string()))
         }
         "var" => {
-            let name = arg.ok_or_else(|| {
-                crate::Error::LaunchParse("$(var) requires a name".to_string())
-            })?;
+            let name =
+                arg.ok_or_else(|| crate::Error::LaunchParse("$(var) requires a name".to_string()))?;
             Ok(Substitution::Var(name.to_string()))
         }
         "env" => {
-            let arg_str = arg.ok_or_else(|| {
-                crate::Error::LaunchParse("$(env) requires a name".to_string())
-            })?;
+            let arg_str =
+                arg.ok_or_else(|| crate::Error::LaunchParse("$(env) requires a name".to_string()))?;
             // $(env NAME) or $(env NAME default_value)
             let mut env_parts = arg_str.splitn(2, char::is_whitespace);
             let name = env_parts.next().unwrap().to_string();
@@ -420,7 +438,12 @@ fn resolve_substitutions_inner(
                     crate::Error::LaunchParse(format!("undefined argument: {}", name))
                 })?;
                 // Recursively resolve in case the arg value contains substitutions
-                let value = propagate!(resolve_substitutions_inner(value, ctx, resolve_pkg_share, is_structural)?);
+                let value = propagate!(resolve_substitutions_inner(
+                    value,
+                    ctx,
+                    resolve_pkg_share,
+                    is_structural
+                )?);
                 result.push_str(&value);
             }
             Substitution::Var(name) => {
@@ -434,21 +457,28 @@ fn resolve_substitutions_inner(
                         crate::Error::LaunchParse(format!("undefined variable: {}", name))
                     })?;
                 // Recursively resolve in case the var value contains substitutions
-                let value = propagate!(resolve_substitutions_inner(value, ctx, resolve_pkg_share, is_structural)?);
+                let value = propagate!(resolve_substitutions_inner(
+                    value,
+                    ctx,
+                    resolve_pkg_share,
+                    is_structural
+                )?);
                 result.push_str(&value);
             }
             Substitution::Env { name, default } => {
                 let value = std::env::var(&name).ok().or(default).ok_or_else(|| {
-                    crate::Error::LaunchParse(format!(
-                        "environment variable not set: {}",
-                        name
-                    ))
+                    crate::Error::LaunchParse(format!("environment variable not set: {}", name))
                 })?;
                 result.push_str(&value);
             }
             Substitution::FindPkgShare(pkg) => {
                 // First resolve the package name (it might be $(var ...))
-                let pkg_name = propagate!(resolve_substitutions_inner(&pkg, ctx, resolve_pkg_share, is_structural)?);
+                let pkg_name = propagate!(resolve_substitutions_inner(
+                    &pkg,
+                    ctx,
+                    resolve_pkg_share,
+                    is_structural
+                )?);
 
                 // Track as dependency
                 package_deps.insert(pkg_name.clone());
@@ -483,7 +513,12 @@ fn resolve_substitutions_inner(
             }
             Substitution::FindPkgPrefix(pkg) => {
                 // First resolve the package name
-                let pkg_name = propagate!(resolve_substitutions_inner(&pkg, ctx, resolve_pkg_share, is_structural)?);
+                let pkg_name = propagate!(resolve_substitutions_inner(
+                    &pkg,
+                    ctx,
+                    resolve_pkg_share,
+                    is_structural
+                )?);
 
                 // Track as dependency
                 package_deps.insert(pkg_name.clone());
@@ -512,15 +547,18 @@ fn resolve_substitutions_inner(
             }
             Substitution::Eval(expr) => {
                 // Resolve any nested substitutions in the expression first
-                let python_expr = propagate!(resolve_substitutions_inner(&expr, ctx, resolve_pkg_share, is_structural)?);
+                let python_expr = propagate!(resolve_substitutions_inner(
+                    &expr,
+                    ctx,
+                    resolve_pkg_share,
+                    is_structural
+                )?);
 
                 // Evaluate via python3 subprocess
                 match eval_python_expr(&python_expr) {
                     Ok(value) => result.push_str(&value),
                     Err(e) => {
-                        errors.push(format!(
-                            "$(eval {python_expr}) failed: {e}"
-                        ));
+                        errors.push(format!("$(eval {python_expr}) failed: {e}"));
                         if ctx.preview_mode {
                             result.push_str(&format!("$(eval {python_expr})"));
                         }
@@ -534,8 +572,12 @@ fn resolve_substitutions_inner(
                 // Resolve nested substitutions in the body so the output shows concrete
                 // values (e.g. resolved $(var ...) args).  Body resolution is never
                 // structural — it is only used for display.
-                let resolved_body =
-                    propagate!(resolve_substitutions_inner(&body, ctx, resolve_pkg_share, false)?);
+                let resolved_body = propagate!(resolve_substitutions_inner(
+                    &body,
+                    ctx,
+                    resolve_pkg_share,
+                    false
+                )?);
 
                 if is_structural {
                     // Structural position (e.g. <include file=...>): the launch graph
@@ -910,7 +952,15 @@ impl From<&ResolvedNode> for SemanticNode {
 pub fn semantic_eq(a: &[ResolvedNode], b: &[ResolvedNode]) -> bool {
     // IncludeMarker nodes carry no executable content — exclude them from comparison.
     let is_exec = |n: &&ResolvedNode| {
-        !matches!(n.kind, NodeKind::IncludeMarker | NodeKind::SetEnv { .. } | NodeKind::UnsetEnv { .. } | NodeKind::SetParameter { .. } | NodeKind::SetRemap { .. } | NodeKind::Log { .. })
+        !matches!(
+            n.kind,
+            NodeKind::IncludeMarker
+                | NodeKind::SetEnv { .. }
+                | NodeKind::UnsetEnv { .. }
+                | NodeKind::SetParameter { .. }
+                | NodeKind::SetRemap { .. }
+                | NodeKind::Log { .. }
+        )
     };
     let a_s: Vec<SemanticNode> = a.iter().filter(is_exec).map(SemanticNode::from).collect();
     let b_s: Vec<SemanticNode> = b.iter().filter(is_exec).map(SemanticNode::from).collect();
@@ -959,8 +1009,9 @@ pub struct ResolveOptions {
     ///
     /// If `None`, Python includes do not propagate `SetLaunchConfiguration` into the XML
     /// context (legacy behaviour; `$(var ...)` references to Python-set vars will fail).
-    pub python_cfg_callback:
-        Option<Arc<dyn Fn(&Path, &HashMap<String, String>) -> HashMap<String, String> + Send + Sync>>,
+    pub python_cfg_callback: Option<
+        Arc<dyn Fn(&Path, &HashMap<String, String>) -> HashMap<String, String> + Send + Sync>,
+    >,
 
     /// Expand `<param from="...">` files at resolve time by reading and parsing each YAML file,
     /// storing individual `(name, value)` pairs in the IR.
@@ -994,10 +1045,16 @@ impl std::fmt::Debug for ResolveOptions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ResolveOptions")
             .field("max_include_depth", &self.max_include_depth)
-            .field("include_loader", &self.include_loader.as_ref().map(|_| "<fn>"))
+            .field(
+                "include_loader",
+                &self.include_loader.as_ref().map(|_| "<fn>"),
+            )
             .field("apply_arg_defaults", &self.apply_arg_defaults)
             .field("allow_unportable_paths", &self.allow_unportable_paths)
-            .field("python_cfg_callback", &self.python_cfg_callback.as_ref().map(|_| "<fn>"))
+            .field(
+                "python_cfg_callback",
+                &self.python_cfg_callback.as_ref().map(|_| "<fn>"),
+            )
             .field("inline_params", &self.inline_params)
             .finish()
     }
@@ -1118,13 +1175,15 @@ fn resolve_params(
             let full_rf = match resolve_substitutions_full(from, ctx) {
                 Ok(rf) => rf,
                 Err(e) => {
-                    result.errors.push(format!(
-                        "failed to resolve param source '{}': {e}",
-                        rf_val
-                    ));
+                    result
+                        .errors
+                        .push(format!("failed to resolve param source '{}': {e}", rf_val));
                     // Fall back to the portably-resolved value so remaining
                     // params in this element can still be processed.
-                    SubstitutionResult { value: rf_val.clone(), ..Default::default() }
+                    SubstitutionResult {
+                        value: rf_val.clone(),
+                        ..Default::default()
+                    }
                 }
             };
             result.errors.extend(full_rf.errors);
@@ -1143,24 +1202,32 @@ fn resolve_params(
                         Ok(params) => ParamFile::Inlined { display, params },
                         Err(e) => {
                             // Parse failure — downgrade to a warning and keep as reference.
-                            result.warnings.push(format!(
-                                "--inline-params: skipping '{abs_val}': {e}"
-                            ));
-                            ParamFile::Reference { display, abs: abs_val }
+                            result
+                                .warnings
+                                .push(format!("--inline-params: skipping '{abs_val}': {e}"));
+                            ParamFile::Reference {
+                                display,
+                                abs: abs_val,
+                            }
                         }
                     },
                     Err(e) => {
                         if e.kind() != std::io::ErrorKind::NotFound {
-                            result.warnings.push(format!(
-                                "--inline-params: cannot read '{}': {e}",
-                                abs_val
-                            ));
+                            result
+                                .warnings
+                                .push(format!("--inline-params: cannot read '{}': {e}", abs_val));
                         }
-                        ParamFile::Reference { display, abs: abs_val }
+                        ParamFile::Reference {
+                            display,
+                            abs: abs_val,
+                        }
                     }
                 }
             } else {
-                ParamFile::Reference { display, abs: abs_val }
+                ParamFile::Reference {
+                    display,
+                    abs: abs_val,
+                }
             };
             resolved_param_files.push(param_file);
         }
@@ -1253,7 +1320,11 @@ fn resolve_element(
             }
         }
 
-        LaunchElement::Let { name, value, condition } => {
+        LaunchElement::Let {
+            name,
+            value,
+            condition,
+        } => {
             let should_set = if let Some(cond) = condition {
                 let (include, cond_sub) = evaluate_condition(cond, ctx)?;
                 cond_sub.propagate_diagnostics(result);
@@ -1286,8 +1357,7 @@ fn resolve_element(
                     // Create scoped context: new arg/var scope but inherits the accumulated
                     // namespace stack so PushRosNamespace from outer groups remains visible.
                     // Arc allows cloning the resolver closures into the scoped context.
-                    let initial_scoped_keys: HashSet<String> =
-                        ctx.args.keys().cloned().collect();
+                    let initial_scoped_keys: HashSet<String> = ctx.args.keys().cloned().collect();
                     let mut scoped_ctx = SubstitutionContext {
                         args: ctx.args.clone(),
                         vars: ctx.vars.clone(),
@@ -1428,9 +1498,9 @@ fn resolve_element(
                                 DependencyKind::Launch,
                             )
                             .or_else(|| {
-                                resolve_substitutions(file, ctx)
-                                    .ok()
-                                    .and_then(|r| extract_file_dependency(&r.value, DependencyKind::Launch))
+                                resolve_substitutions(file, ctx).ok().and_then(|r| {
+                                    extract_file_dependency(&r.value, DependencyKind::Launch)
+                                })
                             })
                             .or_else(|| extract_file_dependency(file, DependencyKind::Launch))
                             {
@@ -1507,13 +1577,14 @@ fn resolve_element(
                 // Form 2 is essential in preview mode where resolve_substitutions_full
                 // expands $(find-pkg-share X) to a source path that extract_file_dependency
                 // cannot parse, while the portable form keeps the $(find-pkg-share) token.
-                if let Some(file_dep) = extract_file_dependency(&resolved_file.value, DependencyKind::Launch)
-                    .or_else(|| {
-                        resolve_substitutions(file, ctx)
-                            .ok()
-                            .and_then(|r| extract_file_dependency(&r.value, DependencyKind::Launch))
-                    })
-                    .or_else(|| extract_file_dependency(file, DependencyKind::Launch))
+                if let Some(file_dep) =
+                    extract_file_dependency(&resolved_file.value, DependencyKind::Launch)
+                        .or_else(|| {
+                            resolve_substitutions(file, ctx).ok().and_then(|r| {
+                                extract_file_dependency(&r.value, DependencyKind::Launch)
+                            })
+                        })
+                        .or_else(|| extract_file_dependency(file, DependencyKind::Launch))
                 {
                     result.required_packages.insert(file_dep.package.clone());
                     result.include_args.insert(
@@ -1543,9 +1614,7 @@ fn resolve_element(
                 // subsequent $(var name) substitutions in the current XML file can resolve them.
                 // This mirrors ROS 2's global LaunchContext where SetLaunchConfiguration writes
                 // into the shared context dict that all files see.
-                if resolved_file.value.ends_with(".py")
-                    && !resolved_file.value.contains("$(")
-                {
+                if resolved_file.value.ends_with(".py") && !resolved_file.value.contains("$(") {
                     if let Some(ref cb) = options.python_cfg_callback {
                         let py_path = Path::new(&resolved_file.value);
                         let set_cfgs = cb(py_path, &ctx.args);
@@ -1566,7 +1635,10 @@ fn resolve_element(
                     if include_stack.contains(&include_path) {
                         return Err(crate::Error::CircularDependency(format!(
                             "circular include detected: {} -> {}",
-                            include_stack.last().map(|p| p.display().to_string()).unwrap_or_default(),
+                            include_stack
+                                .last()
+                                .map(|p| p.display().to_string())
+                                .unwrap_or_default(),
                             include_path.display()
                         )));
                     }
@@ -1732,7 +1804,11 @@ fn resolve_element(
             }
         }
 
-        LaunchElement::SetEnv { name, value, condition } => {
+        LaunchElement::SetEnv {
+            name,
+            value,
+            condition,
+        } => {
             let should_set = if let Some(cond) = condition {
                 let (include, cond_sub) = evaluate_condition(cond, ctx)?;
                 cond_sub.propagate_diagnostics(result);
@@ -1742,9 +1818,12 @@ fn resolve_element(
             };
             if should_set {
                 let name_val = resolve_substitutions(name, ctx)?.propagate_into(result);
-                let env_val  = resolve_substitutions(value, ctx)?.propagate_into(result);
+                let env_val = resolve_substitutions(value, ctx)?.propagate_into(result);
                 result.nodes.push(ResolvedNode {
-                    kind: NodeKind::SetEnv { name: name_val, value: env_val },
+                    kind: NodeKind::SetEnv {
+                        name: name_val,
+                        value: env_val,
+                    },
                     ..Default::default()
                 });
             }
@@ -1768,7 +1847,12 @@ fn resolve_element(
         }
 
         LaunchElement::NodeContainer {
-            pkg, exec, name, namespace, condition, composable_nodes,
+            pkg,
+            exec,
+            name,
+            namespace,
+            condition,
+            composable_nodes,
         } => {
             let should_include = if let Some(cond) = condition {
                 let (include, cond_sub) = evaluate_condition(cond, ctx)?;
@@ -1786,12 +1870,17 @@ fn resolve_element(
 
                 let resolved_name = if let Some(n) = name {
                     Some(resolve_substitutions(n, ctx)?.propagate_into(result))
-                } else { None };
+                } else {
+                    None
+                };
 
                 let node_explicit_ns = if let Some(ns) = namespace {
                     Some(resolve_substitutions(ns, ctx)?.propagate_into(result))
-                } else { None };
-                let resolved_ns = effective_namespace(&ctx.namespace_stack, node_explicit_ns.as_deref());
+                } else {
+                    None
+                };
+                let resolved_ns =
+                    effective_namespace(&ctx.namespace_stack, node_explicit_ns.as_deref());
 
                 // Resolve each composable plugin.
                 let mut plugins = Vec::new();
@@ -1816,15 +1905,18 @@ fn resolve_element(
                     kind: NodeKind::Container { plugins },
                     param_files: vec![],
                     output: None,
-                args: None,
-                respawn: None,
+                    args: None,
+                    respawn: None,
                     respawn_delay: None,
                 });
             }
         }
 
         LaunchElement::LoadComposableNode {
-            target, namespace, condition, composable_nodes,
+            target,
+            namespace,
+            condition,
+            composable_nodes,
         } => {
             let should_include = if let Some(cond) = condition {
                 let (include, cond_sub) = evaluate_condition(cond, ctx)?;
@@ -1848,8 +1940,12 @@ fn resolve_element(
                     if !ns_val.is_empty() {
                         ctx.namespace_stack.push(ns_val);
                         true
-                    } else { false }
-                } else { false };
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
 
                 let mut plugins = Vec::new();
                 for cn in composable_nodes {
@@ -1858,7 +1954,9 @@ fn resolve_element(
                     }
                 }
 
-                if pushed { ctx.namespace_stack.pop(); }
+                if pushed {
+                    ctx.namespace_stack.pop();
+                }
 
                 // A LoadComposableNode is not itself a process; package/executable are empty.
                 result.nodes.push(ResolvedNode {
@@ -1872,11 +1970,14 @@ fn resolve_element(
                     env: BTreeMap::new(),
                     source: None,
                     include_chain: vec![],
-                    kind: NodeKind::LoadComposable { target: resolved_target, plugins },
+                    kind: NodeKind::LoadComposable {
+                        target: resolved_target,
+                        plugins,
+                    },
                     param_files: vec![],
                     output: None,
-                args: None,
-                respawn: None,
+                    args: None,
+                    respawn: None,
                     respawn_delay: None,
                 });
             }
@@ -1884,18 +1985,24 @@ fn resolve_element(
 
         LaunchElement::SetParameter { name, value } => {
             let name_val = resolve_substitutions(name, ctx)?.propagate_into(result);
-            let val_val  = resolve_substitutions(value, ctx)?.propagate_into(result);
+            let val_val = resolve_substitutions(value, ctx)?.propagate_into(result);
             result.nodes.push(ResolvedNode {
-                kind: NodeKind::SetParameter { name: name_val, value: val_val },
+                kind: NodeKind::SetParameter {
+                    name: name_val,
+                    value: val_val,
+                },
                 ..Default::default()
             });
         }
 
         LaunchElement::SetRemap { from, to } => {
             let from_val = resolve_substitutions(from, ctx)?.propagate_into(result);
-            let to_val   = resolve_substitutions(to, ctx)?.propagate_into(result);
+            let to_val = resolve_substitutions(to, ctx)?.propagate_into(result);
             result.nodes.push(ResolvedNode {
-                kind: NodeKind::SetRemap { from: from_val, to: to_val },
+                kind: NodeKind::SetRemap {
+                    from: from_val,
+                    to: to_val,
+                },
                 ..Default::default()
             });
         }
@@ -1909,12 +2016,17 @@ fn resolve_element(
         }
 
         LaunchElement::UnknownElement { tag_name } => {
-            result.warnings.push(format!(
-                "unknown XML element <{tag_name}> — skipped"
-            ));
+            result
+                .warnings
+                .push(format!("unknown XML element <{tag_name}> — skipped"));
         }
 
-        LaunchElement::Executable { cmd, name, shell, condition } => {
+        LaunchElement::Executable {
+            cmd,
+            name,
+            shell,
+            condition,
+        } => {
             let should_include = if let Some(cond) = condition {
                 let (include, cond_sub) = evaluate_condition(cond, ctx)?;
                 cond_sub.propagate_diagnostics(result);
@@ -1924,13 +2036,18 @@ fn resolve_element(
             };
 
             if should_include {
-                let cmd_val  = resolve_substitutions(cmd, ctx)?.propagate_into(result);
-                let name_val = name.as_deref()
+                let cmd_val = resolve_substitutions(cmd, ctx)?.propagate_into(result);
+                let name_val = name
+                    .as_deref()
                     .map(|n| resolve_substitutions(n, ctx))
                     .transpose()?
                     .map(|r| r.propagate_into(result));
                 result.nodes.push(ResolvedNode {
-                    kind: NodeKind::Executable { cmd: cmd_val, name: name_val, shell: *shell },
+                    kind: NodeKind::Executable {
+                        cmd: cmd_val,
+                        name: name_val,
+                        shell: *shell,
+                    },
                     ..Default::default()
                 });
             }
@@ -2050,7 +2167,9 @@ fn eval_python_expr(expr: &str) -> crate::Result<String> {
     // Style A: outer double-quote wrapper (no unescaped " inside after unescaping).
     let expr: &str = {
         let s = unescaped.as_str();
-        if s.len() >= 2 && s.starts_with('"') && s.ends_with('"')
+        if s.len() >= 2
+            && s.starts_with('"')
+            && s.ends_with('"')
             && !has_unescaped(&s[1..s.len() - 1], b'"')
         {
             &s[1..s.len() - 1]
@@ -2138,7 +2257,8 @@ pub fn render_resolved_xml(
         for (name, value) in sorted {
             out.push_str(&format!(
                 "  <!-- arg name=\"{}\" value=\"{}\" -->\n",
-                name, xml_escape(value)
+                name,
+                xml_escape(value)
             ));
         }
     }
@@ -2201,8 +2321,11 @@ pub fn render_resolved_xml(
         };
 
         // Namespace target: empty when flattening namespaces (baked into node attribute).
-        let target_ns: Vec<String> =
-            if flatten_namespaces { vec![] } else { node.namespace_stack.clone() };
+        let target_ns: Vec<String> = if flatten_namespaces {
+            vec![]
+        } else {
+            node.namespace_stack.clone()
+        };
 
         let common = common_prefix_len(&open_src, &target_src);
         let src_changing = common < open_src.len() || open_src.len() < target_src.len();
@@ -2227,14 +2350,24 @@ pub fn render_resolved_xml(
                 if !flatten {
                     out.push_str(&format!("{}</group>\n", pad(vd)));
                 }
-                out.push_str(&format!("{}<!-- end: {}://{} -->\n", pad(vd), pkg, path.display()));
+                out.push_str(&format!(
+                    "{}<!-- end: {}://{} -->\n",
+                    pad(vd),
+                    pkg,
+                    path.display()
+                ));
             }
             // Open intermediate levels persistently so real-node siblings inherit the context.
             while open_src.len() + 1 < target_src.len() {
                 let depth = open_src.len();
                 let vd = visual_src_depth(depth, flatten);
                 let (pkg, path) = target_src[depth].clone();
-                out.push_str(&format!("{}<!-- source: {}://{} -->\n", pad(vd), pkg, path.display()));
+                out.push_str(&format!(
+                    "{}<!-- source: {}://{} -->\n",
+                    pad(vd),
+                    pkg,
+                    path.display()
+                ));
                 if !flatten {
                     out.push_str(&format!("{}<group>\n", pad(vd)));
                 }
@@ -2245,7 +2378,9 @@ pub fn render_resolved_xml(
                         for (name, value) in sorted {
                             out.push_str(&format!(
                                 "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
-                                pad(vd + 1), name, xml_escape(value)
+                                pad(vd + 1),
+                                name,
+                                xml_escape(value)
                             ));
                         }
                     }
@@ -2257,7 +2392,12 @@ pub fn render_resolved_xml(
                 let depth = open_src.len();
                 let vd = visual_src_depth(depth, flatten);
                 let (pkg, path) = &target_src[depth];
-                out.push_str(&format!("{}<!-- source: {}://{} -->\n", pad(vd), pkg, path.display()));
+                out.push_str(&format!(
+                    "{}<!-- source: {}://{} -->\n",
+                    pad(vd),
+                    pkg,
+                    path.display()
+                ));
                 // Emit explicit args for this include boundary.
                 if show_args {
                     if let Some(ctx) = include_args.get(&(pkg.clone(), path.clone())) {
@@ -2266,12 +2406,19 @@ pub fn render_resolved_xml(
                         for (name, value) in sorted {
                             out.push_str(&format!(
                                 "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
-                                pad(vd + 1), name, xml_escape(value)
+                                pad(vd + 1),
+                                name,
+                                xml_escape(value)
                             ));
                         }
                     }
                 }
-                out.push_str(&format!("{}<!-- end: {}://{} -->\n", pad(vd), pkg, path.display()));
+                out.push_str(&format!(
+                    "{}<!-- end: {}://{} -->\n",
+                    pad(vd),
+                    pkg,
+                    path.display()
+                ));
             }
             continue;
         }
@@ -2315,7 +2462,9 @@ pub fn render_resolved_xml(
                         for (name, value) in sorted {
                             out.push_str(&format!(
                                 "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
-                                pad(vd + 1), name, xml_escape(value)
+                                pad(vd + 1),
+                                name,
+                                xml_escape(value)
                             ));
                         }
                     }
@@ -2353,10 +2502,23 @@ pub fn render_resolved_xml(
 
         match &node.kind {
             NodeKind::Node => {
-                render_node(node, &node_ind, &child_ind, stack_only_ns.as_deref(), &mut out);
+                render_node(
+                    node,
+                    &node_ind,
+                    &child_ind,
+                    stack_only_ns.as_deref(),
+                    &mut out,
+                );
             }
             NodeKind::Container { plugins } => {
-                render_container_node(node, plugins, &node_ind, &child_ind, stack_only_ns.as_deref(), &mut out);
+                render_container_node(
+                    node,
+                    plugins,
+                    &node_ind,
+                    &child_ind,
+                    stack_only_ns.as_deref(),
+                    &mut out,
+                );
             }
             NodeKind::LoadComposable { target, plugins } => {
                 render_load_composable_node(target, plugins, &node_ind, &child_ind, &mut out);
@@ -2365,40 +2527,52 @@ pub fn render_resolved_xml(
             NodeKind::SetEnv { name, value } => {
                 out.push_str(&format!(
                     "{}<set_env name=\"{}\" value=\"{}\"/>\n",
-                    node_ind, xml_escape(name), xml_escape(value)
+                    node_ind,
+                    xml_escape(name),
+                    xml_escape(value)
                 ));
             }
             NodeKind::UnsetEnv { name } => {
                 out.push_str(&format!(
                     "{}<unset_env name=\"{}\"/>\n",
-                    node_ind, xml_escape(name)
+                    node_ind,
+                    xml_escape(name)
                 ));
             }
             NodeKind::Log { message } => {
                 out.push_str(&format!(
                     "{}<log message=\"{}\"/>\n",
-                    node_ind, xml_escape(message)
+                    node_ind,
+                    xml_escape(message)
                 ));
             }
             NodeKind::SetParameter { name, value } => {
                 out.push_str(&format!(
                     "{}<set_parameter name=\"{}\" value=\"{}\"/>\n",
-                    node_ind, xml_escape(name), xml_escape(value)
+                    node_ind,
+                    xml_escape(name),
+                    xml_escape(value)
                 ));
             }
             NodeKind::SetRemap { from, to } => {
                 out.push_str(&format!(
                     "{}<set_remap from=\"{}\" to=\"{}\"/>\n",
-                    node_ind, xml_escape(from), xml_escape(to)
+                    node_ind,
+                    xml_escape(from),
+                    xml_escape(to)
                 ));
             }
             NodeKind::Executable { cmd, name, shell } => {
-                let name_attr = name.as_deref()
+                let name_attr = name
+                    .as_deref()
                     .map(|n| format!(" name=\"{}\"", xml_escape(n)))
                     .unwrap_or_default();
                 out.push_str(&format!(
                     "{}<executable cmd=\"{}\"{} shell=\"{}\"/>\n",
-                    node_ind, xml_escape(cmd), name_attr, shell
+                    node_ind,
+                    xml_escape(cmd),
+                    name_attr,
+                    shell
                 ));
             }
         }
@@ -2673,7 +2847,11 @@ fn render_composable_plugin(plugin: &ComposablePlugin, ind: &str, out: &mut Stri
 fn render_param_file(pf: &ParamFile, ind: &str, out: &mut String) {
     match pf {
         ParamFile::Reference { display, .. } => {
-            out.push_str(&format!("{}<param from=\"{}\"/>\n", ind, xml_escape(display)));
+            out.push_str(&format!(
+                "{}<param from=\"{}\"/>\n",
+                ind,
+                xml_escape(display)
+            ));
         }
         ParamFile::Inlined { display, params } => {
             out.push_str(&format!(
@@ -2854,27 +3032,57 @@ fn collect_arg_var_refs_in_elem(elem: &LaunchElement, refs: &mut HashSet<String>
             scan_str_for_arg_var_refs(value, refs);
         }
         LaunchElement::UnsetEnv { .. } => {}
-        LaunchElement::NodeContainer { pkg, exec, name, namespace, condition, composable_nodes } => {
+        LaunchElement::NodeContainer {
+            pkg,
+            exec,
+            name,
+            namespace,
+            condition,
+            composable_nodes,
+        } => {
             scan_str_for_arg_var_refs(pkg, refs);
             scan_str_for_arg_var_refs(exec, refs);
-            if let Some(n) = name { scan_str_for_arg_var_refs(n, refs); }
-            if let Some(ns) = namespace { scan_str_for_arg_var_refs(ns, refs); }
-            if let Some(c) = condition { scan_str_for_arg_var_refs(&c.expr, refs); }
+            if let Some(n) = name {
+                scan_str_for_arg_var_refs(n, refs);
+            }
+            if let Some(ns) = namespace {
+                scan_str_for_arg_var_refs(ns, refs);
+            }
+            if let Some(c) = condition {
+                scan_str_for_arg_var_refs(&c.expr, refs);
+            }
             for cn in composable_nodes {
                 scan_str_for_arg_var_refs(&cn.pkg, refs);
                 scan_str_for_arg_var_refs(&cn.plugin, refs);
-                if let Some(n) = &cn.name { scan_str_for_arg_var_refs(n, refs); }
-                if let Some(c) = &cn.condition { scan_str_for_arg_var_refs(&c.expr, refs); }
+                if let Some(n) = &cn.name {
+                    scan_str_for_arg_var_refs(n, refs);
+                }
+                if let Some(c) = &cn.condition {
+                    scan_str_for_arg_var_refs(&c.expr, refs);
+                }
             }
         }
-        LaunchElement::LoadComposableNode { namespace, condition, composable_nodes, .. } => {
-            if let Some(ns) = namespace { scan_str_for_arg_var_refs(ns, refs); }
-            if let Some(c) = condition { scan_str_for_arg_var_refs(&c.expr, refs); }
+        LaunchElement::LoadComposableNode {
+            namespace,
+            condition,
+            composable_nodes,
+            ..
+        } => {
+            if let Some(ns) = namespace {
+                scan_str_for_arg_var_refs(ns, refs);
+            }
+            if let Some(c) = condition {
+                scan_str_for_arg_var_refs(&c.expr, refs);
+            }
             for cn in composable_nodes {
                 scan_str_for_arg_var_refs(&cn.pkg, refs);
                 scan_str_for_arg_var_refs(&cn.plugin, refs);
-                if let Some(n) = &cn.name { scan_str_for_arg_var_refs(n, refs); }
-                if let Some(c) = &cn.condition { scan_str_for_arg_var_refs(&c.expr, refs); }
+                if let Some(n) = &cn.name {
+                    scan_str_for_arg_var_refs(n, refs);
+                }
+                if let Some(c) = &cn.condition {
+                    scan_str_for_arg_var_refs(&c.expr, refs);
+                }
             }
         }
         LaunchElement::SetParameter { name, value } => {
@@ -2889,10 +3097,19 @@ fn collect_arg_var_refs_in_elem(elem: &LaunchElement, refs: &mut HashSet<String>
             scan_str_for_arg_var_refs(message, refs);
         }
         LaunchElement::UnknownElement { .. } => {}
-        LaunchElement::Executable { cmd, name, condition, .. } => {
-            if let Some(c) = condition { scan_str_for_arg_var_refs(&c.expr, refs); }
+        LaunchElement::Executable {
+            cmd,
+            name,
+            condition,
+            ..
+        } => {
+            if let Some(c) = condition {
+                scan_str_for_arg_var_refs(&c.expr, refs);
+            }
             scan_str_for_arg_var_refs(cmd, refs);
-            if let Some(n) = name { scan_str_for_arg_var_refs(n, refs); }
+            if let Some(n) = name {
+                scan_str_for_arg_var_refs(n, refs);
+            }
         }
     }
 }
@@ -2930,7 +3147,10 @@ pub fn collect_scoped_false_includes(elements: &[LaunchElement]) -> Vec<String> 
 
 fn collect_scoped_false_includes_impl(elements: &[LaunchElement], includes: &mut Vec<String>) {
     for elem in elements {
-        if let LaunchElement::Group { scoped, children, .. } = elem {
+        if let LaunchElement::Group {
+            scoped, children, ..
+        } = elem
+        {
             if !scoped {
                 // Flag every <include> that is a direct child of this unscoped group.
                 for child in children.iter() {
@@ -2976,13 +3196,21 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
         LaunchElement::Let { value, .. } => {
             scan_str_for_env_no_fallback(value, names);
         }
-        LaunchElement::Group { condition, children, .. } => {
+        LaunchElement::Group {
+            condition,
+            children,
+            ..
+        } => {
             if let Some(c) = condition {
                 scan_str_for_env_no_fallback(&c.expr, names);
             }
             collect_env_no_fallback_impl(children, names);
         }
-        LaunchElement::Include { file, condition, args } => {
+        LaunchElement::Include {
+            file,
+            condition,
+            args,
+        } => {
             scan_str_for_env_no_fallback(file, names);
             if let Some(c) = condition {
                 scan_str_for_env_no_fallback(&c.expr, names);
@@ -2992,17 +3220,37 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
             }
         }
         LaunchElement::Node {
-            pkg, exec, name, namespace, condition, params, remaps, envs, ..
+            pkg,
+            exec,
+            name,
+            namespace,
+            condition,
+            params,
+            remaps,
+            envs,
+            ..
         } => {
             scan_str_for_env_no_fallback(pkg, names);
             scan_str_for_env_no_fallback(exec, names);
-            if let Some(n) = name { scan_str_for_env_no_fallback(n, names); }
-            if let Some(ns) = namespace { scan_str_for_env_no_fallback(ns, names); }
-            if let Some(c) = condition { scan_str_for_env_no_fallback(&c.expr, names); }
+            if let Some(n) = name {
+                scan_str_for_env_no_fallback(n, names);
+            }
+            if let Some(ns) = namespace {
+                scan_str_for_env_no_fallback(ns, names);
+            }
+            if let Some(c) = condition {
+                scan_str_for_env_no_fallback(&c.expr, names);
+            }
             for p in params {
-                if let Some(v) = &p.value { scan_str_for_env_no_fallback(v, names); }
-                if let Some(f) = &p.from { scan_str_for_env_no_fallback(f, names); }
-                if let Some(n) = &p.name { scan_str_for_env_no_fallback(n, names); }
+                if let Some(v) = &p.value {
+                    scan_str_for_env_no_fallback(v, names);
+                }
+                if let Some(f) = &p.from {
+                    scan_str_for_env_no_fallback(f, names);
+                }
+                if let Some(n) = &p.name {
+                    scan_str_for_env_no_fallback(n, names);
+                }
             }
             for r in remaps {
                 scan_str_for_env_no_fallback(&r.from, names);
@@ -3012,7 +3260,11 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
                 scan_str_for_env_no_fallback(&e.value, names);
             }
         }
-        LaunchElement::PushRosNamespace { namespace, condition, .. } => {
+        LaunchElement::PushRosNamespace {
+            namespace,
+            condition,
+            ..
+        } => {
             scan_str_for_env_no_fallback(namespace, names);
             if let Some(c) = condition {
                 scan_str_for_env_no_fallback(&c.expr, names);
@@ -3022,27 +3274,57 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
             scan_str_for_env_no_fallback(value, names);
         }
         LaunchElement::UnsetEnv { .. } => {}
-        LaunchElement::NodeContainer { pkg, exec, name, namespace, condition, composable_nodes } => {
+        LaunchElement::NodeContainer {
+            pkg,
+            exec,
+            name,
+            namespace,
+            condition,
+            composable_nodes,
+        } => {
             scan_str_for_env_no_fallback(pkg, names);
             scan_str_for_env_no_fallback(exec, names);
-            if let Some(n) = name { scan_str_for_env_no_fallback(n, names); }
-            if let Some(ns) = namespace { scan_str_for_env_no_fallback(ns, names); }
-            if let Some(c) = condition { scan_str_for_env_no_fallback(&c.expr, names); }
+            if let Some(n) = name {
+                scan_str_for_env_no_fallback(n, names);
+            }
+            if let Some(ns) = namespace {
+                scan_str_for_env_no_fallback(ns, names);
+            }
+            if let Some(c) = condition {
+                scan_str_for_env_no_fallback(&c.expr, names);
+            }
             for cn in composable_nodes {
                 scan_str_for_env_no_fallback(&cn.pkg, names);
                 scan_str_for_env_no_fallback(&cn.plugin, names);
-                if let Some(n) = &cn.name { scan_str_for_env_no_fallback(n, names); }
-                if let Some(c) = &cn.condition { scan_str_for_env_no_fallback(&c.expr, names); }
+                if let Some(n) = &cn.name {
+                    scan_str_for_env_no_fallback(n, names);
+                }
+                if let Some(c) = &cn.condition {
+                    scan_str_for_env_no_fallback(&c.expr, names);
+                }
             }
         }
-        LaunchElement::LoadComposableNode { namespace, condition, composable_nodes, .. } => {
-            if let Some(ns) = namespace { scan_str_for_env_no_fallback(ns, names); }
-            if let Some(c) = condition { scan_str_for_env_no_fallback(&c.expr, names); }
+        LaunchElement::LoadComposableNode {
+            namespace,
+            condition,
+            composable_nodes,
+            ..
+        } => {
+            if let Some(ns) = namespace {
+                scan_str_for_env_no_fallback(ns, names);
+            }
+            if let Some(c) = condition {
+                scan_str_for_env_no_fallback(&c.expr, names);
+            }
             for cn in composable_nodes {
                 scan_str_for_env_no_fallback(&cn.pkg, names);
                 scan_str_for_env_no_fallback(&cn.plugin, names);
-                if let Some(n) = &cn.name { scan_str_for_env_no_fallback(n, names); }
-                if let Some(c) = &cn.condition { scan_str_for_env_no_fallback(&c.expr, names); }
+                if let Some(n) = &cn.name {
+                    scan_str_for_env_no_fallback(n, names);
+                }
+                if let Some(c) = &cn.condition {
+                    scan_str_for_env_no_fallback(&c.expr, names);
+                }
             }
         }
         LaunchElement::SetParameter { name, value } => {
@@ -3057,10 +3339,19 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
             scan_str_for_env_no_fallback(message, names);
         }
         LaunchElement::UnknownElement { .. } => {}
-        LaunchElement::Executable { cmd, name, condition, .. } => {
-            if let Some(c) = condition { scan_str_for_env_no_fallback(&c.expr, names); }
+        LaunchElement::Executable {
+            cmd,
+            name,
+            condition,
+            ..
+        } => {
+            if let Some(c) = condition {
+                scan_str_for_env_no_fallback(&c.expr, names);
+            }
             scan_str_for_env_no_fallback(cmd, names);
-            if let Some(n) = name { scan_str_for_env_no_fallback(n, names); }
+            if let Some(n) = name {
+                scan_str_for_env_no_fallback(n, names);
+            }
         }
     }
 }
@@ -3068,7 +3359,11 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
 fn scan_str_for_env_no_fallback(s: &str, names: &mut Vec<String>) {
     if let Ok(parts) = parse_substitutions(s) {
         for part in &parts {
-            if let Substitution::Env { name, default: None } = part {
+            if let Substitution::Env {
+                name,
+                default: None,
+            } = part
+            {
                 names.push(name.clone());
             }
         }
@@ -3265,10 +3560,20 @@ mod tests {
         // Navigate to the deepest node
         if let LaunchElement::Group { children: c1, .. } = &launch.elements[0] {
             assert_eq!(c1.len(), 1);
-            if let LaunchElement::Group { children: c2, condition: cond1, .. } = &c1[0] {
+            if let LaunchElement::Group {
+                children: c2,
+                condition: cond1,
+                ..
+            } = &c1[0]
+            {
                 assert!(cond1.is_some());
                 assert_eq!(cond1.as_ref().unwrap().kind, ConditionKind::If);
-                if let LaunchElement::Group { children: c3, condition: cond2, .. } = &c2[0] {
+                if let LaunchElement::Group {
+                    children: c3,
+                    condition: cond2,
+                    ..
+                } = &c2[0]
+                {
                     assert!(cond2.is_some());
                     assert_eq!(cond2.as_ref().unwrap().kind, ConditionKind::Unless);
                     assert_eq!(c3.len(), 1);
@@ -3398,18 +3703,21 @@ mod tests {
         assert!(parse_launch_xml(xml, Path::new("t.launch.xml")).is_ok());
 
         // from only is valid
-        let xml = r#"<launch><node pkg="p" exec="e"><param from="/cfg/params.yaml"/></node></launch>"#;
+        let xml =
+            r#"<launch><node pkg="p" exec="e"><param from="/cfg/params.yaml"/></node></launch>"#;
         assert!(parse_launch_xml(xml, Path::new("t.launch.xml")).is_ok());
     }
 
     #[test]
     fn test_param_invalid_combinations() {
-        let node_wrap = |inner: &str| {
-            format!(r#"<launch><node pkg="p" exec="e">{inner}</node></launch>"#)
-        };
+        let node_wrap =
+            |inner: &str| format!(r#"<launch><node pkg="p" exec="e">{inner}</node></launch>"#);
 
         // name without value
-        let r = parse_launch_xml(&node_wrap(r#"<param name="x"/>"#), Path::new("t.launch.xml"));
+        let r = parse_launch_xml(
+            &node_wrap(r#"<param name="x"/>"#),
+            Path::new("t.launch.xml"),
+        );
         assert!(r.is_err());
         assert!(r.unwrap_err().to_string().contains("requires either"));
 
@@ -3422,7 +3730,10 @@ mod tests {
         assert!(r.unwrap_err().to_string().contains("requires either"));
 
         // value alone (no name, no from)
-        let r = parse_launch_xml(&node_wrap(r#"<param value="42"/>"#), Path::new("t.launch.xml"));
+        let r = parse_launch_xml(
+            &node_wrap(r#"<param value="42"/>"#),
+            Path::new("t.launch.xml"),
+        );
         assert!(r.is_err());
 
         // nothing
@@ -3464,7 +3775,9 @@ mod tests {
         assert!(result.is_ok());
         let launch = result.unwrap();
         assert_eq!(launch.elements.len(), 1);
-        assert!(matches!(&launch.elements[0], LaunchElement::UnknownElement { tag_name } if tag_name == "unclosed"));
+        assert!(
+            matches!(&launch.elements[0], LaunchElement::UnknownElement { tag_name } if tag_name == "unclosed")
+        );
     }
 
     #[test]
@@ -3546,7 +3859,10 @@ mod tests {
         let launch = parse_launch_xml(xml, Path::new("test.launch.xml")).unwrap();
         assert_eq!(launch.elements.len(), 1);
 
-        if let LaunchElement::Node { condition, name, .. } = &launch.elements[0] {
+        if let LaunchElement::Node {
+            condition, name, ..
+        } = &launch.elements[0]
+        {
             assert_eq!(name.as_deref(), Some("conditional_node"));
             assert!(condition.is_some());
             let cond = condition.as_ref().unwrap();
@@ -3716,10 +4032,12 @@ mod tests {
     fn test_resolve_eval_string_equality() {
         let mut ctx = SubstitutionContext::default();
         // The classic Autoware pattern: compare resolved var to a string literal
-        ctx.vars.insert("gnss_receiver".to_string(), "ublox".to_string());
+        ctx.vars
+            .insert("gnss_receiver".to_string(), "ublox".to_string());
         // Expression after var resolution: '$(var gnss_receiver)'=='ublox' → 'ublox'=='ublox'
         // Python's str(True) is "True" (capitalised), matching ROS 2's PythonExpression.perform().
-        let result = resolve_substitutions("$(eval '$(var gnss_receiver)'=='ublox')", &mut ctx).unwrap();
+        let result =
+            resolve_substitutions("$(eval '$(var gnss_receiver)'=='ublox')", &mut ctx).unwrap();
         assert_eq!(result.value, "True");
     }
 
@@ -3744,7 +4062,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.value, "True");
-        assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+        assert!(
+            result.errors.is_empty(),
+            "unexpected errors: {:?}",
+            result.errors
+        );
     }
 
     #[test]
@@ -3759,7 +4081,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.value, "True");
-        assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+        assert!(
+            result.errors.is_empty(),
+            "unexpected errors: {:?}",
+            result.errors
+        );
     }
 
     #[test]
@@ -3771,7 +4097,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.value, "False");
-        assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+        assert!(
+            result.errors.is_empty(),
+            "unexpected errors: {:?}",
+            result.errors
+        );
     }
 
     #[test]
@@ -3820,7 +4150,8 @@ mod tests {
     #[test]
     fn test_resolve_arg() {
         let mut ctx = SubstitutionContext::default();
-        ctx.args.insert("vehicle".to_string(), "sample_vehicle".to_string());
+        ctx.args
+            .insert("vehicle".to_string(), "sample_vehicle".to_string());
 
         let result = resolve_substitutions("$(arg vehicle)", &ctx).unwrap();
         assert_eq!(result.value, "sample_vehicle");
@@ -3830,7 +4161,8 @@ mod tests {
     #[test]
     fn test_resolve_var() {
         let mut ctx = SubstitutionContext::default();
-        ctx.vars.insert("config".to_string(), "/path/to/config".to_string());
+        ctx.vars
+            .insert("config".to_string(), "/path/to/config".to_string());
 
         let result = resolve_substitutions("$(var config)", &ctx).unwrap();
         assert_eq!(result.value, "/path/to/config");
@@ -3838,6 +4170,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(unsafe_code)]
     fn test_resolve_env() {
         // Set a test env var
         // SAFETY: This test runs in a single thread and the var is unique to this test
@@ -3902,7 +4235,8 @@ mod tests {
     #[test]
     fn test_resolve_nested_substitution() {
         let mut ctx = SubstitutionContext::default();
-        ctx.vars.insert("pkg_name".to_string(), "vehicle_description".to_string());
+        ctx.vars
+            .insert("pkg_name".to_string(), "vehicle_description".to_string());
         ctx.pkg_share_resolver = Some(Arc::new(|pkg: &str| {
             if pkg == "vehicle_description" {
                 Some(PathBuf::from("/opt/ros/humble/share/vehicle_description"))
@@ -3912,8 +4246,12 @@ mod tests {
         }));
 
         // $(find-pkg-share $(var pkg_name)) -> should resolve pkg_name first
-        let result = resolve_substitutions("$(find-pkg-share $(var pkg_name))/config", &ctx).unwrap();
-        assert_eq!(result.value, "/opt/ros/humble/share/vehicle_description/config");
+        let result =
+            resolve_substitutions("$(find-pkg-share $(var pkg_name))/config", &ctx).unwrap();
+        assert_eq!(
+            result.value,
+            "/opt/ros/humble/share/vehicle_description/config"
+        );
         assert!(result.package_deps.contains("vehicle_description"));
     }
 
@@ -3921,7 +4259,10 @@ mod tests {
     fn test_resolve_chained_vars() {
         let mut ctx = SubstitutionContext::default();
         ctx.args.insert("vehicle".to_string(), "sample".to_string());
-        ctx.vars.insert("config_path".to_string(), "$(find-pkg-share $(arg vehicle)_description)/config".to_string());
+        ctx.vars.insert(
+            "config_path".to_string(),
+            "$(find-pkg-share $(arg vehicle)_description)/config".to_string(),
+        );
         ctx.pkg_share_resolver = Some(Arc::new(|pkg: &str| {
             if pkg == "sample_description" {
                 Some(PathBuf::from("/share/sample_description"))
@@ -3939,10 +4280,8 @@ mod tests {
     fn test_resolve_multiple_deps() {
         let ctx = SubstitutionContext::default();
 
-        let result = resolve_substitutions(
-            "$(find-pkg-share pkg1)/$(find-pkg-share pkg2)",
-            &ctx,
-        ).unwrap();
+        let result =
+            resolve_substitutions("$(find-pkg-share pkg1)/$(find-pkg-share pkg2)", &ctx).unwrap();
         assert!(result.package_deps.contains("pkg1"));
         assert!(result.package_deps.contains("pkg2"));
         assert_eq!(result.package_deps.len(), 2);
@@ -3954,7 +4293,12 @@ mod tests {
 
         let result = resolve_substitutions("$(arg undefined)", &ctx);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("undefined argument"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("undefined argument")
+        );
     }
 
     #[test]
@@ -3963,10 +4307,16 @@ mod tests {
 
         let result = resolve_substitutions("$(var undefined)", &ctx);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("undefined variable"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("undefined variable")
+        );
     }
 
     #[test]
+    #[allow(unsafe_code)]
     fn test_resolve_error_undefined_env() {
         let ctx = SubstitutionContext::default();
 
@@ -4042,7 +4392,9 @@ mod tests {
 
     #[test]
     fn test_condition_truthy_values() {
-        for truthy in ["true", "True", "TRUE", "1", "yes", "Yes", "YES", "on", "On", "ON"] {
+        for truthy in [
+            "true", "True", "TRUE", "1", "yes", "Yes", "YES", "on", "On", "ON",
+        ] {
             let mut ctx = SubstitutionContext::default();
             ctx.vars.insert("val".to_string(), truthy.to_string());
 
@@ -4058,7 +4410,9 @@ mod tests {
 
     #[test]
     fn test_condition_falsy_values() {
-        for falsy in ["false", "False", "FALSE", "0", "no", "No", "NO", "off", "Off", "OFF", ""] {
+        for falsy in [
+            "false", "False", "FALSE", "0", "no", "No", "NO", "off", "Off", "OFF", "",
+        ] {
             let mut ctx = SubstitutionContext::default();
             ctx.vars.insert("val".to_string(), falsy.to_string());
 
@@ -4075,7 +4429,10 @@ mod tests {
     #[test]
     fn test_condition_with_package_dependency() {
         let mut ctx = SubstitutionContext::default();
-        ctx.vars.insert("use_pkg".to_string(), "$(find-pkg-share my_pkg)".to_string());
+        ctx.vars.insert(
+            "use_pkg".to_string(),
+            "$(find-pkg-share my_pkg)".to_string(),
+        );
 
         // This won't be a typical condition, but tests dependency tracking
         let condition = Condition {
@@ -4093,7 +4450,10 @@ mod tests {
 
     #[test]
     fn test_extract_file_dependency_find_pkg_share() {
-        let dep = extract_file_dependency("$(find-pkg-share my_pkg)/launch/foo.launch.xml", DependencyKind::Launch);
+        let dep = extract_file_dependency(
+            "$(find-pkg-share my_pkg)/launch/foo.launch.xml",
+            DependencyKind::Launch,
+        );
         assert!(dep.is_some());
         let dep = dep.unwrap();
         assert_eq!(dep.package, "my_pkg");
@@ -4103,7 +4463,10 @@ mod tests {
 
     #[test]
     fn test_extract_file_dependency_find_pkg_prefix() {
-        let dep = extract_file_dependency("$(find-pkg-prefix my_pkg)/lib/my_pkg/config.yaml", DependencyKind::Param);
+        let dep = extract_file_dependency(
+            "$(find-pkg-prefix my_pkg)/lib/my_pkg/config.yaml",
+            DependencyKind::Param,
+        );
         assert!(dep.is_some());
         let dep = dep.unwrap();
         assert_eq!(dep.package, "my_pkg");
@@ -4114,7 +4477,10 @@ mod tests {
     #[test]
     fn test_extract_file_dependency_nested_substitution() {
         // Package name is itself a substitution
-        let dep = extract_file_dependency("$(find-pkg-share $(var pkg_name))/launch/foo.launch.xml", DependencyKind::Launch);
+        let dep = extract_file_dependency(
+            "$(find-pkg-share $(var pkg_name))/launch/foo.launch.xml",
+            DependencyKind::Launch,
+        );
         assert!(dep.is_some());
         let dep = dep.unwrap();
         assert_eq!(dep.package, "$(var pkg_name)");
@@ -4141,9 +4507,15 @@ mod tests {
     #[test]
     fn test_extract_file_dependency_kind_preserved() {
         // Test that the kind parameter is correctly preserved
-        let dep_launch = extract_file_dependency("$(find-pkg-share pkg)/file.xml", DependencyKind::Launch).unwrap();
-        let dep_param = extract_file_dependency("$(find-pkg-share pkg)/file.yaml", DependencyKind::Param).unwrap();
-        let dep_other = extract_file_dependency("$(find-pkg-share pkg)/file.txt", DependencyKind::Other).unwrap();
+        let dep_launch =
+            extract_file_dependency("$(find-pkg-share pkg)/file.xml", DependencyKind::Launch)
+                .unwrap();
+        let dep_param =
+            extract_file_dependency("$(find-pkg-share pkg)/file.yaml", DependencyKind::Param)
+                .unwrap();
+        let dep_other =
+            extract_file_dependency("$(find-pkg-share pkg)/file.txt", DependencyKind::Other)
+                .unwrap();
 
         assert_eq!(dep_launch.kind, DependencyKind::Launch);
         assert_eq!(dep_param.kind, DependencyKind::Param);
@@ -4395,10 +4767,14 @@ mod tests {
         assert_eq!(node.parameters.get("rate"), Some(&"100".to_string()));
         assert!(
             matches!(&node.param_files[..], [ParamFile::Reference { display, .. }] if display == "$(find-pkg-share config_pkg)/params.yaml"),
-            "expected one Reference param file, got: {:?}", node.param_files
+            "expected one Reference param file, got: {:?}",
+            node.param_files
         );
         assert_eq!(node.remappings.len(), 1);
-        assert_eq!(node.remappings[0], ("/cmd_vel".to_string(), "/robot/cmd_vel".to_string()));
+        assert_eq!(
+            node.remappings[0],
+            ("/cmd_vel".to_string(), "/robot/cmd_vel".to_string())
+        );
         assert_eq!(node.env.get("DEBUG"), Some(&"1".to_string()));
         assert!(result.required_packages.contains("config_pkg"));
 
@@ -4438,14 +4814,22 @@ mod tests {
             ..Default::default()
         };
         ctx.preview_mode = true;
-        let options = ResolveOptions { apply_arg_defaults: true, ..Default::default() };
+        let options = ResolveOptions {
+            apply_arg_defaults: true,
+            ..Default::default()
+        };
 
         let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
         let node = &result.nodes[0];
 
         // In preview mode the param file display path should preserve the portable
         // $(find-pkg-share ...) form, while the abs path should be the resolved filesystem path.
-        assert_eq!(node.param_files.len(), 1, "expected one param file, got: {:?}", node.param_files);
+        assert_eq!(
+            node.param_files.len(),
+            1,
+            "expected one param file, got: {:?}",
+            node.param_files
+        );
         match &node.param_files[0] {
             ParamFile::Reference { display, abs } => {
                 assert_eq!(display, "$(find-pkg-share my_pkg)/config/params.yaml");
@@ -4732,8 +5116,14 @@ mod tests {
     fn test_render_resolved_xml_groups_by_source_file() {
         // Two nodes from the same source file → one <group>.
         // One node without a source file → emitted flat at <launch> level.
-        let src_a = ("sensor_launch".to_string(), PathBuf::from("launch/sensing.launch.xml"));
-        let src_b = ("planner_launch".to_string(), PathBuf::from("launch/planning.launch.xml"));
+        let src_a = (
+            "sensor_launch".to_string(),
+            PathBuf::from("launch/sensing.launch.xml"),
+        );
+        let src_b = (
+            "planner_launch".to_string(),
+            PathBuf::from("launch/planning.launch.xml"),
+        );
 
         let nodes = vec![
             ResolvedNode {
@@ -4810,10 +5200,23 @@ mod tests {
             },
         ];
 
-        let xml = render_resolved_xml("my_pkg", "launcher.launch.xml", &nodes, false, false, &HashMap::new(), false, &HashMap::new());
+        let xml = render_resolved_xml(
+            "my_pkg",
+            "launcher.launch.xml",
+            &nodes,
+            false,
+            false,
+            &HashMap::new(),
+            false,
+            &HashMap::new(),
+        );
 
         // Should have two <group> elements (one per source file)
-        assert_eq!(xml.matches("<group>").count(), 2, "expected 2 groups\n{xml}");
+        assert_eq!(
+            xml.matches("<group>").count(),
+            2,
+            "expected 2 groups\n{xml}"
+        );
         assert_eq!(xml.matches("</group>").count(), 2);
 
         // sensing group: sensor_node and camera_node both inside
@@ -4825,11 +5228,23 @@ mod tests {
             .map(|o| sensing_group_start + o)
             .expect("no closing </group>");
         let sensing_group = &xml[sensing_group_start..sensing_group_end];
-        assert!(sensing_group.contains("sensor_node"), "sensor_node not in sensing group");
-        assert!(sensing_group.contains("camera_node"), "camera_node not in sensing group");
+        assert!(
+            sensing_group.contains("sensor_node"),
+            "sensor_node not in sensing group"
+        );
+        assert!(
+            sensing_group.contains("camera_node"),
+            "camera_node not in sensing group"
+        );
         // param and remap should be indented inside the group's node
-        assert!(sensing_group.contains("      <param"), "param should be 6-space indented");
-        assert!(sensing_group.contains("      <remap"), "remap should be 6-space indented");
+        assert!(
+            sensing_group.contains("      <param"),
+            "param should be 6-space indented"
+        );
+        assert!(
+            sensing_group.contains("      <remap"),
+            "remap should be 6-space indented"
+        );
 
         // planning group: planner only
         assert!(xml.contains("planner_launch://launch/planning.launch.xml"));
@@ -4918,10 +5333,23 @@ mod tests {
             },
         ];
 
-        let xml = render_resolved_xml("my_pkg", "top.launch.xml", &nodes, false, false, &HashMap::new(), false, &HashMap::new());
+        let xml = render_resolved_xml(
+            "my_pkg",
+            "top.launch.xml",
+            &nodes,
+            false,
+            false,
+            &HashMap::new(),
+            false,
+            &HashMap::new(),
+        );
 
         // Two <group> elements: one source group for src_a, one namespace sub-group inside it.
-        assert_eq!(xml.matches("<group>").count(), 2, "expected 2 groups (source + namespace)\n{xml}");
+        assert_eq!(
+            xml.matches("<group>").count(),
+            2,
+            "expected 2 groups (source + namespace)\n{xml}"
+        );
         assert_eq!(xml.matches("</group>").count(), 2);
 
         // <push-ros-namespace> should appear inside the inner (namespace) group.
@@ -4969,9 +5397,18 @@ mod tests {
         //       <node radar/>
         //     </group>
         //   </group>
-        let root = ("my_pkg".to_string(), PathBuf::from("launch/root.launch.xml"));
-        let comp = ("comp_pkg".to_string(), PathBuf::from("launch/comp.launch.xml"));
-        let sensing = ("sensing_pkg".to_string(), PathBuf::from("launch/sensing.launch.xml"));
+        let root = (
+            "my_pkg".to_string(),
+            PathBuf::from("launch/root.launch.xml"),
+        );
+        let comp = (
+            "comp_pkg".to_string(),
+            PathBuf::from("launch/comp.launch.xml"),
+        );
+        let sensing = (
+            "sensing_pkg".to_string(),
+            PathBuf::from("launch/sensing.launch.xml"),
+        );
 
         let nodes = vec![
             ResolvedNode {
@@ -5012,10 +5449,23 @@ mod tests {
             },
         ];
 
-        let xml = render_resolved_xml("my_pkg", "root.launch.xml", &nodes, false, false, &HashMap::new(), false, &HashMap::new());
+        let xml = render_resolved_xml(
+            "my_pkg",
+            "root.launch.xml",
+            &nodes,
+            false,
+            false,
+            &HashMap::new(),
+            false,
+            &HashMap::new(),
+        );
 
         // Two nested <group>s: outer for comp, inner for sensing.
-        assert_eq!(xml.matches("<group>").count(), 2, "expected 2 nested groups\n{xml}");
+        assert_eq!(
+            xml.matches("<group>").count(),
+            2,
+            "expected 2 nested groups\n{xml}"
+        );
         assert_eq!(xml.matches("</group>").count(), 2);
 
         // Both nodes are inside (no namespace sub-groups, just source nesting).
@@ -5023,7 +5473,9 @@ mod tests {
         assert!(xml.contains("radar_node"), "radar_node missing\n{xml}");
 
         // comp group comes before sensing group in source-comment order.
-        let comp_pos = xml.find("comp_pkg://launch/comp.launch.xml").expect("comp comment missing");
+        let comp_pos = xml
+            .find("comp_pkg://launch/comp.launch.xml")
+            .expect("comp comment missing");
         let sensing_pos = xml
             .find("sensing_pkg://launch/sensing.launch.xml")
             .expect("sensing comment missing");
@@ -5118,8 +5570,14 @@ mod tests {
         // - No <push-ros-namespace> emitted
         // - namespace= attribute appears directly on each node that has one
         // - Same-source nodes end up in one group regardless of namespace stack differences
-        let src_a = ("sensor_launch".to_string(), PathBuf::from("launch/sensing.launch.xml"));
-        let src_b = ("planner_launch".to_string(), PathBuf::from("launch/planning.launch.xml"));
+        let src_a = (
+            "sensor_launch".to_string(),
+            PathBuf::from("launch/sensing.launch.xml"),
+        );
+        let src_b = (
+            "planner_launch".to_string(),
+            PathBuf::from("launch/planning.launch.xml"),
+        );
 
         let nodes = vec![
             ResolvedNode {
@@ -5180,7 +5638,16 @@ mod tests {
             },
         ];
 
-        let xml = render_resolved_xml("my_pkg", "top.launch.xml", &nodes, true, false, &HashMap::new(), false, &HashMap::new());
+        let xml = render_resolved_xml(
+            "my_pkg",
+            "top.launch.xml",
+            &nodes,
+            true,
+            false,
+            &HashMap::new(),
+            false,
+            &HashMap::new(),
+        );
 
         // No push-ros-namespace anywhere.
         assert!(
@@ -5189,12 +5656,25 @@ mod tests {
         );
 
         // Two groups: one per source file.
-        assert_eq!(xml.matches("<group>").count(), 2, "expected 2 groups in flatten mode\n{xml}");
+        assert_eq!(
+            xml.matches("<group>").count(),
+            2,
+            "expected 2 groups in flatten mode\n{xml}"
+        );
 
         // Each node must carry its own namespace= attribute.
-        assert!(xml.contains("namespace=\"/sensing/lidar\""), "lidar node missing namespace\n{xml}");
-        assert!(xml.contains("namespace=\"/sensing/radar\""), "radar node missing namespace\n{xml}");
-        assert!(xml.contains("namespace=\"/planning\""), "planner node missing namespace\n{xml}");
+        assert!(
+            xml.contains("namespace=\"/sensing/lidar\""),
+            "lidar node missing namespace\n{xml}"
+        );
+        assert!(
+            xml.contains("namespace=\"/sensing/radar\""),
+            "radar node missing namespace\n{xml}"
+        );
+        assert!(
+            xml.contains("namespace=\"/planning\""),
+            "planner node missing namespace\n{xml}"
+        );
     }
 
     // =========================================================================
@@ -5203,8 +5683,14 @@ mod tests {
     fn test_render_resolved_xml_flatten_no_groups_except_ns() {
         // --flatten: source-boundary <group>s are suppressed; nodes emitted flat.
         // A node with a non-empty namespace_stack still gets a <group> + <push-ros-namespace>.
-        let src_a = ("sensor_launch".to_string(), PathBuf::from("launch/sensing.launch.xml"));
-        let src_b = ("planner_launch".to_string(), PathBuf::from("launch/planning.launch.xml"));
+        let src_a = (
+            "sensor_launch".to_string(),
+            PathBuf::from("launch/sensing.launch.xml"),
+        );
+        let src_b = (
+            "planner_launch".to_string(),
+            PathBuf::from("launch/planning.launch.xml"),
+        );
 
         let nodes = vec![
             // No namespace stack → should appear flat (no group) under --flatten.
@@ -5247,28 +5733,57 @@ mod tests {
             },
         ];
 
-        let xml = render_resolved_xml("my_pkg", "top.launch.xml", &nodes, false, true, &HashMap::new(), false, &HashMap::new());
+        let xml = render_resolved_xml(
+            "my_pkg",
+            "top.launch.xml",
+            &nodes,
+            false,
+            true,
+            &HashMap::new(),
+            false,
+            &HashMap::new(),
+        );
 
         // Only one <group> — the one wrapping the namespace node.
-        assert_eq!(xml.matches("<group>").count(), 1, "expected 1 group (ns-only)\n{xml}");
-        assert!(xml.contains("<push-ros-namespace"), "push-ros-namespace missing\n{xml}");
+        assert_eq!(
+            xml.matches("<group>").count(),
+            1,
+            "expected 1 group (ns-only)\n{xml}"
+        );
+        assert!(
+            xml.contains("<push-ros-namespace"),
+            "push-ros-namespace missing\n{xml}"
+        );
 
         // sensor_node has no namespace stack → must appear flat (no surrounding <group>).
         // Verify it is present and NOT inside a <group>...</group> block.
         assert!(xml.contains("sensor_node"), "sensor_node missing\n{xml}");
         let sensor_idx = xml.find("sensor_node").unwrap();
         let group_idx = xml.find("<group>").unwrap();
-        assert!(sensor_idx < group_idx, "sensor_node should appear before the namespace group\n{xml}");
+        assert!(
+            sensor_idx < group_idx,
+            "sensor_node should appear before the namespace group\n{xml}"
+        );
 
         // End comments should be present for each source section.
-        assert!(xml.contains("<!-- end:"), "end comment missing in flatten mode\n{xml}");
-        assert_eq!(xml.matches("<!-- end:").count(), 2, "expected one end comment per source\n{xml}");
+        assert!(
+            xml.contains("<!-- end:"),
+            "end comment missing in flatten mode\n{xml}"
+        );
+        assert_eq!(
+            xml.matches("<!-- end:").count(),
+            2,
+            "expected one end comment per source\n{xml}"
+        );
     }
 
     #[test]
     fn test_render_resolved_xml_flatten_and_flatten_namespaces_no_groups() {
         // --flatten --flatten-namespaces: completely group-free output.
-        let src_a = ("sensor_launch".to_string(), PathBuf::from("launch/sensing.launch.xml"));
+        let src_a = (
+            "sensor_launch".to_string(),
+            PathBuf::from("launch/sensing.launch.xml"),
+        );
 
         let nodes = vec![
             ResolvedNode {
@@ -5309,22 +5824,51 @@ mod tests {
             },
         ];
 
-        let xml = render_resolved_xml("my_pkg", "top.launch.xml", &nodes, true, true, &HashMap::new(), false, &HashMap::new());
+        let xml = render_resolved_xml(
+            "my_pkg",
+            "top.launch.xml",
+            &nodes,
+            true,
+            true,
+            &HashMap::new(),
+            false,
+            &HashMap::new(),
+        );
 
         // No groups whatsoever.
         assert!(!xml.contains("<group>"), "no groups expected\n{xml}");
-        assert!(!xml.contains("<push-ros-namespace"), "no push-ros-namespace expected\n{xml}");
+        assert!(
+            !xml.contains("<push-ros-namespace"),
+            "no push-ros-namespace expected\n{xml}"
+        );
 
         // Both nodes present with full namespace= attribute.
-        assert!(xml.contains("namespace=\"/sensing/lidar\""), "lidar ns missing\n{xml}");
-        assert!(xml.contains("namespace=\"/sensing/radar\""), "radar ns missing\n{xml}");
+        assert!(
+            xml.contains("namespace=\"/sensing/lidar\""),
+            "lidar ns missing\n{xml}"
+        );
+        assert!(
+            xml.contains("namespace=\"/sensing/radar\""),
+            "radar ns missing\n{xml}"
+        );
 
         // Source comment and matching end comment both present.
-        assert!(xml.contains("<!-- source:"), "source comment missing\n{xml}");
+        assert!(
+            xml.contains("<!-- source:"),
+            "source comment missing\n{xml}"
+        );
         assert!(xml.contains("<!-- end:"), "end comment missing\n{xml}");
         // One source + one end (single source file).
-        assert_eq!(xml.matches("<!-- source:").count(), 1, "expected 1 source comment\n{xml}");
-        assert_eq!(xml.matches("<!-- end:").count(), 1, "expected 1 end comment\n{xml}");
+        assert_eq!(
+            xml.matches("<!-- source:").count(),
+            1,
+            "expected 1 source comment\n{xml}"
+        );
+        assert_eq!(
+            xml.matches("<!-- end:").count(),
+            1,
+            "expected 1 end comment\n{xml}"
+        );
     }
 
     // =========================================================================
@@ -5389,12 +5933,18 @@ launch:
   - unset_env:
       name: OLD_VAR
 "#;
-        let launch = parse_launch_yaml(yaml, std::path::Path::new("test.yaml"))
-            .expect("parse failed");
+        let launch =
+            parse_launch_yaml(yaml, std::path::Path::new("test.yaml")).expect("parse failed");
         assert_eq!(launch.elements.len(), 3);
-        assert!(matches!(&launch.elements[0], LaunchElement::Let { name, .. } if name == "config_dir"));
-        assert!(matches!(&launch.elements[1], LaunchElement::SetEnv { name, .. } if name == "MY_VAR"));
-        assert!(matches!(&launch.elements[2], LaunchElement::UnsetEnv { name, .. } if name == "OLD_VAR"));
+        assert!(
+            matches!(&launch.elements[0], LaunchElement::Let { name, .. } if name == "config_dir")
+        );
+        assert!(
+            matches!(&launch.elements[1], LaunchElement::SetEnv { name, .. } if name == "MY_VAR")
+        );
+        assert!(
+            matches!(&launch.elements[2], LaunchElement::UnsetEnv { name, .. } if name == "OLD_VAR")
+        );
     }
 
     #[test]
@@ -5415,22 +5965,41 @@ launch:
             name: child_let
             value: foo
 "#;
-        let launch = parse_launch_yaml(yaml, std::path::Path::new("test.yaml"))
-            .expect("parse failed");
+        let launch =
+            parse_launch_yaml(yaml, std::path::Path::new("test.yaml")).expect("parse failed");
         assert_eq!(launch.elements.len(), 2);
 
         match &launch.elements[0] {
-            LaunchElement::PushRosNamespace { namespace, condition } => {
+            LaunchElement::PushRosNamespace {
+                namespace,
+                condition,
+            } => {
                 assert_eq!(namespace, "/sensing");
-                assert!(matches!(condition, Some(Condition { kind: ConditionKind::If, .. })));
+                assert!(matches!(
+                    condition,
+                    Some(Condition {
+                        kind: ConditionKind::If,
+                        ..
+                    })
+                ));
             }
             other => panic!("expected PushRosNamespace, got {other:?}"),
         }
 
         match &launch.elements[1] {
-            LaunchElement::Group { scoped, condition, children } => {
+            LaunchElement::Group {
+                scoped,
+                condition,
+                children,
+            } => {
                 assert!(!scoped);
-                assert!(matches!(condition, Some(Condition { kind: ConditionKind::Unless, .. })));
+                assert!(matches!(
+                    condition,
+                    Some(Condition {
+                        kind: ConditionKind::Unless,
+                        ..
+                    })
+                ));
                 assert_eq!(children.len(), 2);
             }
             other => panic!("expected Group, got {other:?}"),
@@ -5450,11 +6019,15 @@ launch:
         - name: sensor_kit
           value: sample_kit
 "#;
-        let launch = parse_launch_yaml(yaml, std::path::Path::new("test.yaml"))
-            .expect("parse failed");
+        let launch =
+            parse_launch_yaml(yaml, std::path::Path::new("test.yaml")).expect("parse failed");
         assert_eq!(launch.elements.len(), 1);
         match &launch.elements[0] {
-            LaunchElement::Include { file, condition, args } => {
+            LaunchElement::Include {
+                file,
+                condition,
+                args,
+            } => {
                 assert!(file.contains("foo.launch.xml"));
                 assert!(condition.is_some());
                 assert_eq!(args.len(), 2);
@@ -5486,16 +6059,32 @@ launch:
         - name: MY_ENV
           value: val
 "#;
-        let launch = parse_launch_yaml(yaml, std::path::Path::new("test.yaml"))
-            .expect("parse failed");
+        let launch =
+            parse_launch_yaml(yaml, std::path::Path::new("test.yaml")).expect("parse failed");
         assert_eq!(launch.elements.len(), 1);
         match &launch.elements[0] {
-            LaunchElement::Node { pkg, exec, name, namespace, condition, params, remaps, envs, .. } => {
+            LaunchElement::Node {
+                pkg,
+                exec,
+                name,
+                namespace,
+                condition,
+                params,
+                remaps,
+                envs,
+                ..
+            } => {
                 assert_eq!(pkg, "my_pkg");
                 assert_eq!(exec, "my_node");
                 assert_eq!(name.as_deref(), Some("named_node"));
                 assert_eq!(namespace.as_deref(), Some("/my_ns"));
-                assert!(matches!(condition, Some(Condition { kind: ConditionKind::Unless, .. })));
+                assert!(matches!(
+                    condition,
+                    Some(Condition {
+                        kind: ConditionKind::Unless,
+                        ..
+                    })
+                ));
                 assert_eq!(params.len(), 2);
                 assert_eq!(params[0].name.as_deref(), Some("rate"));
                 assert_eq!(params[1].from.as_deref(), Some("/path/to/params.yaml"));
@@ -5522,11 +6111,18 @@ launch:
       name: also_known
       default: val2
 "#;
-        let launch = parse_launch_yaml(yaml, std::path::Path::new("test.yaml"))
-            .expect("parse failed");
+        let launch =
+            parse_launch_yaml(yaml, std::path::Path::new("test.yaml")).expect("parse failed");
         // Unknown element is preserved as UnknownElement; 2 args + 1 unknown = 3.
-        assert_eq!(launch.elements.len(), 3, "expected 3 elements, got:\n{:?}", launch.elements);
-        assert!(matches!(&launch.elements[1], LaunchElement::UnknownElement { tag_name } if tag_name == "truly_unknown_element"));
+        assert_eq!(
+            launch.elements.len(),
+            3,
+            "expected 3 elements, got:\n{:?}",
+            launch.elements
+        );
+        assert!(
+            matches!(&launch.elements[1], LaunchElement::UnknownElement { tag_name } if tag_name == "truly_unknown_element")
+        );
     }
 
     #[test]
@@ -5541,11 +6137,21 @@ launch:
   <set_parameter name="use_sim_time" value="false"/>
   <set_remap from="input" to="output"/>
 </launch>"#;
-        let launch = parse_launch_xml(xml, Path::new("test.xml"))
-            .expect("parse failed");
-        assert_eq!(launch.elements.len(), 3, "expected 3 elements, got:\n{:?}", launch.elements);
+        let launch = parse_launch_xml(xml, Path::new("test.xml")).expect("parse failed");
+        assert_eq!(
+            launch.elements.len(),
+            3,
+            "expected 3 elements, got:\n{:?}",
+            launch.elements
+        );
         match &launch.elements[0] {
-            LaunchElement::NodeContainer { pkg, exec, name, composable_nodes, .. } => {
+            LaunchElement::NodeContainer {
+                pkg,
+                exec,
+                name,
+                composable_nodes,
+                ..
+            } => {
                 assert_eq!(pkg, "rclcpp_components");
                 assert_eq!(exec, "component_container_mt");
                 assert_eq!(name.as_deref(), Some("my_container"));
@@ -5555,8 +6161,12 @@ launch:
             }
             other => panic!("expected NodeContainer, got {other:?}"),
         }
-        assert!(matches!(&launch.elements[1], LaunchElement::SetParameter { name, .. } if name == "use_sim_time"));
-        assert!(matches!(&launch.elements[2], LaunchElement::SetRemap { from, .. } if from == "input"));
+        assert!(
+            matches!(&launch.elements[1], LaunchElement::SetParameter { name, .. } if name == "use_sim_time")
+        );
+        assert!(
+            matches!(&launch.elements[2], LaunchElement::SetRemap { from, .. } if from == "input")
+        );
     }
 
     #[test]
@@ -5567,11 +6177,14 @@ launch:
     <composable_node pkg="my_pkg" plugin="my_pkg::MyPlugin" name="my_plugin"/>
   </load_composable_node>
 </launch>"#;
-        let launch = parse_launch_xml(xml, Path::new("test.xml"))
-            .expect("parse failed");
+        let launch = parse_launch_xml(xml, Path::new("test.xml")).expect("parse failed");
         assert_eq!(launch.elements.len(), 1);
         match &launch.elements[0] {
-            LaunchElement::LoadComposableNode { target, composable_nodes, .. } => {
+            LaunchElement::LoadComposableNode {
+                target,
+                composable_nodes,
+                ..
+            } => {
                 assert_eq!(target.as_deref(), Some("/my_container"));
                 assert_eq!(composable_nodes.len(), 1);
                 assert_eq!(composable_nodes[0].plugin, "my_pkg::MyPlugin");
@@ -5595,8 +6208,8 @@ launch:
         let launch = parse_launch_xml(xml, Path::new("/test/test.launch.xml")).unwrap();
         let mut ctx = SubstitutionContext::default();
         let options = ResolveOptions::default();
-        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options)
-            .expect("resolve failed");
+        let result =
+            resolve_launch(&launch, HashMap::new(), &mut ctx, &options).expect("resolve failed");
         // container node + load_composable node = 2 entries total (not 4 flat nodes)
         assert_eq!(result.nodes.len(), 2, "nodes: {:?}", result.nodes);
 
@@ -5621,8 +6234,14 @@ launch:
             other => panic!("expected NodeKind::LoadComposable, got {:?}", other),
         }
 
-        assert!(result.required_packages.contains("nebula_ros"), "nebula_ros missing");
-        assert!(result.required_packages.contains("extra_pkg"), "extra_pkg missing");
+        assert!(
+            result.required_packages.contains("nebula_ros"),
+            "nebula_ros missing"
+        );
+        assert!(
+            result.required_packages.contains("extra_pkg"),
+            "extra_pkg missing"
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -5639,10 +6258,14 @@ launch:
                 package: "parent_pkg".to_string(),
                 executable: "parent_node".to_string(),
                 name: Some("parent".to_string()),
-                source: Some(("root_pkg".to_string(), PathBuf::from("launch/root.launch.xml"))),
-                include_chain: vec![
-                    ("root_pkg".to_string(), PathBuf::from("launch/root.launch.xml")),
-                ],
+                source: Some((
+                    "root_pkg".to_string(),
+                    PathBuf::from("launch/root.launch.xml"),
+                )),
+                include_chain: vec![(
+                    "root_pkg".to_string(),
+                    PathBuf::from("launch/root.launch.xml"),
+                )],
                 kind: NodeKind::Node,
                 param_files: vec![],
                 output: None,
@@ -5653,27 +6276,52 @@ launch:
             },
             // Marker for an included file that had no nodes.
             ResolvedNode {
-                source: Some(("preset_pkg".to_string(), PathBuf::from("launch/preset.launch.xml"))),
+                source: Some((
+                    "preset_pkg".to_string(),
+                    PathBuf::from("launch/preset.launch.xml"),
+                )),
                 include_chain: vec![
-                    ("root_pkg".to_string(), PathBuf::from("launch/root.launch.xml")),
-                    ("preset_pkg".to_string(), PathBuf::from("launch/preset.launch.xml")),
+                    (
+                        "root_pkg".to_string(),
+                        PathBuf::from("launch/root.launch.xml"),
+                    ),
+                    (
+                        "preset_pkg".to_string(),
+                        PathBuf::from("launch/preset.launch.xml"),
+                    ),
                 ],
                 kind: NodeKind::IncludeMarker,
                 ..Default::default()
             },
         ];
 
-        let xml = render_resolved_xml("root_pkg", "root.launch.xml", &nodes, false, false, &HashMap::new(), false, &HashMap::new());
+        let xml = render_resolved_xml(
+            "root_pkg",
+            "root.launch.xml",
+            &nodes,
+            false,
+            false,
+            &HashMap::new(),
+            false,
+            &HashMap::new(),
+        );
 
         // Marker comment pair must appear.
-        assert!(xml.contains("<!-- source: preset_pkg://launch/preset.launch.xml -->"),
-            "missing source comment:\n{xml}");
-        assert!(xml.contains("<!-- end: preset_pkg://launch/preset.launch.xml -->"),
-            "missing end comment:\n{xml}");
+        assert!(
+            xml.contains("<!-- source: preset_pkg://launch/preset.launch.xml -->"),
+            "missing source comment:\n{xml}"
+        );
+        assert!(
+            xml.contains("<!-- end: preset_pkg://launch/preset.launch.xml -->"),
+            "missing end comment:\n{xml}"
+        );
         // The real node is root-level (its chain matches the root, so target_src = []).
         // The marker is one level deep relative to root, so it also appears at root level.
         // Neither produces a <group> tag.
-        assert!(!xml.contains("<group>"), "unexpected <group> in output:\n{xml}");
+        assert!(
+            !xml.contains("<group>"),
+            "unexpected <group> in output:\n{xml}"
+        );
     }
 
     #[test]
@@ -5705,13 +6353,20 @@ launch:
             .expect("resolve failed");
 
         // The preset YAML's package should be tracked.
-        assert!(result.required_packages.contains("preset_pkg"),
-            "preset_pkg missing from required_packages");
+        assert!(
+            result.required_packages.contains("preset_pkg"),
+            "preset_pkg missing from required_packages"
+        );
         // The YAML dep should be in required_files (so the orchestrator can inject a marker).
-        let yaml_dep = result.required_files.iter()
+        let yaml_dep = result
+            .required_files
+            .iter()
             .find(|d| d.package == "preset_pkg");
-        assert!(yaml_dep.is_some(),
-            "preset_pkg dep missing from required_files: {:#?}", result.required_files);
+        assert!(
+            yaml_dep.is_some(),
+            "preset_pkg dep missing from required_files: {:#?}",
+            result.required_files
+        );
         // The real node is still resolved.
         assert_eq!(result.nodes.len(), 1);
         assert_eq!(result.nodes[0].package, "driver");
@@ -5733,22 +6388,56 @@ launch:
         let launch = parse_launch_xml(xml, Path::new("/test/test.launch.xml")).unwrap();
         let mut ctx = SubstitutionContext::default();
         let options = ResolveOptions::default();
-        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options)
-            .expect("resolve failed");
+        let result =
+            resolve_launch(&launch, HashMap::new(), &mut ctx, &options).expect("resolve failed");
 
-        let rendered = render_resolved_xml("my_pkg", "test.launch.xml", &result.nodes, false, false, &HashMap::new(), false, &HashMap::new());
+        let rendered = render_resolved_xml(
+            "my_pkg",
+            "test.launch.xml",
+            &result.nodes,
+            false,
+            false,
+            &HashMap::new(),
+            false,
+            &HashMap::new(),
+        );
 
         // Should contain node_container and composable_node, not <node>
-        assert!(rendered.contains("<node_container"), "expected <node_container> in:\n{}", rendered);
-        assert!(rendered.contains("<composable_node"), "expected <composable_node> in:\n{}", rendered);
-        assert!(rendered.contains("<load_composable_node"), "expected <load_composable_node> in:\n{}", rendered);
+        assert!(
+            rendered.contains("<node_container"),
+            "expected <node_container> in:\n{}",
+            rendered
+        );
+        assert!(
+            rendered.contains("<composable_node"),
+            "expected <composable_node> in:\n{}",
+            rendered
+        );
+        assert!(
+            rendered.contains("<load_composable_node"),
+            "expected <load_composable_node> in:\n{}",
+            rendered
+        );
         // The container's executable and package should appear
-        assert!(rendered.contains("component_container_mt"), "container exec missing");
-        assert!(rendered.contains("nebula::ros::HesaiRosWrapper"), "plugin missing");
-        assert!(rendered.contains("extra_pkg::ExtraPlugin"), "load plugin missing");
+        assert!(
+            rendered.contains("component_container_mt"),
+            "container exec missing"
+        );
+        assert!(
+            rendered.contains("nebula::ros::HesaiRosWrapper"),
+            "plugin missing"
+        );
+        assert!(
+            rendered.contains("extra_pkg::ExtraPlugin"),
+            "load plugin missing"
+        );
         // Should NOT have a bare <node> element (plain nodes render as <node>)
         // but we should not have the composable data rendered as <node>
-        assert!(!rendered.contains("<node pkg=\"rclcpp_components\""), "should not render container as <node>: {}", rendered);
+        assert!(
+            !rendered.contains("<node pkg=\"rclcpp_components\""),
+            "should not render container as <node>: {}",
+            rendered
+        );
     }
 
     #[test]
@@ -5764,11 +6453,15 @@ launch:
           plugin: nebula::ros::HesaiRosWrapper
           name: hesai_driver
 "#;
-        let launch = parse_launch_yaml(yaml, std::path::Path::new("test.yaml"))
-            .expect("parse failed");
+        let launch =
+            parse_launch_yaml(yaml, std::path::Path::new("test.yaml")).expect("parse failed");
         assert_eq!(launch.elements.len(), 1);
         match &launch.elements[0] {
-            LaunchElement::NodeContainer { exec, composable_nodes, .. } => {
+            LaunchElement::NodeContainer {
+                exec,
+                composable_nodes,
+                ..
+            } => {
                 assert_eq!(exec, "component_container_mt");
                 assert_eq!(composable_nodes.len(), 1);
                 assert_eq!(composable_nodes[0].plugin, "nebula::ros::HesaiRosWrapper");
@@ -5854,7 +6547,10 @@ launch:
         let declared = collect_declared_args(&launch.elements);
         // Only 'mine' should be in declared; 'forwarded' is an include arg, not a file arg.
         assert!(declared.contains("mine"));
-        assert!(!declared.contains("forwarded"), "'forwarded' is an include arg, not a file declaration");
+        assert!(
+            !declared.contains("forwarded"),
+            "'forwarded' is an include arg, not a file declaration"
+        );
         assert_eq!(declared.len(), 1);
     }
 
@@ -5866,8 +6562,14 @@ launch:
 </launch>"#;
         let launch = parse_launch_xml(xml, std::path::Path::new("t.launch.xml")).unwrap();
         let refs = collect_arg_and_var_refs(&launch.elements);
-        assert!(refs.contains("pkg_name"), "expected 'pkg_name' from $(arg pkg_name)");
-        assert!(refs.contains("some_var"), "expected 'some_var' from $(var some_var)");
+        assert!(
+            refs.contains("pkg_name"),
+            "expected 'pkg_name' from $(arg pkg_name)"
+        );
+        assert!(
+            refs.contains("some_var"),
+            "expected 'some_var' from $(var some_var)"
+        );
     }
 
     #[test]
@@ -5879,7 +6581,10 @@ launch:
 </launch>"#;
         let launch = parse_launch_xml(xml, std::path::Path::new("t.launch.xml")).unwrap();
         let refs = collect_arg_and_var_refs(&launch.elements);
-        assert!(refs.contains("use_sim"), "expected 'use_sim' from condition expr");
+        assert!(
+            refs.contains("use_sim"),
+            "expected 'use_sim' from condition expr"
+        );
     }
 
     #[test]
@@ -5893,7 +6598,10 @@ launch:
         let launch = parse_launch_xml(xml, std::path::Path::new("t.launch.xml")).unwrap();
         let refs = collect_arg_and_var_refs(&launch.elements);
         // $(var vehicle_model) in the include arg value is a reference.
-        assert!(refs.contains("vehicle_model"), "expected 'vehicle_model' from include arg value");
+        assert!(
+            refs.contains("vehicle_model"),
+            "expected 'vehicle_model' from include arg value"
+        );
     }
 
     #[test]
@@ -5904,7 +6612,10 @@ launch:
         let launch = parse_launch_xml(xml, std::path::Path::new("t.launch.xml")).unwrap();
         let refs = collect_arg_and_var_refs(&launch.elements);
         // $(env HOME) should NOT be in arg/var refs.
-        assert!(!refs.contains("HOME"), "$(env HOME) should not count as an arg/var ref");
+        assert!(
+            !refs.contains("HOME"),
+            "$(env HOME) should not count as an arg/var ref"
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -5966,7 +6677,10 @@ launch:
 </launch>"#;
         let launch = parse_launch_xml(xml, std::path::Path::new("t.launch.xml")).unwrap();
         let includes = collect_scoped_false_includes(&launch.elements);
-        assert!(includes.is_empty(), "top-level include should not be flagged");
+        assert!(
+            includes.is_empty(),
+            "top-level include should not be flagged"
+        );
     }
 
     #[test]
@@ -5986,10 +6700,6 @@ launch:
 </launch>"#;
         let launch = parse_launch_xml(xml, std::path::Path::new("t.launch.xml")).unwrap();
         let names = collect_env_without_fallback(&launch.elements);
-        assert!(
-            names.is_empty(),
-            "$(env X default) should not be flagged"
-        );
+        assert!(names.is_empty(), "$(env X default) should not be flagged");
     }
-
 }

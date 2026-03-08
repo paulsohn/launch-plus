@@ -26,30 +26,29 @@ pub use error::{Error, Result};
 
 // Re-export resolver types for convenience
 pub use resolver::{
-    extract_file_dependency, parse_launch_xml, parse_launch_yaml, render_resolved_xml,
-    resolve_launch, semantic_eq,
     Condition, ConditionKind, DependencyKind, FileDependency, IncludeArgContext, LaunchElement,
     LaunchFile, LaunchInclude, ParsedLaunchFile, ResolveOptions, ResolvedLaunch, ResolvedNode,
-    SemanticNode, SubstitutionContext,
+    SemanticNode, SubstitutionContext, extract_file_dependency, parse_launch_xml,
+    parse_launch_yaml, render_resolved_xml, resolve_launch, semantic_eq,
 };
 
 // Re-export locator types
-pub use locator::{locator_from_lockfile, locator_from_workspace, PackageLocator};
+pub use locator::{PackageLocator, locator_from_lockfile, locator_from_workspace};
 
 // Re-export indexer types for lockfile access
 pub use indexer::{
-    compute_build_order, resolve_dependencies,
     Dependencies, DependencyGraph, DependencyMode, Lockfile, PackageLock, RepoLock,
+    compute_build_order, resolve_dependencies,
 };
 
 // Re-export fetcher types
-pub use fetcher::{fetch_packages, FetchOptions, FetchedPackage};
+pub use fetcher::{FetchOptions, FetchedPackage, fetch_packages};
 
 // Re-export builder types
-pub use builder::{execute_build, plan_build_from_packages, BuildOptions, BuildPlan};
+pub use builder::{BuildOptions, BuildPlan, execute_build, plan_build_from_packages};
 
 // Re-export orchestrator for resolve workflow
-pub use orchestrator::{resolve_launch_recursive, ResolveResult, ResolveWorkflowOptions};
+pub use orchestrator::{ResolveResult, ResolveWorkflowOptions, resolve_launch_recursive};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

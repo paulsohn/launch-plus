@@ -1,6 +1,5 @@
 # Rust
 target/
-Cargo.lock
 
 # IDE
 .idea/
@@ -47,6 +46,10 @@ build/
 /src/
 /manifest.repos
 /manifest.lock.repos
+
+# Integration test outputs (keep only the committed resolved.launch.xml)
+example/**/*.xml
+!example/autoware/resolved.launch.xml
 
 # Fetched packages from example runs
 example/**/src/

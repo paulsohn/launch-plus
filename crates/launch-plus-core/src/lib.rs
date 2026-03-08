@@ -4,6 +4,7 @@
 //! build and run system for ROS 2 that enables lazy, on-demand package
 //! fetching and building based on actual launch-time dependencies.
 
+pub mod builder;
 pub mod error;
 pub mod fetcher;
 pub mod indexer;
@@ -38,6 +39,9 @@ pub use fetcher::{fetch_packages, FetchOptions, FetchedPackage};
 
 // Re-export orchestrator for resolve workflow
 pub use orchestrator::{resolve_launch_recursive, ResolveResult, ResolveWorkflowOptions};
+
+// Re-export builder types
+pub use builder::{execute_build, plan_build_from_packages, BuildOptions, BuildPlan};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

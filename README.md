@@ -13,6 +13,8 @@ remap that would be active at runtime.
 ## Prerequisites
 
 - Rust toolchain (`cargo`) — https://rustup.rs
+- `python3` in `PATH` (used to evaluate `$(eval ...)` substitutions and to resolve Python launch files)
+- ROS 2 sourced — only required for `--rosdep` (system package resolution); the resolver itself does not depend on any ROS 2 Python packages
 
 ## Build
 
@@ -20,6 +22,8 @@ remap that would be active at runtime.
 git clone https://github.com/paulsohn/launch-plus.git
 cd launch-plus
 cargo build --bin launch-plus --release
+# binary: target/release/launch-plus
+# or use `cargo run --bin launch-plus --` in place of the binary below
 ```
 
 ## Key commands
@@ -28,8 +32,101 @@ cargo build --bin launch-plus --release
 |---|---|
 | `index <manifest.repos>` | Parse `.repos` file and generate a lockfile |
 | `update [REPOS...]` | Re-resolve refs and update lockfile SHAs |
+| `resolve <pkg> <launcher> [args...]` | Resolve launch file to a flat XML |
+| `check <pkg> <launcher> [args...]` | Like `resolve` but exits non-zero on errors |
 | `fetch <pkg>...` | Sparse-checkout specific packages from the lockfile |
+| `build <pkg> <launcher> [args...]` | Resolve, plan dependencies, and run `colcon build` |
+| `test <pkg> <launcher> [args...]` | Like `build` but includes `test_depend` packages |
 | `clean` | Remove fetched packages |
+
+## Notable `resolve` / `check` flags
+
+### Workspace state (required — exactly one)
+
+| Flag | Short | Description |
+|---|---|---|
+| `--clean` | `-c` | Reset every repository to the pinned lockfile SHA; discard local modifications |
+| `--dirty` | `-d` | Use whatever is on disk; skip all git operations for existing repos |
+
+Use `--dirty` during local iteration (edits survive).
+Use `--clean` for reproducible CI runs.
+
+### Resolution options
+
+| Flag | Description |
+|---|---|
+| `--lockfile <path>` | Lockfile to use (default: `manifest.lock.repos`) |
+| `--src <dir>` | Directory where packages are fetched (default: `src/`) |
+| `--preview` | Use portable `$(find-pkg-share ...)` paths in output |
+| `--inline-params` | Expand `<param from="file.yaml"/>` entries inline |
+| `--flatten-namespaces` | Fold namespace into each node's name/topic |
+| `--show-args` | Emit `<!-- arg name=... -->` comments at include boundaries |
+| `--apply-opaque-file-access` | Let OpaqueFunction bodies read param files |
+| `--apply-launch-arg-defaults` | Fill unset args from their declared defaults |
+| `--allow-global-arg-cascade` | Propagate parent args into included files |
+| `--rosdep` | Resolve system packages via rosdep (requires sourced ROS 2) |
+
+## `build` / `test` flags
+
+`build` resolves the launch file, computes the transitive build-dependency closure
+(`build_depend`, `buildtool_depend`, `<depend>`, …), and calls `colcon build
+--packages-select <exact list>`.  `test` does the same but also pulls in
+`test_depend` packages.
+
+### Workspace state (required — exactly one)
+
+| Flag | Short | Description |
+|---|---|---|
+| `--clean` | `-c` | Reset every repository to the pinned lockfile SHA |
+| `--dirty` | `-d` | Use whatever is on disk; skip git operations |
+
+### Build / install directories
+
+| Flag | Default | Description |
+|---|---|---|
+| `--build-base <dir>` | `build` | Colcon build output directory |
+| `--install-base <dir>` | `install` | Colcon install prefix |
+
+### Extra colcon flags (flagfile)
+
+Pass arbitrary colcon flags via a flagfile — one shell token per line,
+`#` comments allowed:
+
+```bash
+launch-plus build autoware_launch autoware.launch.xml \
+  sensor_model:=sample_sensor_kit vehicle_model:=sample_vehicle map_path:=/ \
+  --clean --colcon-flagfile example/colcon-flags.example.txt
+```
+
+Each line of the flagfile is inserted verbatim into `colcon build` before
+`--packages-select`.  Flags that conflict with launch-plus-managed arguments
+(`--packages-*`, `--base-paths`, `--build-base`, `--install-base`) are
+rejected as errors.
+
+| Flag | Description |
+|---|---|
+| `--colcon-flagfile <file>` | Path to a flagfile with extra colcon arguments |
+| `--dry-run` | Print the colcon command without running it |
+
+## How the resolver works
+
+**XML launch files** are parsed and resolved in Rust. Substitution expressions
+(`$(find-pkg-share ...)`, `$(var ...)`, `$(eval ...)`) are evaluated, `<include>`
+tags are followed recursively, and all `<node>`, `<param>`, and `<remap>` elements
+are collected into the output.
+
+**Python launch files** are executed with `importlib`, but before the file loads,
+a `MetaPathFinder` intercepts all imports of `launch`, `launch_ros`, and
+`ament_index_python` and replaces them with shim modules built entirely from the
+standard library.  The shims record constructor arguments (package, executable,
+parameters, remaps, included files) into a structured trace instead of scheduling
+anything for execution.  No ROS 2 packages need to be installed.
+
+**OpaqueFunction** bodies are arbitrary Python callables and cannot be statically
+analysed — they are executed directly.  `open()`, `yaml.safe_load()`, and
+`os.path.*` are patched so filesystem reads go through portable
+`$(find-pkg-share pkg)/...` paths; the package is sparse-checked out on demand if
+not yet present locally.
 
 ## Development
 

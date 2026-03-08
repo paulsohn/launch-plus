@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use launch_plus_core::builder::{execute_build, plan_build_from_packages, BuildOptions};
 use launch_plus_core::fetcher::{fetch_packages, FetchOptions, WorkspaceState};
 use launch_plus_core::indexer::{
     blobless_clone, discover_packages, generate_lockfile, parse_lockfile, parse_repos,
@@ -312,6 +313,225 @@ enum Commands {
         shallow: bool,
     },
 
+    /// Fetch and build packages for a launcher (target-focused, Bazel-like)
+    ///
+    /// Resolves the launch file, computes the transitive build-dependency closure
+    /// (build_depend + <depend>), and invokes colcon with the exact package list.
+    #[command(override_usage = "launch-plus build [OPTIONS] <PACKAGE> <LAUNCHER> [ARG]...")]
+    Build {
+        /// Package name
+        package: String,
+
+        /// Launch file name
+        launcher: String,
+
+        /// Launch arguments in name:=value format
+        #[arg(value_name = "ARG")]
+        args: Vec<String>,
+
+        /// Lockfile path (default: manifest.lock.repos)
+        #[arg(short, long, default_value = "manifest.lock.repos")]
+        lockfile: String,
+
+        /// Source directory for sparse-checkout (default: src)
+        #[arg(long, default_value = "src")]
+        src: String,
+
+        /// Use clean workspace state (reset to lockfile SHAs)
+        #[arg(short = 'c', long, conflicts_with = "dirty")]
+        clean: bool,
+
+        /// Use dirty workspace state (skip re-checkout of existing repos)
+        #[arg(short = 'd', long, conflicts_with = "clean")]
+        dirty: bool,
+
+        /// Use shallow clone (depth=1) when fetching new repositories.
+        /// Off by default; useful in CI where clone history is not needed.
+        /// Has no effect on repositories already cloned.
+        #[arg(long)]
+        shallow: bool,
+
+        /// Allow child launch files to inherit args without explicit forwarding
+        #[arg(long)]
+        allow_global_arg_cascade: bool,
+
+        /// Apply default values from <arg> declarations
+        #[arg(long)]
+        apply_launch_arg_defaults: bool,
+
+        /// Allow OpaqueFunction bodies to open files via portable paths
+        #[arg(long)]
+        apply_opaque_file_access: bool,
+
+        /// Allow raw filesystem paths in <include> and <param from> during resolution.
+        /// See `resolve --allow-including-unportable-path` for details.
+        #[arg(long)]
+        allow_including_unportable_path: bool,
+
+        /// Automatically install packages not in the lockfile via rosdep.
+        /// See `resolve --rosdep` for details.
+        #[arg(long)]
+        rosdep: bool,
+
+        /// Colcon build output directory
+        #[arg(long, default_value = "build")]
+        build_base: String,
+
+        /// Colcon install prefix
+        #[arg(long, default_value = "install")]
+        install_base: String,
+
+        /// Path to a colcon flagfile (one token per line, # comments allowed).
+        ///
+        /// The file contents are inserted verbatim into `colcon build` before
+        /// `--packages-select`.  This lets you pass any colcon flag without
+        /// requiring a dedicated launch-plus CLI option, e.g.:
+        ///
+        ///   --symlink-install
+        ///   --cmake-force-configure
+        ///   --cmake-args
+        ///   -DCMAKE_BUILD_TYPE=Release
+        ///   -DCMAKE_CXX_FLAGS=-w
+        ///   --parallel-workers
+        ///   8
+        #[arg(long, value_name = "FILE")]
+        colcon_flagfile: Option<String>,
+
+        /// Print the colcon command without running it
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Build package(s) by name with automatic transitive dependency fetching
+    ///
+    /// Unlike `colcon build --packages-select`, this fetches all transitive
+    /// build dependencies from the lockfile before invoking colcon, so you
+    /// don't need to manually ensure every dependency is on disk.
+    ///
+    /// The seed packages are expanded transitively using on-disk `package.xml`
+    /// build/exec dependencies, missing packages are fetched from the lockfile,
+    /// and the result is built in topological order via colcon.
+    #[command(name = "build-pkg", override_usage = "launch-plus build-pkg [OPTIONS] <PACKAGES>...")]
+    BuildPkg {
+        /// Package names to build
+        #[arg(required = true)]
+        packages: Vec<String>,
+
+        /// Lockfile path (default: manifest.lock.repos)
+        #[arg(short, long, default_value = "manifest.lock.repos")]
+        lockfile: String,
+
+        /// Source directory for sparse-checkout (default: src)
+        #[arg(long, default_value = "src")]
+        src: String,
+
+        /// Use clean workspace state (reset to lockfile SHAs)
+        #[arg(short = 'c', long, conflicts_with = "dirty")]
+        clean: bool,
+
+        /// Use dirty workspace state (skip re-checkout of existing repos)
+        #[arg(short = 'd', long, conflicts_with = "clean")]
+        dirty: bool,
+
+        /// Use shallow clone (depth=1) when fetching new repositories.
+        #[arg(long)]
+        shallow: bool,
+
+        /// Colcon build output directory
+        #[arg(long, default_value = "build")]
+        build_base: String,
+
+        /// Colcon install prefix
+        #[arg(long, default_value = "install")]
+        install_base: String,
+
+        /// Path to a colcon flagfile (one token per line, # comments allowed).
+        /// See `build --colcon-flagfile` for details.
+        #[arg(long, value_name = "FILE")]
+        colcon_flagfile: Option<String>,
+
+        /// Print the colcon command without running it
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Fetch, build, and run tests for a launcher
+    ///
+    /// Like `build` but also includes test_depend packages in the build set.
+    #[command(override_usage = "launch-plus test [OPTIONS] <PACKAGE> <LAUNCHER> [ARG]...")]
+    Test {
+        /// Package name
+        package: String,
+
+        /// Launch file name
+        launcher: String,
+
+        /// Launch arguments in name:=value format
+        #[arg(value_name = "ARG")]
+        args: Vec<String>,
+
+        /// Lockfile path (default: manifest.lock.repos)
+        #[arg(short, long, default_value = "manifest.lock.repos")]
+        lockfile: String,
+
+        /// Source directory for sparse-checkout (default: src)
+        #[arg(long, default_value = "src")]
+        src: String,
+
+        /// Use clean workspace state (reset to lockfile SHAs)
+        #[arg(short = 'c', long, conflicts_with = "dirty")]
+        clean: bool,
+
+        /// Use dirty workspace state (skip re-checkout of existing repos)
+        #[arg(short = 'd', long, conflicts_with = "clean")]
+        dirty: bool,
+
+        /// Use shallow clone (depth=1) when fetching new repositories.
+        /// Off by default; useful in CI where clone history is not needed.
+        /// Has no effect on repositories already cloned.
+        #[arg(long)]
+        shallow: bool,
+
+        /// Allow child launch files to inherit args without explicit forwarding
+        #[arg(long)]
+        allow_global_arg_cascade: bool,
+
+        /// Apply default values from <arg> declarations
+        #[arg(long)]
+        apply_launch_arg_defaults: bool,
+
+        /// Allow OpaqueFunction bodies to open files via portable paths
+        #[arg(long)]
+        apply_opaque_file_access: bool,
+
+        /// Allow raw filesystem paths in <include> and <param from> during resolution.
+        /// See `resolve --allow-including-unportable-path` for details.
+        #[arg(long)]
+        allow_including_unportable_path: bool,
+
+        /// Automatically install packages not in the lockfile via rosdep.
+        /// See `resolve --rosdep` for details.
+        #[arg(long)]
+        rosdep: bool,
+
+        /// Colcon build output directory
+        #[arg(long, default_value = "build")]
+        build_base: String,
+
+        /// Colcon install prefix
+        #[arg(long, default_value = "install")]
+        install_base: String,
+
+        /// Path to a colcon flagfile (one token per line, # comments allowed).
+        /// See `build --colcon-flagfile` for details.
+        #[arg(long, value_name = "FILE")]
+        colcon_flagfile: Option<String>,
+
+        /// Print the colcon command without running it
+        #[arg(long)]
+        dry_run: bool,
+    },
+
     /// Fetch, build, and launch (full execution)
     Run {
         /// Package name
@@ -520,6 +740,168 @@ fn main() -> Result<()> {
                 warn_all,
                 workspace_state,
                 workflow_options,
+                shallow,
+            )?;
+        }
+        Commands::Build {
+            package,
+            launcher,
+            args,
+            lockfile,
+            src,
+            clean,
+            dirty,
+            shallow,
+            allow_global_arg_cascade,
+            apply_launch_arg_defaults,
+            apply_opaque_file_access,
+            allow_including_unportable_path,
+            rosdep,
+            build_base,
+            install_base,
+            colcon_flagfile,
+            dry_run,
+        } => {
+            let workspace_state = parse_workspace_state(clean, dirty)?;
+            let initial_args = parse_launch_args(&args)?;
+            let workflow_options = ResolveWorkflowOptions {
+                global_arg_cascade: allow_global_arg_cascade,
+                apply_arg_defaults: apply_launch_arg_defaults,
+                preview: true, // always resolve from source for build
+                apply_opaque_file_access,
+                allow_unportable_paths: allow_including_unportable_path,
+                rosdep_fallback: rosdep,
+                ..Default::default()
+            };
+            let extra_colcon_args = colcon_flagfile
+                .as_deref()
+                .map(read_colcon_flagfile)
+                .transpose()?
+                .unwrap_or_default();
+            run_build(
+                &package,
+                &launcher,
+                &initial_args,
+                &lockfile,
+                &src,
+                workspace_state,
+                workflow_options,
+                &build_base,
+                &install_base,
+                BuildOptions { dry_run, extra_colcon_args },
+                false, // test_mode
+                verbose,
+                shallow,
+            )?;
+        }
+        Commands::BuildPkg {
+            packages,
+            lockfile,
+            src,
+            clean,
+            dirty,
+            shallow,
+            build_base,
+            install_base,
+            colcon_flagfile,
+            dry_run,
+        } => {
+            let workspace_state = parse_workspace_state(clean, dirty)?;
+            let content = fs::read_to_string(&lockfile)
+                .with_context(|| format!("failed to read lockfile: {lockfile}"))?;
+            let parsed_lockfile = parse_lockfile(&content)
+                .with_context(|| format!("failed to parse lockfile: {lockfile}"))?;
+
+            let src_path = std::path::Path::new(&src);
+            let fetch_options = FetchOptions {
+                recurse_submodules: true,
+                shallow,
+                workspace_state,
+            };
+
+            // Fetch the seed packages themselves first.
+            let to_fetch: Vec<String> = packages.iter()
+                .filter(|p| parsed_lockfile.packages.contains_key(p.as_str()))
+                .cloned()
+                .collect();
+            if !to_fetch.is_empty() {
+                fetch_packages(&to_fetch, &parsed_lockfile, src_path, &fetch_options)?;
+            }
+
+            let seed: std::collections::HashSet<String> = packages.into_iter().collect();
+            let plan = plan_build_from_packages(
+                &seed,
+                &parsed_lockfile,
+                src_path,
+                std::path::Path::new(&build_base),
+                std::path::Path::new(&install_base),
+                &fetch_options,
+                false, // test_mode
+            )?;
+
+            let extra_colcon_args = colcon_flagfile
+                .as_deref()
+                .map(read_colcon_flagfile)
+                .transpose()?
+                .unwrap_or_default();
+
+            tracing::info!(
+                "Building {} packages (from {} seed): {:?}",
+                plan.packages.len(),
+                seed.len(),
+                plan.packages
+            );
+
+            execute_build(&plan, &BuildOptions { dry_run, extra_colcon_args })?;
+        }
+        Commands::Test {
+            package,
+            launcher,
+            args,
+            lockfile,
+            src,
+            clean,
+            dirty,
+            shallow,
+            allow_global_arg_cascade,
+            apply_launch_arg_defaults,
+            apply_opaque_file_access,
+            allow_including_unportable_path,
+            rosdep,
+            build_base,
+            install_base,
+            colcon_flagfile,
+            dry_run,
+        } => {
+            let workspace_state = parse_workspace_state(clean, dirty)?;
+            let initial_args = parse_launch_args(&args)?;
+            let workflow_options = ResolveWorkflowOptions {
+                global_arg_cascade: allow_global_arg_cascade,
+                apply_arg_defaults: apply_launch_arg_defaults,
+                preview: true,
+                apply_opaque_file_access,
+                allow_unportable_paths: allow_including_unportable_path,
+                rosdep_fallback: rosdep,
+                ..Default::default()
+            };
+            let extra_colcon_args = colcon_flagfile
+                .as_deref()
+                .map(read_colcon_flagfile)
+                .transpose()?
+                .unwrap_or_default();
+            run_build(
+                &package,
+                &launcher,
+                &initial_args,
+                &lockfile,
+                &src,
+                workspace_state,
+                workflow_options,
+                &build_base,
+                &install_base,
+                BuildOptions { dry_run, extra_colcon_args },
+                true, // test_mode
+                verbose,
                 shallow,
             )?;
         }
@@ -996,6 +1378,130 @@ fn parse_workspace_state(clean: bool, dirty: bool) -> Result<WorkspaceState> {
         }
         (true, true) => unreachable!("clap conflicts_with prevents --clean and --dirty together"),
     }
+}
+
+/// Read a colcon flagfile and return the tokens as a `Vec<String>`.
+///
+/// Format: one token per line; lines starting with `#` (after trimming) are
+/// comments and are ignored; blank lines are ignored.
+///
+/// The following flags are always managed by launch-plus and must **not** appear
+/// in the flagfile (an error is returned if they do):
+/// - `--packages-*` (e.g. `--packages-select`, `--packages-up-to`, `--packages-skip`)
+/// - `--base-paths`, `--build-base`, `--install-base`
+///
+/// Example file:
+/// ```text
+/// # Build settings
+/// --symlink-install
+/// --cmake-force-configure
+/// --cmake-args
+/// -DCMAKE_BUILD_TYPE=Release
+/// -DCMAKE_CXX_FLAGS=-w
+/// --parallel-workers
+/// 8
+/// ```
+fn read_colcon_flagfile(path: &str) -> Result<Vec<String>> {
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("failed to read colcon flagfile: {path}"))?;
+    let tokens: Vec<String> = content
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(str::to_string)
+        .collect();
+
+    // Reject flags that conflict with arguments launch-plus always manages.
+    for token in &tokens {
+        if token.starts_with("--packages-")
+            || token == "--base-paths"
+            || token == "--build-base"
+            || token == "--install-base"
+        {
+            anyhow::bail!(
+                "colcon flagfile {path:?}: '{}' conflicts with a launch-plus-managed \
+                 argument; remove it from the flagfile",
+                token
+            );
+        }
+    }
+
+    Ok(tokens)
+}
+
+/// Execute the build/test command: resolve → plan → colcon build
+#[allow(clippy::too_many_arguments)]
+fn run_build(
+    package: &str,
+    launcher: &str,
+    initial_args: &std::collections::HashMap<String, String>,
+    lockfile_path: &str,
+    src_dir: &str,
+    workspace_state: WorkspaceState,
+    workflow_options: ResolveWorkflowOptions,
+    build_base: &str,
+    install_base: &str,
+    build_options: BuildOptions,
+    test_mode: bool,
+    verbose: bool,
+    shallow: bool,
+) -> Result<()> {
+    let content = fs::read_to_string(lockfile_path)
+        .with_context(|| format!("failed to read lockfile: {lockfile_path}"))?;
+    let lockfile = parse_lockfile(&content)
+        .with_context(|| format!("failed to parse lockfile: {lockfile_path}"))?;
+
+    let fetch_path = Path::new(src_dir);
+    let fetch_options = FetchOptions {
+        recurse_submodules: true,
+        shallow,
+        workspace_state,
+    };
+
+    let result = resolve_launch_recursive(
+        &lockfile,
+        package,
+        launcher,
+        fetch_path,
+        &fetch_options,
+        initial_args.clone(),
+        &workflow_options,
+    )
+    .with_context(|| format!("failed to resolve {package}/{launcher}"))?;
+
+    if !result.errors.is_empty() {
+        for e in &result.errors {
+            eprintln!("[error] {e}");
+        }
+        anyhow::bail!("resolve step produced errors; aborting build");
+    }
+
+    let plan = plan_build_from_packages(
+        &result.direct_packages,
+        &lockfile,
+        fetch_path,
+        Path::new(build_base),
+        Path::new(install_base),
+        &fetch_options,
+        test_mode,
+    )
+    .with_context(|| "failed to compute build plan")?;
+
+    eprintln!(
+        "[build] {} packages to build{}",
+        plan.packages.len(),
+        if test_mode { " (+ test deps)" } else { "" }
+    );
+    if verbose {
+        for pkg in &plan.packages {
+            eprintln!("  {pkg}");
+        }
+    }
+
+    execute_build(&plan, &build_options)
+        .with_context(|| "colcon build failed")?;
+
+    Ok(())
 }
 
 /// Execute the resolve command: recursively resolve launch file dependencies

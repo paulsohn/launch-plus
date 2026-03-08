@@ -18,6 +18,9 @@ tracing.workspace = true
 tar.workspace = true
 tempfile.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [lib]
 name = "launch_plus_core"
 crate-type = ["lib", "cdylib"]

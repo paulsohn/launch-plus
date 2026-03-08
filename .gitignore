@@ -20,6 +20,28 @@ Thumbs.db
 *.log
 logs/
 
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Python build
+*.so
+*.pyd
+.eggs/
+*.egg
+.pytest_cache/
+.ruff_cache/
+
+# Maturin
+.maturin/
+
 # Testing artifacts (created when running launch-plus from repo root)
 /src/
 /manifest.repos

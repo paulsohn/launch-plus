@@ -28,6 +28,9 @@ quick-xml = { version = "0.37", features = ["serialize"] }
 # Archive handling
 tar = "0.4"
 
+# Python bindings
+pyo3 = { version = "0.24", features = ["extension-module"] }
+
 # Testing
 tempfile = "3.16"
 

@@ -20,3 +20,12 @@ tempfile.workspace = true
 
 [lib]
 name = "launch_plus_core"
+crate-type = ["lib", "cdylib"]
+
+[features]
+default = []
+python = ["pyo3"]
+
+[dependencies.pyo3]
+workspace = true
+optional = true

@@ -8,6 +8,7 @@ pub mod error;
 pub mod fetcher;
 pub mod indexer;
 pub mod locator;
+pub mod orchestrator;
 pub mod parser;
 pub mod resolver;
 
@@ -35,5 +36,23 @@ pub use locator::{locator_from_lockfile, locator_from_workspace, PackageLocator}
 // Re-export fetcher types
 pub use fetcher::{fetch_packages, FetchOptions, FetchedPackage};
 
+// Re-export orchestrator for resolve workflow
+pub use orchestrator::{resolve_launch_recursive, ResolveResult, ResolveWorkflowOptions};
+
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[cfg(feature = "python")]
+mod python;
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+/// Python module initialization
+#[cfg(feature = "python")]
+#[pymodule]
+fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("__version__", VERSION)?;
+    m.add_function(wrap_pyfunction!(python::hello, m)?)?;
+    Ok(())
+}

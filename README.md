@@ -16,7 +16,9 @@ remap that would be active at runtime.
 - `python3` in `PATH` (used to evaluate `$(eval ...)` substitutions and to resolve Python launch files)
 - ROS 2 sourced — only required for `--rosdep` (system package resolution); the resolver itself does not depend on any ROS 2 Python packages
 
-## Build
+## Quickstart
+
+### 1. Clone and build
 
 ```bash
 git clone https://github.com/paulsohn/launch-plus.git
@@ -25,6 +27,83 @@ cargo build --bin launch-plus --release
 # binary: target/release/launch-plus
 # or use `cargo run --bin launch-plus --` in place of the binary below
 ```
+
+### 2. Try the bundled Autoware example
+
+A pre-generated lockfile for a full [Autoware workspace](https://github.com/autowarefoundation/autoware/tree/a06b188d3275da9de561ef4aa5ce0c4bfd87d716/repositories) is included in
+[`example/autoware/`](example/autoware/).  You can run the resolver against it
+immediately without writing a manifest or running `index` first.
+
+```bash
+# Source ROS 2 first so that rosdep and ament can locate system packages.
+source /opt/ros/humble/setup.bash
+
+cd example/autoware
+
+cargo run --bin launch-plus -- resolve -c autoware_launch autoware.launch.xml \
+  sensor_model:=sample_sensor_kit \
+  vehicle_model:=sample_vehicle \
+  map_path:="[map_path]" \
+  --allow-global-arg-cascade \
+  --apply-launch-arg-defaults \
+  --apply-opaque-file-access \
+  --allow-including-unportable-path \
+  --show-args \
+  --inline-params \
+  --flatten-namespaces \
+  --rosdep \
+  --preview \
+  > resolved.launch.xml
+```
+
+On first run, the resolver will sparse-clone only the packages it needs into
+`example/autoware/src/` (this may take a few minutes). Subsequent runs reuse
+the already-fetched packages and are fast.
+
+`--preview` keeps `$(find-pkg-share pkg)/...` placeholders in the output
+instead of absolute filesystem paths, making the result portable across machines.
+
+The pre-generated output files (paths anonymized, `[home]` replaces the home
+directory) are included for reference:
+- [`example/autoware/resolved.launch.xml`](example/autoware/resolved.launch.xml)
+- [`example/autoware/resolver.log`](example/autoware/resolver.log)
+
+To build the resolved packages with colcon (requires a sourced ROS 2 environment
+and `colcon` installed):
+
+```bash
+cd example/autoware
+
+cargo run --bin launch-plus -- build -c autoware_launch autoware.launch.xml \
+  sensor_model:=sample_sensor_kit \
+  vehicle_model:=sample_vehicle \
+  map_path:="[map_path]" \
+  --allow-global-arg-cascade \
+  --apply-launch-arg-defaults \
+  --apply-opaque-file-access \
+  --allow-including-unportable-path \
+  --rosdep \
+  --colcon-flagfile colcon-flags.txt
+```
+
+`colcon-flags.txt` enables `--symlink-install` by default; edit it to add
+`--cmake-args`, `--parallel-workers`, etc.
+
+### 3. Use your own manifest
+
+Write a `.repos` file listing the repositories you need — see
+[`example/autoware/manifest.repos`](example/autoware/manifest.repos) for the
+format — then generate a lockfile:
+
+```bash
+cd example/autoware
+
+cargo run --bin launch-plus -- index
+```
+
+The lockfile pins every repository to a concrete commit SHA and records the ROS
+packages it contains.  Commit it alongside your manifest, then run `resolve` as
+above pointing `--lockfile` at it.
 
 ## Key commands
 
@@ -101,7 +180,8 @@ launch-plus build autoware_launch autoware.launch.xml \
 Each line of the flagfile is inserted verbatim into `colcon build` before
 `--packages-select`.  Flags that conflict with launch-plus-managed arguments
 (`--packages-*`, `--base-paths`, `--build-base`, `--install-base`) are
-rejected as errors.
+rejected as errors.  See [`example/colcon-flags.example.txt`](example/colcon-flags.example.txt)
+for an annotated template.
 
 | Flag | Description |
 |---|---|

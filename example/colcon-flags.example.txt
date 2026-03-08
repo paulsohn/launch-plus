@@ -1,0 +1,52 @@
+# Example colcon flagfile for launch-plus build / test modes.
+#
+# Usage:
+#   launch-plus build ... --colcon-flagfile examples/colcon-flags.example.txt
+#   launch-plus test  ... --colcon-flagfile examples/colcon-flags.example.txt
+#
+# Format:
+#   One shell token per line.  Blank lines and lines starting with '#' are ignored.
+#   Multi-token arguments (e.g. --cmake-args -DFOO=bar) each go on their own line.
+#
+# Restrictions:
+#   The following flags are managed by launch-plus and must NOT appear here:
+#     --packages-select, --packages-up-to, --packages-skip, --packages-*
+#     --base-paths, --build-base, --install-base
+
+# ── Installation ──────────────────────────────────────────────────────────────
+
+# Install via symlinks instead of copying.
+# Recommended for development: incremental rebuilds only relink changed files.
+--symlink-install
+
+# ── Parallelism ───────────────────────────────────────────────────────────────
+
+# Use the parallel executor (default on most setups, but explicit is fine).
+--executor
+parallel
+
+# Cap parallelism to avoid overloading the machine.
+# Remove or raise to use all available cores.
+--parallel-workers
+8
+
+# ── CMake ─────────────────────────────────────────────────────────────────────
+
+# All tokens after --cmake-args are forwarded to CMake until the next
+# colcon flag.  Each -D... token must be on its own line.
+--cmake-args
+-DCMAKE_BUILD_TYPE=Release
+
+# Suppress warnings from third-party headers (optional).
+# -DCMAKE_CXX_FLAGS=-w
+
+# Force CMake to re-run its configure step even if the cache exists.
+# Useful after toolchain changes; slow, so disable for routine builds.
+# --cmake-force-configure
+
+# ── Overriding ────────────────────────────────────────────────────────────────
+
+# Allow packages already present in the install space to be overridden
+# by packages in the build plan.  Needed when mixing pre-built debians
+# with source builds.
+# --allow-overriding

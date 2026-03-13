@@ -176,7 +176,7 @@ impl PackageLocator {
 
     /// Locate a package's share directory from AMENT_PREFIX_PATH only.
     ///
-    /// Unlike [`locate_package_share`] this skips the workspace entirely and
+    /// Unlike `locate_package_share` this skips the workspace entirely and
     /// only returns paths from the colcon install tree.  Used in non-preview
     /// mode where the resolved output must reference installed artifacts.
     pub fn locate_install_share(&self, package: &str) -> Option<PathBuf> {
@@ -336,7 +336,7 @@ impl PackageLocator {
     /// (e.g. py_resolver.py) so they can resolve `$(find-pkg-share X)` substitutions
     /// against source packages.
     ///
-    /// In non-preview mode use [`all_install_shares`] instead.
+    /// In non-preview mode use `all_install_shares` instead.
     pub fn all_package_shares(&self) -> HashMap<String, String> {
         let mut result = HashMap::new();
         if let (Some(lockfile), Some(workspace)) = (&self.lockfile, &self.workspace_src) {

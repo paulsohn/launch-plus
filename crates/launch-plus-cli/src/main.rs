@@ -43,7 +43,7 @@ enum Commands {
         output: Option<String>,
 
         /// Source directory for cloning repositories
-        /// Repos are cloned to <src>/<workspace_path> and reused on subsequent runs
+        /// Repos are cloned to `<src>/<workspace_path>` and reused on subsequent runs
         #[arg(long, default_value = "src")]
         src: String,
 
@@ -141,8 +141,8 @@ enum Commands {
         /// forwarding, emulating ROS 2's global LaunchConfiguration context.
         ///
         /// By default (strict mode) every arg used in an included file must be declared
-        /// with <arg name="..."/> in that file and explicitly passed via
-        /// <arg name="..." value="$(var ...)"/> in the <include> tag.  Strict mode makes
+        /// with `<arg name="..."/>` in that file and explicitly passed via
+        /// `<arg name="..." value="$(var ...)"/>` in the `<include>` tag.  Strict mode makes
         /// each launch file self-describing and composable.
         ///
         /// This flag disables that check.  Use it only for legacy launch files that cannot
@@ -151,7 +151,7 @@ enum Commands {
         #[arg(long)]
         allow_global_arg_cascade: bool,
 
-        /// Apply default="..." values from <arg> declarations when an arg is not supplied.
+        /// Apply default="..." values from `<arg>` declarations when an arg is not supplied.
         ///
         /// By default (strict mode) every arg must be provided explicitly on the command
         /// line.  Missing args surface as "undefined variable" errors, making hidden
@@ -189,7 +189,7 @@ enum Commands {
         #[arg(long, requires = "preview")]
         expand_paths: bool,
 
-        /// Allow raw filesystem paths in <include file=...> and <param from=...> in preview
+        /// Allow raw filesystem paths in `<include file=...>` and `<param from=...>` in preview
         /// mode instead of requiring $(find-pkg-share ...) substitutions.
         ///
         /// By default (strict mode) any absolute path passed to an include source or param
@@ -201,7 +201,7 @@ enum Commands {
         #[arg(long)]
         allow_including_unportable_path: bool,
 
-        /// Remove source-boundary <group> wrappers from the resolved output.
+        /// Remove source-boundary `<group>` wrappers from the resolved output.
         ///
         /// By default each include-file boundary is represented by a `<group>` element
         /// that wraps the nodes originating from that file.  This flag suppresses those
@@ -215,8 +215,8 @@ enum Commands {
         #[arg(long)]
         flatten: bool,
 
-        /// Inline namespace stacks directly onto each <node> element instead of
-        /// preserving <push-ros-namespace> wrappers.
+        /// Inline namespace stacks directly onto each `<node>` element instead of
+        /// preserving `<push-ros-namespace>` wrappers.
         ///
         /// By default the resolved XML preserves `<push-ros-namespace namespace="..."/>`
         /// inside `<group>` elements, faithfully representing how namespaces are applied
@@ -279,7 +279,7 @@ enum Commands {
         /// resolver runs `rosdep install --from-keys <package>` to install it, then
         /// retries.
         ///
-        /// Requires ROS_DISTRO to be set (source /opt/ros/<distro>/setup.bash).
+        /// Requires ROS_DISTRO to be set (source /opt/ros/`<distro>`/setup.bash).
         #[arg(long)]
         rosdep: bool,
 
@@ -316,7 +316,7 @@ enum Commands {
     /// Fetch and build packages for a launcher (target-focused, Bazel-like)
     ///
     /// Resolves the launch file, computes the transitive build-dependency closure
-    /// (build_depend + <depend>), and invokes colcon with the exact package list.
+    /// (build_depend + `<depend>`), and invokes colcon with the exact package list.
     #[command(override_usage = "launch-plus build [OPTIONS] <PACKAGE> <LAUNCHER> [ARG]...")]
     Build {
         /// Package name
@@ -355,7 +355,7 @@ enum Commands {
         #[arg(long)]
         allow_global_arg_cascade: bool,
 
-        /// Apply default values from <arg> declarations
+        /// Apply default values from `<arg>` declarations
         #[arg(long)]
         apply_launch_arg_defaults: bool,
 
@@ -363,7 +363,7 @@ enum Commands {
         #[arg(long)]
         apply_opaque_file_access: bool,
 
-        /// Allow raw filesystem paths in <include> and <param from> during resolution.
+        /// Allow raw filesystem paths in `<include>` and `<param from>` during resolution.
         /// See `resolve --allow-including-unportable-path` for details.
         #[arg(long)]
         allow_including_unportable_path: bool,
@@ -499,7 +499,7 @@ enum Commands {
         #[arg(long)]
         allow_global_arg_cascade: bool,
 
-        /// Apply default values from <arg> declarations
+        /// Apply default values from `<arg>` declarations
         #[arg(long)]
         apply_launch_arg_defaults: bool,
 
@@ -507,7 +507,7 @@ enum Commands {
         #[arg(long)]
         apply_opaque_file_access: bool,
 
-        /// Allow raw filesystem paths in <include> and <param from> during resolution.
+        /// Allow raw filesystem paths in `<include>` and `<param from>` during resolution.
         /// See `resolve --allow-including-unportable-path` for details.
         #[arg(long)]
         allow_including_unportable_path: bool,
@@ -578,7 +578,7 @@ enum Commands {
         #[arg(long)]
         allow_global_arg_cascade: bool,
 
-        /// Apply default="..." values from <arg> declarations when an arg is not supplied.
+        /// Apply default="..." values from `<arg>` declarations when an arg is not supplied.
         /// See `resolve --apply-launch-arg-defaults` for details.
         #[arg(long)]
         apply_launch_arg_defaults: bool,
@@ -588,7 +588,7 @@ enum Commands {
         #[arg(long)]
         preview: bool,
 
-        /// Allow raw filesystem paths in <include> and <param from> in preview mode.
+        /// Allow raw filesystem paths in `<include>` and `<param from>` in preview mode.
         /// See `resolve --allow-including-unportable-path` for details.
         #[arg(long)]
         allow_including_unportable_path: bool,

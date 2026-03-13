@@ -4,7 +4,7 @@
 //!
 //! The build plan is derived from the launch resolver output:
 //!
-//! 1. [`ResolveResult::direct_packages`] — packages directly referenced in the launch graph
+//! 1. `ResolveResult::direct_packages` — packages directly referenced in the launch graph
 //!    (node `pkg=` attributes and included packages).
 //! 2. [`resolve_dependencies`] with [`DependencyMode::Build`] — expands the seed set
 //!    transitively using `build_depend`, `<depend>`, `build_export_depend`, and
@@ -169,7 +169,12 @@ pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<
     // Install a SIGINT handler that sets the flag instead of killing our process.
     // The default SIGINT behaviour is restored after the child exits.
     #[cfg(unix)]
-    let prev_handler = unsafe { libc::signal(libc::SIGINT, sigint_handler as libc::sighandler_t) };
+    let prev_handler = unsafe {
+        libc::signal(
+            libc::SIGINT,
+            sigint_handler as *const () as libc::sighandler_t,
+        )
+    };
 
     let status = child
         .wait()

@@ -109,9 +109,9 @@ pub enum NodeKind {
 
 /// Context for resolving substitutions
 pub struct SubstitutionContext {
-    /// Argument values (from <arg> declarations)
+    /// Argument values (from `<arg>` declarations)
     pub args: HashMap<String, String>,
-    /// Variable values (from <let> declarations)
+    /// Variable values (from `<let>` declarations)
     pub vars: HashMap<String, String>,
     /// Path to the current launch file (for $(dirname) and source traceability)
     pub launch_file_dir: Option<PathBuf>,
@@ -812,15 +812,15 @@ pub struct ResolvedLaunch {
 
     /// Non-fatal errors collected during resolution (e.g. unportable path detection in
     /// preview mode when `--allow-including-unportable-path` is not set).
-    /// Propagated to [`ResolveResult::errors`] by the orchestrator via [`ResolveResult::merge`].
+    /// Propagated to `ResolveResult::errors` by the orchestrator via `ResolveResult::merge`.
     pub errors: Vec<String>,
 
     /// Non-fatal warnings collected during resolution.
-    /// Propagated to [`ResolveResult::warnings`] by the orchestrator via [`ResolveResult::merge`].
+    /// Propagated to `ResolveResult::warnings` by the orchestrator via `ResolveResult::merge`.
     pub warnings: Vec<String>,
 
     /// Informational messages (pedantic warnings suppressed by default).
-    /// Propagated to [`ResolveResult::infos`] by the orchestrator.
+    /// Propagated to `ResolveResult::infos` by the orchestrator.
     pub infos: Vec<String>,
 }
 
@@ -980,7 +980,7 @@ pub struct ResolveOptions {
     /// Apply `default="..."` values from `<arg>` declarations when an arg is not provided.
     ///
     /// **Default: `true`** (library default; preserves backward compatibility for unit tests).
-    /// The CLI defaults this to `false` via [`ResolveWorkflowOptions`] — users must
+    /// The CLI defaults this to `false` via `ResolveWorkflowOptions` — users must
     /// supply every arg explicitly or opt in with `--apply-launch-arg-defaults`.
     ///
     /// When `false`, a missing arg remains unset; referencing it produces

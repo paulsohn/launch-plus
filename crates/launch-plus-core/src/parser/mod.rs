@@ -211,7 +211,7 @@ pub enum ConditionKind {
 /// A format-agnostic representation of a single launch file element.
 ///
 /// Both the XML and YAML parsers emit `RawElement` trees.  The shared
-/// [`raw_to_launch`] function converts them into the typed [`LaunchElement`]
+/// `raw_to_launch` function converts them into the typed [`LaunchElement`]
 /// AST, validating required attributes and collecting unknown attributes in
 /// a single place.
 #[derive(Debug, Clone)]

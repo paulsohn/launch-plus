@@ -209,68 +209,6 @@ pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<
     Ok(())
 }
 
-/// Install external (non-lockfile) build dependencies via `rosdep`.
-///
-/// Runs `rosdep update` (once per process) then
-/// `rosdep install --rosdistro $ROS_DISTRO -y --from-keys <pkgs...>`.
-///
-/// This is used before `colcon build` to ensure system ROS packages
-/// referenced in `package.xml` `<depend>` / `<build_depend>` are installed.
-pub fn install_rosdep_keys(packages: &HashSet<String>) -> crate::Result<()> {
-    if packages.is_empty() {
-        return Ok(());
-    }
-
-    let ros_distro = std::env::var("ROS_DISTRO")
-        .ok()
-        .filter(|d| !d.is_empty())
-        .ok_or_else(|| {
-            crate::Error::ProcessExecution(
-                "ROS_DISTRO is not set; cannot install external deps via rosdep".to_string(),
-            )
-        })?;
-
-    // rosdep update (best-effort, once per process)
-    {
-        use std::sync::Once;
-        static ROSDEP_UPDATE: Once = Once::new();
-        ROSDEP_UPDATE.call_once(|| {
-            tracing::info!("Running one-time rosdep update");
-            let _ = Command::new("rosdep").args(["update"]).status();
-        });
-    }
-
-    let pkg_list: Vec<&str> = packages.iter().map(|s| s.as_str()).collect();
-    tracing::info!(
-        "Installing {} external build deps via rosdep: {:?}",
-        pkg_list.len(),
-        pkg_list
-    );
-
-    let mut args = vec![
-        "install".to_string(),
-        "--rosdistro".to_string(),
-        ros_distro,
-        "-y".to_string(),
-        "--from-keys".to_string(),
-    ];
-    args.extend(packages.iter().cloned());
-
-    let status = Command::new("rosdep")
-        .args(&args)
-        .status()
-        .map_err(|e| crate::Error::ProcessExecution(format!("failed to run rosdep: {e}")))?;
-
-    if !status.success() {
-        return Err(crate::Error::ProcessExecution(format!(
-            "rosdep install failed (exit {}); some external build deps may be unavailable",
-            status.code().unwrap_or(-1)
-        )));
-    }
-
-    Ok(())
-}
-
 /// Signal-safe SIGINT handler: sets the INTERRUPTED flag.
 ///
 /// The child process (colcon) is in the same process group and receives SIGINT

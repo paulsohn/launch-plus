@@ -2,15 +2,14 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use launch_plus_core::builder::{
-    BuildOptions, execute_build, install_rosdep_keys, plan_build_from_packages,
-};
+use launch_plus_core::builder::{BuildOptions, execute_build, plan_build_from_packages};
 use launch_plus_core::fetcher::{FetchOptions, WorkspaceState, fetch_packages};
 use launch_plus_core::indexer::{
     Lockfile, blobless_clone, discover_packages, generate_lockfile, parse_lockfile, parse_repos,
     resolve_version_local, serialize_lockfile,
 };
 use launch_plus_core::orchestrator::{ResolveWorkflowOptions, resolve_launch_recursive};
+use launch_plus_core::rosdep::rosdep_install;
 use std::fs;
 use std::path::Path;
 
@@ -878,7 +877,8 @@ fn main() -> Result<()> {
                     "[build-pkg] Installing {} external deps via rosdep",
                     plan.external_deps.len()
                 );
-                install_rosdep_keys(&plan.external_deps)
+                let keys: Vec<&str> = plan.external_deps.iter().map(|s| s.as_str()).collect();
+                rosdep_install(&keys)
                     .with_context(|| "failed to install external build dependencies via rosdep")?;
             }
 
@@ -1549,7 +1549,8 @@ fn run_build(
                 "[build] Installing {} external deps via rosdep",
                 plan.external_deps.len()
             );
-            install_rosdep_keys(&plan.external_deps)
+            let keys: Vec<&str> = plan.external_deps.iter().map(|s| s.as_str()).collect();
+            rosdep_install(&keys)
                 .with_context(|| "failed to install external build dependencies via rosdep")?;
         } else if verbose {
             eprintln!(

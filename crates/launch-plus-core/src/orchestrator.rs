@@ -576,59 +576,13 @@ fn ensure_package_fetched(
 
 /// Attempt to install a missing ROS package via `rosdep`.
 ///
-/// Runs `rosdep update` (best-effort) then
-/// `rosdep install --rosdistro $ROS_DISTRO -y --from-keys <package>`.
-///
-/// Returns `true` when installation succeeded (exit 0), `false` otherwise.
-/// Warnings/errors are appended to `result`.
+/// Delegates to [`crate::rosdep::rosdep_install`] and translates the result
+/// into a boolean + error on `result`.
 fn try_rosdep_install(package: &str, result: &mut ResolveResult) -> bool {
-    use std::process::Command;
-
-    let ros_distro = match std::env::var("ROS_DISTRO") {
-        Ok(d) if !d.is_empty() => d,
-        _ => {
-            result.add_warning(
-                "ROS_DISTRO is not set; source /opt/ros/<distro>/setup.bash before running launch-plus".to_string(),
-            );
-            result.add_error(format!(
-                "cannot rosdep-install '{}': ROS_DISTRO is not set",
-                package
-            ));
-            return false;
-        }
-    };
-
-    // rosdep update (best-effort; failure is non-fatal — the db may already be fresh)
-    let _ = Command::new("rosdep").args(["update"]).status();
-
-    // rosdep install for the specific package key
-    info!(
-        "Installing '{}' via rosdep (distro={})",
-        package, ros_distro
-    );
-    let status = Command::new("rosdep")
-        .args([
-            "install",
-            "--rosdistro",
-            &ros_distro,
-            "-y",
-            "--from-keys",
-            package,
-        ])
-        .status();
-
-    match status {
-        Ok(s) if s.success() => true,
-        Ok(s) => {
-            result.add_error(format!(
-                "rosdep install failed for '{}' (exit {})",
-                package,
-                s.code().unwrap_or(-1)
-            ));
-            false
-        }
+    match crate::rosdep::rosdep_install(&[package]) {
+        Ok(()) => true,
         Err(e) => {
-            result.add_error(format!("failed to run rosdep for '{}': {}", package, e));
+            result.add_error(format!("{e}"));
             false
         }
     }

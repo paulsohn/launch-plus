@@ -20,6 +20,7 @@ pub mod locator;
 pub mod orchestrator;
 pub mod parser;
 pub mod resolver;
+pub mod rosdep;
 
 // Re-export common types
 pub use error::{Error, Result};
@@ -45,9 +46,10 @@ pub use indexer::{
 pub use fetcher::{FetchOptions, FetchedPackage, fetch_packages};
 
 // Re-export builder types
-pub use builder::{
-    BuildOptions, BuildPlan, execute_build, install_rosdep_keys, plan_build_from_packages,
-};
+pub use builder::{BuildOptions, BuildPlan, execute_build, plan_build_from_packages};
+
+// Re-export rosdep helpers
+pub use rosdep::{ensure_rosdep_updated, rosdep_install};
 
 // Re-export orchestrator for resolve workflow
 pub use orchestrator::{ResolveResult, ResolveWorkflowOptions, resolve_launch_recursive};

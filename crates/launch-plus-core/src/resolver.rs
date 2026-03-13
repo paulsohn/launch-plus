@@ -140,6 +140,9 @@ pub struct SubstitutionContext {
     /// that hasn't been fetched yet (silent — it will be resolved after fetch) and a
     /// system/external package that genuinely isn't installed (error).
     pub lockfile_packages: Arc<HashSet<String>>,
+    /// When `true`, missing packages are not treated as errors because `--rosdep`
+    /// may install them later.  The portable form is kept silently.
+    pub rosdep_fallback: bool,
 }
 
 impl Default for SubstitutionContext {
@@ -154,6 +157,7 @@ impl Default for SubstitutionContext {
             namespace_stack: Vec::new(),
             preview_mode: false,
             lockfile_packages: Arc::new(HashSet::new()),
+            rosdep_fallback: false,
         }
     }
 }
@@ -488,9 +492,9 @@ fn resolve_substitutions_inner(
                     if let Some(ref resolver) = ctx.pkg_share_resolver {
                         if let Some(path) = resolver(&pkg_name) {
                             result.push_str(&path.to_string_lossy());
-                        } else if ctx.lockfile_packages.contains(&pkg_name) {
-                            // Package is in the lockfile but not yet fetched — keep the
-                            // portable form silently; the fetcher will make it available.
+                        } else if ctx.lockfile_packages.contains(&pkg_name) || ctx.rosdep_fallback {
+                            // Package is in the lockfile but not yet fetched, or --rosdep
+                            // may install it later — keep the portable form silently.
                             result.push_str(&format!("$(find-pkg-share {})", pkg_name));
                         } else {
                             // Package is not in the lockfile and not in the ament index —
@@ -1368,6 +1372,7 @@ fn resolve_element(
                         pkg_prefix_resolver: ctx.pkg_prefix_resolver.clone(),
                         preview_mode: ctx.preview_mode,
                         lockfile_packages: ctx.lockfile_packages.clone(),
+                        rosdep_fallback: ctx.rosdep_fallback,
                     };
                     resolve_elements(children, &mut scoped_ctx, result, options, include_stack)?;
                     // Propagate newly declared args (with defaults) from the scoped context
@@ -1665,6 +1670,7 @@ fn resolve_element(
                         namespace_stack: ctx.namespace_stack.clone(),
                         preview_mode: ctx.preview_mode,
                         lockfile_packages: ctx.lockfile_packages.clone(),
+                        rosdep_fallback: ctx.rosdep_fallback,
                     };
 
                     let nodes_before_xml = result.nodes.len();

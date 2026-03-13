@@ -1427,6 +1427,7 @@ fn resolve_file_recursive(
         })),
         preview_mode: workflow_options.preview,
         lockfile_packages: lockfile_pkg_names,
+        rosdep_fallback: workflow_options.rosdep_fallback,
         ..Default::default()
     };
     // Build a callback that runs py_resolver inline on Python includes so that

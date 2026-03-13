@@ -21,6 +21,7 @@
 //!
 //! For `test` mode, [`DependencyMode::All`] adds `test_depend` packages to the build set.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -36,6 +37,12 @@ use crate::indexer::{DependencyMode, Lockfile, compute_build_order, resolve_depe
 pub struct BuildPlan {
     /// Lockfile packages to build, in topological order (dependencies first).
     pub packages: Vec<String>,
+    /// External dependencies not in the lockfile (e.g. system ROS packages).
+    ///
+    /// These are discovered from `package.xml` `<depend>`, `<build_depend>`, etc.
+    /// but are not part of the lockfile.  They must be installed via `rosdep` or
+    /// `apt` before building.
+    pub external_deps: HashSet<String>,
     /// Source directory passed to `colcon build --base-paths`.
     pub src_dir: PathBuf,
     /// Colcon build output directory (`--build-base`).
@@ -116,6 +123,7 @@ pub fn plan_build_from_packages(
 
     Ok(BuildPlan {
         packages,
+        external_deps: graph.external,
         src_dir: src_dir.to_path_buf(),
         build_base: build_base.to_path_buf(),
         install_base: install_base.to_path_buf(),
@@ -198,6 +206,68 @@ pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<
             "colcon build failed with status: {status}"
         )));
     }
+    Ok(())
+}
+
+/// Install external (non-lockfile) build dependencies via `rosdep`.
+///
+/// Runs `rosdep update` (once per process) then
+/// `rosdep install --rosdistro $ROS_DISTRO -y --from-keys <pkgs...>`.
+///
+/// This is used before `colcon build` to ensure system ROS packages
+/// referenced in `package.xml` `<depend>` / `<build_depend>` are installed.
+pub fn install_rosdep_keys(packages: &HashSet<String>) -> crate::Result<()> {
+    if packages.is_empty() {
+        return Ok(());
+    }
+
+    let ros_distro = std::env::var("ROS_DISTRO")
+        .ok()
+        .filter(|d| !d.is_empty())
+        .ok_or_else(|| {
+            crate::Error::ProcessExecution(
+                "ROS_DISTRO is not set; cannot install external deps via rosdep".to_string(),
+            )
+        })?;
+
+    // rosdep update (best-effort, once per process)
+    {
+        use std::sync::Once;
+        static ROSDEP_UPDATE: Once = Once::new();
+        ROSDEP_UPDATE.call_once(|| {
+            tracing::info!("Running one-time rosdep update");
+            let _ = Command::new("rosdep").args(["update"]).status();
+        });
+    }
+
+    let pkg_list: Vec<&str> = packages.iter().map(|s| s.as_str()).collect();
+    tracing::info!(
+        "Installing {} external build deps via rosdep: {:?}",
+        pkg_list.len(),
+        pkg_list
+    );
+
+    let mut args = vec![
+        "install".to_string(),
+        "--rosdistro".to_string(),
+        ros_distro,
+        "-y".to_string(),
+        "--from-keys".to_string(),
+    ];
+    args.extend(packages.iter().cloned());
+
+    let status = Command::new("rosdep")
+        .args(&args)
+        .status()
+        .map_err(|e| crate::Error::ProcessExecution(format!("failed to run rosdep: {e}")))?;
+
+    if !status.success() {
+        return Err(crate::Error::ProcessExecution(format!(
+            "rosdep install failed (exit {}); some external build deps may be unavailable",
+            status.code().unwrap_or(-1)
+        )));
+    }
+
     Ok(())
 }
 

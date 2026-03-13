@@ -2,7 +2,9 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use launch_plus_core::builder::{BuildOptions, execute_build, plan_build_from_packages};
+use launch_plus_core::builder::{
+    BuildOptions, execute_build, install_rosdep_keys, plan_build_from_packages,
+};
 use launch_plus_core::fetcher::{FetchOptions, WorkspaceState, fetch_packages};
 use launch_plus_core::indexer::{
     Lockfile, blobless_clone, discover_packages, generate_lockfile, parse_lockfile, parse_repos,
@@ -453,6 +455,11 @@ enum Commands {
         #[arg(long, value_name = "FILE")]
         colcon_flagfile: Option<String>,
 
+        /// Automatically install external dependencies via rosdep.
+        /// See `build --rosdep` for details.
+        #[arg(long)]
+        rosdep: bool,
+
         /// Print the colcon command without running it
         #[arg(long)]
         dry_run: bool,
@@ -816,6 +823,7 @@ fn main() -> Result<()> {
             build_base,
             install_base,
             colcon_flagfile,
+            rosdep,
             dry_run,
         } => {
             let workspace_state = parse_workspace_state(clean, dirty)?;
@@ -864,6 +872,15 @@ fn main() -> Result<()> {
                 seed.len(),
                 plan.packages
             );
+
+            if rosdep && !plan.external_deps.is_empty() {
+                eprintln!(
+                    "[build-pkg] Installing {} external deps via rosdep",
+                    plan.external_deps.len()
+                );
+                install_rosdep_keys(&plan.external_deps)
+                    .with_context(|| "failed to install external build dependencies via rosdep")?;
+            }
 
             execute_build(
                 &plan,
@@ -1523,6 +1540,23 @@ fn run_build(
     if verbose {
         for pkg in &plan.packages {
             eprintln!("  {pkg}");
+        }
+    }
+
+    if !plan.external_deps.is_empty() {
+        if workflow_options.rosdep_fallback {
+            eprintln!(
+                "[build] Installing {} external deps via rosdep",
+                plan.external_deps.len()
+            );
+            install_rosdep_keys(&plan.external_deps)
+                .with_context(|| "failed to install external build dependencies via rosdep")?;
+        } else if verbose {
+            eprintln!(
+                "[build] {} external deps not in lockfile (use --rosdep to install): {:?}",
+                plan.external_deps.len(),
+                plan.external_deps
+            );
         }
     }
 

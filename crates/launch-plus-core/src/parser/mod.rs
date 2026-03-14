@@ -143,6 +143,54 @@ pub enum LaunchElement {
         shell: bool,
         condition: Option<Condition>,
     },
+    /// Lifecycle node declaration: `<lifecycle_node pkg="..." exec="..." name="..."/>`.
+    ///
+    /// Identical to `Node` but renders as `<lifecycle_node>` in the resolved XML.
+    /// This is a launch-plus XML extension for lifecycle-managed nodes.
+    LifecycleNode {
+        pkg: String,
+        exec: String,
+        name: Option<String>,
+        namespace: Option<String>,
+        condition: Option<Condition>,
+        params: Vec<Param>,
+        remaps: Vec<Remap>,
+        envs: Vec<Env>,
+        output: Option<String>,
+        args: Option<String>,
+        respawn: Option<String>,
+        respawn_delay: Option<String>,
+        unknown_attrs: Vec<String>,
+    },
+    /// Event handler: `<on_process_start>`, `<on_process_exit>`, `<on_state_transition>`.
+    ///
+    /// Contains child actions (typically `<emit_event>`).  launch-plus XML extension.
+    EventHandler {
+        kind: EventHandlerKind,
+        /// `target=` for on_process_start/on_process_exit.
+        target: Option<String>,
+        /// `target_node=` for on_state_transition.
+        target_node: Option<String>,
+        /// `start_state=` and `goal_state=` for on_state_transition.
+        start_state: Option<String>,
+        goal_state: Option<String>,
+        children: Vec<LaunchElement>,
+    },
+    /// Emit an event: `<emit_event event="..." target_node="..."/>`.
+    ///
+    /// Only valid inside an `EventHandler`.  launch-plus XML extension.
+    EmitEvent {
+        event: String,
+        target_node: Option<String>,
+    },
+}
+
+/// Kind of event handler element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventHandlerKind {
+    OnProcessStart,
+    OnProcessExit,
+    OnStateTransition,
 }
 
 /// Argument passed to an include
@@ -464,6 +512,88 @@ fn raw_to_launch(raw: RawElement) -> crate::Result<Option<LaunchElement>> {
                 shell,
                 condition,
             }))
+        }
+        "lifecycle_node" => {
+            let pkg = raw.require("pkg")?;
+            let exec = raw.require("exec")?;
+            let name = raw.get("name");
+            let namespace = raw.get("namespace");
+            let output = raw.get("output");
+            let args = raw.get("args");
+            let respawn = raw.get("respawn");
+            let respawn_delay = raw.get("respawn_delay");
+            let condition = raw.condition()?;
+            let unknown_attrs = raw.unknown_attrs(&[
+                "pkg",
+                "exec",
+                "name",
+                "namespace",
+                "if",
+                "unless",
+                "output",
+                "args",
+                "respawn",
+                "respawn_delay",
+            ]);
+            let (params, remaps, envs) = extract_node_children(&raw.children)?;
+            Ok(Some(LaunchElement::LifecycleNode {
+                pkg,
+                exec,
+                name,
+                namespace,
+                condition,
+                params,
+                remaps,
+                envs,
+                output,
+                args,
+                respawn,
+                respawn_delay,
+                unknown_attrs,
+            }))
+        }
+        "on_process_start" => {
+            let target = raw.get("target");
+            let children = raw_to_launch_elements(raw.children)?;
+            Ok(Some(LaunchElement::EventHandler {
+                kind: EventHandlerKind::OnProcessStart,
+                target,
+                target_node: None,
+                start_state: None,
+                goal_state: None,
+                children,
+            }))
+        }
+        "on_process_exit" => {
+            let target = raw.get("target");
+            let children = raw_to_launch_elements(raw.children)?;
+            Ok(Some(LaunchElement::EventHandler {
+                kind: EventHandlerKind::OnProcessExit,
+                target,
+                target_node: None,
+                start_state: None,
+                goal_state: None,
+                children,
+            }))
+        }
+        "on_state_transition" => {
+            let target_node = raw.get("target_node");
+            let start_state = raw.get("start_state");
+            let goal_state = raw.get("goal_state");
+            let children = raw_to_launch_elements(raw.children)?;
+            Ok(Some(LaunchElement::EventHandler {
+                kind: EventHandlerKind::OnStateTransition,
+                target: None,
+                target_node,
+                start_state,
+                goal_state,
+                children,
+            }))
+        }
+        "emit_event" => {
+            let event = raw.require("event")?;
+            let target_node = raw.get("target_node");
+            Ok(Some(LaunchElement::EmitEvent { event, target_node }))
         }
         _ => Ok(Some(LaunchElement::UnknownElement { tag_name: raw.tag })),
     }

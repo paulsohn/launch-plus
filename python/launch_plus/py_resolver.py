@@ -232,6 +232,7 @@ _tracked = {
     "set_launch_configurations": {},  # {name: value} — SetLaunchConfiguration calls
     "include_deps": [],               # [{package, share_path}] — structured include dependencies
     "param_file_deps": [],            # [{package, share_path}] — structured param file dependencies
+    "event_handlers": [],              # [{handler_kind, target, target_node, start_state, goal_state, actions}]
 }
 
 # Names of args already recorded in declared_args (first declaration wins).
@@ -393,7 +394,164 @@ class _TrackedNode:
         return f"TrackedNode(package={_tracked['nodes'][self._idx]['package']!r})"
 
 class _TrackedLifecycleNode(_TrackedNode):
-    pass
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        _tracked["nodes"][self._idx]["kind"] = "lifecycle_node"
+
+
+class _TrackedEmitEvent:
+    """Tracked emit_event — records the event type and optional target node."""
+    def __init__(self, event=None, **kwargs):
+        self._event = event
+        self._target_node = None
+        # Extract target node from ChangeState-like event objects
+        if event is not None and hasattr(event, "_target_node"):
+            self._target_node = event._target_node
+        if event is not None and hasattr(event, "_event_name"):
+            self._event = event._event_name
+
+    def to_dict(self):
+        return {
+            "event": str(self._event) if self._event else "",
+            "target_node": self._target_node,
+        }
+
+
+class _TrackedChangeState:
+    """Tracked ChangeState event — records the transition and target node.
+
+    Real API: ``ChangeState(lifecycle_node_matcher=matches_action(node), transition_id=...)``
+    where ``matches_action(node)`` returns a ``_TrackedMatchesAction`` that carries ``_node_name``.
+    """
+    def __init__(self, lifecycle_node_matcher=None, transition_id=None, **kwargs):
+        self._event_name = _transition_name(transition_id)
+        self._target_node = None
+        if lifecycle_node_matcher is not None and hasattr(lifecycle_node_matcher, "_node_name"):
+            self._target_node = lifecycle_node_matcher._node_name
+
+
+class _TrackedShutdown:
+    """Tracked Shutdown event."""
+    _event_name = "shutdown"
+
+
+class _TrackedMatchesAction:
+    """Wraps ``matches_action(node)`` — carries the node name for ChangeState targeting.
+
+    The real ``launch.events.matches_action`` returns a callable matcher.
+    Our version also records the node name so ``_TrackedChangeState`` can extract it.
+    """
+    def __init__(self, action):
+        self._node_name = _action_name(action)
+
+    def __call__(self, *args, **kwargs):
+        return True  # dummy matcher
+
+
+def _transition_name(transition_id):
+    """Convert a lifecycle Transition constant to a human-readable name."""
+    # Transition IDs are integers in the lifecycle_msgs
+    _TRANSITION_MAP = {
+        1: "configure",    # TRANSITION_CONFIGURE
+        2: "cleanup",      # TRANSITION_CLEANUP
+        3: "activate",     # TRANSITION_ACTIVATE
+        4: "deactivate",   # TRANSITION_DEACTIVATE
+        5: "shutdown",     # TRANSITION_UNCONFIGURED_SHUTDOWN
+        6: "shutdown",     # TRANSITION_INACTIVE_SHUTDOWN
+        7: "shutdown",     # TRANSITION_ACTIVE_SHUTDOWN
+    }
+    if isinstance(transition_id, int):
+        return _TRANSITION_MAP.get(transition_id, f"transition_{transition_id}")
+    return str(transition_id) if transition_id else ""
+
+
+class _TrackedOnProcessStart:
+    """Tracked OnProcessStart event handler."""
+    def __init__(self, target_action=None, on_start=None, **kwargs):
+        self._target_name = _action_name(target_action)
+        self._actions = on_start or []
+
+    def to_event_handler(self):
+        return {
+            "handler_kind": "on_process_start",
+            "target": self._target_name,
+            "target_node": None,
+            "start_state": None,
+            "goal_state": None,
+            "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
+        }
+
+
+class _TrackedOnProcessExit:
+    """Tracked OnProcessExit event handler."""
+    def __init__(self, target_action=None, on_exit=None, **kwargs):
+        self._target_name = _action_name(target_action)
+        self._actions = on_exit or []
+
+    def to_event_handler(self):
+        return {
+            "handler_kind": "on_process_exit",
+            "target": self._target_name,
+            "target_node": None,
+            "start_state": None,
+            "goal_state": None,
+            "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
+        }
+
+
+class _TrackedOnStateTransition:
+    """Tracked OnStateTransition event handler.
+
+    Real API: ``OnStateTransition(target_lifecycle_node=node,
+    start_state='configuring', goal_state='inactive', entities=[...])``
+    """
+    def __init__(self, target_lifecycle_node=None, start_state=None, goal_state=None,
+                 entities=None, **kwargs):
+        self._target_node = _action_name(target_lifecycle_node)
+        self._start_state = str(start_state) if start_state else None
+        self._goal_state = str(goal_state) if goal_state else None
+        self._actions = entities or []
+
+    def to_event_handler(self):
+        return {
+            "handler_kind": "on_state_transition",
+            "target": None,
+            "target_node": self._target_node or None,
+            "start_state": self._start_state,
+            "goal_state": self._goal_state,
+            "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
+        }
+
+
+class _TrackedOnShutdown:
+    """Tracked OnShutdown event handler."""
+    def __init__(self, on_shutdown=None, **kwargs):
+        self._actions = on_shutdown or []
+
+    def to_event_handler(self):
+        return {
+            "handler_kind": "on_process_exit",  # model as on_process_exit for XML output
+            "target": None,
+            "target_node": None,
+            "start_state": None,
+            "goal_state": None,
+            "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
+        }
+
+
+class _TrackedRegisterEventHandler:
+    """Tracked RegisterEventHandler — records the event handler to _tracked."""
+    def __init__(self, event_handler=None, **kwargs):
+        if event_handler is not None and hasattr(event_handler, "to_event_handler"):
+            _tracked["event_handlers"].append(event_handler.to_event_handler())
+
+
+def _action_name(action):
+    """Extract the node name from a tracked action for event handler targeting."""
+    if action is not None and hasattr(action, "_idx"):
+        return _tracked["nodes"][action._idx].get("name", "")
+    return ""
+
 
 class _TrackedComposableNode:
     """A composable node plugin loaded into a container process.
@@ -1477,6 +1635,12 @@ _KNOWN_ACTION_CLASSES: frozenset = frozenset({
     "_SetLaunchConfiguration",
     "_TrackedOpaqueFunction",
     "_TrackedGroupAction",
+    "_TrackedRegisterEventHandler",
+    "_TrackedEmitEvent",
+    "_TrackedOnProcessStart",
+    "_TrackedOnProcessExit",
+    "_TrackedOnStateTransition",
+    "_TrackedOnShutdown",
     "_TimerAction",
     # Real launch_ros classes handled via cls_name fallback in _walk_action
     "Node",
@@ -1600,26 +1764,26 @@ def _build_patched_launch_actions():
     mod.SetLaunchConfiguration = _SetLaunchConfiguration
     mod.LogInfo = lambda *a, **kw: None
     mod.TimerAction = _TimerAction
-    mod.RegisterEventHandler = lambda *a, **kw: None
-    mod.EmitEvent = lambda *a, **kw: None
-    mod.Shutdown = lambda *a, **kw: None
+    mod.RegisterEventHandler = _TrackedRegisterEventHandler
+    mod.EmitEvent = _TrackedEmitEvent
+    mod.Shutdown = _TrackedShutdown
     mod.PushLaunchConfigurations = lambda *a, **kw: None
     mod.PopLaunchConfigurations = lambda *a, **kw: None
     mod.SetEnvironmentVariable = lambda *a, **kw: None
     mod.ExecuteProcess = _TrackedExecutable
     mod.ExecuteLocal = lambda *a, **kw: None
-    mod.OnProcessExit = lambda *a, **kw: None
-    mod.OnProcessStart = lambda *a, **kw: None
+    mod.OnProcessExit = _TrackedOnProcessExit
+    mod.OnProcessStart = _TrackedOnProcessStart
     return mod
 
 def _build_patched_launch_event_handlers():
-    """Stub for launch.event_handlers — event-handler classes are no-ops for static analysis."""
+    """Tracked stubs for launch.event_handlers — record event handler structure."""
     mod = types.ModuleType("launch.event_handlers")
-    mod.OnProcessExit = lambda *a, **kw: None
-    mod.OnProcessStart = lambda *a, **kw: None
+    mod.OnProcessExit = _TrackedOnProcessExit
+    mod.OnProcessStart = _TrackedOnProcessStart
     mod.OnProcessIO = lambda *a, **kw: None
-    mod.OnShutdown = lambda *a, **kw: None
-    mod.OnStateTransition = lambda *a, **kw: None
+    mod.OnShutdown = _TrackedOnShutdown
+    mod.OnStateTransition = _TrackedOnStateTransition
     mod.OnExecutionComplete = lambda *a, **kw: None
     return mod
 
@@ -1762,6 +1926,75 @@ def _build_patched_ament_index_python_packages():
     mod.get_package_prefix = get_package_prefix
     return mod
 
+def _build_patched_launch_ros_events():
+    """Patched launch_ros.events — provides ChangeState."""
+    mod = types.ModuleType("launch_ros.events")
+    mod.__path__ = []
+    mod.__package__ = "launch_ros.events"
+    mod.ChangeState = _TrackedChangeState
+    return mod
+
+def _build_patched_launch_ros_events_lifecycle():
+    """Patched launch_ros.events.lifecycle — provides ChangeState."""
+    mod = types.ModuleType("launch_ros.events.lifecycle")
+    mod.ChangeState = _TrackedChangeState
+    return mod
+
+def _build_patched_launch_ros_event_handlers():
+    """Patched launch_ros.event_handlers — lifecycle event matchers."""
+    mod = types.ModuleType("launch_ros.event_handlers")
+    mod.__path__ = []
+    mod.__package__ = "launch_ros.event_handlers"
+    mod.OnStateTransition = _TrackedOnStateTransition
+    return mod
+
+def _build_patched_launch_ros_event_handlers_on_state_transition():
+    mod = types.ModuleType("launch_ros.event_handlers.on_state_transition")
+    mod.OnStateTransition = _TrackedOnStateTransition
+    return mod
+
+def _build_patched_lifecycle_msgs():
+    """Patched lifecycle_msgs — provides Transition constants."""
+    mod = types.ModuleType("lifecycle_msgs")
+    mod.__path__ = []
+    mod.__package__ = "lifecycle_msgs"
+    return mod
+
+def _build_patched_lifecycle_msgs_msg():
+    """Patched lifecycle_msgs.msg — provides Transition constants."""
+    mod = types.ModuleType("lifecycle_msgs.msg")
+
+    class Transition:
+        TRANSITION_CONFIGURE = 1
+        TRANSITION_CLEANUP = 2
+        TRANSITION_ACTIVATE = 3
+        TRANSITION_DEACTIVATE = 4
+        TRANSITION_UNCONFIGURED_SHUTDOWN = 5
+        TRANSITION_INACTIVE_SHUTDOWN = 6
+        TRANSITION_ACTIVE_SHUTDOWN = 7
+
+    mod.Transition = Transition
+    return mod
+
+def _build_patched_launch_events():
+    """Patched launch.events — provides Shutdown event and matches_action."""
+    mod = types.ModuleType("launch.events")
+    mod.__path__ = []
+    mod.__package__ = "launch.events"
+    mod.Shutdown = _TrackedShutdown
+    mod.matches_action = _TrackedMatchesAction
+    return mod
+
+def _build_patched_launch_events_process():
+    mod = types.ModuleType("launch.events.process")
+    return mod
+
+def _build_patched_launch_event_handler():
+    mod = types.ModuleType("launch.event_handler")
+    mod.EventHandler = lambda *a, **kw: None
+    return mod
+
+
 class _PatchingFinder(importlib.abc.MetaPathFinder):
     """Intercept imports of specific launch/ament modules and return patched versions."""
 
@@ -1780,6 +2013,15 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
         "launch.launch_description_sources": _build_patched_launch_launch_description_sources,
         "ament_index_python": _build_patched_ament_index_python,
         "ament_index_python.packages": _build_patched_ament_index_python_packages,
+        "launch_ros.events": _build_patched_launch_ros_events,
+        "launch_ros.events.lifecycle": _build_patched_launch_ros_events_lifecycle,
+        "launch_ros.event_handlers": _build_patched_launch_ros_event_handlers,
+        "launch_ros.event_handlers.on_state_transition": _build_patched_launch_ros_event_handlers_on_state_transition,
+        "lifecycle_msgs": _build_patched_lifecycle_msgs,
+        "lifecycle_msgs.msg": _build_patched_lifecycle_msgs_msg,
+        "launch.events": _build_patched_launch_events,
+        "launch.events.process": _build_patched_launch_events_process,
+        "launch.event_handler": _build_patched_launch_event_handler,
     }
 
     def find_spec(self, fullname, path, target=None):

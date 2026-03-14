@@ -27,10 +27,10 @@ use crate::fetcher::{FetchOptions, fetch_packages};
 use crate::indexer::Lockfile;
 use crate::locator::PackageLocator;
 use crate::resolver::{
-    ComposablePlugin, DependencyKind, FileDependency, IncludeArgContext, LaunchInclude, NodeKind,
-    ParsedLaunchFile, ResolveOptions, ResolvedLaunch, ResolvedNode, SubstitutionContext,
-    collect_arg_and_var_refs, collect_declared_args, collect_env_without_fallback,
-    collect_scoped_false_includes, parse_launch_xml, resolve_launch,
+    ComposablePlugin, DependencyKind, EventHandlerKind, FileDependency, IncludeArgContext,
+    LaunchInclude, NodeKind, ParsedLaunchFile, ResolveOptions, ResolvedEventAction, ResolvedLaunch,
+    ResolvedNode, SubstitutionContext, collect_arg_and_var_refs, collect_declared_args,
+    collect_env_without_fallback, collect_scoped_false_includes, parse_launch_xml, resolve_launch,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -449,6 +449,9 @@ struct PyResolverOutput {
     /// Structured param file dependencies: [{package, share_path}].
     #[serde(default)]
     param_file_deps: Vec<PyFileDep>,
+    /// Event handlers detected in the Python launch file.
+    #[serde(default)]
+    event_handlers: Vec<PyEventHandler>,
 }
 
 #[derive(Debug, serde::Deserialize, Clone, PartialEq)]
@@ -469,6 +472,31 @@ enum PyNodeKind {
     LoadComposable,
     SetParameter,
     Executable,
+    LifecycleNode,
+}
+
+/// A deserialized event handler from the Python resolver.
+#[derive(Debug, serde::Deserialize)]
+struct PyEventHandler {
+    handler_kind: String,
+    #[serde(default)]
+    target: Option<String>,
+    #[serde(default)]
+    target_node: Option<String>,
+    #[serde(default)]
+    start_state: Option<String>,
+    #[serde(default)]
+    goal_state: Option<String>,
+    #[serde(default)]
+    actions: Vec<PyEventAction>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct PyEventAction {
+    #[serde(default)]
+    event: String,
+    #[serde(default)]
+    target_node: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -651,7 +679,7 @@ fn resolved_launch_to_parsed(resolved: ResolvedLaunch) -> ParsedLaunchFile {
 /// Warnings are intentionally excluded here — the caller handles them with py_resolver-specific
 /// formatting (package://path: prefix) before calling this function.
 fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
-    let nodes = py_output
+    let mut nodes = py_output
         .nodes
         .iter()
         .map(|n| {
@@ -686,6 +714,7 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                         .collect(),
                 },
                 PyNodeKind::Node => NodeKind::Node,
+                PyNodeKind::LifecycleNode => NodeKind::LifecycleNode,
                 PyNodeKind::SetParameter => NodeKind::SetParameter {
                     name: n.name.clone(),
                     value: n.param_value.clone().unwrap_or_default(),
@@ -726,7 +755,39 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                 respawn_delay: None,
             }
         })
-        .collect();
+        .collect::<Vec<_>>();
+
+    // Convert event handlers from the Python output into ResolvedNode entries.
+    for eh in &py_output.event_handlers {
+        let handler_kind = match eh.handler_kind.as_str() {
+            "on_process_start" => EventHandlerKind::OnProcessStart,
+            "on_process_exit" => EventHandlerKind::OnProcessExit,
+            "on_state_transition" => EventHandlerKind::OnStateTransition,
+            other => {
+                tracing::warn!("unknown event handler kind from Python resolver: {other}");
+                continue;
+            }
+        };
+        let actions = eh
+            .actions
+            .iter()
+            .map(|a| ResolvedEventAction::EmitEvent {
+                event: a.event.clone(),
+                target_node: a.target_node.clone(),
+            })
+            .collect();
+        nodes.push(ResolvedNode {
+            kind: NodeKind::EventHandler {
+                handler_kind,
+                target: eh.target.clone(),
+                target_node: eh.target_node.clone(),
+                start_state: eh.start_state.clone(),
+                goal_state: eh.goal_state.clone(),
+                actions,
+            },
+            ..ResolvedNode::default()
+        });
+    }
 
     let launch_includes = py_output
         .include_deps

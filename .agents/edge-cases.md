@@ -1347,4 +1347,3 @@ respectively.  This causes two classes of failures:
 
 Both are upstream CMakeLists.txt bugs.  launch-plus recommends `-DBUILD_TESTING=OFF`
 in the colcon flagfile for production builds, which is standard Autoware CI practice.
-

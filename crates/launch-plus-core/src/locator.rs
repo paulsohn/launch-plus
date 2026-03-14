@@ -109,7 +109,6 @@ impl PackageLocator {
         self
     }
 
-
     // =========================================================================
     // Lockfile Mode: Deterministic path resolution (no existence check)
     // =========================================================================
@@ -177,7 +176,7 @@ impl PackageLocator {
 
     /// Locate a package's share directory from AMENT_PREFIX_PATH only.
     ///
-    /// Unlike [`locate_package_share`] this skips the workspace entirely and
+    /// Unlike `locate_package_share` this skips the workspace entirely and
     /// only returns paths from the colcon install tree.  Used in non-preview
     /// mode where the resolved output must reference installed artifacts.
     pub fn locate_install_share(&self, package: &str) -> Option<PathBuf> {
@@ -202,10 +201,7 @@ impl PackageLocator {
             } else if self.workspace_src.is_none() {
                 crate::Error::LaunchParse("no workspace configured in locator".to_string())
             } else {
-                crate::Error::LaunchParse(format!(
-                    "package '{}' not found in lockfile",
-                    package
-                ))
+                crate::Error::LaunchParse(format!("package '{}' not found in lockfile", package))
             }
         })
     }
@@ -340,7 +336,7 @@ impl PackageLocator {
     /// (e.g. py_resolver.py) so they can resolve `$(find-pkg-share X)` substitutions
     /// against source packages.
     ///
-    /// In non-preview mode use [`all_install_shares`] instead.
+    /// In non-preview mode use `all_install_shares` instead.
     pub fn all_package_shares(&self) -> HashMap<String, String> {
         let mut result = HashMap::new();
         if let (Some(lockfile), Some(workspace)) = (&self.lockfile, &self.workspace_src) {
@@ -357,7 +353,9 @@ impl PackageLocator {
                     let path = entry.path();
                     if path.is_dir() {
                         let pkg_name = entry.file_name().to_string_lossy().into_owned();
-                        result.entry(pkg_name).or_insert_with(|| path.to_string_lossy().into_owned());
+                        result
+                            .entry(pkg_name)
+                            .or_insert_with(|| path.to_string_lossy().into_owned());
                     }
                 }
             }
@@ -379,7 +377,9 @@ impl PackageLocator {
                     let path = entry.path();
                     if path.is_dir() {
                         let pkg_name = entry.file_name().to_string_lossy().into_owned();
-                        result.entry(pkg_name).or_insert_with(|| path.to_string_lossy().into_owned());
+                        result
+                            .entry(pkg_name)
+                            .or_insert_with(|| path.to_string_lossy().into_owned());
                     }
                 }
             }
@@ -412,7 +412,10 @@ pub fn locator_from_workspace<P: AsRef<Path>>(workspace_src: P) -> PackageLocato
 
 /// Convenience function to create a locator from workspace and lockfile
 #[must_use]
-pub fn locator_from_lockfile<P: AsRef<Path>>(workspace_src: P, lockfile: Lockfile) -> PackageLocator {
+pub fn locator_from_lockfile<P: AsRef<Path>>(
+    workspace_src: P,
+    lockfile: Lockfile,
+) -> PackageLocator {
     let mut locator = PackageLocator::with_workspace(workspace_src);
     locator.set_lockfile(lockfile);
     locator.add_ament_from_env();

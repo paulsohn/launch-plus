@@ -6,10 +6,10 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
+use quick_xml::events::{BytesStart, Event};
 
-use super::{raw_to_launch_elements, LaunchFile, RawElement};
+use super::{LaunchFile, RawElement, raw_to_launch_elements};
 
 /// Parse a launch.xml file into an AST.
 pub fn parse_launch_xml(content: &str, path: &Path) -> crate::Result<LaunchFile> {
@@ -64,10 +64,7 @@ fn collect_attrs(start: &BytesStart) -> HashMap<String, String> {
 
 /// Parse child elements until the matching `</end_tag>` close, returning them
 /// as a flat list of [`RawElement`]s.
-fn parse_raw_children(
-    reader: &mut Reader<&[u8]>,
-    end_tag: &str,
-) -> crate::Result<Vec<RawElement>> {
+fn parse_raw_children(reader: &mut Reader<&[u8]>, end_tag: &str) -> crate::Result<Vec<RawElement>> {
     let mut elements = Vec::new();
     let mut buf = Vec::new();
 

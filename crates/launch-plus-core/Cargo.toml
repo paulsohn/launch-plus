@@ -32,3 +32,6 @@ python = ["pyo3"]
 [dependencies.pyo3]
 workspace = true
 optional = true
+
+[lints]
+workspace = true

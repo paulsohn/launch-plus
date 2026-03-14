@@ -2,13 +2,14 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use launch_plus_core::builder::{execute_build, plan_build_from_packages, BuildOptions};
-use launch_plus_core::fetcher::{fetch_packages, FetchOptions, WorkspaceState};
+use launch_plus_core::builder::{BuildOptions, execute_build, plan_build_from_packages};
+use launch_plus_core::fetcher::{FetchOptions, WorkspaceState, fetch_packages};
 use launch_plus_core::indexer::{
-    blobless_clone, discover_packages, generate_lockfile, parse_lockfile, parse_repos,
-    resolve_version_local, serialize_lockfile, Lockfile,
+    Lockfile, blobless_clone, discover_packages, generate_lockfile, parse_lockfile, parse_repos,
+    resolve_version_local, serialize_lockfile,
 };
-use launch_plus_core::orchestrator::{resolve_launch_recursive, ResolveWorkflowOptions};
+use launch_plus_core::orchestrator::{ResolveWorkflowOptions, resolve_launch_recursive};
+use launch_plus_core::rosdep::rosdep_install;
 use std::fs;
 use std::path::Path;
 
@@ -43,7 +44,7 @@ enum Commands {
         output: Option<String>,
 
         /// Source directory for cloning repositories
-        /// Repos are cloned to <src>/<workspace_path> and reused on subsequent runs
+        /// Repos are cloned to `<src>/<workspace_path>` and reused on subsequent runs
         #[arg(long, default_value = "src")]
         src: String,
 
@@ -141,8 +142,8 @@ enum Commands {
         /// forwarding, emulating ROS 2's global LaunchConfiguration context.
         ///
         /// By default (strict mode) every arg used in an included file must be declared
-        /// with <arg name="..."/> in that file and explicitly passed via
-        /// <arg name="..." value="$(var ...)"/> in the <include> tag.  Strict mode makes
+        /// with `<arg name="..."/>` in that file and explicitly passed via
+        /// `<arg name="..." value="$(var ...)"/>` in the `<include>` tag.  Strict mode makes
         /// each launch file self-describing and composable.
         ///
         /// This flag disables that check.  Use it only for legacy launch files that cannot
@@ -151,7 +152,7 @@ enum Commands {
         #[arg(long)]
         allow_global_arg_cascade: bool,
 
-        /// Apply default="..." values from <arg> declarations when an arg is not supplied.
+        /// Apply default="..." values from `<arg>` declarations when an arg is not supplied.
         ///
         /// By default (strict mode) every arg must be provided explicitly on the command
         /// line.  Missing args surface as "undefined variable" errors, making hidden
@@ -189,7 +190,7 @@ enum Commands {
         #[arg(long, requires = "preview")]
         expand_paths: bool,
 
-        /// Allow raw filesystem paths in <include file=...> and <param from=...> in preview
+        /// Allow raw filesystem paths in `<include file=...>` and `<param from=...>` in preview
         /// mode instead of requiring $(find-pkg-share ...) substitutions.
         ///
         /// By default (strict mode) any absolute path passed to an include source or param
@@ -201,7 +202,7 @@ enum Commands {
         #[arg(long)]
         allow_including_unportable_path: bool,
 
-        /// Remove source-boundary <group> wrappers from the resolved output.
+        /// Remove source-boundary `<group>` wrappers from the resolved output.
         ///
         /// By default each include-file boundary is represented by a `<group>` element
         /// that wraps the nodes originating from that file.  This flag suppresses those
@@ -215,8 +216,8 @@ enum Commands {
         #[arg(long)]
         flatten: bool,
 
-        /// Inline namespace stacks directly onto each <node> element instead of
-        /// preserving <push-ros-namespace> wrappers.
+        /// Inline namespace stacks directly onto each `<node>` element instead of
+        /// preserving `<push-ros-namespace>` wrappers.
         ///
         /// By default the resolved XML preserves `<push-ros-namespace namespace="..."/>`
         /// inside `<group>` elements, faithfully representing how namespaces are applied
@@ -279,7 +280,7 @@ enum Commands {
         /// resolver runs `rosdep install --from-keys <package>` to install it, then
         /// retries.
         ///
-        /// Requires ROS_DISTRO to be set (source /opt/ros/<distro>/setup.bash).
+        /// Requires ROS_DISTRO to be set (source /opt/ros/`<distro>`/setup.bash).
         #[arg(long)]
         rosdep: bool,
 
@@ -316,7 +317,7 @@ enum Commands {
     /// Fetch and build packages for a launcher (target-focused, Bazel-like)
     ///
     /// Resolves the launch file, computes the transitive build-dependency closure
-    /// (build_depend + <depend>), and invokes colcon with the exact package list.
+    /// (build_depend + `<depend>`), and invokes colcon with the exact package list.
     #[command(override_usage = "launch-plus build [OPTIONS] <PACKAGE> <LAUNCHER> [ARG]...")]
     Build {
         /// Package name
@@ -355,7 +356,7 @@ enum Commands {
         #[arg(long)]
         allow_global_arg_cascade: bool,
 
-        /// Apply default values from <arg> declarations
+        /// Apply default values from `<arg>` declarations
         #[arg(long)]
         apply_launch_arg_defaults: bool,
 
@@ -363,7 +364,7 @@ enum Commands {
         #[arg(long)]
         apply_opaque_file_access: bool,
 
-        /// Allow raw filesystem paths in <include> and <param from> during resolution.
+        /// Allow raw filesystem paths in `<include>` and `<param from>` during resolution.
         /// See `resolve --allow-including-unportable-path` for details.
         #[arg(long)]
         allow_including_unportable_path: bool,
@@ -411,7 +412,10 @@ enum Commands {
     /// The seed packages are expanded transitively using on-disk `package.xml`
     /// build/exec dependencies, missing packages are fetched from the lockfile,
     /// and the result is built in topological order via colcon.
-    #[command(name = "build-pkg", override_usage = "launch-plus build-pkg [OPTIONS] <PACKAGES>...")]
+    #[command(
+        name = "build-pkg",
+        override_usage = "launch-plus build-pkg [OPTIONS] <PACKAGES>..."
+    )]
     BuildPkg {
         /// Package names to build
         #[arg(required = true)]
@@ -449,6 +453,11 @@ enum Commands {
         /// See `build --colcon-flagfile` for details.
         #[arg(long, value_name = "FILE")]
         colcon_flagfile: Option<String>,
+
+        /// Automatically install external dependencies via rosdep.
+        /// See `build --rosdep` for details.
+        #[arg(long)]
+        rosdep: bool,
 
         /// Print the colcon command without running it
         #[arg(long)]
@@ -496,7 +505,7 @@ enum Commands {
         #[arg(long)]
         allow_global_arg_cascade: bool,
 
-        /// Apply default values from <arg> declarations
+        /// Apply default values from `<arg>` declarations
         #[arg(long)]
         apply_launch_arg_defaults: bool,
 
@@ -504,7 +513,7 @@ enum Commands {
         #[arg(long)]
         apply_opaque_file_access: bool,
 
-        /// Allow raw filesystem paths in <include> and <param from> during resolution.
+        /// Allow raw filesystem paths in `<include>` and `<param from>` during resolution.
         /// See `resolve --allow-including-unportable-path` for details.
         #[arg(long)]
         allow_including_unportable_path: bool,
@@ -575,7 +584,7 @@ enum Commands {
         #[arg(long)]
         allow_global_arg_cascade: bool,
 
-        /// Apply default="..." values from <arg> declarations when an arg is not supplied.
+        /// Apply default="..." values from `<arg>` declarations when an arg is not supplied.
         /// See `resolve --apply-launch-arg-defaults` for details.
         #[arg(long)]
         apply_launch_arg_defaults: bool,
@@ -585,7 +594,7 @@ enum Commands {
         #[arg(long)]
         preview: bool,
 
-        /// Allow raw filesystem paths in <include> and <param from> in preview mode.
+        /// Allow raw filesystem paths in `<include>` and `<param from>` in preview mode.
         /// See `resolve --allow-including-unportable-path` for details.
         #[arg(long)]
         allow_including_unportable_path: bool,
@@ -668,7 +677,13 @@ fn main() -> Result<()> {
                 let exit_code = cmd_verify(&files, output.as_deref())?;
                 std::process::exit(exit_code);
             } else {
-                cmd_index(&files, append, output.as_deref(), &src, !no_recurse_submodules)?;
+                cmd_index(
+                    &files,
+                    append,
+                    output.as_deref(),
+                    &src,
+                    !no_recurse_submodules,
+                )?;
             }
         }
         Commands::Update {
@@ -735,8 +750,8 @@ fn main() -> Result<()> {
                 flatten,
                 flatten_namespaces,
                 show_args,
-                false,  // suppress_xml — resolve always emits XML
-                false,  // strict — resolve exits non-zero only on errors
+                false, // suppress_xml — resolve always emits XML
+                false, // strict — resolve exits non-zero only on errors
                 warn_all,
                 workspace_state,
                 workflow_options,
@@ -788,7 +803,10 @@ fn main() -> Result<()> {
                 workflow_options,
                 &build_base,
                 &install_base,
-                BuildOptions { dry_run, extra_colcon_args },
+                BuildOptions {
+                    dry_run,
+                    extra_colcon_args,
+                },
                 false, // test_mode
                 verbose,
                 shallow,
@@ -804,6 +822,7 @@ fn main() -> Result<()> {
             build_base,
             install_base,
             colcon_flagfile,
+            rosdep,
             dry_run,
         } => {
             let workspace_state = parse_workspace_state(clean, dirty)?;
@@ -820,7 +839,8 @@ fn main() -> Result<()> {
             };
 
             // Fetch the seed packages themselves first.
-            let to_fetch: Vec<String> = packages.iter()
+            let to_fetch: Vec<String> = packages
+                .iter()
                 .filter(|p| parsed_lockfile.packages.contains_key(p.as_str()))
                 .cloned()
                 .collect();
@@ -852,7 +872,23 @@ fn main() -> Result<()> {
                 plan.packages
             );
 
-            execute_build(&plan, &BuildOptions { dry_run, extra_colcon_args })?;
+            if rosdep && !plan.external_deps.is_empty() {
+                eprintln!(
+                    "[build-pkg] Installing {} external deps via rosdep",
+                    plan.external_deps.len()
+                );
+                let keys: Vec<&str> = plan.external_deps.iter().map(|s| s.as_str()).collect();
+                rosdep_install(&keys)
+                    .with_context(|| "failed to install external build dependencies via rosdep")?;
+            }
+
+            execute_build(
+                &plan,
+                &BuildOptions {
+                    dry_run,
+                    extra_colcon_args,
+                },
+            )?;
         }
         Commands::Test {
             package,
@@ -899,7 +935,10 @@ fn main() -> Result<()> {
                 workflow_options,
                 &build_base,
                 &install_base,
-                BuildOptions { dry_run, extra_colcon_args },
+                BuildOptions {
+                    dry_run,
+                    extra_colcon_args,
+                },
                 true, // test_mode
                 verbose,
                 shallow,
@@ -936,7 +975,7 @@ fn main() -> Result<()> {
                 allow_unportable_paths: allow_including_unportable_path,
                 apply_opaque_file_access,
                 rosdep_fallback: rosdep,
-                inline_params: false,  // check suppresses XML anyway
+                inline_params: false, // check suppresses XML anyway
             };
             cmd_resolve(
                 &package,
@@ -944,13 +983,13 @@ fn main() -> Result<()> {
                 initial_args,
                 &lockfile,
                 &src,
-                false,   // report
+                false, // report
                 preview,
-                false,   // expand_paths — not applicable for check
-                false,   // flatten
-                false,   // flatten_namespaces
-                false,   // show_args — irrelevant, XML is suppressed
-                true,    // suppress_xml — check never writes resolved XML to stdout
+                false, // expand_paths — not applicable for check
+                false, // flatten
+                false, // flatten_namespaces
+                false, // show_args — irrelevant, XML is suppressed
+                true,  // suppress_xml — check never writes resolved XML to stdout
                 strict,
                 warn_all,
                 workspace_state,
@@ -1108,15 +1147,18 @@ fn cmd_verify(files: &[String], output: Option<&str>) -> Result<i32> {
             };
 
             // Determine what to compare based on version format
-            let is_sha = entry.version.len() == 40
-                && entry.version.chars().all(|c| c.is_ascii_hexdigit());
+            let is_sha =
+                entry.version.len() == 40 && entry.version.chars().all(|c| c.is_ascii_hexdigit());
 
             let (expected, actual, label) = if is_sha {
                 // Version is SHA: compare directly with lockfile version
                 (&entry.version, &lock_entry.version, "sha")
             } else {
                 // Version is tag/branch: compare with lockfile ref
-                let actual = lock_entry.version_ref.as_ref().unwrap_or(&lock_entry.version);
+                let actual = lock_entry
+                    .version_ref
+                    .as_ref()
+                    .unwrap_or(&lock_entry.version);
                 (&entry.version, actual, "ref")
             };
 
@@ -1207,7 +1249,10 @@ fn cmd_update(
         // Resolve via local fetch; blobless-clone first if no local clone exists.
         let repo_dir = src_path.join(workspace_path);
         let resolve_result = if !repo_dir.join(".git").exists() {
-            tracing::debug!("No local clone for {}, blobless-cloning first", workspace_path);
+            tracing::debug!(
+                "No local clone for {}, blobless-cloning first",
+                workspace_path
+            );
             blobless_clone(&repo.url, &repo_dir)
                 .and_then(|()| resolve_version_local(&repo_dir, version_ref))
         } else {
@@ -1332,7 +1377,7 @@ fn cmd_fetch(
     let options = FetchOptions {
         recurse_submodules,
         shallow,
-        workspace_state: WorkspaceState::Clean,  // fetch always syncs to lockfile SHA
+        workspace_state: WorkspaceState::Clean, // fetch always syncs to lockfile SHA
     };
 
     tracing::info!("Fetching {} packages into {}", packages.len(), fetch_dir);
@@ -1498,8 +1543,25 @@ fn run_build(
         }
     }
 
-    execute_build(&plan, &build_options)
-        .with_context(|| "colcon build failed")?;
+    if !plan.external_deps.is_empty() {
+        if workflow_options.rosdep_fallback {
+            eprintln!(
+                "[build] Installing {} external deps via rosdep",
+                plan.external_deps.len()
+            );
+            let keys: Vec<&str> = plan.external_deps.iter().map(|s| s.as_str()).collect();
+            rosdep_install(&keys)
+                .with_context(|| "failed to install external build dependencies via rosdep")?;
+        } else if verbose {
+            eprintln!(
+                "[build] {} external deps not in lockfile (use --rosdep to install): {:?}",
+                plan.external_deps.len(),
+                plan.external_deps
+            );
+        }
+    }
+
+    execute_build(&plan, &build_options).with_context(|| "colcon build failed")?;
 
     Ok(())
 }
@@ -1553,7 +1615,16 @@ fn cmd_resolve(
 
     // Resolved XML → stdout (suppressed in check mode)
     if !suppress_xml {
-        let mut xml = render_resolved_xml(package, launcher, &result.nodes, flatten_namespaces, flatten, &result.include_args, show_args, &result.initial_args);
+        let mut xml = render_resolved_xml(
+            package,
+            launcher,
+            &result.nodes,
+            flatten_namespaces,
+            flatten,
+            &result.include_args,
+            show_args,
+            &result.initial_args,
+        );
         if preview && expand_paths {
             // Expand $(find-pkg-share <pkg>) tokens to absolute AMENT install paths
             // so the output is directly comparable with a non-preview (post-build)
@@ -1565,7 +1636,10 @@ fn cmd_resolve(
         } else if preview {
             // Prepend a preview marker so consumers can distinguish source-path output
             // from post-build install-path output.
-            xml.insert_str(0, "<!-- PREVIEW: resolved from source workspace, not install paths -->\n");
+            xml.insert_str(
+                0,
+                "<!-- PREVIEW: resolved from source workspace, not install paths -->\n",
+            );
         }
         println!("{xml}");
     }
@@ -1687,7 +1761,10 @@ fn cmd_resolve(
 ///
 /// Each `$(find-pkg-share <pkg>)` occurrence is resolved via the locator's AMENT prefix
 /// entries.  Tokens whose package cannot be found are left unchanged.
-fn expand_portable_paths(text: &str, locator: &launch_plus_core::locator::PackageLocator) -> String {
+fn expand_portable_paths(
+    text: &str,
+    locator: &launch_plus_core::locator::PackageLocator,
+) -> String {
     use std::fmt::Write;
     let token = "$(find-pkg-share ";
     let mut out = String::with_capacity(text.len());
@@ -1743,12 +1820,14 @@ fn cmd_clean(src_dir: &str, keep_git: bool) -> Result<()> {
         // Remove everything except .git directories
         tracing::info!("Cleaning {} (keeping .git directories)", src_dir);
         clean_directory_keep_git(src_path)?;
-        println!("Cleaned {} (kept .git directories for faster re-fetch)", src_dir);
+        println!(
+            "Cleaned {} (kept .git directories for faster re-fetch)",
+            src_dir
+        );
     } else {
         // Remove the entire src directory
         tracing::info!("Cleaning {} (removing everything)", src_dir);
-        fs::remove_dir_all(src_path)
-            .with_context(|| format!("failed to remove {}", src_dir))?;
+        fs::remove_dir_all(src_path).with_context(|| format!("failed to remove {}", src_dir))?;
         println!("Cleaned {}", src_dir);
     }
 

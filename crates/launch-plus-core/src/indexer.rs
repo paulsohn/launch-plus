@@ -519,7 +519,10 @@ fn discover_packages_from_existing_repo(
         packages.extend(submodule_packages);
     }
 
-    debug!("Found {} packages via git object inspection", packages.len());
+    debug!(
+        "Found {} packages via git object inspection",
+        packages.len()
+    );
     Ok(packages)
 }
 
@@ -565,11 +568,7 @@ fn discover_packages_from_git_objects(
                 let content = String::from_utf8_lossy(&content_output.stdout);
                 let pkg_path = if let Some(parent) = Path::new(line).parent() {
                     let p = parent.to_string_lossy().to_string();
-                    if p.is_empty() {
-                        ".".to_string()
-                    } else {
-                        p
-                    }
+                    if p.is_empty() { ".".to_string() } else { p }
                 } else {
                     ".".to_string()
                 };
@@ -662,9 +661,10 @@ fn discover_packages_from_submodules(
                                     .stderr(Stdio::piped())
                                     .output();
 
-                                if let Ok(mut sub_packages) =
-                                    discover_packages_from_git_objects(&submodule_dir, submodule_sha)
-                                {
+                                if let Ok(mut sub_packages) = discover_packages_from_git_objects(
+                                    &submodule_dir,
+                                    submodule_sha,
+                                ) {
                                     // Prefix paths with submodule path
                                     for pkg in &mut sub_packages {
                                         pkg.path = format!("{}/{}", path, pkg.path);
@@ -795,7 +795,8 @@ pub fn generate_lockfile(
         debug!("Resolved {} {} -> {}", workspace_path, entry.version, sha);
 
         // Discover packages in this repository
-        let packages = discover_packages(&entry.url, &sha, repo_dir.as_deref(), recurse_submodules)?;
+        let packages =
+            discover_packages(&entry.url, &sha, repo_dir.as_deref(), recurse_submodules)?;
 
         // Add to repositories map (using workspace_path as key, same as .repos format)
         let mut package_names: Vec<String> = packages.iter().map(|p| p.name.clone()).collect();
@@ -886,7 +887,10 @@ fn read_package_deps(
     pkg_name: &str,
 ) -> Option<Dependencies> {
     let pkg_lock = lockfile.packages.get(pkg_name)?;
-    let xml_path = src_dir.join(&pkg_lock.repo).join(&pkg_lock.path).join("package.xml");
+    let xml_path = src_dir
+        .join(&pkg_lock.repo)
+        .join(&pkg_lock.path)
+        .join("package.xml");
     let content = std::fs::read_to_string(&xml_path).ok()?;
     let parsed = parse_package_xml(&content, &xml_path.to_string_lossy()).ok()?;
     Some(parsed.dependencies)
@@ -986,7 +990,9 @@ pub fn compute_build_order(
     // Count incoming edges from on-disk package.xml build deps.
     for pkg in packages {
         if let Some(deps) = read_package_deps(lockfile, src_dir, pkg) {
-            let build_deps = deps.build.iter()
+            let build_deps = deps
+                .build
+                .iter()
                 .chain(deps.build_export.iter())
                 .chain(deps.buildtool.iter())
                 .chain(deps.buildtool_export.iter());
@@ -1191,7 +1197,11 @@ repositories:
         let info = parse_package_xml(content, "my_package").unwrap();
         assert_eq!(info.name, "my_package");
         assert_eq!(info.path, "my_package");
-        assert!(info.dependencies.buildtool.contains(&"ament_cmake".to_string()));
+        assert!(
+            info.dependencies
+                .buildtool
+                .contains(&"ament_cmake".to_string())
+        );
         assert!(info.dependencies.build.contains(&"rclcpp".to_string()));
         assert!(info.dependencies.exec.contains(&"std_msgs".to_string()));
         assert!(
@@ -1238,5 +1248,4 @@ repositories:
         let result = parse_package_xml(content, "test");
         assert!(result.is_err());
     }
-
 }

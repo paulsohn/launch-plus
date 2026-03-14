@@ -1,0 +1,56 @@
+name: Autoware Integration Test
+
+on:
+  push:
+    branches: [devel]
+  pull_request:
+    branches: [devel]
+  workflow_dispatch:
+
+jobs:
+  integration:
+    name: Resolve + Build + Verify
+    runs-on: ubuntu-24.04
+    container: ros:jazzy
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends \
+            build-essential \
+            curl \
+            git \
+            pkg-config \
+            libssl-dev \
+            python3-venv \
+            ros-dev-tools \
+            ros-jazzy-ublox-gps
+
+      - name: Initialize rosdep
+        run: |
+          rosdep init 2>/dev/null || true
+          rosdep update
+        shell: bash
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build launch-plus
+        run: cargo build --bin launch-plus --release
+
+      - name: Install acados
+        run: bash example/autoware/install-acados.sh
+
+      - name: Install Autoware ML param files
+        run: cp -r .github/assets/autoware_data "$HOME/autoware_data"
+
+      - name: Run integration test
+        working-directory: example/autoware
+        shell: bash
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          bash test-autoware.sh -c

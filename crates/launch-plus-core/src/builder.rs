@@ -4,7 +4,7 @@
 //!
 //! The build plan is derived from the launch resolver output:
 //!
-//! 1. [`ResolveResult::direct_packages`] — packages directly referenced in the launch graph
+//! 1. `ResolveResult::direct_packages` — packages directly referenced in the launch graph
 //!    (node `pkg=` attributes and included packages).
 //! 2. [`resolve_dependencies`] with [`DependencyMode::Build`] — expands the seed set
 //!    transitively using `build_depend`, `<depend>`, `build_export_depend`, and
@@ -21,6 +21,7 @@
 //!
 //! For `test` mode, [`DependencyMode::All`] adds `test_depend` packages to the build set.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -28,14 +29,20 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// Flag set by the SIGINT handler so the builder knows the child was interrupted.
 static INTERRUPTED: AtomicBool = AtomicBool::new(false);
 
-use crate::fetcher::{fetch_packages, FetchOptions};
-use crate::indexer::{compute_build_order, resolve_dependencies, DependencyMode, Lockfile};
+use crate::fetcher::{FetchOptions, fetch_packages};
+use crate::indexer::{DependencyMode, Lockfile, compute_build_order, resolve_dependencies};
 
 /// Everything colcon needs to build the launch target.
 #[derive(Debug, Clone)]
 pub struct BuildPlan {
     /// Lockfile packages to build, in topological order (dependencies first).
     pub packages: Vec<String>,
+    /// External dependencies not in the lockfile (e.g. system ROS packages).
+    ///
+    /// These are discovered from `package.xml` `<depend>`, `<build_depend>`, etc.
+    /// but are not part of the lockfile.  They must be installed via `rosdep` or
+    /// `apt` before building.
+    pub external_deps: HashSet<String>,
     /// Source directory passed to `colcon build --base-paths`.
     pub src_dir: PathBuf,
     /// Colcon build output directory (`--build-base`).
@@ -116,6 +123,7 @@ pub fn plan_build_from_packages(
 
     Ok(BuildPlan {
         packages,
+        external_deps: graph.external,
         src_dir: src_dir.to_path_buf(),
         build_base: build_base.to_path_buf(),
         install_base: install_base.to_path_buf(),
@@ -125,6 +133,7 @@ pub fn plan_build_from_packages(
 /// Execute `colcon build --packages-select <packages>`.
 ///
 /// When `options.dry_run` is true, prints the command to stdout without running it.
+#[allow(unsafe_code)]
 pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<()> {
     if plan.packages.is_empty() {
         tracing::info!("No packages to build.");
@@ -169,20 +178,26 @@ pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<
     // The default SIGINT behaviour is restored after the child exits.
     #[cfg(unix)]
     let prev_handler = unsafe {
-        libc::signal(libc::SIGINT, sigint_handler as libc::sighandler_t)
+        libc::signal(
+            libc::SIGINT,
+            sigint_handler as *const () as libc::sighandler_t,
+        )
     };
 
-    let status = child.wait()
+    let status = child
+        .wait()
         .map_err(|e| crate::Error::ProcessExecution(format!("failed to wait for colcon: {e}")))?;
 
     // Restore previous signal handler.
     #[cfg(unix)]
-    unsafe { libc::signal(libc::SIGINT, prev_handler); }
+    unsafe {
+        libc::signal(libc::SIGINT, prev_handler);
+    }
 
     if INTERRUPTED.load(Ordering::SeqCst) {
         // Child was killed by our forwarded signal; propagate as an error.
         return Err(crate::Error::ProcessExecution(
-            "build interrupted by Ctrl+C".to_string()
+            "build interrupted by Ctrl+C".to_string(),
         ));
     }
 

@@ -2,3 +2,5 @@
 # See example/colcon-flags.example.txt for all available options.
 
 --symlink-install
+--cmake-args
+-DBUILD_TESTING=OFF

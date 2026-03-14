@@ -23,15 +23,14 @@
 //! println!("Direct packages: {:?}", result.direct_packages);
 //! ```
 
-use crate::fetcher::{fetch_packages, FetchOptions};
+use crate::fetcher::{FetchOptions, fetch_packages};
 use crate::indexer::Lockfile;
 use crate::locator::PackageLocator;
 use crate::resolver::{
-    collect_arg_and_var_refs, collect_declared_args,
-    collect_env_without_fallback, collect_scoped_false_includes, parse_launch_xml,
-    resolve_launch, ComposablePlugin, DependencyKind, FileDependency, IncludeArgContext,
-    LaunchInclude, NodeKind, ParsedLaunchFile, ResolveOptions, ResolvedLaunch, ResolvedNode,
-    SubstitutionContext,
+    ComposablePlugin, DependencyKind, FileDependency, IncludeArgContext, LaunchInclude, NodeKind,
+    ParsedLaunchFile, ResolveOptions, ResolvedLaunch, ResolvedNode, SubstitutionContext,
+    collect_arg_and_var_refs, collect_declared_args, collect_env_without_fallback,
+    collect_scoped_false_includes, parse_launch_xml, resolve_launch,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -259,10 +258,14 @@ pub fn resolve_launch_recursive(
     let mut fetched_packages: HashSet<String> = HashSet::new();
 
     // Warn early if ROS_DISTRO is not set — many fallbacks depend on it.
-    if std::env::var("ROS_DISTRO").map(|v| v.is_empty()).unwrap_or(true) {
+    if std::env::var("ROS_DISTRO")
+        .map(|v| v.is_empty())
+        .unwrap_or(true)
+    {
         result.add_warning(
             "ROS_DISTRO is not set; source /opt/ros/<distro>/setup.bash for full functionality. \
-             Packages not in the lockfile will not be found via AMENT_PREFIX_PATH.".to_string(),
+             Packages not in the lockfile will not be found via AMENT_PREFIX_PATH."
+                .to_string(),
         );
     }
 
@@ -304,7 +307,6 @@ fn is_xml_launch_file(path: &Path) -> bool {
 fn is_python_launch_file(path: &Path) -> bool {
     path.to_string_lossy().ends_with(".launch.py")
 }
-
 
 /// The py_resolver.py script embedded in the binary so it can be extracted to a temp file.
 const PY_RESOLVER_SCRIPT: &str = include_str!("../../../python/launch_plus/py_resolver.py");
@@ -360,21 +362,17 @@ fn run_py_resolver(
     });
     let flags_json = flags.to_string();
 
-    let script_str = script_path.to_str()
-        .ok_or_else(|| crate::Error::Git("py_resolver script path is not valid UTF-8".to_string()))?;
-    let file_str = file_path.to_str()
-        .ok_or_else(|| crate::Error::Git(format!(
+    let script_str = script_path.to_str().ok_or_else(|| {
+        crate::Error::Git("py_resolver script path is not valid UTF-8".to_string())
+    })?;
+    let file_str = file_path.to_str().ok_or_else(|| {
+        crate::Error::Git(format!(
             "launch file path is not valid UTF-8: {}",
             file_path.display()
-        )))?;
+        ))
+    })?;
     let output = Command::new("python3")
-        .args([
-            script_str,
-            file_str,
-            &args_json,
-            &shares_json,
-            &flags_json,
-        ])
+        .args([script_str, file_str, &args_json, &shares_json, &flags_json])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -552,7 +550,11 @@ fn ensure_package_fetched(
     // Check if already on disk
     let pkg_path = fetch_dir.join(&pkg_lock.repo).join(&pkg_lock.path);
     if pkg_path.exists() && pkg_path.join("package.xml").exists() {
-        debug!("Package {} already fetched at {}", package, pkg_path.display());
+        debug!(
+            "Package {} already fetched at {}",
+            package,
+            pkg_path.display()
+        );
         fetched_packages.insert(package.to_string());
         return true;
     }
@@ -574,59 +576,13 @@ fn ensure_package_fetched(
 
 /// Attempt to install a missing ROS package via `rosdep`.
 ///
-/// Runs `rosdep update` (best-effort) then
-/// `rosdep install --rosdistro $ROS_DISTRO -y --from-keys <package>`.
-///
-/// Returns `true` when installation succeeded (exit 0), `false` otherwise.
-/// Warnings/errors are appended to `result`.
+/// Delegates to [`crate::rosdep::rosdep_install`] and translates the result
+/// into a boolean + error on `result`.
 fn try_rosdep_install(package: &str, result: &mut ResolveResult) -> bool {
-    use std::process::Command;
-
-    let ros_distro = match std::env::var("ROS_DISTRO") {
-        Ok(d) if !d.is_empty() => d,
-        _ => {
-            result.add_warning(
-                "ROS_DISTRO is not set; source /opt/ros/<distro>/setup.bash before running launch-plus".to_string(),
-            );
-            result.add_error(format!(
-                "cannot rosdep-install '{}': ROS_DISTRO is not set",
-                package
-            ));
-            return false;
-        }
-    };
-
-    // rosdep update (best-effort; failure is non-fatal — the db may already be fresh)
-    let _ = Command::new("rosdep").args(["update"]).status();
-
-    // rosdep install for the specific package key
-    info!("Installing '{}' via rosdep (distro={})", package, ros_distro);
-    let status = Command::new("rosdep")
-        .args([
-            "install",
-            "--rosdistro",
-            &ros_distro,
-            "-y",
-            "--from-keys",
-            package,
-        ])
-        .status();
-
-    match status {
-        Ok(s) if s.success() => true,
-        Ok(s) => {
-            result.add_error(format!(
-                "rosdep install failed for '{}' (exit {})",
-                package,
-                s.code().unwrap_or(-1)
-            ));
-            false
-        }
+    match crate::rosdep::rosdep_install(&[package]) {
+        Ok(()) => true,
         Err(e) => {
-            result.add_error(format!(
-                "failed to run rosdep for '{}': {}",
-                package, e
-            ));
+            result.add_error(format!("{e}"));
             false
         }
     }
@@ -694,9 +650,7 @@ fn resolved_launch_to_parsed(resolved: ResolvedLaunch) -> ParsedLaunchFile {
 /// (already decomposed into `(package, share_path)` pairs) — no reverse path mapping needed.
 /// Warnings are intentionally excluded here — the caller handles them with py_resolver-specific
 /// formatting (package://path: prefix) before calling this function.
-fn py_output_to_parsed(
-    py_output: PyResolverOutput,
-) -> ParsedLaunchFile {
+fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
     let nodes = py_output
         .nodes
         .iter()
@@ -733,19 +687,27 @@ fn py_output_to_parsed(
                 },
                 PyNodeKind::Node => NodeKind::Node,
                 PyNodeKind::SetParameter => NodeKind::SetParameter {
-                    name:  n.name.clone(),
+                    name: n.name.clone(),
                     value: n.param_value.clone().unwrap_or_default(),
                 },
                 PyNodeKind::Executable => NodeKind::Executable {
-                    cmd:   n.cmd.clone().unwrap_or_default(),
-                    name:  if n.name.is_empty() { None } else { Some(n.name.clone()) },
+                    cmd: n.cmd.clone().unwrap_or_default(),
+                    name: if n.name.is_empty() {
+                        None
+                    } else {
+                        Some(n.name.clone())
+                    },
                     shell: n.shell,
                 },
             };
             ResolvedNode {
                 package: n.package.clone(),
                 executable: n.executable.clone(),
-                name: if n.name.is_empty() { None } else { Some(n.name.clone()) },
+                name: if n.name.is_empty() {
+                    None
+                } else {
+                    Some(n.name.clone())
+                },
                 namespace: crate::resolver::effective_namespace(
                     &n.namespace_stack,
                     n.explicit_namespace.as_deref(),
@@ -754,13 +716,13 @@ fn py_output_to_parsed(
                 parameters: n.parameters.clone(),
                 remappings: n.remappings.clone(),
                 env: n.env.clone(),
-                source: None,            // set by process_parsed_file
+                source: None,              // set by process_parsed_file
                 include_chain: Vec::new(), // set by process_parsed_file
                 kind,
                 param_files: vec![],
                 output: None,
                 args: None,
-                respawn: None,       // Python launch API has no respawn support yet
+                respawn: None, // Python launch API has no respawn support yet
                 respawn_delay: None,
             }
         })
@@ -783,8 +745,11 @@ fn py_output_to_parsed(
         })
         .collect();
 
-    let declared_arg_defaults: HashMap<String, String> =
-        py_output.declared_args.iter().map(|a| (a.name.clone(), a.default.clone())).collect();
+    let declared_arg_defaults: HashMap<String, String> = py_output
+        .declared_args
+        .iter()
+        .map(|a| (a.name.clone(), a.default.clone()))
+        .collect();
 
     let param_files = py_output
         .param_file_deps
@@ -834,7 +799,9 @@ fn process_parsed_file(
     options: &FetchOptions,
 ) {
     // Accumulate direct packages
-    result.direct_packages.extend(parsed.packages.iter().cloned());
+    result
+        .direct_packages
+        .extend(parsed.packages.iter().cloned());
 
     // Dedup-extend param_files and other_files
     for dep in parsed.param_files {
@@ -964,10 +931,11 @@ fn process_parsed_file(
                 .get(&(include.package.clone(), include.share_path.clone()))
                 .cloned()
                 .unwrap_or_default();
-            let explicit_names: HashSet<String> =
-                include.explicit_args.keys().cloned().collect();
-            let mut excessive: Vec<String> =
-                explicit_names.difference(&child_declared).cloned().collect();
+            let explicit_names: HashSet<String> = include.explicit_args.keys().cloned().collect();
+            let mut excessive: Vec<String> = explicit_names
+                .difference(&child_declared)
+                .cloned()
+                .collect();
             excessive.sort();
             for arg_name in excessive {
                 result.add_warning(format!(
@@ -1005,7 +973,14 @@ fn resolve_python_file_recursive(
     // Resolve the file path based on mode (same logic as XML resolver).
     let file_path = if workflow_options.preview {
         if lockfile.packages.contains_key(package) {
-            if !ensure_package_fetched(lockfile, package, fetch_dir, options, result, fetched_packages) {
+            if !ensure_package_fetched(
+                lockfile,
+                package,
+                fetch_dir,
+                options,
+                result,
+                fetched_packages,
+            ) {
                 return;
             }
             match locator.resolve_share_file(package, share_path) {
@@ -1064,7 +1039,6 @@ fn resolve_python_file_recursive(
             }
         }
     };
-
 
     // Collect package share paths for py_resolver.
     // Preview mode: workspace source paths (lockfile + AMENT fallback).
@@ -1136,7 +1110,9 @@ fn resolve_python_file_recursive(
             if !any_fetched {
                 // Nothing could be fetched (e.g. all packages missing from lockfile).
                 // Stop retrying — output may be incomplete.
-                let missing: Vec<_> = out.packages_to_fetch.iter()
+                let missing: Vec<_> = out
+                    .packages_to_fetch
+                    .iter()
                     .filter(|p| !fetched_packages.contains(p.as_str()))
                     .cloned()
                     .collect();
@@ -1172,7 +1148,12 @@ fn resolve_python_file_recursive(
     // Done before consuming py_output; py_output_to_parsed intentionally omits warnings.
     for warning in &py_output.warnings {
         warn!("py_resolver [{}]: {}", file_path.display(), warning);
-        result.add_warning(format!("{}://{}: {}", package, share_path.display(), warning));
+        result.add_warning(format!(
+            "{}://{}: {}",
+            package,
+            share_path.display(),
+            warning
+        ));
     }
     // Promote shim errors (non-recoverable Python exceptions).
     for error in &py_output.errors {
@@ -1225,12 +1206,23 @@ fn resolve_file_recursive(
     // system treats every <include> as an independent instantiation, and two includes
     // of the same file (even with identical args) may produce distinct nodes when
     // wrapped in different PushRosNamespace / <group namespace="..."> contexts.
-    if parent_chain.iter().any(|(p, s)| p == package && s == share_path) {
-        debug!("Cycle detected for {}:{}, stopping recursion", package, share_path.display());
+    if parent_chain
+        .iter()
+        .any(|(p, s)| p == package && s == share_path)
+    {
+        debug!(
+            "Cycle detected for {}:{}, stopping recursion",
+            package,
+            share_path.display()
+        );
         return;
     }
 
-    debug!("Resolving launch file: {}:{}", package, share_path.display());
+    debug!(
+        "Resolving launch file: {}:{}",
+        package,
+        share_path.display()
+    );
 
     // Route to appropriate handler based on file type
     if is_python_launch_file(share_path) {
@@ -1266,7 +1258,14 @@ fn resolve_file_recursive(
     let file_path = if workflow_options.preview {
         if lockfile.packages.contains_key(package) {
             // Package is in lockfile: fetch workspace source and resolve from there.
-            if !ensure_package_fetched(lockfile, package, fetch_dir, options, result, fetched_packages) {
+            if !ensure_package_fetched(
+                lockfile,
+                package,
+                fetch_dir,
+                options,
+                result,
+                fetched_packages,
+            ) {
                 return;
             }
             match locator.resolve_share_file(package, share_path) {
@@ -1300,7 +1299,7 @@ fn resolve_file_recursive(
                                 }
                             }
                         } else {
-                            return;  // error already added by try_rosdep_install
+                            return; // error already added by try_rosdep_install
                         }
                     } else {
                         result.add_error(format!(
@@ -1334,11 +1333,7 @@ fn resolve_file_recursive(
     let content = match std::fs::read_to_string(&file_path) {
         Ok(c) => c,
         Err(e) => {
-            result.add_error(format!(
-                "failed to read {}: {}",
-                file_path.display(),
-                e
-            ));
+            result.add_error(format!("failed to read {}: {}", file_path.display(), e));
             return;
         }
     };
@@ -1346,11 +1341,7 @@ fn resolve_file_recursive(
     let ast = match parse_launch_xml(&content, &file_path) {
         Ok(a) => a,
         Err(e) => {
-            result.add_error(format!(
-                "failed to parse {}: {}",
-                file_path.display(),
-                e
-            ));
+            result.add_error(format!("failed to parse {}: {}", file_path.display(), e));
             return;
         }
     };
@@ -1390,6 +1381,7 @@ fn resolve_file_recursive(
         })),
         preview_mode: workflow_options.preview,
         lockfile_packages: lockfile_pkg_names,
+        rosdep_fallback: workflow_options.rosdep_fallback,
         ..Default::default()
     };
     // Build a callback that runs py_resolver inline on Python includes so that
@@ -1406,7 +1398,14 @@ fn resolve_file_recursive(
         // Augment args with the package shares from AMENT_PREFIX_PATH so that
         // Python files that call get_package_share_directory() resolve correctly.
         let _ = &locator_for_cb; // keep alive
-        match run_py_resolver(py_path, args, &package_shares_for_cb, &lockfile_pkg_list_for_cb, &[], &workflow_options_for_cb) {
+        match run_py_resolver(
+            py_path,
+            args,
+            &package_shares_for_cb,
+            &lockfile_pkg_list_for_cb,
+            &[],
+            &workflow_options_for_cb,
+        ) {
             Ok(output) => output.set_launch_configurations,
             Err(e) => {
                 tracing::warn!(
@@ -1433,11 +1432,7 @@ fn resolve_file_recursive(
     let resolved = match resolve_launch(&ast, initial_args, &mut ctx, &resolve_options) {
         Ok(r) => r,
         Err(e) => {
-            result.add_error(format!(
-                "failed to resolve {}: {}",
-                file_path.display(),
-                e
-            ));
+            result.add_error(format!("failed to resolve {}: {}", file_path.display(), e));
             return;
         }
     };
@@ -1499,7 +1494,10 @@ fn resolve_file_recursive(
     // process_parsed_file uses LaunchInclude.explicit_args directly and does not need
     // result.include_args, but we keep it populated.
     result.include_args.extend(
-        resolved.include_args.iter().map(|(k, v)| (k.clone(), v.clone()))
+        resolved
+            .include_args
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone())),
     );
     // Convert to unified IR and delegate all common post-processing (accumulation,
     // node chain/source assignment, declared-arg tracking, include recursion,
@@ -1572,7 +1570,11 @@ mod tests {
     #[test]
     fn test_py_output_namespace_computation() {
         let cases: &[(&[&str], Option<&str>, Option<&str>)] = &[
-            (&["sensing", "lidar"], Some("my_node"), Some("/sensing/lidar/my_node")),
+            (
+                &["sensing", "lidar"],
+                Some("my_node"),
+                Some("/sensing/lidar/my_node"),
+            ),
             (&["sensing"], Some("/abs"), Some("/abs")), // absolute overrides stack
             (&[], Some("solo_ns"), Some("/solo_ns")),
             (&["a"], None, Some("/a")),

@@ -171,13 +171,13 @@ pub struct ResolveResult {
     ///   - unportable param source paths (e.g. ~/autoware_data convention)
     pub infos: Vec<String>,
 
-    /// Per-file declared arg names (from static AST scan), keyed by (package, share_path).
+    /// Per-file declared arg names and defaults, keyed by (package, share_path).
     ///
     /// Populated during resolution by scanning each parsed XML launch file with
-    /// [`collect_declared_args`].  Used by the excessive-include-arg check: after a child
-    /// file is resolved the caller looks up its declared args and compares them against the
-    /// explicit args that were forwarded via `<include><arg .../></include>`.
-    pub declared_args_by_file: HashMap<(String, PathBuf), HashSet<String>>,
+    /// [`collect_declared_args`].  Used by:
+    /// - the excessive-include-arg check (compares forwarded args against declared keys)
+    /// - `--show-args` rendering (shows declared defaults alongside explicit args)
+    pub declared_args_by_file: HashMap<(String, PathBuf), HashMap<String, String>>,
 
     /// Globally accumulated SetParameter values discovered during resolution.
     ///
@@ -910,10 +910,10 @@ fn process_parsed_file(
         result.nodes.push(node);
     }
 
-    // Store declared args so the excessive-include-arg check can run after recursing.
+    // Store declared args so the excessive-include-arg check and --show-args can use them.
     result.declared_args_by_file.insert(
         (package.to_string(), share_path.to_path_buf()),
-        parsed.declared_arg_defaults.keys().cloned().collect(),
+        parsed.declared_arg_defaults.clone(),
     );
 
     // Build next_persisted: current persisted context + this file's declared defaults.
@@ -987,10 +987,10 @@ fn process_parsed_file(
         // never declares.  Skip in global-cascade mode where children may use args via
         // LaunchConfiguration without declaring them.
         if !workflow_options.global_arg_cascade && !include.explicit_args.is_empty() {
-            let child_declared = result
+            let child_declared: HashSet<String> = result
                 .declared_args_by_file
                 .get(&(include.package.clone(), include.share_path.clone()))
-                .cloned()
+                .map(|m| m.keys().cloned().collect())
                 .unwrap_or_default();
             let explicit_names: HashSet<String> = include.explicit_args.keys().cloned().collect();
             let mut excessive: Vec<String> = explicit_names

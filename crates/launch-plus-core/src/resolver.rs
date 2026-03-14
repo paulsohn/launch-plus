@@ -2430,6 +2430,60 @@ fn eval_python_expr(expr: &str) -> crate::Result<String> {
 /// opener and a matching `<!-- end: pkg://path -->` closer.  In flat mode the closer marks
 /// the extent of the section where there is no `</group>` tag.  In nested mode it labels
 /// the closing `</group>` with the originating file name.
+/// Emit `<!-- arg ... -->` comments for a given include boundary.
+///
+/// Shows explicitly-forwarded args first, then any declared defaults from the file
+/// that aren't already covered by explicit args (marked with `(default)`).
+fn render_show_args(
+    out: &mut String,
+    key: &(String, PathBuf),
+    include_args: &HashMap<(String, PathBuf), IncludeArgContext>,
+    declared_args_by_file: &HashMap<(String, PathBuf), HashMap<String, String>>,
+    indent: usize,
+) {
+    let explicit = include_args
+        .get(key)
+        .map(|ctx| &ctx.explicit)
+        .cloned()
+        .unwrap_or_default();
+    let declared = declared_args_by_file.get(key).cloned().unwrap_or_default();
+
+    // Merge: explicit args take precedence, then declared defaults
+    let mut merged: HashMap<&str, (&str, bool)> = HashMap::new();
+    for (name, value) in &explicit {
+        merged.insert(name.as_str(), (value.as_str(), false));
+    }
+    for (name, value) in &declared {
+        merged
+            .entry(name.as_str())
+            .or_insert((value.as_str(), true));
+    }
+
+    if merged.is_empty() {
+        return;
+    }
+
+    let mut sorted: Vec<_> = merged.into_iter().collect();
+    sorted.sort_by_key(|(k, _)| *k);
+    for (name, (value, is_default)) in sorted {
+        if is_default {
+            out.push_str(&format!(
+                "{}<!-- arg name=\"{}\" default=\"{}\" -->\n",
+                pad(indent),
+                name,
+                xml_escape(value)
+            ));
+        } else {
+            out.push_str(&format!(
+                "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
+                pad(indent),
+                name,
+                xml_escape(value)
+            ));
+        }
+    }
+}
+
 pub fn render_resolved_xml(
     package: &str,
     launcher: &str,
@@ -2439,6 +2493,7 @@ pub fn render_resolved_xml(
     include_args: &HashMap<(String, PathBuf), IncludeArgContext>,
     show_args: bool,
     initial_args: &HashMap<String, String>,
+    declared_args_by_file: &HashMap<(String, PathBuf), HashMap<String, String>>,
 ) -> String {
     let mut out = String::new();
 
@@ -2567,18 +2622,13 @@ pub fn render_resolved_xml(
                     out.push_str(&format!("{}<group>\n", pad(vd)));
                 }
                 if show_args {
-                    if let Some(ctx) = include_args.get(&(pkg.clone(), path.clone())) {
-                        let mut sorted: Vec<_> = ctx.explicit.iter().collect();
-                        sorted.sort_by_key(|(k, _)| k.as_str());
-                        for (name, value) in sorted {
-                            out.push_str(&format!(
-                                "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
-                                pad(vd + 1),
-                                name,
-                                xml_escape(value)
-                            ));
-                        }
-                    }
+                    render_show_args(
+                        &mut out,
+                        &(pkg.clone(), path.clone()),
+                        include_args,
+                        declared_args_by_file,
+                        vd + 1,
+                    );
                 }
                 open_src.push((pkg, path));
             }
@@ -2595,18 +2645,13 @@ pub fn render_resolved_xml(
                 ));
                 // Emit explicit args and declared defaults for this include boundary.
                 if show_args {
-                    if let Some(ctx) = include_args.get(&(pkg.clone(), path.clone())) {
-                        let mut sorted: Vec<_> = ctx.explicit.iter().collect();
-                        sorted.sort_by_key(|(k, _)| k.as_str());
-                        for (name, value) in sorted {
-                            out.push_str(&format!(
-                                "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
-                                pad(vd + 1),
-                                name,
-                                xml_escape(value)
-                            ));
-                        }
-                    }
+                    render_show_args(
+                        &mut out,
+                        &(pkg.clone(), path.clone()),
+                        include_args,
+                        declared_args_by_file,
+                        vd + 1,
+                    );
                 }
                 out.push_str(&format!(
                     "{}<!-- end: {}://{} -->\n",
@@ -2651,18 +2696,13 @@ pub fn render_resolved_xml(
                 }
                 // Emit explicit args and declared defaults for this include boundary.
                 if show_args {
-                    if let Some(ctx) = include_args.get(&(pkg.clone(), path.clone())) {
-                        let mut sorted: Vec<_> = ctx.explicit.iter().collect();
-                        sorted.sort_by_key(|(k, _)| k.as_str());
-                        for (name, value) in sorted {
-                            out.push_str(&format!(
-                                "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
-                                pad(vd + 1),
-                                name,
-                                xml_escape(value)
-                            ));
-                        }
-                    }
+                    render_show_args(
+                        &mut out,
+                        &(pkg.clone(), path.clone()),
+                        include_args,
+                        declared_args_by_file,
+                        vd + 1,
+                    );
                 }
                 open_src.push((pkg, path));
             }
@@ -5670,6 +5710,7 @@ mod tests {
             &HashMap::new(),
             false,
             &HashMap::new(),
+            &HashMap::new(),
         );
 
         // Should have two <group> elements (one per source file)
@@ -5803,6 +5844,7 @@ mod tests {
             &HashMap::new(),
             false,
             &HashMap::new(),
+            &HashMap::new(),
         );
 
         // Two <group> elements: one source group for src_a, one namespace sub-group inside it.
@@ -5918,6 +5960,7 @@ mod tests {
             false,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 
@@ -6108,6 +6151,7 @@ mod tests {
             &HashMap::new(),
             false,
             &HashMap::new(),
+            &HashMap::new(),
         );
 
         // No push-ros-namespace anywhere.
@@ -6203,6 +6247,7 @@ mod tests {
             &HashMap::new(),
             false,
             &HashMap::new(),
+            &HashMap::new(),
         );
 
         // Only one <group> — the one wrapping the namespace node.
@@ -6293,6 +6338,7 @@ mod tests {
             true,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 
@@ -6765,6 +6811,7 @@ launch:
             &HashMap::new(),
             false,
             &HashMap::new(),
+            &HashMap::new(),
         );
 
         // Marker comment pair must appear.
@@ -6860,6 +6907,7 @@ launch:
             false,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 
@@ -7332,6 +7380,7 @@ launch:
             false,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 

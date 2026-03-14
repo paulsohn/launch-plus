@@ -1624,6 +1624,7 @@ fn cmd_resolve(
             &result.include_args,
             show_args,
             &result.initial_args,
+            &result.declared_args_by_file,
         );
         if preview && expand_paths {
             // Expand $(find-pkg-share <pkg>) tokens to absolute AMENT install paths

@@ -72,6 +72,14 @@ RESOLVE_DISPLAY=(
     --show-args
 )
 
+# ── Acados environment (if installed) ────────────────────────────────────────
+
+if [[ -d /opt/acados/lib ]]; then
+    export CMAKE_PREFIX_PATH="/opt/acados:${CMAKE_PREFIX_PATH:-}"
+    export ACADOS_SOURCE_DIR="/opt/acados"
+    export LD_LIBRARY_PATH="/opt/acados/lib:${LD_LIBRARY_PATH:-}"
+fi
+
 # ── Clean workspace if requested ─────────────────────────────────────────────
 
 if [[ "$MODE_FLAG" == "-c" ]]; then

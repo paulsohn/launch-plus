@@ -24,6 +24,7 @@ jobs:
             git \
             pkg-config \
             libssl-dev \
+            python3-venv \
             ros-dev-tools \
             ros-jazzy-ublox-gps
 
@@ -40,6 +41,9 @@ jobs:
 
       - name: Build launch-plus
         run: cargo build --bin launch-plus --release
+
+      - name: Install acados
+        run: bash example/autoware/install-acados.sh
 
       - name: Install Autoware ML param files
         run: cp -r .github/assets/autoware_data "$HOME/autoware_data"

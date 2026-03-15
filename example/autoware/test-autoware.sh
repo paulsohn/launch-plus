@@ -107,7 +107,7 @@ echo
 # ── Step 2: Build ────────────────────────────────────────────────────────────
 
 echo "==> Step 2: Build"
-$LP build "${MODE_ARGS[@]}" "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" --colcon-flagfile colcon-flags.txt
+$LP build ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" --colcon-flagfile colcon-flags.txt
 echo "    OK"
 echo
 

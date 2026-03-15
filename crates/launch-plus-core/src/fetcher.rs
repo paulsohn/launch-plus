@@ -510,7 +510,7 @@ fn get_sparse_checkout_paths(repo_dir: &Path) -> crate::Result<Vec<String>> {
     Ok(stdout.lines().map(|s| s.to_string()).collect())
 }
 
-/// Check if the working tree has uncommitted changes (staged or unstaged).
+/// Check if the working tree has uncommitted changes (staged, unstaged, or untracked files).
 fn is_working_tree_dirty(repo_dir: &Path) -> crate::Result<bool> {
     let output = Command::new("git")
         .current_dir(repo_dir)

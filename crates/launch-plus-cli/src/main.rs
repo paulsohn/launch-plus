@@ -296,13 +296,14 @@ enum Commands {
         warn_all: bool,
 
         /// Reset every repository to the pinned lockfile SHA before resolving.
-        /// Dirty working trees are stashed automatically.  Guarantees
-        /// reproducible output.  Without --clean or --dirty, launch-plus
+        /// Dirty working trees are stashed automatically (dirty submodules
+        /// are discarded).  Guarantees reproducible output.
+        /// Without --clean or --dirty, launch-plus
         /// verifies SHA and working tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use the current on-disk state without any git operations.
+        /// Use the current on-disk state without modifying existing repos.
         /// Only fetches repositories that are completely missing from disk.
         /// Without --clean or --dirty, launch-plus verifies SHA and working
         /// tree state, erroring if either is wrong.
@@ -340,13 +341,13 @@ enum Commands {
         #[arg(long, default_value = "src")]
         src: String,
 
-        /// Reset repos to lockfile SHAs (stash dirty changes automatically).
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically; dirty submodules are discarded).
         /// Without --clean or --dirty, launch-plus verifies SHA and working
         /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use the current on-disk state without any git operations.
+        /// Use the current on-disk state without modifying existing repos.
         /// Without --clean or --dirty, launch-plus verifies SHA and working
         /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
@@ -435,13 +436,13 @@ enum Commands {
         #[arg(long, default_value = "src")]
         src: String,
 
-        /// Reset repos to lockfile SHAs (stash dirty changes automatically).
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically; dirty submodules are discarded).
         /// Without --clean or --dirty, launch-plus verifies SHA and working
         /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use the current on-disk state without any git operations.
+        /// Use the current on-disk state without modifying existing repos.
         /// Without --clean or --dirty, launch-plus verifies SHA and working
         /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
@@ -497,13 +498,13 @@ enum Commands {
         #[arg(long, default_value = "src")]
         src: String,
 
-        /// Reset repos to lockfile SHAs (stash dirty changes automatically).
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically; dirty submodules are discarded).
         /// Without --clean or --dirty, launch-plus verifies SHA and working
         /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use the current on-disk state without any git operations.
+        /// Use the current on-disk state without modifying existing repos.
         /// Without --clean or --dirty, launch-plus verifies SHA and working
         /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
@@ -636,13 +637,13 @@ enum Commands {
         #[arg(long)]
         warn_all: bool,
 
-        /// Reset repos to lockfile SHAs (stash dirty changes automatically).
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically; dirty submodules are discarded).
         /// Without --clean or --dirty, launch-plus verifies SHA and working
         /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use the current on-disk state without any git operations.
+        /// Use the current on-disk state without modifying existing repos.
         /// Without --clean or --dirty, launch-plus verifies SHA and working
         /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]

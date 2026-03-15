@@ -30,8 +30,9 @@ pub enum WorkspaceState {
     /// dirty submodules are force-reset to the committed state (their local
     /// changes are **discarded**, not stashed).  Guarantees reproducibility.
     Clean,
-    /// Trust whatever is currently on disk.  Repositories that already exist are
-    /// not touched by any git operation.  Only missing repos are cloned fresh.
+    /// Trust whatever is currently on disk.  Existing repositories are not
+    /// modified (read-only git commands may still run for diagnostics).
+    /// Only missing repos are cloned fresh.
     Dirty,
     /// Verify that each existing repository matches the lockfile SHA and has a
     /// clean working tree.  If either check fails, error out and ask the user
@@ -613,7 +614,8 @@ fn verify_repo_state(repo_dir: &Path, expected_sha: &str) -> crate::Result<()> {
     Err(crate::Error::Git(format!(
         "repository '{}' at {} is not in the expected state:\n  {}\n\n\
          Specify how to proceed:\n  \
-         -c, --clean   reset to the lockfile SHA (local changes are stashed)\n  \
+         -c, --clean   reset to the lockfile SHA (local changes are stashed; \
+dirty submodules are discarded)\n  \
          -d, --dirty   use the current on-disk state as-is",
         repo_name,
         repo_dir.display(),

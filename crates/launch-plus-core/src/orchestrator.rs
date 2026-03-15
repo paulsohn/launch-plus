@@ -755,6 +755,7 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                     &n.namespace_stack,
                     n.explicit_namespace.as_deref(),
                 ),
+                explicit_namespace: n.explicit_namespace.clone(),
                 namespace_stack: n.namespace_stack.clone(),
                 parameters: n.parameters.clone(),
                 remappings: n.remappings.clone(),
@@ -871,45 +872,33 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
 /// `<push-ros-namespace>` group, nodes from B need the parent namespace prepended.
 /// This is a post-hoc adjustment — the child resolver runs namespace-agnostically,
 /// and the caller (orchestrator) applies the enclosing scope's namespace afterward.
-fn apply_parent_namespace(
-    parent_stack: &[String],
-    parent_ns: Option<&str>,
-    node: &mut ResolvedNode,
-) {
-    use crate::resolver::ros2_namespace_join;
+fn apply_parent_namespace(parent_stack: &[String], node: &mut ResolvedNode) {
+    use crate::resolver::effective_namespace;
 
     // Prepend parent stack to the node's own namespace_stack.
     let mut new_stack = parent_stack.to_vec();
     new_stack.extend(node.namespace_stack.iter().cloned());
     node.namespace_stack = new_stack;
 
-    // Recompute the node's effective namespace by joining parent onto child.
-    node.namespace = match (parent_ns, node.namespace.as_deref()) {
-        (Some(p), Some(c)) => ros2_namespace_join(Some(p), c),
-        (Some(p), None) => Some(p.to_string()),
-        (None, c) => c.map(|s| s.to_string()),
-    };
+    // Recompute effective namespace from the combined stack + explicit namespace.
+    // This avoids the double-effective-join bug where joining two absolute namespaces
+    // causes the parent to be lost (e.g. "/can0" + "/inner" → "/inner" instead of "/can0/inner").
+    node.namespace = effective_namespace(&node.namespace_stack, node.explicit_namespace.as_deref());
 
-    // For event handlers, also apply parent namespace to the handler and its actions.
+    // For event handlers, also recompute handler and action namespaces.
     if let NodeKind::EventHandler {
         ref mut namespace,
         ref mut actions,
         ..
     } = node.kind
     {
-        *namespace = match (parent_ns, namespace.as_deref()) {
-            (Some(p), Some(c)) => ros2_namespace_join(Some(p), c),
-            (Some(p), None) => Some(p.to_string()),
-            (None, c) => c.map(|s| s.to_string()),
-        };
+        // Event handler namespace = effective from combined stack (no explicit ns attr).
+        *namespace = effective_namespace(&node.namespace_stack, None);
+        let handler_ns = namespace.clone();
         for action in actions {
             match action {
                 ResolvedEventAction::EmitEvent { namespace, .. } => {
-                    *namespace = match (parent_ns, namespace.as_deref()) {
-                        (Some(p), Some(c)) => ros2_namespace_join(Some(p), c),
-                        (Some(p), None) => Some(p.to_string()),
-                        (None, c) => c.map(|s| s.to_string()),
-                    };
+                    *namespace = handler_ns.clone();
                 }
             }
         }
@@ -1054,9 +1043,8 @@ fn process_parsed_file(
         // namespace context is an enclosing scope concern that the child doesn't know
         // about, so we apply it post-hoc.
         if !include.namespace_stack.is_empty() {
-            let parent_ns = crate::resolver::effective_namespace(&include.namespace_stack, None);
             for node in &mut result.nodes[nodes_before..] {
-                apply_parent_namespace(&include.namespace_stack, parent_ns.as_deref(), node);
+                apply_parent_namespace(&include.namespace_stack, node);
             }
         }
 
@@ -1746,14 +1734,13 @@ mod tests {
     fn test_apply_parent_namespace() {
         // Node with no namespace, parent has namespace "can0"
         let parent_stack = vec!["can0".to_string()];
-        let parent_ns = crate::resolver::effective_namespace(&parent_stack, None);
         let mut node = ResolvedNode {
             namespace: None,
             namespace_stack: vec![],
             kind: NodeKind::LifecycleNode,
             ..Default::default()
         };
-        apply_parent_namespace(&parent_stack, parent_ns.as_deref(), &mut node);
+        apply_parent_namespace(&parent_stack, &mut node);
         assert_eq!(node.namespace.as_deref(), Some("/can0"));
         assert_eq!(node.namespace_stack, vec!["can0"]);
 
@@ -1765,33 +1752,33 @@ mod tests {
             kind: NodeKind::Node,
             ..Default::default()
         };
-        apply_parent_namespace(&parent_stack, parent_ns.as_deref(), &mut node2);
+        apply_parent_namespace(&parent_stack, &mut node2);
         assert_eq!(node2.namespace.as_deref(), Some("/can0"));
 
         // Node with explicit absolute namespace="/override", parent "can0"
         // Absolute namespace should override (ros2 semantics)
         let mut node3 = ResolvedNode {
             namespace: Some("/override".to_string()),
+            explicit_namespace: Some("/override".to_string()),
             namespace_stack: vec![],
             kind: NodeKind::Node,
             ..Default::default()
         };
-        apply_parent_namespace(&parent_stack, parent_ns.as_deref(), &mut node3);
-        // ros2_namespace_join(Some("/can0"), "/override") → Some("/override")
+        apply_parent_namespace(&parent_stack, &mut node3);
+        // Absolute explicit namespace overrides parent via ros2_namespace_join
         assert_eq!(node3.namespace.as_deref(), Some("/override"));
 
-        // Node with relative child namespace, parent "can0"
+        // Node with relative child push-ros-namespace, parent "can0"
+        // Previously this was broken: effective("/inner") joined with "/can0" → "/inner"
         let mut node4 = ResolvedNode {
             namespace: Some("/inner".to_string()),
             namespace_stack: vec!["inner".to_string()],
             kind: NodeKind::Node,
             ..Default::default()
         };
-        apply_parent_namespace(&parent_stack, parent_ns.as_deref(), &mut node4);
-        // The child had effective namespace "/inner" from its own stack ["inner"].
-        // But "/inner" is absolute, so ros2_namespace_join("/can0", "/inner") → "/inner"
-        // This is correct: the child's push-ros-namespace produced an absolute path.
-        assert_eq!(node4.namespace.as_deref(), Some("/inner"));
+        apply_parent_namespace(&parent_stack, &mut node4);
+        // Combined stack ["can0", "inner"] → effective "/can0/inner"
+        assert_eq!(node4.namespace.as_deref(), Some("/can0/inner"));
         assert_eq!(node4.namespace_stack, vec!["can0", "inner"]);
 
         // Event handler: parent namespace should apply to handler and actions
@@ -1813,7 +1800,7 @@ mod tests {
             },
             ..Default::default()
         };
-        apply_parent_namespace(&parent_stack, parent_ns.as_deref(), &mut node5);
+        apply_parent_namespace(&parent_stack, &mut node5);
         if let NodeKind::EventHandler {
             namespace, actions, ..
         } = &node5.kind

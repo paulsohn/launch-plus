@@ -122,16 +122,18 @@ echo "    OK (AMENT_PREFIX_PATH set)"
 echo
 
 # ── Step 4: Preview resolve + expand paths ───────────────────────────────────
+# Post-build steps always use --dirty: colcon may have generated files in the
+# source repos (e.g. compile_commands.json), making the working tree dirty.
 
 echo "==> Step 4: Preview resolve (expand paths)"
-$LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" "${RESOLVE_DISPLAY[@]}" --preview --expand-paths > preview.xml
+$LP resolve --dirty "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" "${RESOLVE_DISPLAY[@]}" --preview --expand-paths > preview.xml
 echo "    OK (preview.xml)"
 echo
 
 # ── Step 5: Post-build resolve (real paths) ──────────────────────────────────
 
 echo "==> Step 5: Post-build resolve"
-$LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" "${RESOLVE_DISPLAY[@]}" > postbuild.xml
+$LP resolve --dirty "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" "${RESOLVE_DISPLAY[@]}" > postbuild.xml
 echo "    OK (postbuild.xml)"
 echo
 

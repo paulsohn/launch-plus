@@ -2007,12 +2007,13 @@ fn resolve_element(
                     } else {
                         None
                     };
-                    // If emit_event has an explicit namespace=, use it; otherwise
-                    // inherit the handler's effective namespace.
+                    // Resolve explicit namespace= if present; otherwise leave as
+                    // None so apply_parent_namespace can inherit the handler's
+                    // effective namespace after cross-file prefix is applied.
                     let cn = if let Some(ns) = child_ns {
                         Some(resolve_substitutions(ns, ctx)?.propagate_into(result))
                     } else {
-                        handler_effective_ns.clone()
+                        None
                     };
                     actions.push(ResolvedEventAction::EmitEvent {
                         event: ev,

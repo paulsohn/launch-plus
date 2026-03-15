@@ -36,15 +36,15 @@
   <group>
     <!-- arg name="container_name" value="pointcloud_container" -->
     <!-- arg name="use_multithread" value="true" -->
-    <node_container pkg="rclcpp_components" exec="container_executable" name="container_name">
-      <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_component"/>
-    </node_container>
+    <node_container pkg="rclcpp_components" exec="container_executable" name="container_name"/>
   </group>
   <!-- end: autoware_launch://launch/pointcloud_container.launch.py -->
   <!-- source: tier4_vehicle_launch://launch/vehicle.launch.xml -->
   <group>
     <!-- arg name="config_dir" value="$(find-pkg-share sample_sensor_kit_description)/config" -->
+    <!-- arg name="initial_engage_state" default="false" -->
     <!-- arg name="launch_vehicle_interface" value="true" -->
+    <!-- arg name="model_file" default="$(find-pkg-share tier4_vehicle_launch)/urdf/vehicle.xacro" -->
     <!-- arg name="raw_vehicle_cmd_converter_param_path" value="$(find-pkg-share autoware_launch)/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml" -->
     <!-- arg name="sensor_model" value="sample_sensor_kit" -->
     <!-- arg name="vehicle_id" value="default" -->
@@ -54,27 +54,42 @@
       <param name="robot_description" value="$(command 'xacro $(find-pkg-share tier4_vehicle_launch)/urdf/vehicle.xacro vehicle_model:=sample_vehicle sensor_model:=sample_sensor_kit config_dir:=$(find-pkg-share sample_sensor_kit_description)/config' 'warn')"/>
     </node>
     <!-- source: sample_vehicle_launch://launch/vehicle_interface.launch.xml -->
+      <!-- arg name="initial_engage_state" value="false" -->
+      <!-- arg name="raw_vehicle_cmd_converter_param_path" value="$(find-pkg-share autoware_launch)/config/vehicle/raw_vehicle_cmd_converter/raw_vehicle_cmd_converter.param.yaml" -->
+      <!-- arg name="vehicle_id" value="default" -->
     <!-- end: sample_vehicle_launch://launch/vehicle_interface.launch.xml -->
   </group>
   <!-- end: tier4_vehicle_launch://launch/vehicle.launch.xml -->
   <!-- source: autoware_launch://launch/components/tier4_system_component.launch.xml -->
   <group>
+    <!-- arg name="diagnostic_graph_aggregator_param_path" default="$(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml" -->
     <set_parameter name="use_sim_time" value="false"/>
     <!-- source: tier4_system_launch://launch/system.launch.xml -->
     <group>
       <!-- arg name="availability_converter_param_path" value="$(find-pkg-share autoware_launch)/config/system/command_mode/converter.param.yaml" -->
+      <!-- arg name="change_autoware_control_srv" default="/system/operation_mode/change_autoware_control" -->
+      <!-- arg name="change_operation_mode_srv" default="/system/operation_mode/change_operation_mode" -->
       <!-- arg name="command_mode_decider_param_path" value="$(find-pkg-share autoware_launch)/config/system/command_mode/decider.param.yaml" -->
       <!-- arg name="command_mode_switcher_param_path" value="$(find-pkg-share autoware_launch)/config/system/command_mode/switcher.param.yaml" -->
       <!-- arg name="component_state_monitor_topic_path" value="$(find-pkg-share autoware_launch)/config/system/component_state_monitor/topics.yaml" -->
+      <!-- arg name="diag_reset_srv" default="/diagnostics_graph/reset" -->
+      <!-- arg name="diag_status_topic" default="/diagnostics_graph/status" -->
+      <!-- arg name="diag_struct_topic" default="/diagnostics_graph/struct" -->
       <!-- arg name="diagnostic_graph_aggregator_graph_path" value="$(find-pkg-share autoware_launch)/config/system/diagnostics/autoware-main.yaml" -->
+      <!-- arg name="diagnostic_graph_aggregator_graph_vars" default="" -->
       <!-- arg name="diagnostic_graph_aggregator_param_path" value="$(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml" -->
       <!-- arg name="dummy_diag_publisher_param_path" value="$(find-pkg-share autoware_launch)/config/system/diagnostics/dummy_diag_publisher.param.yaml" -->
       <!-- arg name="duplicated_node_checker_param_path" value="$(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml" -->
       <!-- arg name="launch_dummy_diag_publisher" value="false" -->
+      <!-- arg name="launch_rqt_reconfigure" default="false" -->
+      <!-- arg name="launch_rqt_robot_monitor" default="false" -->
+      <!-- arg name="launch_rqt_runtime_monitor" default="false" -->
+      <!-- arg name="launch_rqt_runtime_monitor_err" default="false" -->
       <!-- arg name="launch_system_monitor" value="true" -->
       <!-- arg name="mrm_comfortable_stop_operator_param_path" value="$(find-pkg-share autoware_launch)/config/system/mrm_comfortable_stop_operator/mrm_comfortable_stop_operator.param.yaml" -->
       <!-- arg name="mrm_emergency_stop_operator_param_path" value="$(find-pkg-share autoware_launch)/config/system/mrm_emergency_stop_operator/mrm_emergency_stop_operator.param.yaml" -->
       <!-- arg name="mrm_handler_param_path" value="$(find-pkg-share autoware_launch)/config/system/mrm_handler/mrm_handler.param.yaml" -->
+      <!-- arg name="mrm_state_topic" default="/system/fail_safe/mrm_state" -->
       <!-- arg name="pipeline_latency_monitor_param_path" value="$(find-pkg-share autoware_launch)/config/system/pipeline_latency_monitor/pipeline_latency_monitor.param.yaml" -->
       <!-- arg name="processing_time_checker_param_path" value="$(find-pkg-share autoware_launch)/config/system/processing_time_checker/processing_time_checker.param.yaml" -->
       <!-- arg name="run_mode" value="online" -->
@@ -87,6 +102,7 @@
       <!-- arg name="system_monitor_ntp_monitor_param_path" value="$(find-pkg-share autoware_launch)/config/system/system_monitor/ntp_monitor.param.yaml" -->
       <!-- arg name="system_monitor_process_monitor_param_path" value="$(find-pkg-share autoware_launch)/config/system/system_monitor/process_monitor.param.yaml" -->
       <!-- arg name="system_monitor_voltage_monitor_param_path" value="$(find-pkg-share autoware_launch)/config/system/system_monitor/voltage_monitor.param.yaml" -->
+      <!-- arg name="use_control_command_gate" default="false" -->
       <!-- source: autoware_system_monitor://launch/system_monitor.launch.xml -->
       <group>
         <!-- arg name="cpu_monitor_config_file" value="$(find-pkg-share autoware_launch)/config/system/system_monitor/cpu_monitor.param.yaml" -->
@@ -199,6 +215,7 @@
       <!-- source: autoware_processing_time_checker://launch/processing_time_checker.launch.xml -->
       <group>
         <!-- arg name="config_file" value="$(find-pkg-share autoware_launch)/config/system/processing_time_checker/processing_time_checker.param.yaml" -->
+        <!-- arg name="output_metrics" default="false" -->
         <node pkg="autoware_processing_time_checker" exec="processing_time_checker_node" name="processing_time_checker" output="screen">
           <!-- params from: $(find-pkg-share autoware_launch)/config/system/processing_time_checker/processing_time_checker.param.yaml -->
           <param name="update_rate" value="10.0"/>
@@ -260,6 +277,8 @@
         </node_container>
         <!-- source: autoware_topic_state_monitor://launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_vector_map">
               <param name="best_effort" value="False"/>
@@ -278,6 +297,8 @@
         <!-- end: autoware_topic_state_monitor://launch/load_topic_state_monitor.launch.xml -->
         <!-- source: autoware_topic_state_monitor://launch/load_topic_state_monitor_tf.launch.xml -->
         <group>
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_transform_map_to_base_link">
               <param name="best_effort" value="False"/>
@@ -336,9 +357,11 @@
         <!-- arg name="graph_file" value="$(find-pkg-share autoware_launch)/config/system/diagnostics/autoware-main.yaml" -->
         <!-- arg name="graph_vars" value="" -->
         <!-- arg name="param_file" value="$(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml" -->
+        <!-- arg name="~/availability" default="/system/command_mode/availability" -->
         <!-- arg name="~/reset" value="/diagnostics_graph/reset" -->
         <!-- arg name="~/status" value="/diagnostics_graph/status" -->
         <!-- arg name="~/struct" value="/diagnostics_graph/struct" -->
+        <!-- arg name="~/unknowns" default="/diagnostics_graph/unknowns" -->
         <node pkg="autoware_diagnostic_graph_aggregator" exec="aggregator_node">
           <!-- params from: $(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml -->
           <param name="use_operation_mode_availability" value="true"/>
@@ -387,6 +410,22 @@
       <!-- source: autoware_mrm_handler://launch/mrm_handler.launch.xml -->
       <group>
         <!-- arg name="config_file" value="$(find-pkg-share autoware_launch)/config/system/mrm_handler/mrm_handler.param.yaml" -->
+        <!-- arg name="input_api_operation_mode_state" default="/api/operation_mode/state" -->
+        <!-- arg name="input_control_mode" default="/vehicle/status/control_mode" -->
+        <!-- arg name="input_gear" default="/control/command/gear_cmd" -->
+        <!-- arg name="input_mrm_comfortable_stop_state" default="/system/mrm/comfortable_stop/status" -->
+        <!-- arg name="input_mrm_emergency_stop_state" default="/system/mrm/emergency_stop/status" -->
+        <!-- arg name="input_mrm_pull_over_state" default="/system/mrm/pull_over_manager/status" -->
+        <!-- arg name="input_odometry" default="/localization/kinematic_state" -->
+        <!-- arg name="input_operation_mode_availability" default="/system/operation_mode/availability" -->
+        <!-- arg name="output_emergency_holding" default="/system/emergency_holding" -->
+        <!-- arg name="output_gear" default="/system/emergency/gear_cmd" -->
+        <!-- arg name="output_hazard" default="/system/emergency/hazard_lights_cmd" -->
+        <!-- arg name="output_mrm_comfortable_stop_operate" default="/system/mrm/comfortable_stop/operate" -->
+        <!-- arg name="output_mrm_emergency_stop_operate" default="/system/mrm/emergency_stop/operate" -->
+        <!-- arg name="output_mrm_pull_over_operate" default="/system/mrm/pull_over_manager/operate" -->
+        <!-- arg name="output_mrm_state" default="/system/fail_safe/mrm_state" -->
+        <!-- arg name="output_turn_indicators" default="/system/emergency/turn_indicators_cmd" -->
         <node pkg="autoware_mrm_handler" exec="autoware_mrm_handler_node" name="mrm_handler" output="screen">
           <!-- params from: $(find-pkg-share autoware_launch)/config/system/mrm_handler/mrm_handler.param.yaml -->
           <param name="update_rate" value="10"/>
@@ -424,6 +463,7 @@
     <!-- source: autoware_diagnostic_graph_utils://launch/logging.launch.xml -->
     <group>
       <!-- arg name="enable_terminal_log" value="true" -->
+      <!-- arg name="ignore_dependent_error" default="false" -->
       <!-- arg name="max_depth" value="3" -->
       <!-- arg name="root_path" value="/autoware/modes/autonomous" -->
       <!-- arg name="show_rate" value="10.0" -->
@@ -450,6 +490,7 @@
       <!-- arg name="pointcloud_map_loader_param_path" value="$(find-pkg-share autoware_launch)/config/map/pointcloud_map_loader.param.yaml" -->
       <!-- arg name="pointcloud_map_metadata_path" value="[map_path]/pointcloud_map_metadata.yaml" -->
       <!-- arg name="pointcloud_map_path" value="[map_path]/pointcloud_map.pcd" -->
+      <!-- arg name="use_multithread" default="false" -->
       <node_container pkg="rclcpp_components" exec="component_container" name="map_container" namespace="/map">
         <composable_node pkg="autoware_map_loader" plugin="autoware::map_loader::PointCloudMapLoaderNode" name="pointcloud_map_loader">
           <!-- params from: $(find-pkg-share autoware_launch)/config/map/pointcloud_map_loader.param.yaml -->
@@ -513,6 +554,7 @@
   <!-- end: autoware_launch://launch/components/tier4_map_component.launch.xml -->
   <!-- source: autoware_launch://launch/components/tier4_sensing_component.launch.xml -->
   <group>
+    <!-- arg name="launch_pointcloud_container" default="false" -->
     <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
     <!-- source: autoware_global_parameter_loader://launch/global_params.launch.py -->
     <group>
@@ -544,43 +586,66 @@
       <!-- arg name="vehicle_param_file" value="$(find-pkg-share sample_vehicle_description)/config/vehicle_info.param.yaml" -->
       <!-- source: sample_sensor_kit_launch://launch/sensing.launch.xml -->
       <group>
+        <!-- arg name="launch_driver" value="true" -->
+        <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
+        <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
         <!-- source: sample_sensor_kit_launch://launch/lidar.launch.xml -->
         <group>
+          <!-- arg name="host_ip" default="192.168.1.10" -->
           <!-- arg name="launch_driver" value="true" -->
           <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
+          <!-- arg name="use_concat_filter" default="true" -->
           <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
           <!-- source: common_sensor_launch://launch/velodyne_VLS128.launch.xml -->
           <group>
+            <!-- arg name="cloud_max_angle" default="360" -->
+            <!-- arg name="cloud_min_angle" default="0" -->
             <!-- arg name="container_name" value="pointcloud_container" -->
             <!-- arg name="data_port" value="2368" -->
             <!-- arg name="host_ip" value="192.168.1.10" -->
             <!-- arg name="launch_driver" value="true" -->
             <!-- arg name="max_range" value="250.0" -->
+            <!-- arg name="min_range" default="0.5" -->
+            <!-- arg name="model" default="VLS128" -->
+            <!-- arg name="return_mode" default="SingleStrongest" -->
             <!-- arg name="scan_phase" value="300.0" -->
             <!-- arg name="sensor_frame" value="velodyne_top" -->
             <!-- arg name="sensor_ip" value="192.168.1.201" -->
+            <!-- arg name="udp_only" default="false" -->
             <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
             <!-- source: common_sensor_launch://launch/nebula_node_container.launch.py -->
             <group>
+              <!-- arg name="base_frame" default="base_link" -->
               <!-- arg name="cloud_max_angle" value="60" -->
               <!-- arg name="cloud_min_angle" value="300" -->
+              <!-- arg name="config_file" default="" -->
               <!-- arg name="container_name" value="pointcloud_container" -->
               <!-- arg name="data_port" value="2371" -->
+              <!-- arg name="distortion_correction_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml" -->
+              <!-- arg name="dual_return_distance_threshold" default="0.1" -->
               <!-- arg name="frame_id" value="velodyne_rear" -->
+              <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
+              <!-- arg name="input_frame" default="base_link" -->
               <!-- arg name="launch_driver" value="true" -->
+              <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="1.5" -->
               <!-- arg name="min_range" value="0.4" -->
+              <!-- arg name="output_as_sensor_frame" default="True" -->
+              <!-- arg name="output_frame" default="base_link" -->
+              <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
+              <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
+              <!-- arg name="rotation_speed" default="600" -->
               <!-- arg name="scan_phase" value="180.0" -->
               <!-- arg name="sensor_ip" value="192.168.1.204" -->
               <!-- arg name="sensor_model" value="VLP16" -->
+              <!-- arg name="setup_sensor" default="True" -->
               <!-- arg name="udp_only" value="false" -->
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
               <node_container pkg="rclcpp_components" exec="container_executable" name="container_name" namespace="/pointcloud_preprocessor">
-                <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_component"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
                   <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
                   <param name="cloud_max_angle" value="360"/>
@@ -648,6 +713,7 @@
             <!-- source: autoware_velodyne_monitor://launch/velodyne_monitor.launch.xml -->
             <group>
               <!-- arg name="ip_address" value="192.168.1.204" -->
+              <!-- arg name="velodyne_monitor_param_file" default="$(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml" -->
               <node pkg="autoware_velodyne_monitor" exec="autoware_velodyne_monitor_node" name="velodyne_monitor" output="log" respawn="true" respawn_delay="5.0">
                 <!-- params from: $(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml -->
                 <param name="timeout" value="5.0"/>
@@ -673,31 +739,47 @@
             <!-- arg name="host_ip" value="192.168.1.10" -->
             <!-- arg name="launch_driver" value="true" -->
             <!-- arg name="max_range" value="1.5" -->
+            <!-- arg name="min_range" default="0.4" -->
+            <!-- arg name="model" default="VLP16" -->
+            <!-- arg name="return_mode" default="SingleStrongest" -->
             <!-- arg name="scan_phase" value="180.0" -->
             <!-- arg name="sensor_frame" value="velodyne_rear" -->
             <!-- arg name="sensor_ip" value="192.168.1.204" -->
+            <!-- arg name="udp_only" default="false" -->
             <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
             <!-- source: common_sensor_launch://launch/nebula_node_container.launch.py -->
             <group>
+              <!-- arg name="base_frame" default="base_link" -->
               <!-- arg name="cloud_max_angle" value="60" -->
               <!-- arg name="cloud_min_angle" value="300" -->
+              <!-- arg name="config_file" default="" -->
               <!-- arg name="container_name" value="pointcloud_container" -->
               <!-- arg name="data_port" value="2371" -->
+              <!-- arg name="distortion_correction_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml" -->
+              <!-- arg name="dual_return_distance_threshold" default="0.1" -->
               <!-- arg name="frame_id" value="velodyne_rear" -->
+              <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
+              <!-- arg name="input_frame" default="base_link" -->
               <!-- arg name="launch_driver" value="true" -->
+              <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="1.5" -->
               <!-- arg name="min_range" value="0.4" -->
+              <!-- arg name="output_as_sensor_frame" default="True" -->
+              <!-- arg name="output_frame" default="base_link" -->
+              <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
+              <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
+              <!-- arg name="rotation_speed" default="600" -->
               <!-- arg name="scan_phase" value="180.0" -->
               <!-- arg name="sensor_ip" value="192.168.1.204" -->
               <!-- arg name="sensor_model" value="VLP16" -->
+              <!-- arg name="setup_sensor" default="True" -->
               <!-- arg name="udp_only" value="false" -->
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
               <node_container pkg="rclcpp_components" exec="container_executable" name="container_name" namespace="/pointcloud_preprocessor">
-                <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_component"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
                   <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLP16.yaml"/>
                   <param name="cloud_max_angle" value="60"/>
@@ -765,6 +847,7 @@
             <!-- source: autoware_velodyne_monitor://launch/velodyne_monitor.launch.xml -->
             <group>
               <!-- arg name="ip_address" value="192.168.1.204" -->
+              <!-- arg name="velodyne_monitor_param_file" default="$(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml" -->
               <node pkg="autoware_velodyne_monitor" exec="autoware_velodyne_monitor_node" name="velodyne_monitor" output="log" respawn="true" respawn_delay="5.0">
                 <!-- params from: $(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml -->
                 <param name="timeout" value="5.0"/>
@@ -784,6 +867,7 @@
           <!-- source: sample_sensor_kit_launch://launch/pointcloud_preprocessor.launch.py -->
           <group>
             <!-- arg name="base_frame" value="base_link" -->
+            <!-- arg name="concatenate_and_time_sync_node_param_path" default="$(find-pkg-share sample_sensor_kit_launch)/config/concatenate_and_time_sync_node.param.yaml" -->
             <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
             <!-- arg name="use_intra_process" value="true" -->
             <!-- arg name="use_multithread" value="true" -->
@@ -800,21 +884,19 @@
         <!-- end: sample_sensor_kit_launch://launch/lidar.launch.xml -->
         <!-- source: sample_sensor_kit_launch://launch/imu.launch.xml -->
         <group>
+          <!-- arg name="imu_corrector_param_file" default="$(find-pkg-share sample_sensor_kit_description)/config/imu_corrector.param.yaml" -->
+          <!-- arg name="imu_raw_name" default="tamagawa/imu_raw" -->
           <!-- arg name="launch_driver" value="true" -->
           <!-- source: autoware_imu_corrector://launch/imu_corrector.launch.xml -->
           <group>
+            <!-- arg name="input_gyro_bias_topic" default="gyro_bias" -->
+            <!-- arg name="input_gyro_scale_topic" default="gyro_scale" -->
             <!-- arg name="input_topic" value="tamagawa/imu_raw" -->
             <!-- arg name="output_topic" value="imu_data" -->
             <!-- arg name="param_file" value="$(find-pkg-share sample_sensor_kit_description)/config/imu_corrector.param.yaml" -->
+            <!-- arg name="param_scale_file" default="$(find-pkg-share autoware_imu_corrector)/config/gyro_scale_estimator.param.yaml" -->
             <node pkg="autoware_imu_corrector" exec="imu_corrector_node" output="both">
-              <!-- params from: $(find-pkg-share sample_sensor_kit_description)/config/imu_corrector.param.yaml -->
-              <param name="angular_velocity_stddev_xx" value="0.00339"/>
-              <param name="angular_velocity_stddev_yy" value="0.00339"/>
-              <param name="angular_velocity_stddev_zz" value="0.00339"/>
-              <param name="angular_velocity_offset_x" value="-0.005799"/>
-              <param name="angular_velocity_offset_y" value="-0.007148"/>
-              <param name="angular_velocity_offset_z" value="-0.001499"/>
-              <!-- end params from: $(find-pkg-share sample_sensor_kit_description)/config/imu_corrector.param.yaml -->
+              <param from="$(find-pkg-share sample_sensor_kit_description)/config/imu_corrector.param.yaml"/>
               <!-- params from: $(find-pkg-share autoware_imu_corrector)/config/gyro_scale_estimator.param.yaml -->
               <param name="estimate_scale_init" value="1.0"/>
               <param name="min_allowed_scale" value="0.9"/>
@@ -861,10 +943,15 @@
           <!-- end: autoware_imu_corrector://launch/imu_corrector.launch.xml -->
           <!-- source: autoware_imu_corrector://launch/gyro_bias_estimator.launch.xml -->
           <group>
+            <!-- arg name="gyro_bias_estimator_param_file" default="$(find-pkg-share autoware_imu_corrector)/config/gyro_bias_estimator.param.yaml" -->
+            <!-- arg name="gyro_scale_estimator_param_file" default="$(find-pkg-share autoware_imu_corrector)/config/gyro_scale_estimator.param.yaml" -->
             <!-- arg name="imu_corrector_param_file" value="$(find-pkg-share sample_sensor_kit_description)/config/imu_corrector.param.yaml" -->
             <!-- arg name="input_imu_raw" value="tamagawa/imu_raw" -->
             <!-- arg name="input_odom" value="/localization/kinematic_state" -->
             <!-- arg name="input_pose_ndt" value="/localization/pose_estimator/pose_with_covariance" -->
+            <!-- arg name="output_gyro_bias" default="gyro_bias" -->
+            <!-- arg name="output_gyro_scale" default="gyro_scale" -->
+            <!-- arg name="output_imu_scaled" default="imu_scaled" -->
             <node pkg="autoware_imu_corrector" exec="gyro_bias_estimator_node" output="both">
               <!-- params from: $(find-pkg-share autoware_imu_corrector)/config/gyro_bias_estimator.param.yaml -->
               <param name="gyro_bias_threshold" value="0.009"/>
@@ -872,14 +959,7 @@
               <param name="diagnostics_updater_interval_sec" value="0.1"/>
               <param name="straight_motion_ang_vel_upper_limit" value="0.015"/>
               <!-- end params from: $(find-pkg-share autoware_imu_corrector)/config/gyro_bias_estimator.param.yaml -->
-              <!-- params from: $(find-pkg-share sample_sensor_kit_description)/config/imu_corrector.param.yaml -->
-              <param name="angular_velocity_stddev_xx" value="0.00339"/>
-              <param name="angular_velocity_stddev_yy" value="0.00339"/>
-              <param name="angular_velocity_stddev_zz" value="0.00339"/>
-              <param name="angular_velocity_offset_x" value="-0.005799"/>
-              <param name="angular_velocity_offset_y" value="-0.007148"/>
-              <param name="angular_velocity_offset_z" value="-0.001499"/>
-              <!-- end params from: $(find-pkg-share sample_sensor_kit_description)/config/imu_corrector.param.yaml -->
+              <param from="$(find-pkg-share sample_sensor_kit_description)/config/imu_corrector.param.yaml"/>
               <!-- params from: $(find-pkg-share autoware_imu_corrector)/config/gyro_scale_estimator.param.yaml -->
               <param name="estimate_scale_init" value="1.0"/>
               <param name="min_allowed_scale" value="0.9"/>
@@ -930,6 +1010,7 @@
         <!-- end: sample_sensor_kit_launch://launch/imu.launch.xml -->
         <!-- source: sample_sensor_kit_launch://launch/gnss.launch.xml -->
         <group>
+          <!-- arg name="gnss_receiver" default="ublox" -->
           <!-- arg name="launch_driver" value="true" -->
           <node pkg="ublox_gps" exec="ublox_gps_node" name="ublox" namespace="/gnss" respawn="true" respawn_delay="1.0">
             <!-- params from: $(find-pkg-share ublox_gps)/config/zed_f9p.yaml -->
@@ -955,6 +1036,7 @@
             <!-- arg name="output_topic_gnss_fixed" value="fixed" -->
             <!-- arg name="output_topic_gnss_pose" value="pose" -->
             <!-- arg name="output_topic_gnss_pose_cov" value="pose_with_covariance" -->
+            <!-- arg name="param_file" default="$(find-pkg-share autoware_gnss_poser)/config/gnss_poser.param.yaml" -->
             <!-- arg name="use_gnss_ins_orientation" value="true" -->
             <node pkg="autoware_gnss_poser" exec="gnss_poser" name="gnss_poser" output="both">
               <!-- params from: $(find-pkg-share autoware_gnss_poser)/config/gnss_poser.param.yaml -->
@@ -977,6 +1059,7 @@
         <!-- end: sample_sensor_kit_launch://launch/gnss.launch.xml -->
         <!-- source: autoware_vehicle_velocity_converter://launch/vehicle_velocity_converter.launch.xml -->
         <group>
+          <!-- arg name="config_file" default="$(find-pkg-share autoware_vehicle_velocity_converter)/config/vehicle_velocity_converter.param.yaml" -->
           <!-- arg name="input_vehicle_velocity_topic" value="/vehicle/status/velocity_status" -->
           <!-- arg name="output_twist_with_covariance" value="/sensing/vehicle_velocity_converter/twist_with_covariance" -->
           <node pkg="autoware_vehicle_velocity_converter" exec="autoware_vehicle_velocity_converter_node" output="both">
@@ -999,6 +1082,13 @@
   <!-- end: autoware_launch://launch/components/tier4_sensing_component.launch.xml -->
   <!-- source: autoware_launch://launch/components/tier4_localization_component.launch.xml -->
   <group>
+    <!-- arg name="initial_pose" default="[]" -->
+    <!-- arg name="input_pointcloud" default="/sensing/lidar/concatenated/pointcloud" -->
+    <!-- arg name="launch_pointcloud_container" default="false" -->
+    <!-- arg name="loc_config_path" default="$(find-pkg-share autoware_launch)/config/localization" -->
+    <!-- arg name="localization_pointcloud_container_name" default="/pointcloud_container" -->
+    <!-- arg name="pose_source" default="ndt" -->
+    <!-- arg name="twist_source" default="gyro_odom" -->
     <!-- source: autoware_global_parameter_loader://launch/global_params.launch.py -->
     <group>
       <!-- arg name="use_sim_time" value="false" -->
@@ -1054,7 +1144,9 @@
       <!-- arg name="undistort_param_path" value="$(find-pkg-share autoware_launch)/config/localization/yabloc/undistort.param.yaml" -->
       <!-- source: tier4_localization_launch://launch/pose_twist_estimator/pose_twist_estimator.launch.xml -->
       <group>
+        <!-- arg name="gnss_enabled" default="true" -->
         <!-- arg name="localization_pointcloud_container_name" value="/pointcloud_container" -->
+        <!-- arg name="use_autoware_pose_covariance_modifier" default="false" -->
         <!-- source: tier4_localization_launch://launch/pose_twist_estimator/ndt_scan_matcher.launch.xml -->
         <group>
           <!-- arg name="output_pose_with_covariance_topic" value="/localization/pose_estimator/pose_with_covariance" -->
@@ -1065,6 +1157,7 @@
             <!-- arg name="input_pointcloud" value="/localization/util/downsample/pointcloud" -->
             <!-- arg name="input_regularization_pose_topic" value="/sensing/gnss/pose_with_covariance" -->
             <!-- arg name="input_service_trigger_node" value="/localization/pose_estimator/trigger_node" -->
+            <!-- arg name="node_name" default="ndt_scan_matcher" -->
             <!-- arg name="output_pose_topic" value="/localization/pose_estimator/pose" -->
             <!-- arg name="output_pose_with_covariance_topic" value="/localization/pose_estimator/pose_with_covariance" -->
             <!-- arg name="param_file" value="$(find-pkg-share autoware_launch)/config/localization/ndt_scan_matcher/ndt_scan_matcher.param.yaml" -->
@@ -1120,7 +1213,11 @@
         <group>
           <!-- source: autoware_gyro_odometer://launch/gyro_odometer.launch.xml -->
           <group>
+            <!-- arg name="config_file" default="$(find-pkg-share autoware_gyro_odometer)/config/gyro_odometer.param.yaml" -->
+            <!-- arg name="input_imu_topic" default="/sensing/imu/imu_data" -->
             <!-- arg name="input_vehicle_twist_with_covariance_topic" value="/sensing/vehicle_velocity_converter/twist_with_covariance" -->
+            <!-- arg name="output_twist_raw_topic" default="gyro_twist_raw" -->
+            <!-- arg name="output_twist_topic" default="gyro_twist" -->
             <!-- arg name="output_twist_with_covariance_raw_topic" value="/localization/twist_estimator/twist_with_covariance_raw" -->
             <!-- arg name="output_twist_with_covariance_topic" value="/localization/twist_estimator/twist_with_covariance" -->
             <node pkg="autoware_gyro_odometer" exec="autoware_gyro_odometer_node" output="both">
@@ -1144,6 +1241,7 @@
           <!-- arg name="config_file" value="$(find-pkg-share autoware_launch)/config/localization/pose_initializer.param.yaml" -->
           <!-- arg name="ekf_enabled" value="true" -->
           <!-- arg name="gnss_enabled" value="true" -->
+          <!-- arg name="gnss_initial_pose_auto_fix_target" default="pointcloud_map" -->
           <!-- arg name="ndt_enabled" value="True" -->
           <!-- arg name="stop_check_enabled" value="true" -->
           <!-- arg name="sub_gnss_pose_cov" value="/sensing/gnss/pose_with_covariance" -->
@@ -1190,6 +1288,8 @@
         <group>
           <!-- arg name="input_pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
           <!-- arg name="localization_pointcloud_container_name" value="/pointcloud_container" -->
+          <!-- arg name="output/pointcloud" default="downsample/pointcloud" -->
+          <!-- arg name="use_intra_process" default="true" -->
           <load_composable_node target="/pointcloud_container">
             <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_measurement_range">
               <!-- params from: $(find-pkg-share autoware_launch)/config/localization/ndt_scan_matcher/pointcloud_preprocessor/crop_box_filter_measurement_range.param.yaml -->
@@ -1234,12 +1334,14 @@
         <group>
           <!-- arg name="input_initial_pose_name" value="/initialpose3d" -->
           <!-- arg name="input_pose_with_cov_name" value="/localization/pose_estimator/pose_with_covariance" -->
+          <!-- arg name="input_trigger_node_service_name" default="trigger_node" -->
           <!-- arg name="input_twist_with_cov_name" value="/localization/twist_estimator/twist_with_covariance" -->
           <!-- arg name="output_biased_pose_name" value="biased_pose" -->
           <!-- arg name="output_biased_pose_with_covariance_name" value="biased_pose_with_covariance" -->
           <!-- arg name="output_odom_name" value="kinematic_state" -->
           <!-- arg name="output_pose_name" value="pose" -->
           <!-- arg name="output_pose_with_covariance_name" value="/localization/pose_with_covariance" -->
+          <!-- arg name="output_processing_time_ms" default="debug/processing_time_ms" -->
           <!-- arg name="output_twist_name" value="twist" -->
           <!-- arg name="output_twist_with_covariance_name" value="twist_with_covariance" -->
           <!-- arg name="param_file" value="$(find-pkg-share autoware_launch)/config/localization/ekf_localizer.param.yaml" -->
@@ -1294,6 +1396,7 @@
         <!-- end: autoware_ekf_localizer://launch/ekf_localizer.launch.xml -->
         <!-- source: autoware_stop_filter://launch/stop_filter.launch.xml -->
         <group>
+          <!-- arg name="debug_stop_flag" default="debug/stop_flag" -->
           <!-- arg name="input_odom_name" value="/localization/pose_twist_fusion_filter/kinematic_state" -->
           <!-- arg name="input_twist_with_covariance_name" value="/localization/pose_twist_fusion_filter/twist_with_covariance" -->
           <!-- arg name="output_odom_name" value="/localization/kinematic_state" -->
@@ -1331,6 +1434,7 @@
         <group>
           <!-- arg name="input_odometry" value="/localization/kinematic_state" -->
           <!-- arg name="input_twist" value="/localization/twist_estimator/twist_with_covariance" -->
+          <!-- arg name="node_name" default="pose_instability_detector" -->
           <!-- arg name="param_file" value="$(find-pkg-share autoware_launch)/config/localization/pose_instability_detector.param.yaml" -->
           <node pkg="autoware_pose_instability_detector" exec="autoware_pose_instability_detector_node" name="pose_instability_detector" output="both">
             <!-- params from: $(find-pkg-share autoware_launch)/config/localization/pose_instability_detector.param.yaml -->
@@ -1384,8 +1488,41 @@
   <!-- end: autoware_launch://launch/components/tier4_localization_component.launch.xml -->
   <!-- source: autoware_launch://launch/components/tier4_perception_component.launch.xml -->
   <group>
+    <!-- arg name="camera_2d_detector/color_map_path" default="[home]/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
+    <!-- arg name="camera_2d_detector/label_path" default="[home]/autoware_data/tensorrt_yolox/label.txt" -->
+    <!-- arg name="camera_2d_detector/model_path" default="[home]/autoware_data/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
+    <!-- arg name="camera_vru_detector_rois_ids" default="[0]" -->
     <!-- arg name="data_path" value="[home]/autoware_data" -->
+    <!-- arg name="detected_objects_filter_method" default="lanelet_filter" -->
+    <!-- arg name="detected_objects_validation_method" default="obstacle_pointcloud" -->
+    <!-- arg name="input_pointcloud_for_traffic_light_occlusion_predictor" default="/sensing/lidar/top/pointcloud_raw_ex" -->
+    <!-- arg name="launch_pointcloud_container" default="false" -->
+    <!-- arg name="lidar_detection_model" default="centerpoint" -->
+    <!-- arg name="ml_camera_lidar_merger_priority_mode" default="0" -->
+    <!-- arg name="occupancy_grid_map_method" default="pointcloud_based" -->
+    <!-- arg name="occupancy_grid_map_updater" default="binary_bayes_filter" -->
     <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
+    <!-- arg name="segmentation_pointcloud_fusion_camera_ids" default="[0,2,4]" -->
+    <!-- arg name="tracker_publish_merged_objects" default="false" -->
+    <!-- arg name="traffic_light_recognition/camera_namespaces" default="[camera6, camera7]" -->
+    <!-- arg name="traffic_light_recognition/high_accuracy_detection_type" default="fine_detection" -->
+    <!-- arg name="use_camera_vru_detector" default="false" -->
+    <!-- arg name="use_detection_by_tracker" default="true" -->
+    <!-- arg name="use_empty_dynamic_object_publisher" default="false" -->
+    <!-- arg name="use_image_segmentation_based_filter" default="false" -->
+    <!-- arg name="use_irregular_object_detector" default="true" -->
+    <!-- arg name="use_low_height_cropbox" default="false" -->
+    <!-- arg name="use_low_intensity_cluster_filter" default="true" -->
+    <!-- arg name="use_multi_channel_tracker_merger" default="true" -->
+    <!-- arg name="use_object_filter" default="true" -->
+    <!-- arg name="use_obstacle_segmentation_single_frame_filter" default="false" -->
+    <!-- arg name="use_obstacle_segmentation_time_series_filter" default="true" -->
+    <!-- arg name="use_perception_analytics_publisher" default="true" -->
+    <!-- arg name="use_perception_online_evaluator" default="false" -->
+    <!-- arg name="use_pointcloud_map" default="true" -->
+    <!-- arg name="use_radar_tracking_fusion" default="true" -->
+    <!-- arg name="use_traffic_light_recognition" default="true" -->
+    <!-- arg name="use_vector_map" default="true" -->
     <!-- source: autoware_global_parameter_loader://launch/global_params.launch.py -->
     <group>
       <!-- arg name="use_sim_time" value="false" -->
@@ -1409,16 +1546,57 @@
     <!-- end: autoware_global_parameter_loader://launch/global_params.launch.py -->
     <!-- source: tier4_perception_launch://launch/perception.launch.xml -->
     <group>
+      <!-- arg name="bevfusion_model_path" default="[home]/autoware_data/bevfusion" -->
       <!-- arg name="camera_2d_detector/color_map_path" value="[home]/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
       <!-- arg name="camera_2d_detector/label_path" value="[home]/autoware_data/tensorrt_yolox/label.txt" -->
       <!-- arg name="camera_2d_detector/model_path" value="[home]/autoware_data/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
+      <!-- arg name="camera_info0" default="/sensing/camera/camera0/camera_info" -->
+      <!-- arg name="camera_info1" default="/sensing/camera/camera1/camera_info" -->
+      <!-- arg name="camera_info2" default="/sensing/camera/camera2/camera_info" -->
+      <!-- arg name="camera_info3" default="/sensing/camera/camera3/camera_info" -->
+      <!-- arg name="camera_info4" default="/sensing/camera/camera4/camera_info" -->
+      <!-- arg name="camera_info5" default="/sensing/camera/camera5/camera_info" -->
+      <!-- arg name="camera_info6" default="/sensing/camera/camera6/camera_info" -->
+      <!-- arg name="camera_info7" default="/sensing/camera/camera7/camera_info" -->
+      <!-- arg name="camera_info8" default="/sensing/camera/camera8/camera_info" -->
       <!-- arg name="camera_vru_detector_rois_ids" value="[0]" -->
       <!-- arg name="car_traffic_light_classifier_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml" -->
+      <!-- arg name="centerpoint_model_path" default="[home]/autoware_data/lidar_centerpoint" -->
+      <!-- arg name="common_downsample_voxel_size_x" default="0.05" -->
+      <!-- arg name="common_downsample_voxel_size_y" default="0.05" -->
+      <!-- arg name="common_downsample_voxel_size_z" default="0.05" -->
       <!-- arg name="crosswalk_traffic_light_estimator_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/crosswalk_traffic_light_estimator/crosswalk_traffic_light_estimator.param.yaml" -->
+      <!-- arg name="cuda_pointcloud_preprocessing" default="false" -->
       <!-- arg name="data_path" value="[home]/autoware_data" -->
+      <!-- arg name="detection_rois0" default="/perception/object_recognition/detection/rois0" -->
+      <!-- arg name="detection_rois1" default="/perception/object_recognition/detection/rois1" -->
+      <!-- arg name="detection_rois2" default="/perception/object_recognition/detection/rois2" -->
+      <!-- arg name="detection_rois3" default="/perception/object_recognition/detection/rois3" -->
+      <!-- arg name="detection_rois4" default="/perception/object_recognition/detection/rois4" -->
+      <!-- arg name="detection_rois5" default="/perception/object_recognition/detection/rois5" -->
+      <!-- arg name="detection_rois6" default="/perception/object_recognition/detection/rois6" -->
+      <!-- arg name="detection_rois7" default="/perception/object_recognition/detection/rois7" -->
+      <!-- arg name="detection_rois8" default="/perception/object_recognition/detection/rois8" -->
+      <!-- arg name="downsample_perception_common_pointcloud" default="false" -->
       <!-- arg name="each_traffic_light_map_based_detector_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_map_based_detector/TRAFFIC_LIGHT_RECOGNITION_CAMERA_NAMESPACE_traffic_light_map_based_detector.param.yaml" -->
+      <!-- arg name="image_number" default="6" -->
+      <!-- arg name="image_raw0" default="/sensing/camera/camera0/image_rect_color" -->
+      <!-- arg name="image_raw1" default="/sensing/camera/camera1/image_rect_color" -->
+      <!-- arg name="image_raw2" default="/sensing/camera/camera2/image_rect_color" -->
+      <!-- arg name="image_raw3" default="/sensing/camera/camera3/image_rect_color" -->
+      <!-- arg name="image_raw4" default="/sensing/camera/camera4/image_rect_color" -->
+      <!-- arg name="image_raw5" default="/sensing/camera/camera5/image_rect_color" -->
+      <!-- arg name="image_raw6" default="/sensing/camera/camera6/image_rect_color" -->
+      <!-- arg name="image_raw7" default="/sensing/camera/camera7/image_rect_color" -->
+      <!-- arg name="image_raw8" default="/sensing/camera/camera8/image_rect_color" -->
+      <!-- arg name="image_topic_name" default="image_rect_color" -->
+      <!-- arg name="input/concatenation_info" default="/sensing/lidar/concatenated/pointcloud_info" -->
+      <!-- arg name="input/pointcloud" default="/sensing/lidar/concatenated/pointcloud" -->
+      <!-- arg name="input/radar" default="/sensing/radar/detected_objects" -->
       <!-- arg name="input_pointcloud_for_traffic_light_occlusion_predictor" value="/sensing/lidar/top/pointcloud_raw_ex" -->
       <!-- arg name="lidar_detection_model" value="centerpoint" -->
+      <!-- arg name="lidar_short_range_detection_model_name" default="centerpoint_short_range" -->
+      <!-- arg name="lidar_short_range_detection_model_type" default="centerpoint_short_range" -->
       <!-- arg name="ml_camera_lidar_object_association_merger_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/object_merger/ml_camera_lidar_object_association_merger.param.yaml" -->
       <!-- arg name="mode" value="lidar" -->
       <!-- arg name="object_recognition_detection_detection_by_tracker_param" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/detection_by_tracker/detection_by_tracker.param.yaml" -->
@@ -1456,9 +1634,12 @@
       <!-- arg name="occupancy_grid_map_param_path" value="$(find-pkg-share autoware_launch)/config/perception/occupancy_grid_map/pointcloud_based_occupancy_grid_map.param.yaml" -->
       <!-- arg name="occupancy_grid_map_updater" value="binary_bayes_filter" -->
       <!-- arg name="occupancy_grid_map_updater_param_path" value="$(find-pkg-share autoware_launch)/config/perception/occupancy_grid_map/binary_bayes_filter_updater.param.yaml" -->
+      <!-- arg name="output/tracker_merged_objects" default="/perception/object_recognition/detection/objects" -->
       <!-- arg name="pedestrian_traffic_light_classifier_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml" -->
       <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
+      <!-- arg name="pointpainting_model_path" default="[home]/autoware_data/image_projection_based_fusion" -->
       <!-- arg name="segmentation_pointcloud_fusion_camera_ids" value="[0,2,4]" -->
+      <!-- arg name="short_range_centerpoint_model_path" default="[home]/autoware_data/lidar_short_range_centerpoint" -->
       <!-- arg name="tracker_publish_merged_objects" value="false" -->
       <!-- arg name="traffic_light_arbiter_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_arbiter/traffic_light_arbiter.param.yaml" -->
       <!-- arg name="traffic_light_fine_detector_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml" -->
@@ -1477,7 +1658,9 @@
       <!-- arg name="traffic_light_recognition/whole_image_detection/label_path" value="[home]/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
       <!-- arg name="traffic_light_recognition/whole_image_detection/model_path" value="[home]/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
       <!-- arg name="traffic_light_roi_visualizer_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_visualization/traffic_light_roi_visualizer.param.yaml" -->
+      <!-- arg name="transfusion_model_path" default="[home]/autoware_data/lidar_transfusion" -->
       <!-- arg name="use_camera_vru_detector" value="false" -->
+      <!-- arg name="use_cuda_ground_segmentation" default="false" -->
       <!-- arg name="use_detection_by_tracker" value="true" -->
       <!-- arg name="use_empty_dynamic_object_publisher" value="false" -->
       <!-- arg name="use_image_segmentation_based_filter" value="false" -->
@@ -1486,12 +1669,14 @@
       <!-- arg name="use_low_intensity_cluster_filter" value="true" -->
       <!-- arg name="use_multi_channel_tracker_merger" value="true" -->
       <!-- arg name="use_object_filter" value="true" -->
+      <!-- arg name="use_object_validator" default="true" -->
       <!-- arg name="use_obstacle_segmentation_single_frame_filter" value="false" -->
       <!-- arg name="use_obstacle_segmentation_time_series_filter" value="true" -->
       <!-- arg name="use_perception_analytics_publisher" value="true" -->
       <!-- arg name="use_perception_online_evaluator" value="false" -->
       <!-- arg name="use_pointcloud_map" value="true" -->
       <!-- arg name="use_radar_tracking_fusion" value="true" -->
+      <!-- arg name="use_short_range_detection" default="false" -->
       <!-- arg name="use_traffic_light_recognition" value="true" -->
       <!-- arg name="use_vector_map" value="true" -->
       <!-- arg name="vehicle_param_file" value="$(find-pkg-share sample_vehicle_description)/config/vehicle_info.param.yaml" -->
@@ -1499,8 +1684,10 @@
       <!-- source: tier4_perception_launch://launch/obstacle_segmentation/ground_segmentation/ground_segmentation.launch.py -->
       <group>
         <!-- arg name="base_frame" value="base_link" -->
+        <!-- arg name="cuda_ground_segmentation_node_param_path" default="$(find-pkg-share autoware_ground_segmentation_cuda)/config/cuda_scan_ground_segmentation_filter.param.yaml" -->
         <!-- arg name="input/pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
         <!-- arg name="obstacle_segmentation_ground_segmentation_param_path" value="$(find-pkg-share autoware_launch)/config/perception/obstacle_segmentation/ground_segmentation/ground_segmentation.param.yaml" -->
+        <!-- arg name="ogm_outlier_filter_param_path" default="$(find-pkg-share autoware_occupancy_grid_map_outlier_filter)/config/occupancy_grid_map_outlier_filter.param.yaml" -->
         <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
         <!-- arg name="use_cuda_ground_segmentation" value="false" -->
         <!-- arg name="use_intra_process" value="true" -->
@@ -1567,6 +1754,8 @@
       <group>
         <!-- arg name="input/obstacle_pointcloud" value="/perception/obstacle_segmentation/single_frame/pointcloud" -->
         <!-- arg name="input/raw_pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
+        <!-- arg name="input_obstacle_and_raw_pointcloud" default="true" -->
+        <!-- arg name="input_obstacle_pointcloud" default="false" -->
         <!-- arg name="occupancy_grid_map_method" value="pointcloud_based_occupancy_grid_map" -->
         <!-- arg name="occupancy_grid_map_param_path" value="$(find-pkg-share autoware_launch)/config/perception/occupancy_grid_map/pointcloud_based_occupancy_grid_map.param.yaml" -->
         <!-- arg name="occupancy_grid_map_updater" value="binary_bayes_filter" -->
@@ -1575,8 +1764,10 @@
         <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
         <!-- arg name="use_intra_process" value="true" -->
         <!-- arg name="use_multithread" value="true" -->
+        <!-- arg name="use_pointcloud_container" default="true" -->
         <!-- source: autoware_probabilistic_occupancy_grid_map://launch/pointcloud_based_occupancy_grid_map.launch.py -->
         <group>
+          <!-- arg name="individual_container_name" default="occupancy_grid_map_container" -->
           <!-- arg name="input/obstacle_pointcloud" value="/perception/obstacle_segmentation/single_frame/pointcloud" -->
           <!-- arg name="input/raw_pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
           <!-- arg name="output" value="/perception/occupancy_grid_map/map" -->
@@ -1682,8 +1873,11 @@
         <!-- arg name="input/camera8/info" value="/sensing/camera/camera8/camera_info" -->
         <!-- arg name="input/camera8/rois" value="/perception/object_recognition/detection/rois8" -->
         <!-- arg name="input/concatenation_info" value="/sensing/lidar/concatenated/pointcloud_info" -->
+        <!-- arg name="input/obstacle_segmentation/pointcloud" default="/perception/obstacle_segmentation/pointcloud" -->
         <!-- arg name="input/pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
         <!-- arg name="input/radar" value="/sensing/radar/detected_objects" -->
+        <!-- arg name="input/tracked_objects" default="/perception/object_recognition/tracking/objects" -->
+        <!-- arg name="irregular_object_detector_fusion_camera_ids" default="[0]" -->
         <!-- arg name="irregular_object_detector_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/irregular_object_detection/irregular_object_detector.param.yaml" -->
         <!-- arg name="lidar_detection_model_name" value="" -->
         <!-- arg name="lidar_detection_model_type" value="centerpoint" -->
@@ -1699,6 +1893,7 @@
         <!-- arg name="objects_filter_method" value="lanelet_filter" -->
         <!-- arg name="objects_validation_method" value="obstacle_pointcloud" -->
         <!-- arg name="outlier_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/clustering/outlier.param.yaml" -->
+        <!-- arg name="output/objects" default="objects" -->
         <!-- arg name="pointpainting_fusion_common_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/image_projection_based_fusion/pointpainting_common.param.yaml" -->
         <!-- arg name="radar_lanelet_filtering_range_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/object_filter/radar_lanelet_filter.param.yaml" -->
         <!-- arg name="roi_cluster_fusion_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/image_projection_based_fusion/roi_cluster_fusion.param.yaml" -->
@@ -1731,6 +1926,7 @@
           <!-- arg name="use_short_range_detection" value="false" -->
           <!-- source: autoware_lidar_centerpoint://launch/lidar_centerpoint.launch.xml -->
           <group>
+            <!-- arg name="build_only" default="false" -->
             <!-- arg name="class_remapper_param_path" value="[home]/autoware_data/lidar_centerpoint/detection_class_remapper.param.yaml" -->
             <!-- arg name="common_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/lidar_model/centerpoint_common.param.yaml" -->
             <!-- arg name="input/pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
@@ -1802,6 +1998,7 @@
           <!-- arg name="voxel_grid_based_euclidean_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/clustering/voxel_grid_based_euclidean_cluster.param.yaml" -->
           <!-- source: autoware_euclidean_cluster://launch/voxel_grid_based_euclidean_cluster.launch.xml -->
           <group>
+            <!-- arg name="input_map" default="/map/pointcloud_map" -->
             <!-- arg name="input_pointcloud" value="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud" -->
             <!-- arg name="output_clusters" value="/perception/object_recognition/detection/clustering/clusters" -->
             <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
@@ -1894,7 +2091,10 @@
           <!-- end: autoware_euclidean_cluster://launch/voxel_grid_based_euclidean_cluster.launch.xml -->
           <!-- source: autoware_shape_estimation://launch/shape_estimation.launch.xml -->
           <group>
+            <!-- arg name="config_file" default="$(find-pkg-share autoware_shape_estimation)/config/shape_estimation.param.yaml" -->
             <!-- arg name="input/objects" value="/perception/object_recognition/detection/clustering/clusters" -->
+            <!-- arg name="model_path" default="[home]/autoware_data/shape_estimation/pointnet.onnx" -->
+            <!-- arg name="node_name" default="shape_estimation" -->
             <!-- arg name="output/objects" value="/perception/object_recognition/detection/clustering/objects_with_feature" -->
             <node pkg="autoware_shape_estimation" exec="shape_estimation_node" name="shape_estimation" output="screen">
               <!-- params from: $(find-pkg-share autoware_shape_estimation)/config/shape_estimation.param.yaml -->
@@ -1919,7 +2119,9 @@
           <!-- source: autoware_detected_object_feature_remover://launch/detected_object_feature_remover.launch.xml -->
           <group>
             <!-- arg name="input" value="/perception/object_recognition/detection/clustering/objects_with_feature" -->
+            <!-- arg name="node_name" default="detected_object_feature_remover" -->
             <!-- arg name="output" value="/perception/object_recognition/detection/clustering/objects" -->
+            <!-- arg name="run_convex_hull_conversion" default="false" -->
             <node pkg="autoware_detected_object_feature_remover" exec="detected_object_feature_remover_node" name="detected_object_feature_remover" output="screen">
               <param name="run_convex_hull_conversion" value="false"/>
               <remap from="~/input" to="/perception/object_recognition/detection/clustering/objects_with_feature"/>
@@ -2029,6 +2231,27 @@
       <!-- end: tier4_perception_launch://launch/object_recognition/detection/detection.launch.xml -->
       <!-- source: tier4_perception_launch://launch/object_recognition/tracking/tracking.launch.xml -->
       <group>
+        <!-- arg name="input/camera_lidar_rule_detector/channel" default="camera_lidar_fusion" -->
+        <!-- arg name="input/camera_lidar_rule_detector/objects" default="/perception/object_recognition/detection/clustering/camera_lidar_fusion/objects" -->
+        <!-- arg name="input/camera_only/channel" default="camera_streampetr" -->
+        <!-- arg name="input/camera_only/objects" default="/perception/object_recognition/detection/camera_only/objects" -->
+        <!-- arg name="input/camera_vru/channel" default="camera_vru" -->
+        <!-- arg name="input/camera_vru/objects" default="/perception/object_recognition/detection/camera_vru/objects" -->
+        <!-- arg name="input/irregular_object_detector/channel" default="camera_lidar_fusion_irregular" -->
+        <!-- arg name="input/irregular_object_detector/objects" default="/perception/object_recognition/detection/irregular_object/objects" -->
+        <!-- arg name="input/lidar_dnn/channel" default="lidar_centerpoint" -->
+        <!-- arg name="input/lidar_dnn/objects" default="/perception/object_recognition/detection/centerpoint/objects" -->
+        <!-- arg name="input/lidar_dnn_short_range/channel" default="lidar_centerpoint_short_range" -->
+        <!-- arg name="input/lidar_dnn_short_range/objects" default="/perception/object_recognition/detection/centerpoint_short_range/objects" -->
+        <!-- arg name="input/lidar_dnn_validated/objects" default="/perception/object_recognition/detection/centerpoint/validation/objects" -->
+        <!-- arg name="input/merged_detection/channel" default="detected_objects" -->
+        <!-- arg name="input/merged_detection/objects" default="/perception/object_recognition/detection/objects" -->
+        <!-- arg name="input/radar/channel" default="radar" -->
+        <!-- arg name="input/radar/far_objects" default="/perception/object_recognition/detection/radar/far_objects" -->
+        <!-- arg name="input/radar/objects" default="/perception/object_recognition/detection/radar/objects" -->
+        <!-- arg name="input/radar/tracked_objects" default="/sensing/radar/tracked_objects" -->
+        <!-- arg name="input/tracker_based_detector/channel" default="detection_by_tracker" -->
+        <!-- arg name="input/tracker_based_detector/objects" default="/perception/object_recognition/detection/detection_by_tracker/objects" -->
         <!-- arg name="lidar_detection_model_type" value="centerpoint" -->
         <!-- arg name="mode" value="lidar" -->
         <!-- arg name="object_recognition_tracking_object_merger_data_association_matrix_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/tracking/tracking_object_merger/data_association_matrix.param.yaml" -->
@@ -2036,6 +2259,7 @@
         <!-- arg name="object_recognition_tracking_radar_tracked_object_lanelet_filter_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/tracking/radar_object_tracker/tracked_object_lanelet_filter.param.yaml" -->
         <!-- arg name="object_recognition_tracking_radar_tracked_object_sorter_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/tracking/radar_object_tracker/tracked_object_sorter.param.yaml" -->
         <!-- arg name="output/merged_objects" value="/perception/object_recognition/detection/objects" -->
+        <!-- arg name="output/objects" default="/perception/object_recognition/tracking/objects" -->
         <!-- arg name="publish_merged_objects" value="false" -->
         <!-- arg name="use_camera_vru_detector" value="false" -->
         <!-- arg name="use_detection_by_tracker" value="true" -->
@@ -2060,6 +2284,16 @@
           <!-- arg name="input/detection06/objects" value="/perception/object_recognition/detection/radar/far_objects" -->
           <!-- arg name="input/detection07/channel" value="none" -->
           <!-- arg name="input/detection07/objects" value="/perception/object_recognition/detection/camera_vru/objects" -->
+          <!-- arg name="input/detection08/channel" default="none" -->
+          <!-- arg name="input/detection08/objects" default="input/objects08" -->
+          <!-- arg name="input/detection09/channel" default="none" -->
+          <!-- arg name="input/detection09/objects" default="input/objects09" -->
+          <!-- arg name="input/detection10/channel" default="none" -->
+          <!-- arg name="input/detection10/objects" default="input/objects10" -->
+          <!-- arg name="input/detection11/channel" default="none" -->
+          <!-- arg name="input/detection11/objects" default="input/objects11" -->
+          <!-- arg name="input/detection12/channel" default="none" -->
+          <!-- arg name="input/detection12/objects" default="input/objects12" -->
           <!-- arg name="input_channels_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/tracking/multi_object_tracker/input_channels.param.yaml" -->
           <!-- arg name="output/merged_objects" value="/perception/object_recognition/detection/objects" -->
           <!-- arg name="output/objects" value="/perception/object_recognition/tracking/objects" -->
@@ -2221,6 +2455,8 @@
       <!-- end: tier4_perception_launch://launch/object_recognition/tracking/tracking.launch.xml -->
       <!-- source: tier4_perception_launch://launch/object_recognition/prediction/prediction.launch.xml -->
       <group>
+        <!-- arg name="input/objects" default="/perception/object_recognition/tracking/objects" -->
+        <!-- arg name="prediction_model_type" default="map_based" -->
         <!-- arg name="use_vector_map" value="true" -->
         <set_remap from="objects" to="/perception/object_recognition/objects"/>
         <!-- source: autoware_map_based_prediction://launch/map_based_prediction.launch.xml -->
@@ -2228,6 +2464,8 @@
           <!-- arg name="input_topic" value="/perception/object_recognition/tracking/objects" -->
           <!-- arg name="output_topic" value="/perception/object_recognition/objects" -->
           <!-- arg name="param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/prediction/map_based_prediction.param.yaml" -->
+          <!-- arg name="traffic_signals_topic" default="/perception/traffic_light_recognition/traffic_signals" -->
+          <!-- arg name="vector_map_topic" default="/map/vector_map" -->
           <node pkg="autoware_map_based_prediction" exec="map_based_prediction" name="map_based_prediction" output="both">
             <!-- params from: $(find-pkg-share autoware_launch)/config/perception/object_recognition/prediction/map_based_prediction.param.yaml -->
             <param name="prediction_time_horizon.vehicle" value="15.0"/>
@@ -2296,11 +2534,18 @@
         <!-- arg name="classification/pedestrian/model_path" value="[home]/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
         <!-- arg name="crosswalk_traffic_light_estimator_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/crosswalk_traffic_light_estimator/crosswalk_traffic_light_estimator.param.yaml" -->
         <!-- arg name="each_traffic_light_map_based_detector_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_map_based_detector/TRAFFIC_LIGHT_RECOGNITION_CAMERA_NAMESPACE_traffic_light_map_based_detector.param.yaml" -->
+        <!-- arg name="enable_image_decompressor" default="true" -->
+        <!-- arg name="external/traffic_signals" default="/perception/traffic_light_recognition/external/traffic_signals" -->
         <!-- arg name="fine_detection/label_path" value="[home]/autoware_data/traffic_light_fine_detector/tlr_labels.txt" -->
         <!-- arg name="fine_detection/model_path" value="[home]/autoware_data/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx" -->
         <!-- arg name="fusion_only" value="false" -->
         <!-- arg name="high_accuracy_detection_type" value="fine_detection" -->
+        <!-- arg name="input/route" default="/planning/mission_planning/route" -->
+        <!-- arg name="input/vector_map" default="/map/vector_map" -->
         <!-- arg name="input_pointcloud_for_traffic_light_occlusion_predictor" value="/sensing/lidar/top/pointcloud_raw_ex" -->
+        <!-- arg name="internal/traffic_signals" default="/perception/traffic_light_recognition/internal/traffic_signals" -->
+        <!-- arg name="judged/traffic_signals" default="/perception/traffic_light_recognition/judged/traffic_signals" -->
+        <!-- arg name="output/traffic_signals" default="/perception/traffic_light_recognition/traffic_signals" -->
         <!-- arg name="pedestrian_traffic_light_classifier_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml" -->
         <!-- arg name="traffic_light_arbiter_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_arbiter/traffic_light_arbiter.param.yaml" -->
         <!-- arg name="traffic_light_fine_detector_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml" -->
@@ -2610,6 +2855,8 @@
         <!-- end: autoware_crosswalk_traffic_light_estimator://launch/crosswalk_traffic_light_estimator.launch.xml -->
         <!-- source: autoware_traffic_light_visualization://launch/traffic_light_map_visualizer.launch.xml -->
         <group>
+          <!-- arg name="input/tl_state" default="traffic_signals" -->
+          <!-- arg name="output/traffic_light" default="traffic_signals/markers" -->
           <node pkg="autoware_traffic_light_visualization" exec="traffic_light_map_visualizer_node" name="traffic_light_map_visualizer">
             <remap from="~/input/tl_state" to="traffic_signals"/>
             <remap from="~/input/vector_map" to="/map/vector_map"/>
@@ -2621,6 +2868,7 @@
       <!-- end: tier4_perception_launch://launch/traffic_light_recognition/traffic_light.launch.xml -->
       <!-- source: autoware_perception_online_evaluator://launch/perception_analytics_publisher.launch.xml -->
       <group>
+        <!-- arg name="input/objects" default="/perception/object_recognition/objects" -->
         <node pkg="autoware_perception_online_evaluator" exec="autoware_perception_analytics_publisher_node">
           <!-- params from: $(find-pkg-share autoware_perception_online_evaluator)/param/perception_analytics_publisher.defaults.yaml -->
           <param name="meas_to_tracked_latency_topic_name" value="/perception/object_recognition/tracking/multi_object_tracker/debug/meas_to_tracked_object_ms"/>
@@ -2637,11 +2885,59 @@
   <!-- end: autoware_launch://launch/components/tier4_perception_component.launch.xml -->
   <!-- source: autoware_launch://launch/components/tier4_planning_component.launch.xml -->
   <group>
+    <!-- arg name="behavior_path_planner_type" default="behavior_path_planner" -->
     <!-- arg name="enable_all_modules_auto_mode" value="false" -->
     <!-- arg name="is_simulation" value="false" -->
+    <!-- arg name="launch_avoidance_by_lane_change_module" default="true" -->
+    <!-- arg name="launch_bidirectional_traffic_module" default="true" -->
+    <!-- arg name="launch_blind_spot_module" default="true" -->
+    <!-- arg name="launch_boundary_departure_prevention_module" default="true" -->
+    <!-- arg name="launch_crosswalk_module" default="true" -->
+    <!-- arg name="launch_detection_area_module" default="true" -->
+    <!-- arg name="launch_dynamic_obstacle_avoidance" default="false" -->
+    <!-- arg name="launch_dynamic_obstacle_stop_module" default="true" -->
+    <!-- arg name="launch_external_request_lane_change_left_module" default="false" -->
+    <!-- arg name="launch_external_request_lane_change_right_module" default="false" -->
+    <!-- arg name="launch_goal_planner_module" default="true" -->
+    <!-- arg name="launch_intersection_collision_checker" default="true" -->
+    <!-- arg name="launch_intersection_module" default="true" -->
+    <!-- arg name="launch_lane_change_left_module" default="true" -->
+    <!-- arg name="launch_lane_change_right_module" default="true" -->
+    <!-- arg name="launch_latency_checker" default="true" -->
+    <!-- arg name="launch_merge_from_private_module" default="false" -->
+    <!-- arg name="launch_no_drivable_lane_module" default="false" -->
+    <!-- arg name="launch_no_stopping_area_module" default="true" -->
+    <!-- arg name="launch_obstacle_cruise_module" default="true" -->
+    <!-- arg name="launch_obstacle_slow_down_module" default="true" -->
+    <!-- arg name="launch_obstacle_stop_module" default="true" -->
+    <!-- arg name="launch_obstacle_velocity_limiter_module" default="true" -->
+    <!-- arg name="launch_occlusion_spot_module" default="false" -->
+    <!-- arg name="launch_out_of_lane_module" default="true" -->
+    <!-- arg name="launch_parking_module" default="true" -->
+    <!-- arg name="launch_rear_collision_checker" default="true" -->
+    <!-- arg name="launch_remaining_distance_time_calculator" default="true" -->
+    <!-- arg name="launch_road_user_stop_module" default="true" -->
+    <!-- arg name="launch_roundabout_module" default="false" -->
+    <!-- arg name="launch_run_out_module" default="true" -->
+    <!-- arg name="launch_sampling_planner_module" default="false" -->
+    <!-- arg name="launch_side_shift_module" default="true" -->
+    <!-- arg name="launch_speed_bump_module" default="false" -->
+    <!-- arg name="launch_start_planner_module" default="true" -->
+    <!-- arg name="launch_static_obstacle_avoidance" default="true" -->
+    <!-- arg name="launch_stop_line_module" default="true" -->
+    <!-- arg name="launch_surround_obstacle_checker" default="false" -->
+    <!-- arg name="launch_traffic_light_module" default="true" -->
+    <!-- arg name="launch_trajectory_checker" default="true" -->
+    <!-- arg name="launch_virtual_traffic_light_module" default="true" -->
+    <!-- arg name="launch_walkway_module" default="true" -->
     <!-- arg name="module_preset" value="default" -->
+    <!-- arg name="motion_path_planner_type" default="path_optimizer" -->
+    <!-- arg name="motion_path_smoother_type" default="elastic_band" -->
+    <!-- arg name="planning_input_objects_topic_name" default="/perception/object_recognition/objects" -->
+    <!-- arg name="planning_input_pointcloud_topic_name" default="/perception/obstacle_segmentation/pointcloud" -->
     <!-- arg name="use_sim_time" value="false" -->
     <!-- arg name="vehicle_model" value="sample_vehicle" -->
+    <!-- arg name="velocity_smoother_type" default="JerkFiltered" -->
     <!-- source: autoware_global_parameter_loader://launch/global_params.launch.py -->
     <group>
       <!-- arg name="use_sim_time" value="false" -->
@@ -2737,6 +3033,8 @@
       <!-- arg name="velocity_smoother_type_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_velocity_smoother/JerkFiltered.param.yaml" -->
       <!-- source: autoware_manual_lane_change_handler://launch/manual_lane_change_handler.launch.xml -->
       <group>
+        <!-- arg name="manual_lane_change_handler_param_path" default="$(find-pkg-share autoware_manual_lane_change_handler)/config/manual_lane_change_handler.param.yaml" -->
+        <!-- arg name="map_topic_name" default="/map/vector_map" -->
         <!-- arg name="mission_planner_param_path" value="$(find-pkg-share autoware_launch)/config/planning/mission_planning/mission_planner/mission_planner.param.yaml" -->
         <node pkg="autoware_manual_lane_change_handler" exec="autoware_manual_lane_change_handler_node" name="manual_lane_change_handler">
           <!-- params from: $(find-pkg-share autoware_manual_lane_change_handler)/config/manual_lane_change_handler.param.yaml -->
@@ -2757,7 +3055,15 @@
         <!-- arg name="mission_planner_param_path" value="$(find-pkg-share autoware_launch)/config/planning/mission_planning/mission_planner/mission_planner.param.yaml" -->
         <!-- source: autoware_mission_planner_universe://launch/mission_planner.launch.xml -->
         <group>
+          <!-- arg name="clear_route_service_name" default="/planning/clear_route" -->
+          <!-- arg name="map_topic_name" default="/map/vector_map" -->
           <!-- arg name="mission_planner_param_path" value="$(find-pkg-share autoware_launch)/config/planning/mission_planning/mission_planner/mission_planner.param.yaml" -->
+          <!-- arg name="modified_goal_topic_name" default="/planning/scenario_planning/modified_goal" -->
+          <!-- arg name="route_state_topic_name" default="/planning/route_state" -->
+          <!-- arg name="route_topic_name" default="/planning/route" -->
+          <!-- arg name="set_lanelet_route_service_name" default="/planning/set_lanelet_route" -->
+          <!-- arg name="set_waypoint_route_service_name" default="/planning/set_waypoint_route" -->
+          <!-- arg name="visualization_topic_name" default="/planning/mission_planning/route_marker" -->
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="mission_planner_container">
             <composable_node pkg="autoware_mission_planner_universe" plugin="autoware::mission_planner_universe::MissionPlanner" name="mission_planner">
               <!-- params from: $(find-pkg-share autoware_launch)/config/planning/mission_planning/mission_planner/mission_planner.param.yaml -->
@@ -2797,12 +3103,13 @@
               <remap from="~/main/route" to="/planning/route"/>
               <remap from="~/main/state" to="/planning/route_state"/>
             </composable_node>
-            <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_component"/>
           </node_container>
         </group>
         <!-- end: autoware_mission_planner_universe://launch/mission_planner.launch.xml -->
         <!-- source: autoware_mission_planner_universe://launch/goal_pose_visualizer.launch.xml -->
         <group>
+          <!-- arg name="echo_back_goal_pose_topic_name" default="/planning/mission_planning/echo_back_goal_pose" -->
+          <!-- arg name="route_topic_name" default="/planning/mission_planning/route" -->
           <node pkg="autoware_mission_planner_universe" exec="goal_pose_visualizer" name="goal_pose_visualizer" output="screen">
             <remap from="input/route" to="/planning/mission_planning/route"/>
             <remap from="output/goal_pose" to="/planning/mission_planning/echo_back_goal_pose"/>
@@ -2892,10 +3199,10 @@
             <remap from="~/input/operation_mode_state" to="/system/operation_mode/state"/>
             <remap from="~/output/current_velocity_limit_mps" to="/planning/scenario_planning/current_max_velocity"/>
           </composable_node>
-          <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_component"/>
         </node_container>
         <!-- source: autoware_scenario_selector://launch/scenario_selector.launch.xml -->
         <group>
+          <!-- arg name="config_file" default="$(find-pkg-share autoware_scenario_selector)/config/scenario_selector.param.yaml" -->
           <!-- arg name="input_lane_driving_trajectory" value="/planning/scenario_planning/lane_driving/trajectory" -->
           <!-- arg name="input_lanelet_map" value="/map/vector_map" -->
           <!-- arg name="input_odometry" value="/localization/kinematic_state" -->
@@ -2929,6 +3236,11 @@
         <!-- source: autoware_external_velocity_limit_selector://launch/external_velocity_limit_selector.launch.xml -->
         <group>
           <!-- arg name="common_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/common.param.yaml" -->
+          <!-- arg name="input_velocity_limit_clear_command_from_internal" default="/planning/scenario_planning/clear_velocity_limit" -->
+          <!-- arg name="input_velocity_limit_from_api" default="/planning/scenario_planning/max_velocity_default" -->
+          <!-- arg name="input_velocity_limit_from_internal" default="/planning/scenario_planning/max_velocity_candidates" -->
+          <!-- arg name="output_debug_string" default="/planning/scenario_planning/external_velocity_limit_selector/debug" -->
+          <!-- arg name="output_velocity_limit_from_selector" default="/planning/scenario_planning/max_velocity" -->
           <!-- arg name="param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_velocity_smoother/velocity_smoother.param.yaml" -->
           <node pkg="autoware_external_velocity_limit_selector" exec="external_velocity_limit_selector" name="external_velocity_limit_selector" output="screen">
             <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/common.param.yaml -->
@@ -2995,6 +3307,9 @@
         <!-- source: autoware_hazard_lights_selector://launch/hazard_lights_selector.launch.xml -->
         <group>
           <!-- arg name="hazard_lights_selector_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_hazard_lights_selector/hazard_lights_selector.param.yaml" -->
+          <!-- arg name="input_hazard_lights_cmd_from_mrm_operator" default="/system/hazard_lights_cmd" -->
+          <!-- arg name="input_hazard_lights_cmd_from_path_planner" default="/planning/behavior_path_planner/hazard_lights_cmd" -->
+          <!-- arg name="output_hazard_lights_cmd" default="/planning/hazard_lights_cmd" -->
           <node pkg="autoware_hazard_lights_selector" exec="autoware_hazard_lights_selector_node" name="autoware_hazard_lights_selector" output="screen">
             <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_hazard_lights_selector/hazard_lights_selector.param.yaml -->
             <param name="update_rate" value="10"/>
@@ -3013,13 +3328,20 @@
           <!-- arg name="is_simulation" value="false" -->
           <!-- source: tier4_planning_launch://launch/scenario_planning/lane_driving/behavior_planning/behavior_planning.launch.xml -->
           <group>
+            <!-- arg name="behavior_path_planner_launch_modules" default="[" -->
+            <!-- arg name="behavior_velocity_planner_launch_modules" default="[" -->
             <!-- arg name="container_type" value="component_container_mt" -->
             <!-- arg name="enable_all_modules_auto_mode" value="false" -->
             <!-- arg name="input_objects_topic_name" value="/perception/object_recognition/objects" -->
+            <!-- arg name="input_pointcloud_map_topic_name" default="/map/pointcloud_map" -->
             <!-- arg name="input_pointcloud_topic_name" value="/perception/obstacle_segmentation/pointcloud" -->
+            <!-- arg name="input_route_topic_name" default="/planning/mission_planning/route" -->
+            <!-- arg name="input_traffic_light_topic_name" default="/perception/traffic_light_recognition/traffic_signals" -->
+            <!-- arg name="input_vector_map_topic_name" default="/map/vector_map" -->
+            <!-- arg name="input_virtual_traffic_light_topic_name" default="/awapi/tmp/virtual_traffic_light_states" -->
             <!-- arg name="is_simulation" value="false" -->
+            <!-- arg name="launch_module_list_end" default="&quot;&quot;]" -->
             <node_container pkg="rclcpp_components" exec="component_container_mt" name="behavior_planning_container">
-              <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_component"/>
               <composable_node pkg="autoware_behavior_velocity_planner" plugin="autoware::behavior_velocity_planner::experimental::BehaviorVelocityPlannerNode" name="behavior_velocity_planner">
                 <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/common.param.yaml -->
                 <param name="max_vel" value="4.17"/>
@@ -3158,7 +3480,7 @@
                 <param name="crosswalk.slow_down.no_relax_velocity" value="2.78"/>
                 <param name="crosswalk.obstruction_prevention.enable_obstruction_prevention" value="false"/>
                 <param name="crosswalk.obstruction_prevention.target_vehicle_velocity" value="1.0"/>
-                <param name="crosswalk.obstruction_prevention.max_target_vehicle_lateral_offset" value="2.0"/>
+                <param name="crosswalk.obstruction_prevention.required_lateral_clearance" value="0.3"/>
                 <param name="crosswalk.obstruction_prevention.required_clearance" value="6.0"/>
                 <param name="crosswalk.obstruction_prevention.min_acc" value="-1.2"/>
                 <param name="crosswalk.obstruction_prevention.min_jerk" value="-1.2"/>
@@ -3180,6 +3502,7 @@
                 <param name="crosswalk.pass_judge.distance_set_for_no_intention_to_walk" value="[1.0, 5.0]"/>
                 <param name="crosswalk.pass_judge.timeout_set_for_no_intention_to_walk" value="[1.0, 0.0]"/>
                 <param name="crosswalk.pass_judge.timeout_ego_stop_for_yield" value="1.0"/>
+                <param name="crosswalk.pass_judge.min_vru_crossing_width" value="0.0"/>
                 <param name="crosswalk.restart_suppression.min_distance_to_stop" value="0.5"/>
                 <param name="crosswalk.restart_suppression.max_distance_to_stop" value="1.0"/>
                 <param name="crosswalk.object_filtering.crosswalk_attention_range" value="2.0"/>
@@ -3368,6 +3691,7 @@
                 <param name="traffic_light.yellow_lamp_period" value="2.75"/>
                 <param name="traffic_light.yellow_light_stop_velocity" value="1.0"/>
                 <param name="traffic_light.enable_pass_judge" value="true"/>
+                <param name="traffic_light.enable_arrow_aware_yellow_passing" value="false"/>
                 <param name="traffic_light.enable_rtc" value="false"/>
                 <param name="traffic_light.restart_suppression.min_behind_distance_to_stop" value="0.5"/>
                 <param name="traffic_light.restart_suppression.max_behind_distance_to_stop" value="1.0"/>
@@ -3678,6 +4002,7 @@
                 <param name="avoidance.policy.lateral_margin" value="best_effort"/>
                 <param name="avoidance.policy.use_shorten_margin_immediately" value="true"/>
                 <param name="avoidance.policy.candidate_path_turn_signal" value="none"/>
+                <param name="avoidance.policy.turn_signal_on_approval_hold_duration" value="3.0"/>
                 <param name="avoidance.constraints.lateral.velocity" value="[1.39, 4.17, 11.1]"/>
                 <param name="avoidance.constraints.lateral.max_accel_values" value="[0.5, 0.5, 0.5]"/>
                 <param name="avoidance.constraints.lateral.min_jerk_values.avoid" value="[0.2, 0.2, 0.2]"/>
@@ -4391,9 +4716,11 @@
             <!-- arg name="container_type" value="component_container_mt" -->
             <!-- arg name="input_objects_topic_name" value="/perception/object_recognition/objects" -->
             <!-- arg name="input_pointcloud_topic_name" value="/perception/obstacle_segmentation/pointcloud" -->
-            <node_container pkg="rclcpp_components" exec="component_container_mt" name="motion_planning_container">
-              <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_component"/>
-            </node_container>
+            <!-- arg name="interface_input_topic" default="/planning/scenario_planning/lane_driving/behavior_planning/path" -->
+            <!-- arg name="interface_output_topic" default="/planning/scenario_planning/lane_driving/trajectory" -->
+            <!-- arg name="launch_module_list_end" default="&quot;&quot;]" -->
+            <!-- arg name="motion_velocity_planner_launch_modules" default="[" -->
+            <node_container pkg="rclcpp_components" exec="component_container_mt" name="motion_planning_container"/>
             <load_composable_node target="/planning/scenario_planning/lane_driving/motion_planning/motion_planning_container">
               <composable_node pkg="autoware_path_smoother" plugin="autoware::path_smoother::ElasticBandSmoother" name="elastic_band_smoother">
                 <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/common.param.yaml -->
@@ -4502,6 +4829,8 @@
                 <param name="replan.max_ego_moving_dist" value="5.0"/>
                 <param name="replan.max_goal_moving_dist" value="15.0"/>
                 <param name="replan.max_delta_time_sec" value="0.0"/>
+                <param name="mpt.use_acados" value="false"/>
+                <param name="mpt.use_acados_circle_constraints" value="true"/>
                 <param name="mpt.option.steer_limit_constraint" value="false"/>
                 <param name="mpt.option.visualize_sampling_num" value="1"/>
                 <param name="mpt.option.enable_manual_warm_start" value="false"/>
@@ -5217,7 +5546,6 @@
               <remap from="~/output/trajectory" to="/planning/scenario_planning/parking/trajectory"/>
               <remap from="is_completed" to="/planning/scenario_planning/parking/is_completed"/>
             </composable_node>
-            <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_component"/>
           </node_container>
         </group>
         <!-- end: tier4_planning_launch://launch/scenario_planning/parking.launch.xml -->
@@ -5228,15 +5556,20 @@
         <!-- arg name="container_type" value="component_container_mt" -->
         <!-- arg name="input_objects_topic_name" value="/perception/object_recognition/objects" -->
         <!-- arg name="input_pointcloud_topic_name" value="/perception/obstacle_segmentation/pointcloud" -->
+        <!-- arg name="input_route_topic_name" default="/planning/mission_planning/route" -->
+        <!-- arg name="input_traffic_light_topic_name" default="/perception/traffic_light_recognition/traffic_signals" -->
         <!-- arg name="input_trajectory" value="/planning/scenario_planning/velocity_smoother/trajectory" -->
+        <!-- arg name="input_trajectory_topic_name" default="/planning/scenario_planning/velocity_smoother/trajectory" -->
+        <!-- arg name="input_vector_map_topic_name" default="/map/vector_map" -->
+        <!-- arg name="launch_modules_list_end" default="&quot;&quot;]" -->
         <!-- arg name="output_trajectory" value="/planning/trajectory" -->
         <!-- arg name="planning_validator_intersection_collision_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/intersection_collision_checker.param.yaml" -->
         <!-- arg name="planning_validator_latency_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/latency_checker.param.yaml" -->
+        <!-- arg name="planning_validator_launch_modules" default="[" -->
         <!-- arg name="planning_validator_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/planning_validator.param.yaml" -->
         <!-- arg name="planning_validator_rear_collision_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/rear_collision_checker.param.yaml" -->
         <!-- arg name="planning_validator_trajectory_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/trajectory_checker.param.yaml" -->
         <node_container pkg="rclcpp_components" exec="component_container_mt" name="planning_validator_container">
-          <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_component"/>
           <composable_node pkg="autoware_planning_validator" plugin="autoware::planning_validator::PlanningValidatorNode" name="planning_validator">
             <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/planning_validator.param.yaml -->
             <param name="planning_hz" value="10.0"/>
@@ -5399,6 +5732,17 @@
       <!-- end: autoware_planning_validator://launch/planning_validator.launch.xml -->
       <!-- source: autoware_planning_evaluator://launch/planning_evaluator.launch.xml -->
       <group>
+        <!-- arg name="input/acceleration" default="/localization/acceleration" -->
+        <!-- arg name="input/map_topic" default="/map/vector_map" -->
+        <!-- arg name="input/modified_goal" default="/planning/scenario_planning/modified_goal" -->
+        <!-- arg name="input/objects" default="/perception/object_recognition/objects" -->
+        <!-- arg name="input/odometry" default="/localization/kinematic_state" -->
+        <!-- arg name="input/reference_trajectory" default="/planning/scenario_planning/lane_driving/motion_planning/path_optimizer/trajectory" -->
+        <!-- arg name="input/route_topic" default="/planning/mission_planning/route" -->
+        <!-- arg name="input/steering_status" default="/vehicle/status/steering_status" -->
+        <!-- arg name="input/trajectory" default="/planning/trajectory" -->
+        <!-- arg name="input/turn_indicators_status" default="/vehicle/status/turn_indicators_status" -->
+        <!-- arg name="output_metrics" default="false" -->
         <node pkg="autoware_planning_evaluator" exec="planning_evaluator" name="planning_evaluator">
           <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/common.param.yaml -->
           <param name="max_vel" value="4.17"/>
@@ -5450,6 +5794,11 @@
       <!-- end: autoware_planning_evaluator://launch/planning_evaluator.launch.xml -->
       <!-- source: autoware_remaining_distance_time_calculator://launch/remaining_distance_time_calculator.launch.xml -->
       <group>
+        <!-- arg name="input_map" default="/map/vector_map" -->
+        <!-- arg name="input_odometry" default="/localization/kinematic_state" -->
+        <!-- arg name="input_route" default="/planning/mission_planning/route" -->
+        <!-- arg name="input_scenario" default="/planning/scenario_planning/scenario" -->
+        <!-- arg name="remaining_distance_time_calculator_param_path" default="$(find-pkg-share autoware_remaining_distance_time_calculator)/config/remaining_distance_time_calculator.param.yaml" -->
         <node pkg="autoware_remaining_distance_time_calculator" exec="autoware_remaining_distance_time_calculator_node" name="remaining_distance_time_calculator" output="screen">
           <!-- params from: $(find-pkg-share autoware_remaining_distance_time_calculator)/config/remaining_distance_time_calculator.param.yaml -->
           <param name="update_rate" value="10.0"/>
@@ -5468,7 +5817,23 @@
   <!-- end: autoware_launch://launch/components/tier4_planning_component.launch.xml -->
   <!-- source: autoware_launch://launch/components/tier4_control_component.launch.xml -->
   <group>
+    <!-- arg name="control_input_objects_topic_name" default="/perception/object_recognition/objects" -->
+    <!-- arg name="control_input_pointcloud_topic_name" default="/perception/obstacle_segmentation/pointcloud" -->
+    <!-- arg name="lateral_controller_mode" default="mpc" -->
+    <!-- arg name="launch_autonomous_emergency_braking" default="true" -->
+    <!-- arg name="launch_collision_detector" default="true" -->
+    <!-- arg name="launch_control_evaluator" default="true" -->
+    <!-- arg name="launch_control_validator" default="true" -->
+    <!-- arg name="launch_external_cmd_converter" default="true" -->
+    <!-- arg name="launch_external_cmd_selector" default="true" -->
+    <!-- arg name="launch_lane_departure_checker" default="true" -->
+    <!-- arg name="launch_obstacle_collision_checker" default="false" -->
+    <!-- arg name="launch_predicted_path_checker" default="false" -->
+    <!-- arg name="longitudinal_controller_mode" default="pid" -->
     <!-- arg name="module_preset" value="default" -->
+    <!-- arg name="trajectory_follower_mode" default="trajectory_follower_node" -->
+    <!-- arg name="use_aeb_autoware_state_check" default="true" -->
+    <!-- arg name="use_individual_control_param" default="false" -->
     <!-- arg name="use_sim_time" value="false" -->
     <!-- arg name="vehicle_model" value="sample_vehicle" -->
     <!-- source: autoware_launch://config/control/preset/default_preset.yaml -->
@@ -5513,15 +5878,21 @@
       <!-- arg name="nearest_search_param_path" value="$(find-pkg-share autoware_launch)/config/control/common/nearest_search.param.yaml" -->
       <!-- arg name="obstacle_collision_checker_param_path" value="$(find-pkg-share autoware_launch)/config/control/obstacle_collision_checker/obstacle_collision_checker.param.yaml" -->
       <!-- arg name="operation_mode_transition_manager_param_path" value="$(find-pkg-share autoware_launch)/config/control/operation_mode_transition_manager/operation_mode_transition_manager.param.yaml" -->
+      <!-- arg name="output_control_cmd" default="/control/command/control_cmd" -->
+      <!-- arg name="output_gear_cmd" default="/control/command/gear_cmd" -->
+      <!-- arg name="output_hazard_lights_cmd" default="/control/command/hazard_lights_cmd" -->
+      <!-- arg name="output_turn_indicators_cmd" default="/control/command/turn_indicators_cmd" -->
       <!-- arg name="predicted_path_checker_param_path" value="$(find-pkg-share autoware_launch)/config/control/predicted_path_checker/predicted_path_checker.param.yaml" -->
       <!-- arg name="shift_decider_param_path" value="$(find-pkg-share autoware_launch)/config/control/shift_decider/shift_decider.param.yaml" -->
       <!-- arg name="trajectory_follower_node_param_path" value="$(find-pkg-share autoware_launch)/config/control/trajectory_follower/trajectory_follower_node.param.yaml" -->
       <!-- arg name="use_aeb_autoware_state_check" value="true" -->
+      <!-- arg name="use_control_command_gate" default="false" -->
+      <!-- arg name="use_intra_process" default="false" -->
+      <!-- arg name="use_multithread" default="true" -->
       <!-- arg name="vehicle_cmd_gate_param_path" value="$(find-pkg-share autoware_launch)/config/control/vehicle_cmd_gate/vehicle_cmd_gate.param.yaml" -->
       <!-- arg name="vehicle_id" value="default" -->
       <!-- arg name="vehicle_param_file" value="$(find-pkg-share sample_vehicle_description)/config/vehicle_info.param.yaml" -->
       <node_container pkg="rclcpp_components" exec="component_container_mt" name="control_container" namespace="/control">
-        <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_control_container_component"/>
         <composable_node pkg="autoware_shift_decider" plugin="autoware::shift_decider::ShiftDecider" name="autoware_shift_decider">
           <!-- params from: $(find-pkg-share autoware_launch)/config/control/shift_decider/shift_decider.param.yaml -->
           <param name="park_on_goal" value="true"/>
@@ -5776,8 +6147,6 @@
           <param name="curvature_list_for_steer_rate_lim" value="[0.001, 0.002, 0.01]"/>
           <param name="steer_rate_lim_dps_list_by_velocity" value="[60.0, 50.0, 40.0]"/>
           <param name="velocity_list_for_steer_rate_lim" value="[10.0, 15.0, 20.0]"/>
-          <param name="acceleration_limit" value="2.0"/>
-          <param name="velocity_time_constant" value="0.3"/>
           <param name="steering_lpf_cutoff_hz" value="3.0"/>
           <param name="error_deriv_lpf_cutoff_hz" value="5.0"/>
           <param name="stop_state_entry_ego_speed" value="0.001"/>
@@ -5819,9 +6188,7 @@
           <remap from="~/output/control_cmd" to="control_cmd"/>
         </composable_node>
       </load_composable_node>
-      <node_container pkg="rclcpp_components" exec="component_container_mt" name="control_check_container" namespace="/control">
-        <composable_node pkg="autoware_glog_component" plugin="autoware::glog_component::GlogComponent" name="glog_control_check_container_component"/>
-      </node_container>
+      <node_container pkg="rclcpp_components" exec="component_container_mt" name="control_check_container" namespace="/control"/>
       <load_composable_node target="/control/control_check_container">
         <composable_node pkg="autoware_lane_departure_checker" plugin="autoware::lane_departure_checker::LaneDepartureCheckerNode" name="lane_departure_checker_node">
           <!-- params from: $(find-pkg-share autoware_launch)/config/control/common/nearest_search.param.yaml -->
@@ -5979,6 +6346,26 @@
       <!-- source: autoware_external_cmd_selector://launch/external_cmd_selector.launch.py -->
       <group>
         <!-- arg name="external_cmd_selector_param_path" value="$(find-pkg-share autoware_launch)/config/control/external_cmd_selector/external_cmd_selector.param.yaml" -->
+        <!-- arg name="input/local/gear_cmd" default="/external/local/gear_cmd" -->
+        <!-- arg name="input/local/hazard_lights_cmd" default="/external/local/hazard_lights_cmd" -->
+        <!-- arg name="input/local/heartbeat" default="/external/local/heartbeat" -->
+        <!-- arg name="input/local/pedals_cmd" default="/external/local/pedals_cmd" -->
+        <!-- arg name="input/local/steering_cmd" default="/external/local/steering_cmd" -->
+        <!-- arg name="input/local/turn_indicators_cmd" default="/external/local/turn_indicators_cmd" -->
+        <!-- arg name="input/remote/gear_cmd" default="/external/remote/gear_cmd" -->
+        <!-- arg name="input/remote/hazard_lights_cmd" default="/external/remote/hazard_lights_cmd" -->
+        <!-- arg name="input/remote/heartbeat" default="/external/remote/heartbeat" -->
+        <!-- arg name="input/remote/pedals_cmd" default="/external/remote/pedals_cmd" -->
+        <!-- arg name="input/remote/steering_cmd" default="/external/remote/steering_cmd" -->
+        <!-- arg name="input/remote/turn_indicators_cmd" default="/external/remote/turn_indicators_cmd" -->
+        <!-- arg name="output/current_selector_mode" default="~/current_selector_mode" -->
+        <!-- arg name="output/gear_cmd" default="/external/selected/gear_cmd" -->
+        <!-- arg name="output/hazard_lights_cmd" default="/external/selected/hazard_lights_cmd" -->
+        <!-- arg name="output/heartbeat" default="/external/selected/heartbeat" -->
+        <!-- arg name="output/pedals_cmd" default="/external/selected/pedals_cmd" -->
+        <!-- arg name="output/steering_cmd" default="/external/selected/steering_cmd" -->
+        <!-- arg name="output/turn_indicators_cmd" default="/external/selected/turn_indicators_cmd" -->
+        <!-- arg name="service/select_external_command" default="~/select_external_command" -->
         <!-- arg name="target_container" value="/control/control_container" -->
         <!-- arg name="use_intra_process" value="false" -->
         <load_composable_node target="/control/control_container">
@@ -6011,8 +6398,22 @@
       <!-- end: autoware_external_cmd_selector://launch/external_cmd_selector.launch.py -->
       <!-- source: autoware_external_cmd_converter://launch/external_cmd_converter.launch.py -->
       <group>
+        <!-- arg name="control_command_timeout" default="1.0" -->
+        <!-- arg name="csv_path_accel_map" default="$(find-pkg-share autoware_raw_vehicle_cmd_converter)/data/default/accel_map.csv" -->
+        <!-- arg name="csv_path_brake_map" default="$(find-pkg-share autoware_raw_vehicle_cmd_converter)/data/default/brake_map.csv" -->
+        <!-- arg name="emergency_stop_timeout" default="3.0" -->
+        <!-- arg name="in/current_gate_mode" default="/control/current_gate_mode" -->
+        <!-- arg name="in/gear_cmd" default="/external/selected/gear_cmd" -->
+        <!-- arg name="in/heartbeat" default="/external/selected/heartbeat" -->
+        <!-- arg name="in/odometry" default="/localization/kinematic_state" -->
+        <!-- arg name="in/pedals_cmd" default="/external/selected/pedals_cmd" -->
+        <!-- arg name="in/steering_cmd" default="/external/selected/steering_cmd" -->
+        <!-- arg name="out/control_cmd" default="/external/selected/control_cmd" -->
+        <!-- arg name="ref_vel_gain" default="3.0" -->
         <!-- arg name="target_container" value="/control/control_container" -->
+        <!-- arg name="timer_rate" default="10.0" -->
         <!-- arg name="use_intra_process" value="false" -->
+        <!-- arg name="wait_for_first_topic" default="true" -->
         <load_composable_node target="/control/control_container">
           <composable_node pkg="autoware_external_cmd_converter" plugin="autoware::external_cmd_converter::ExternalCmdConverterNode" name="external_cmd_converter">
             <param name="control_command_timeout" value="1.0"/>
@@ -6035,7 +6436,15 @@
       <!-- end: autoware_external_cmd_converter://launch/external_cmd_converter.launch.py -->
       <!-- source: autoware_control_evaluator://launch/control_evaluator.launch.xml -->
       <group>
+        <!-- arg name="input/acceleration" default="/localization/acceleration" -->
+        <!-- arg name="input/behavior_path" default="/planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id" -->
         <!-- arg name="input/objects" value="/perception/object_recognition/objects" -->
+        <!-- arg name="input/odometry" default="/localization/kinematic_state" -->
+        <!-- arg name="input/route" default="/planning/mission_planning/route" -->
+        <!-- arg name="input/steering_status" default="/vehicle/status/steering_status" -->
+        <!-- arg name="input/trajectory" default="/planning/trajectory" -->
+        <!-- arg name="input/vector_map" default="/map/vector_map" -->
+        <!-- arg name="output_metrics" default="false" -->
         <node pkg="autoware_control_evaluator" exec="control_evaluator" name="control_evaluator">
           <!-- params from: $(find-pkg-share autoware_control_evaluator)/config/control_evaluator.param.yaml -->
           <param name="output_metrics_only_moving.enabled" value="true"/>
@@ -6062,6 +6471,7 @@
   <!-- end: autoware_launch://launch/components/tier4_control_component.launch.xml -->
   <!-- source: autoware_launch://launch/components/tier4_autoware_api_component.launch.xml -->
   <group>
+    <!-- arg name="scenario_simulation" default="false" -->
     <!-- arg name="use_sim_time" value="false" -->
     <!-- arg name="vehicle_model" value="sample_vehicle" -->
     <!-- source: autoware_global_parameter_loader://launch/global_params.launch.py -->
@@ -6087,7 +6497,10 @@
     <!-- end: autoware_global_parameter_loader://launch/global_params.launch.py -->
     <!-- source: tier4_autoware_api_launch://launch/autoware_api.launch.xml -->
     <group>
+      <!-- arg name="default_adapi_param_path" default="$(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml" -->
+      <!-- arg name="launch_default_adapi" default="true" -->
       <!-- arg name="launch_evaluation_adapter" value="false" -->
+      <!-- arg name="launch_rviz_adaptors" default="true" -->
       <!-- source: autoware_default_adapi_universe://launch/default_adapi.launch.py -->
       <group>
         <!-- arg name="config" value="$(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml" -->
@@ -6116,6 +6529,7 @@
       <!-- end: autoware_default_adapi_universe://launch/default_adapi.launch.py -->
       <!-- source: autoware_adapi_adaptors://launch/rviz_adaptors.launch.xml -->
       <group>
+        <!-- arg name="rviz_initial_pose_auto_fix_target" default="pointcloud_map" -->
         <node pkg="autoware_adapi_adaptors" exec="initial_pose_adaptor_node" namespace="/default_adapi/helpers">
           <!-- params from: $(find-pkg-share autoware_adapi_adaptors)/config/initial_pose.param.yaml -->
           <param name="initial_pose_particle_covariance" value="[4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]"/>

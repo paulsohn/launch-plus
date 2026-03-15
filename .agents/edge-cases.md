@@ -749,55 +749,52 @@ The stubs are safe for static dependency analysis.
 When the resolver detects these patterns, the resolved XML can encode the operational intent
 using node-level attributes — keeping the output readable and avoiding new element types.
 
-#### Option A: Node-level attributes (recommended for M9)
+#### Chosen: Explicit event-handler elements
 
 ```xml
-<!-- Pattern A: lifecycle auto-manage -->
-<node pkg="ros2_socketcan" exec="socket_can_receiver_node_exe"
-      lifecycle="auto-activate"/>
+<lifecycle_node pkg="ros2_socketcan" exec="socket_can_receiver_node_exe" name="socket_can_receiver">
+    <param name="interface" value="can0"/>
+</lifecycle_node>
 
-<!-- Pattern B: exit-propagates-shutdown -->
-<node pkg="autoware_pointcloud_merger" exec="autoware_pointcloud_merger_node"
-      shutdown-on-exit="true"/>
+<on_process_start target="socket_can_receiver">
+    <emit_event event="configure" target_node="socket_can_receiver" />
+</on_process_start>
+
+<on_state_transition target_node="socket_can_receiver" start_state="configuring" goal_state="inactive">
+    <emit_event event="activate" target_node="socket_can_receiver" />
+</on_state_transition>
 ```
 
-`lifecycle="auto-activate"` means: configure → activate automatically on startup.
-`shutdown-on-exit="true"` means: emit `Shutdown` when this node exits.
+These are launch-plus XML extensions — `ros2 launch` does not support them. They serve as
+documentation in the resolved output. Actual lifecycle management (calling `/change_state`
+services) is deferred to a future `launch-plus run` implementation.
 
-These are not standard ROS 2 XML attributes — they are launch-plus extensions that `ros2 launch`
-will ignore. They serve as documentation in the resolved output and can drive `launch-plus run`.
-
-#### Option B: Explicit event-handler elements (future, if cross-node patterns emerge)
-
+For Pattern B (exit-propagates-shutdown):
 ```xml
-<node pkg="ros2_socketcan" exec="socket_can_receiver_node_exe" name="can_rx">
-  <register-event-handler event="process-start">
-    <change-state node="can_rx" transition="configure"/>
-  </register-event-handler>
-  <register-event-handler event="state-transition" from="configuring" to="inactive">
-    <change-state node="can_rx" transition="activate"/>
-  </register-event-handler>
-</node>
+<on_process_exit target="merger_node">
+    <emit_event event="shutdown" />
+</on_process_exit>
 ```
-
-Reserved for cases where event handlers involve cross-node interactions or non-standard
-transition sequences. Not needed for current Autoware patterns.
 
 ---
 
-### Pattern Detection (M9)
+### Implementation
 
-Detection runs after `_walk_actions` collects all actions. The detector inspects the collected
-`RegisterEventHandler` stubs' original arguments before stubbing discards them. Two heuristics:
+**Parser:** `<lifecycle_node>` parsed like `<node>` but produces `LaunchElement::LifecycleNode`.
+`<on_process_start>`, `<on_state_transition>`, `<on_process_exit>` produce
+`LaunchElement::EventHandler { kind, children }`. `<emit_event>` produces
+`LaunchElement::EmitEvent` (only valid inside event handlers).
 
-1. **Lifecycle pattern:** `LifecycleNode` paired with `RegisterEventHandler(OnProcessStart(...))`
-   targeting the same node, where the event chain leads to `TRANSITION_CONFIGURE` then
-   `TRANSITION_ACTIVATE`.
-2. **Shutdown pattern:** `RegisterEventHandler(OnProcessExit(...))` where `on_exit` contains
-   `EmitEvent(event=Shutdown())`.
+**Resolver:** `NodeKind::LifecycleNode` (unit variant, like `Node`).
+`NodeKind::EventHandler { handler_kind, actions }` carries the resolved event data.
+Shared node-resolution logic extracted to avoid duplication between `Node` and `LifecycleNode`.
 
-If detected → emit attribute on the corresponding `<node>` element.
-If not detected (novel pattern) → silently drop with an optional `[info]` note.
+**Python resolver:** `_TrackedLifecycleNode` emits `"kind": "lifecycle_node"`.
+Replace `RegisterEventHandler`/`OnProcessStart`/`OnStateTransition`/`EmitEvent` stubs with
+tracked classes that record handler structure into `_tracked["event_handlers"]`.
+
+**Rendering:** Parameterize `render_node()` with a tag name string. Add `render_event_handler()`
+for `<on_*>` wrappers containing `<emit_event />` children.
 
 ---
 
@@ -808,9 +805,9 @@ they exit. They do **not** affect the dependency graph (which packages are neede
 exist, which topics are remapped). For the primary purpose of `launch-plus` (dependency
 indexing and workspace management), the current silent-drop behaviour is correct and complete.
 
-The serialization attributes are **informational**: they make the resolved XML more faithful to
-the original Python intent and enable `launch-plus run` to reproduce lifecycle startup sequences,
-but they are not required for dependency analysis.
+The event-handler elements in the resolved XML are **informational**: they make the output
+more faithful to the original Python intent. Actual lifecycle management at execution time
+is deferred to future work.
 
 ---
 

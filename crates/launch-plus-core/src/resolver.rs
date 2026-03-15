@@ -17,8 +17,8 @@ pub use crate::parser::yaml::parse_launch_yaml;
 
 // Re-export AST types from the parser module (canonical home).
 pub use crate::parser::{
-    ComposableNode, Condition, ConditionKind, Env, IncludeArg, LaunchElement, LaunchFile, Param,
-    Remap,
+    ComposableNode, Condition, ConditionKind, Env, EventHandlerKind, IncludeArg, LaunchElement,
+    LaunchFile, Param, Remap,
 };
 
 /// A resolved composable node plugin (the result of resolving a `ComposableNode`).
@@ -100,6 +100,35 @@ pub enum NodeKind {
         cmd: String,
         name: Option<String>,
         shell: bool,
+    },
+    /// A lifecycle-managed node: `<lifecycle_node pkg="..." exec="..."/>`.
+    ///
+    /// Identical to `Node` for dependency purposes; rendered as `<lifecycle_node>` in XML.
+    /// launch-plus XML extension.
+    LifecycleNode,
+    /// An event handler: `<on_process_start>`, `<on_process_exit>`, `<on_state_transition>`.
+    ///
+    /// Contains child actions (e.g. `<emit_event>`).  launch-plus XML extension.
+    /// Excluded from semantic comparison.
+    EventHandler {
+        handler_kind: EventHandlerKind,
+        target: Option<String>,
+        target_node: Option<String>,
+        namespace: Option<String>,
+        start_state: Option<String>,
+        goal_state: Option<String>,
+        actions: Vec<ResolvedEventAction>,
+    },
+}
+
+/// A resolved action inside an event handler.
+#[derive(Debug, Clone)]
+pub enum ResolvedEventAction {
+    /// `<emit_event event="..." target_node="..." namespace="..."/>`.
+    EmitEvent {
+        event: String,
+        target_node: Option<String>,
+        namespace: Option<String>,
     },
 }
 
@@ -774,6 +803,12 @@ pub struct IncludeArgContext {
     /// declaring `<arg name="x"/>`.  Prefer explicit forwarding; use this flag only for
     /// legacy launch files that cannot be refactored.
     pub with_cascade: HashMap<String, String>,
+
+    /// Accumulated `<push-ros-namespace>` stack at the include site.
+    ///
+    /// The orchestrator applies this as a prefix to all nodes produced by the child
+    /// file, so that cross-file namespace propagation matches ROS 2 semantics.
+    pub namespace_stack: Vec<String>,
 }
 
 /// A fully resolved launch configuration
@@ -837,6 +872,10 @@ pub struct LaunchInclude {
     pub share_path: PathBuf,
     /// Args explicitly passed at the include site (not cascaded parent args).
     pub explicit_args: HashMap<String, String>,
+    /// Accumulated `<push-ros-namespace>` stack at the include site in the parent file.
+    ///
+    /// Applied as a namespace prefix to all nodes produced by the child file.
+    pub namespace_stack: Vec<String>,
 }
 
 /// Unified per-file analysis result from any launch file format (XML, YAML, or Python).
@@ -873,6 +912,11 @@ pub struct ResolvedNode {
     /// Effective namespace: combination of `namespace_stack` and any explicit `namespace=`
     /// attribute on the `<node>` element (following ROS 2 `namespace_join` semantics).
     pub namespace: Option<String>,
+    /// The node's own `namespace=` attribute value (before combining with the stack).
+    ///
+    /// Stored separately so that cross-file namespace propagation can recompute the
+    /// effective namespace from a merged stack without losing the explicit attribute.
+    pub explicit_namespace: Option<String>,
     /// Resolved `<push-ros-namespace>` stack at the point this node was declared.
     ///
     /// Each entry corresponds to one `<push-ros-namespace namespace="..."/>` that was active
@@ -964,6 +1008,7 @@ pub fn semantic_eq(a: &[ResolvedNode], b: &[ResolvedNode]) -> bool {
                 | NodeKind::SetParameter { .. }
                 | NodeKind::SetRemap { .. }
                 | NodeKind::Log { .. }
+                | NodeKind::EventHandler { .. }
         )
     };
     let a_s: Vec<SemanticNode> = a.iter().filter(is_exec).map(SemanticNode::from).collect();
@@ -1572,6 +1617,7 @@ fn resolve_element(
                 let inc_arg_ctx = IncludeArgContext {
                     explicit: resolved_args.clone(),
                     with_cascade: cascade_context,
+                    namespace_stack: ctx.namespace_stack.clone(),
                 };
 
                 // Extract file-level dependency and record its arg context.
@@ -1794,6 +1840,7 @@ fn resolve_element(
                     executable: exec_val,
                     name: resolved_name,
                     namespace: resolved_ns,
+                    explicit_namespace: node_explicit_ns,
                     namespace_stack: ctx.namespace_stack.clone(),
                     parameters: resolved_params,
                     remappings: resolved_remaps,
@@ -1808,6 +1855,217 @@ fn resolve_element(
                     respawn_delay: resolved_respawn_delay,
                 });
             }
+        }
+
+        LaunchElement::LifecycleNode {
+            pkg,
+            exec,
+            name,
+            namespace,
+            condition,
+            params,
+            remaps,
+            envs,
+            output,
+            args,
+            respawn,
+            respawn_delay,
+            unknown_attrs,
+        } => {
+            let should_include = if let Some(cond) = condition {
+                let (include, cond_sub) = evaluate_condition(cond, ctx)?;
+                cond_sub.propagate_diagnostics(result);
+                include
+            } else {
+                true
+            };
+
+            if should_include {
+                for attr in unknown_attrs {
+                    result.errors.push(format!(
+                        "unrecognised attribute '{attr}' on <lifecycle_node pkg=\"{pkg}\"> — \
+                         the resolver does not support this attribute and it will be dropped"
+                    ));
+                }
+
+                let pkg_val = resolve_substitutions(pkg, ctx)?.propagate_into(result);
+                result.required_packages.insert(pkg_val.clone());
+
+                let exec_val = resolve_substitutions(exec, ctx)?.propagate_into(result);
+                let resolved_name = if let Some(n) = name {
+                    Some(resolve_substitutions(n, ctx)?.propagate_into(result))
+                } else {
+                    None
+                };
+                let node_explicit_ns = if let Some(ns) = namespace {
+                    Some(resolve_substitutions(ns, ctx)?.propagate_into(result))
+                } else {
+                    None
+                };
+                let resolved_ns =
+                    effective_namespace(&ctx.namespace_stack, node_explicit_ns.as_deref());
+                let (resolved_params, resolved_param_files) =
+                    resolve_params(params, ctx, result, options)?;
+                let resolved_remaps = resolve_remaps(remaps, ctx, result)?;
+                let mut resolved_envs = BTreeMap::new();
+                for env in envs {
+                    let name_val = resolve_substitutions(&env.name, ctx)?.propagate_into(result);
+                    let env_val = resolve_substitutions(&env.value, ctx)?.propagate_into(result);
+                    resolved_envs.insert(name_val, env_val);
+                }
+                let resolved_output = if let Some(o) = output {
+                    Some(resolve_substitutions(o, ctx)?.propagate_into(result))
+                } else {
+                    None
+                };
+                let resolved_args = if let Some(a) = args {
+                    Some(resolve_substitutions(a, ctx)?.propagate_into(result))
+                } else {
+                    None
+                };
+                let resolved_respawn = if let Some(r) = respawn {
+                    Some(resolve_substitutions(r, ctx)?.propagate_into(result))
+                } else {
+                    None
+                };
+                let resolved_respawn_delay = if let Some(d) = respawn_delay {
+                    Some(resolve_substitutions(d, ctx)?.propagate_into(result))
+                } else {
+                    None
+                };
+
+                result.nodes.push(ResolvedNode {
+                    package: pkg_val,
+                    executable: exec_val,
+                    name: resolved_name,
+                    namespace: resolved_ns,
+                    explicit_namespace: node_explicit_ns,
+                    namespace_stack: ctx.namespace_stack.clone(),
+                    parameters: resolved_params,
+                    remappings: resolved_remaps,
+                    env: resolved_envs,
+                    source: None,
+                    include_chain: vec![],
+                    kind: NodeKind::LifecycleNode,
+                    param_files: resolved_param_files,
+                    output: resolved_output,
+                    args: resolved_args,
+                    respawn: resolved_respawn,
+                    respawn_delay: resolved_respawn_delay,
+                });
+            }
+        }
+
+        LaunchElement::EventHandler {
+            kind: handler_kind,
+            target,
+            target_node,
+            namespace,
+            start_state,
+            goal_state,
+            children,
+            unknown_attrs,
+        } => {
+            for attr in unknown_attrs {
+                result.errors.push(format!(
+                    "unrecognised attribute '{attr}' on <{}> — \
+                     the resolver does not support this attribute and it will be dropped",
+                    handler_kind.tag_name()
+                ));
+            }
+            let resolved_target = if let Some(t) = target {
+                Some(resolve_substitutions(t, ctx)?.propagate_into(result))
+            } else {
+                None
+            };
+            let resolved_target_node = if let Some(tn) = target_node {
+                Some(resolve_substitutions(tn, ctx)?.propagate_into(result))
+            } else {
+                None
+            };
+            let handler_explicit_ns = if let Some(ns) = namespace {
+                Some(resolve_substitutions(ns, ctx)?.propagate_into(result))
+            } else {
+                None
+            };
+            let handler_effective_ns =
+                effective_namespace(&ctx.namespace_stack, handler_explicit_ns.as_deref());
+            let resolved_start = if let Some(s) = start_state {
+                Some(resolve_substitutions(s, ctx)?.propagate_into(result))
+            } else {
+                None
+            };
+            let resolved_goal = if let Some(g) = goal_state {
+                Some(resolve_substitutions(g, ctx)?.propagate_into(result))
+            } else {
+                None
+            };
+
+            let mut actions = Vec::new();
+            for child in children {
+                if let LaunchElement::EmitEvent {
+                    event,
+                    target_node,
+                    namespace: child_ns,
+                    unknown_attrs,
+                } = child
+                {
+                    for attr in unknown_attrs {
+                        result.errors.push(format!(
+                            "unrecognised attribute '{attr}' on <emit_event> — \
+                             the resolver does not support this attribute and it will be dropped"
+                        ));
+                    }
+                    let ev = resolve_substitutions(event, ctx)?.propagate_into(result);
+                    let tn = if let Some(tn) = target_node {
+                        Some(resolve_substitutions(tn, ctx)?.propagate_into(result))
+                    } else {
+                        None
+                    };
+                    // Resolve explicit namespace= if present; otherwise leave as
+                    // None so apply_parent_namespace can inherit the handler's
+                    // effective namespace after cross-file prefix is applied.
+                    let cn = if let Some(ns) = child_ns {
+                        Some(resolve_substitutions(ns, ctx)?.propagate_into(result))
+                    } else {
+                        None
+                    };
+                    actions.push(ResolvedEventAction::EmitEvent {
+                        event: ev,
+                        target_node: tn,
+                        namespace: cn,
+                    });
+                } else {
+                    result.warnings.push(
+                        "event handler: ignoring unrecognized child element (expected <emit_event>)".to_string()
+                    );
+                }
+            }
+
+            result.nodes.push(ResolvedNode {
+                namespace_stack: ctx.namespace_stack.clone(),
+                explicit_namespace: handler_explicit_ns,
+                kind: NodeKind::EventHandler {
+                    handler_kind: *handler_kind,
+                    target: resolved_target,
+                    target_node: resolved_target_node,
+                    namespace: handler_effective_ns,
+                    start_state: resolved_start,
+                    goal_state: resolved_goal,
+                    actions,
+                },
+                ..ResolvedNode::default()
+            });
+        }
+
+        LaunchElement::EmitEvent { .. } => {
+            // EmitEvent outside of an EventHandler — warn and skip.
+            // Valid only as a child of EventHandler (handled inline above).
+            result.warnings.push(
+                "<emit_event> outside of an event handler has no effect; \
+                 wrap it in <on_process_start>, <on_process_exit>, etc."
+                    .to_string(),
+            );
         }
 
         LaunchElement::SetEnv {
@@ -1902,6 +2160,7 @@ fn resolve_element(
                     executable: exec_val,
                     name: resolved_name,
                     namespace: resolved_ns,
+                    explicit_namespace: node_explicit_ns,
                     namespace_stack: ctx.namespace_stack.clone(),
                     parameters: BTreeMap::new(),
                     remappings: vec![],
@@ -1970,6 +2229,7 @@ fn resolve_element(
                     executable: String::new(),
                     name: None,
                     namespace: None,
+                    explicit_namespace: None,
                     namespace_stack: ctx.namespace_stack.clone(),
                     parameters: BTreeMap::new(),
                     remappings: vec![],
@@ -2241,6 +2501,62 @@ fn eval_python_expr(expr: &str) -> crate::Result<String> {
 /// opener and a matching `<!-- end: pkg://path -->` closer.  In flat mode the closer marks
 /// the extent of the section where there is no `</group>` tag.  In nested mode it labels
 /// the closing `</group>` with the originating file name.
+/// Emit `<!-- arg ... -->` comments for a given include boundary.
+///
+/// Merges explicitly-forwarded args with declared defaults (explicit wins).
+/// Entries are sorted alphabetically by name.  Explicit args render as
+/// `<!-- arg name="…" value="…" -->`, declared defaults as
+/// `<!-- arg name="…" default="…" -->`.
+fn render_show_args(
+    out: &mut String,
+    key: &(String, PathBuf),
+    include_args: &HashMap<(String, PathBuf), IncludeArgContext>,
+    declared_args_by_file: &HashMap<(String, PathBuf), HashMap<String, String>>,
+    indent: usize,
+) {
+    let explicit = include_args
+        .get(key)
+        .map(|ctx| &ctx.explicit)
+        .cloned()
+        .unwrap_or_default();
+    let declared = declared_args_by_file.get(key).cloned().unwrap_or_default();
+
+    // Merge: explicit args take precedence, then declared defaults
+    let mut merged: HashMap<&str, (&str, bool)> = HashMap::new();
+    for (name, value) in &explicit {
+        merged.insert(name.as_str(), (value.as_str(), false));
+    }
+    for (name, value) in &declared {
+        merged
+            .entry(name.as_str())
+            .or_insert((value.as_str(), true));
+    }
+
+    if merged.is_empty() {
+        return;
+    }
+
+    let mut sorted: Vec<_> = merged.into_iter().collect();
+    sorted.sort_by_key(|(k, _)| *k);
+    for (name, (value, is_default)) in sorted {
+        if is_default {
+            out.push_str(&format!(
+                "{}<!-- arg name=\"{}\" default=\"{}\" -->\n",
+                pad(indent),
+                name,
+                xml_escape(value)
+            ));
+        } else {
+            out.push_str(&format!(
+                "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
+                pad(indent),
+                name,
+                xml_escape(value)
+            ));
+        }
+    }
+}
+
 pub fn render_resolved_xml(
     package: &str,
     launcher: &str,
@@ -2250,6 +2566,7 @@ pub fn render_resolved_xml(
     include_args: &HashMap<(String, PathBuf), IncludeArgContext>,
     show_args: bool,
     initial_args: &HashMap<String, String>,
+    declared_args_by_file: &HashMap<(String, PathBuf), HashMap<String, String>>,
 ) -> String {
     let mut out = String::new();
 
@@ -2378,18 +2695,13 @@ pub fn render_resolved_xml(
                     out.push_str(&format!("{}<group>\n", pad(vd)));
                 }
                 if show_args {
-                    if let Some(ctx) = include_args.get(&(pkg.clone(), path.clone())) {
-                        let mut sorted: Vec<_> = ctx.explicit.iter().collect();
-                        sorted.sort_by_key(|(k, _)| k.as_str());
-                        for (name, value) in sorted {
-                            out.push_str(&format!(
-                                "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
-                                pad(vd + 1),
-                                name,
-                                xml_escape(value)
-                            ));
-                        }
-                    }
+                    render_show_args(
+                        &mut out,
+                        &(pkg.clone(), path.clone()),
+                        include_args,
+                        declared_args_by_file,
+                        vd + 1,
+                    );
                 }
                 open_src.push((pkg, path));
             }
@@ -2404,20 +2716,15 @@ pub fn render_resolved_xml(
                     pkg,
                     path.display()
                 ));
-                // Emit explicit args for this include boundary.
+                // Emit explicit args and declared defaults for this include boundary.
                 if show_args {
-                    if let Some(ctx) = include_args.get(&(pkg.clone(), path.clone())) {
-                        let mut sorted: Vec<_> = ctx.explicit.iter().collect();
-                        sorted.sort_by_key(|(k, _)| k.as_str());
-                        for (name, value) in sorted {
-                            out.push_str(&format!(
-                                "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
-                                pad(vd + 1),
-                                name,
-                                xml_escape(value)
-                            ));
-                        }
-                    }
+                    render_show_args(
+                        &mut out,
+                        &(pkg.clone(), path.clone()),
+                        include_args,
+                        declared_args_by_file,
+                        vd + 1,
+                    );
                 }
                 out.push_str(&format!(
                     "{}<!-- end: {}://{} -->\n",
@@ -2460,20 +2767,15 @@ pub fn render_resolved_xml(
                 if !flatten {
                     out.push_str(&format!("{}<group>\n", pad(vd)));
                 }
-                // Emit explicit args passed to this include boundary.
+                // Emit explicit args and declared defaults for this include boundary.
                 if show_args {
-                    if let Some(ctx) = include_args.get(&(pkg.clone(), path.clone())) {
-                        let mut sorted: Vec<_> = ctx.explicit.iter().collect();
-                        sorted.sort_by_key(|(k, _)| k.as_str());
-                        for (name, value) in sorted {
-                            out.push_str(&format!(
-                                "{}<!-- arg name=\"{}\" value=\"{}\" -->\n",
-                                pad(vd + 1),
-                                name,
-                                xml_escape(value)
-                            ));
-                        }
-                    }
+                    render_show_args(
+                        &mut out,
+                        &(pkg.clone(), path.clone()),
+                        include_args,
+                        declared_args_by_file,
+                        vd + 1,
+                    );
                 }
                 open_src.push((pkg, path));
             }
@@ -2580,6 +2882,37 @@ pub fn render_resolved_xml(
                     name_attr,
                     shell
                 ));
+            }
+            NodeKind::LifecycleNode => {
+                render_lifecycle_node(
+                    node,
+                    &node_ind,
+                    &child_ind,
+                    stack_only_ns.as_deref(),
+                    &mut out,
+                );
+            }
+            NodeKind::EventHandler {
+                handler_kind,
+                target,
+                target_node,
+                namespace,
+                start_state,
+                goal_state,
+                actions,
+            } => {
+                render_event_handler(
+                    *handler_kind,
+                    target.as_deref(),
+                    target_node.as_deref(),
+                    namespace.as_deref(),
+                    start_state.as_deref(),
+                    goal_state.as_deref(),
+                    actions,
+                    &node_ind,
+                    &child_ind,
+                    &mut out,
+                );
             }
         }
     }
@@ -2742,6 +3075,159 @@ fn render_node(
     } else {
         tag.push_str("/>\n");
         out.push_str(&tag);
+    }
+}
+
+/// Emit a `<lifecycle_node>` element (same structure as `<node>` but different tag).
+fn render_lifecycle_node(
+    node: &ResolvedNode,
+    node_ind: &str,
+    child_ind: &str,
+    stack_only_ns: Option<&str>,
+    out: &mut String,
+) {
+    let mut tag = format!(
+        "{}<lifecycle_node pkg=\"{}\" exec=\"{}\"",
+        node_ind, node.package, node.executable
+    );
+    if let Some(ref name) = node.name {
+        tag.push_str(&format!(" name=\"{}\"", xml_escape(name)));
+    }
+    let emit_ns = node.namespace.as_deref() != stack_only_ns;
+    if emit_ns {
+        if let Some(ref ns) = node.namespace {
+            tag.push_str(&format!(" namespace=\"{}\"", xml_escape(ns)));
+        }
+    }
+    if let Some(ref o) = node.output {
+        tag.push_str(&format!(" output=\"{}\"", xml_escape(o)));
+    }
+    if let Some(ref a) = node.args {
+        tag.push_str(&format!(" args=\"{}\"", xml_escape(a)));
+    }
+    if let Some(ref r) = node.respawn {
+        tag.push_str(&format!(" respawn=\"{}\"", xml_escape(r)));
+    }
+    if let Some(ref d) = node.respawn_delay {
+        tag.push_str(&format!(" respawn_delay=\"{}\"", xml_escape(d)));
+    }
+
+    let has_children = !node.param_files.is_empty()
+        || !node.parameters.is_empty()
+        || !node.remappings.is_empty()
+        || !node.env.is_empty();
+
+    if has_children {
+        tag.push_str(">\n");
+        out.push_str(&tag);
+
+        for pf in &node.param_files {
+            render_param_file(pf, child_ind, out);
+        }
+        for (key, value) in &node.parameters {
+            out.push_str(&format!(
+                "{}<param name=\"{}\" value=\"{}\"/>\n",
+                child_ind,
+                xml_escape(key),
+                xml_escape(value)
+            ));
+        }
+        for (from, to) in &node.remappings {
+            out.push_str(&format!(
+                "{}<remap from=\"{}\" to=\"{}\"/>\n",
+                child_ind,
+                xml_escape(from),
+                xml_escape(to)
+            ));
+        }
+        for (name, value) in &node.env {
+            out.push_str(&format!(
+                "{}<env name=\"{}\" value=\"{}\"/>\n",
+                child_ind,
+                xml_escape(name),
+                xml_escape(value)
+            ));
+        }
+
+        out.push_str(&format!("{}</lifecycle_node>\n", node_ind));
+    } else {
+        tag.push_str("/>\n");
+        out.push_str(&tag);
+    }
+}
+
+/// Emit an event handler element (`<on_process_start>`, `<on_process_exit>`,
+/// `<on_state_transition>`) with child `<emit_event>` actions.
+fn render_event_handler(
+    handler_kind: EventHandlerKind,
+    target: Option<&str>,
+    target_node: Option<&str>,
+    namespace: Option<&str>,
+    start_state: Option<&str>,
+    goal_state: Option<&str>,
+    actions: &[ResolvedEventAction],
+    node_ind: &str,
+    child_ind: &str,
+    out: &mut String,
+) {
+    let tag_name = match handler_kind {
+        EventHandlerKind::OnProcessStart => "on_process_start",
+        EventHandlerKind::OnProcessExit => "on_process_exit",
+        EventHandlerKind::OnStateTransition => "on_state_transition",
+        EventHandlerKind::OnShutdown => "on_shutdown",
+    };
+
+    let mut tag = format!("{}<{}", node_ind, tag_name);
+    if let Some(t) = target {
+        tag.push_str(&format!(" target=\"{}\"", xml_escape(t)));
+    }
+    if let Some(tn) = target_node {
+        tag.push_str(&format!(" target_node=\"{}\"", xml_escape(tn)));
+    }
+    if let Some(ns) = namespace {
+        tag.push_str(&format!(" namespace=\"{}\"", xml_escape(ns)));
+    }
+    if let Some(ss) = start_state {
+        tag.push_str(&format!(" start_state=\"{}\"", xml_escape(ss)));
+    }
+    if let Some(gs) = goal_state {
+        tag.push_str(&format!(" goal_state=\"{}\"", xml_escape(gs)));
+    }
+
+    if actions.is_empty() {
+        tag.push_str("/>\n");
+        out.push_str(&tag);
+    } else {
+        tag.push_str(">\n");
+        out.push_str(&tag);
+
+        for action in actions {
+            match action {
+                ResolvedEventAction::EmitEvent {
+                    event,
+                    target_node,
+                    namespace,
+                } => {
+                    let tn_attr = target_node
+                        .as_deref()
+                        .map(|n| format!(" target_node=\"{}\"", xml_escape(n)))
+                        .unwrap_or_default();
+                    let ns_attr = namespace
+                        .as_deref()
+                        .map(|n| format!(" namespace=\"{}\"", xml_escape(n)))
+                        .unwrap_or_default();
+                    out.push_str(&format!(
+                        "{}<emit_event event=\"{}\"{}{}/>\n",
+                        child_ind,
+                        xml_escape(event),
+                        tn_attr,
+                        ns_attr,
+                    ));
+                }
+            }
+        }
+
+        out.push_str(&format!("{}</{}>\n", node_ind, tag_name));
     }
 }
 
@@ -3117,6 +3603,89 @@ fn collect_arg_var_refs_in_elem(elem: &LaunchElement, refs: &mut HashSet<String>
                 scan_str_for_arg_var_refs(n, refs);
             }
         }
+        LaunchElement::LifecycleNode {
+            pkg,
+            exec,
+            name,
+            namespace,
+            condition,
+            params,
+            remaps,
+            envs,
+            ..
+        } => {
+            scan_str_for_arg_var_refs(pkg, refs);
+            scan_str_for_arg_var_refs(exec, refs);
+            if let Some(n) = name {
+                scan_str_for_arg_var_refs(n, refs);
+            }
+            if let Some(ns) = namespace {
+                scan_str_for_arg_var_refs(ns, refs);
+            }
+            if let Some(c) = condition {
+                scan_str_for_arg_var_refs(&c.expr, refs);
+            }
+            for p in params {
+                if let Some(v) = &p.value {
+                    scan_str_for_arg_var_refs(v, refs);
+                }
+                if let Some(f) = &p.from {
+                    scan_str_for_arg_var_refs(f, refs);
+                }
+                if let Some(n) = &p.name {
+                    scan_str_for_arg_var_refs(n, refs);
+                }
+            }
+            for r in remaps {
+                scan_str_for_arg_var_refs(&r.from, refs);
+                scan_str_for_arg_var_refs(&r.to, refs);
+            }
+            for e in envs {
+                scan_str_for_arg_var_refs(&e.value, refs);
+            }
+        }
+        LaunchElement::EventHandler {
+            target,
+            target_node,
+            namespace,
+            start_state,
+            goal_state,
+            children,
+            ..
+        } => {
+            if let Some(s) = target {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            if let Some(s) = target_node {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            if let Some(s) = namespace {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            if let Some(s) = start_state {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            if let Some(s) = goal_state {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            for child in children {
+                collect_arg_var_refs_in_elem(child, refs);
+            }
+        }
+        LaunchElement::EmitEvent {
+            event,
+            target_node,
+            namespace,
+            ..
+        } => {
+            scan_str_for_arg_var_refs(event, refs);
+            if let Some(s) = target_node {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            if let Some(s) = namespace {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+        }
     }
 }
 
@@ -3357,6 +3926,89 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
             scan_str_for_env_no_fallback(cmd, names);
             if let Some(n) = name {
                 scan_str_for_env_no_fallback(n, names);
+            }
+        }
+        LaunchElement::LifecycleNode {
+            pkg,
+            exec,
+            name,
+            namespace,
+            condition,
+            params,
+            remaps,
+            envs,
+            ..
+        } => {
+            scan_str_for_env_no_fallback(pkg, names);
+            scan_str_for_env_no_fallback(exec, names);
+            if let Some(n) = name {
+                scan_str_for_env_no_fallback(n, names);
+            }
+            if let Some(ns) = namespace {
+                scan_str_for_env_no_fallback(ns, names);
+            }
+            if let Some(c) = condition {
+                scan_str_for_env_no_fallback(&c.expr, names);
+            }
+            for p in params {
+                if let Some(v) = &p.value {
+                    scan_str_for_env_no_fallback(v, names);
+                }
+                if let Some(f) = &p.from {
+                    scan_str_for_env_no_fallback(f, names);
+                }
+                if let Some(n) = &p.name {
+                    scan_str_for_env_no_fallback(n, names);
+                }
+            }
+            for r in remaps {
+                scan_str_for_env_no_fallback(&r.from, names);
+                scan_str_for_env_no_fallback(&r.to, names);
+            }
+            for e in envs {
+                scan_str_for_env_no_fallback(&e.value, names);
+            }
+        }
+        LaunchElement::EventHandler {
+            target,
+            target_node,
+            namespace,
+            start_state,
+            goal_state,
+            children,
+            ..
+        } => {
+            if let Some(s) = target {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            if let Some(s) = target_node {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            if let Some(s) = namespace {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            if let Some(s) = start_state {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            if let Some(s) = goal_state {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            for child in children {
+                collect_env_no_fallback_in_elem(child, names);
+            }
+        }
+        LaunchElement::EmitEvent {
+            event,
+            target_node,
+            namespace,
+            ..
+        } => {
+            scan_str_for_env_no_fallback(event, names);
+            if let Some(s) = target_node {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            if let Some(s) = namespace {
+                scan_str_for_env_no_fallback(s, names);
             }
         }
     }
@@ -5137,6 +5789,7 @@ mod tests {
                 executable: "sensor_node".to_string(),
                 name: Some("lidar".to_string()),
                 namespace: None,
+                explicit_namespace: None,
                 namespace_stack: vec![],
                 parameters: [("rate".to_string(), "10".to_string())].into(),
                 remappings: vec![],
@@ -5155,6 +5808,7 @@ mod tests {
                 executable: "camera_node".to_string(),
                 name: Some("cam".to_string()),
                 namespace: None,
+                explicit_namespace: None,
                 namespace_stack: vec![],
                 parameters: Default::default(),
                 remappings: vec![("/in".to_string(), "/out".to_string())],
@@ -5173,6 +5827,7 @@ mod tests {
                 executable: "planner".to_string(),
                 name: None,
                 namespace: None,
+                explicit_namespace: None,
                 namespace_stack: vec![],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5191,6 +5846,7 @@ mod tests {
                 executable: "util".to_string(),
                 name: None,
                 namespace: None,
+                explicit_namespace: None,
                 namespace_stack: vec![],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5214,6 +5870,7 @@ mod tests {
             false,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 
@@ -5286,6 +5943,7 @@ mod tests {
                 executable: "lidar_node".to_string(),
                 name: Some("lidar".to_string()),
                 namespace: Some("/sensing/lidar".to_string()), // effective = stack only
+                explicit_namespace: None,
                 namespace_stack: vec!["sensing".to_string(), "lidar".to_string()],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5305,6 +5963,7 @@ mod tests {
                 executable: "radar_node".to_string(),
                 name: None,
                 namespace: Some("/sensing/lidar".to_string()),
+                explicit_namespace: None,
                 namespace_stack: vec!["sensing".to_string(), "lidar".to_string()],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5324,6 +5983,7 @@ mod tests {
                 executable: "planner".to_string(),
                 name: None,
                 namespace: None,
+                explicit_namespace: None,
                 namespace_stack: vec![],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5347,6 +6007,7 @@ mod tests {
             false,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 
@@ -5422,6 +6083,7 @@ mod tests {
                 executable: "lidar_node".to_string(),
                 name: Some("lidar".to_string()),
                 namespace: None,
+                explicit_namespace: None,
                 namespace_stack: vec![],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5440,6 +6102,7 @@ mod tests {
                 executable: "radar_node".to_string(),
                 name: None,
                 namespace: None,
+                explicit_namespace: None,
                 namespace_stack: vec![],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5463,6 +6126,7 @@ mod tests {
             false,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 
@@ -5591,6 +6255,7 @@ mod tests {
                 executable: "lidar_node".to_string(),
                 name: Some("lidar".to_string()),
                 namespace: Some("/sensing/lidar".to_string()),
+                explicit_namespace: None,
                 namespace_stack: vec!["sensing".to_string(), "lidar".to_string()],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5611,6 +6276,7 @@ mod tests {
                 executable: "radar_node".to_string(),
                 name: None,
                 namespace: Some("/sensing/radar".to_string()),
+                explicit_namespace: None,
                 namespace_stack: vec!["sensing".to_string(), "radar".to_string()],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5629,6 +6295,7 @@ mod tests {
                 executable: "planner".to_string(),
                 name: None,
                 namespace: Some("/planning".to_string()),
+                explicit_namespace: None,
                 namespace_stack: vec!["planning".to_string()],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5652,6 +6319,7 @@ mod tests {
             false,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 
@@ -5705,6 +6373,7 @@ mod tests {
                 executable: "sensor_node".to_string(),
                 name: None,
                 namespace: None,
+                explicit_namespace: None,
                 namespace_stack: vec![],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5724,6 +6393,7 @@ mod tests {
                 executable: "lidar_node".to_string(),
                 name: None,
                 namespace: Some("/sensing/lidar".to_string()),
+                explicit_namespace: None,
                 namespace_stack: vec!["sensing".to_string(), "lidar".to_string()],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5747,6 +6417,7 @@ mod tests {
             true,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 
@@ -5797,6 +6468,7 @@ mod tests {
                 executable: "lidar_node".to_string(),
                 name: None,
                 namespace: Some("/sensing/lidar".to_string()),
+                explicit_namespace: None,
                 namespace_stack: vec!["sensing".to_string(), "lidar".to_string()],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5815,6 +6487,7 @@ mod tests {
                 executable: "radar_node".to_string(),
                 name: None,
                 namespace: Some("/sensing/radar".to_string()),
+                explicit_namespace: None,
                 namespace_stack: vec!["sensing".to_string(), "radar".to_string()],
                 parameters: Default::default(),
                 remappings: vec![],
@@ -5838,6 +6511,7 @@ mod tests {
             true,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 
@@ -6310,6 +6984,7 @@ launch:
             &HashMap::new(),
             false,
             &HashMap::new(),
+            &HashMap::new(),
         );
 
         // Marker comment pair must appear.
@@ -6405,6 +7080,7 @@ launch:
             false,
             &HashMap::new(),
             false,
+            &HashMap::new(),
             &HashMap::new(),
         );
 
@@ -6707,5 +7383,200 @@ launch:
         let launch = parse_launch_xml(xml, std::path::Path::new("t.launch.xml")).unwrap();
         let names = collect_env_without_fallback(&launch.elements);
         assert!(names.is_empty(), "$(env X default) should not be flagged");
+    }
+
+    // =========================================================================
+    // Event-based launch elements
+    // =========================================================================
+
+    #[test]
+    fn test_parse_lifecycle_node() {
+        let xml = r#"<launch>
+  <lifecycle_node pkg="ros2_socketcan" exec="socket_can_receiver_node_exe" name="socket_can_receiver">
+    <param name="interface" value="can0"/>
+  </lifecycle_node>
+</launch>"#;
+        let launch = parse_launch_xml(xml, Path::new("/test/t.launch.xml")).unwrap();
+        assert_eq!(launch.elements.len(), 1);
+        if let LaunchElement::LifecycleNode {
+            pkg,
+            exec,
+            name,
+            params,
+            ..
+        } = &launch.elements[0]
+        {
+            assert_eq!(pkg, "ros2_socketcan");
+            assert_eq!(exec, "socket_can_receiver_node_exe");
+            assert_eq!(name.as_deref(), Some("socket_can_receiver"));
+            assert_eq!(params.len(), 1);
+            assert_eq!(params[0].name.as_deref(), Some("interface"));
+        } else {
+            panic!("expected LifecycleNode");
+        }
+    }
+
+    #[test]
+    fn test_parse_event_handler_on_process_start() {
+        let xml = r#"<launch>
+  <on_process_start target="socket_can_receiver">
+    <emit_event event="configure" target_node="socket_can_receiver"/>
+  </on_process_start>
+</launch>"#;
+        let launch = parse_launch_xml(xml, Path::new("/test/t.launch.xml")).unwrap();
+        assert_eq!(launch.elements.len(), 1);
+        if let LaunchElement::EventHandler {
+            kind,
+            target,
+            children,
+            ..
+        } = &launch.elements[0]
+        {
+            assert_eq!(*kind, EventHandlerKind::OnProcessStart);
+            assert_eq!(target.as_deref(), Some("socket_can_receiver"));
+            assert_eq!(children.len(), 1);
+            if let LaunchElement::EmitEvent {
+                event, target_node, ..
+            } = &children[0]
+            {
+                assert_eq!(event, "configure");
+                assert_eq!(target_node.as_deref(), Some("socket_can_receiver"));
+            } else {
+                panic!("expected EmitEvent child");
+            }
+        } else {
+            panic!("expected EventHandler");
+        }
+    }
+
+    #[test]
+    fn test_parse_on_state_transition() {
+        let xml = r#"<launch>
+  <on_state_transition target_node="my_node" start_state="configuring" goal_state="inactive">
+    <emit_event event="activate" target_node="my_node"/>
+  </on_state_transition>
+</launch>"#;
+        let launch = parse_launch_xml(xml, Path::new("/test/t.launch.xml")).unwrap();
+        if let LaunchElement::EventHandler {
+            kind,
+            target_node,
+            start_state,
+            goal_state,
+            ..
+        } = &launch.elements[0]
+        {
+            assert_eq!(*kind, EventHandlerKind::OnStateTransition);
+            assert_eq!(target_node.as_deref(), Some("my_node"));
+            assert_eq!(start_state.as_deref(), Some("configuring"));
+            assert_eq!(goal_state.as_deref(), Some("inactive"));
+        } else {
+            panic!("expected EventHandler");
+        }
+    }
+
+    #[test]
+    fn test_resolve_lifecycle_node() {
+        let xml = r#"<launch>
+  <lifecycle_node pkg="ros2_socketcan" exec="socket_can_receiver_node_exe" name="socket_can_receiver">
+    <param name="interface" value="can0"/>
+  </lifecycle_node>
+</launch>"#;
+        let launch = parse_launch_xml(xml, Path::new("/test/t.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+        assert_eq!(result.nodes.len(), 1);
+        assert!(matches!(result.nodes[0].kind, NodeKind::LifecycleNode));
+        assert_eq!(result.nodes[0].package, "ros2_socketcan");
+        assert_eq!(
+            result.nodes[0].parameters.get("interface"),
+            Some(&"can0".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resolve_event_handler() {
+        let xml = r#"<launch>
+  <on_process_start target="my_node">
+    <emit_event event="configure" target_node="my_node"/>
+  </on_process_start>
+</launch>"#;
+        let launch = parse_launch_xml(xml, Path::new("/test/t.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+        assert_eq!(result.nodes.len(), 1);
+        if let NodeKind::EventHandler {
+            handler_kind,
+            target,
+            actions,
+            ..
+        } = &result.nodes[0].kind
+        {
+            assert_eq!(*handler_kind, EventHandlerKind::OnProcessStart);
+            assert_eq!(target.as_deref(), Some("my_node"));
+            assert_eq!(actions.len(), 1);
+            let ResolvedEventAction::EmitEvent {
+                event, target_node, ..
+            } = &actions[0];
+            assert_eq!(event, "configure");
+            assert_eq!(target_node.as_deref(), Some("my_node"));
+        } else {
+            panic!("expected EventHandler kind");
+        }
+    }
+
+    #[test]
+    fn test_render_lifecycle_node_and_event_handlers() {
+        let xml = r#"<launch>
+  <lifecycle_node pkg="ros2_socketcan" exec="receiver" name="can_rx">
+    <param name="interface" value="can0"/>
+  </lifecycle_node>
+  <on_process_start target="can_rx">
+    <emit_event event="configure" target_node="can_rx"/>
+  </on_process_start>
+  <on_state_transition target_node="can_rx" start_state="configuring" goal_state="inactive">
+    <emit_event event="activate" target_node="can_rx"/>
+  </on_state_transition>
+  <on_process_exit target="can_rx">
+    <emit_event event="shutdown"/>
+  </on_process_exit>
+</launch>"#;
+        let launch = parse_launch_xml(xml, Path::new("/test/t.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+
+        let rendered = render_resolved_xml(
+            "test_pkg",
+            "t.launch.xml",
+            &result.nodes,
+            false,
+            false,
+            &HashMap::new(),
+            false,
+            &HashMap::new(),
+            &HashMap::new(),
+        );
+
+        assert!(
+            rendered.contains(
+                "<lifecycle_node pkg=\"ros2_socketcan\" exec=\"receiver\" name=\"can_rx\">"
+            )
+        );
+        assert!(rendered.contains("<param name=\"interface\" value=\"can0\"/>"));
+        assert!(rendered.contains("</lifecycle_node>"));
+        assert!(rendered.contains("<on_process_start target=\"can_rx\">"));
+        assert!(rendered.contains("<emit_event event=\"configure\" target_node=\"can_rx\"/>"));
+        assert!(rendered.contains("</on_process_start>"));
+        assert!(rendered.contains("<on_state_transition target_node=\"can_rx\" start_state=\"configuring\" goal_state=\"inactive\">"));
+        assert!(rendered.contains("<emit_event event=\"activate\" target_node=\"can_rx\"/>"));
+        assert!(rendered.contains("</on_state_transition>"));
+        assert!(rendered.contains("<on_process_exit target=\"can_rx\">"));
+        assert!(rendered.contains("<emit_event event=\"shutdown\"/>"));
+        assert!(rendered.contains("</on_process_exit>"));
     }
 }

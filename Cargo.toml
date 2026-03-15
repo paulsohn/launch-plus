@@ -29,7 +29,7 @@ quick-xml = { version = "0.37", features = ["serialize"] }
 tar = "0.4"
 
 # Python bindings
-pyo3 = { version = "0.24", features = ["extension-module"] }
+pyo3 = { version = "0.28", features = ["extension-module"] }
 
 # Testing
 tempfile = "3.27"

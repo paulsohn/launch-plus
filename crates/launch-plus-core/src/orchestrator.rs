@@ -592,9 +592,15 @@ fn ensure_package_fetched(
         return false;
     };
 
-    // Check if already on disk
+    // Check if already on disk.
+    // In clean mode, we still need to call fetch_packages so that the repository
+    // is reset to the lockfile-pinned SHA (the package might exist on disk at a
+    // different commit).
     let pkg_path = fetch_dir.join(&pkg_lock.repo).join(&pkg_lock.path);
-    if pkg_path.exists() && pkg_path.join("package.xml").exists() {
+    if pkg_path.exists()
+        && pkg_path.join("package.xml").exists()
+        && options.workspace_state != crate::fetcher::WorkspaceState::Clean
+    {
         debug!(
             "Package {} already fetched at {}",
             package,

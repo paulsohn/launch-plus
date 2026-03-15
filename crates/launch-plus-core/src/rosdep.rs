@@ -14,13 +14,14 @@
 //! Only `#apt` and `#pip` installers are supported.  Keys that resolve to
 //! other installers (e.g. `#brew`) are treated as unresolved.
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::process::Command;
-use std::sync::Once;
+use std::sync::{Once, OnceLock};
 
 use tracing::info;
 
 static ROSDEP_UPDATE: Once = Once::new();
+static INSTALLED_PACKAGES: OnceLock<HashSet<String>> = OnceLock::new();
 
 /// Run `rosdep update` once per process (best-effort, non-fatal).
 pub fn ensure_rosdep_updated() {
@@ -280,7 +281,8 @@ pub fn rosdep_install(keys: &[&str]) -> crate::Result<()> {
     }
 
     // Filter out keys that are already installed as ROS packages.
-    let installed = installed_packages();
+    // Cached per-process: the orchestrator may call rosdep_install() many times.
+    let installed = INSTALLED_PACKAGES.get_or_init(installed_packages);
     let mut filtered: Vec<&str> = keys
         .iter()
         .copied()
@@ -314,17 +316,17 @@ pub fn rosdep_install(keys: &[&str]) -> crate::Result<()> {
         )));
     }
 
-    // Deduplicate
+    // Deduplicate — BTreeSet gives sorted, deterministic install order.
     let apt_pkgs: Vec<String> = resolved
         .apt
         .into_iter()
-        .collect::<HashSet<_>>()
+        .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
     let pip_pkgs: Vec<String> = resolved
         .pip
         .into_iter()
-        .collect::<HashSet<_>>()
+        .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
 

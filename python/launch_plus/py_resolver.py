@@ -463,8 +463,12 @@ class _TrackedShutdown:
     """
     _event_name = "shutdown"
 
-    def __init__(self, *args, **kwargs):
-        pass  # Accept and ignore any arguments (e.g. reason=)
+    def __init__(self, **kwargs):
+        if kwargs:
+            _error(
+                f"Shutdown event arguments are not yet supported: "
+                f"{', '.join(f'{k}={v!r}' for k, v in kwargs.items())}"
+            )
 
     def to_dict(self):
         return {

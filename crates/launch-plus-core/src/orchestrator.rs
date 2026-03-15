@@ -1766,6 +1766,7 @@ mod tests {
         // Empty string explicit → effective_namespace returns None → parent applies
         let mut node2 = ResolvedNode {
             namespace: None, // effective_namespace([], Some("")) = None
+            explicit_namespace: Some(String::new()),
             namespace_stack: vec![],
             kind: NodeKind::Node,
             ..Default::default()

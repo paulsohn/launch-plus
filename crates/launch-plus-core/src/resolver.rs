@@ -1964,7 +1964,15 @@ fn resolve_element(
             start_state,
             goal_state,
             children,
+            unknown_attrs,
         } => {
+            for attr in unknown_attrs {
+                result.errors.push(format!(
+                    "unrecognised attribute '{attr}' on <{}> — \
+                     the resolver does not support this attribute and it will be dropped",
+                    handler_kind.tag_name()
+                ));
+            }
             let resolved_target = if let Some(t) = target {
                 Some(resolve_substitutions(t, ctx)?.propagate_into(result))
             } else {
@@ -1999,8 +2007,15 @@ fn resolve_element(
                     event,
                     target_node,
                     namespace: child_ns,
+                    unknown_attrs,
                 } = child
                 {
+                    for attr in unknown_attrs {
+                        result.errors.push(format!(
+                            "unrecognised attribute '{attr}' on <emit_event> — \
+                             the resolver does not support this attribute and it will be dropped"
+                        ));
+                    }
                     let ev = resolve_substitutions(event, ctx)?.propagate_into(result);
                     let tn = if let Some(tn) = target_node {
                         Some(resolve_substitutions(tn, ctx)?.propagate_into(result))
@@ -3661,6 +3676,7 @@ fn collect_arg_var_refs_in_elem(elem: &LaunchElement, refs: &mut HashSet<String>
             event,
             target_node,
             namespace,
+            ..
         } => {
             scan_str_for_arg_var_refs(event, refs);
             if let Some(s) = target_node {
@@ -3985,6 +4001,7 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
             event,
             target_node,
             namespace,
+            ..
         } => {
             scan_str_for_env_no_fallback(event, names);
             if let Some(s) = target_node {

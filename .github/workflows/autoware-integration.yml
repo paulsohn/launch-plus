@@ -53,4 +53,4 @@ jobs:
         shell: bash
         run: |
           source /opt/ros/jazzy/setup.bash
-          bash test-autoware.sh -c
+          bash test-autoware.sh

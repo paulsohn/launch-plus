@@ -256,6 +256,7 @@ pub fn resolve_launch_recursive(
     let mut result = ResolveResult::new();
     result.initial_args = initial_args.clone();
     let mut fetched_packages: HashSet<String> = HashSet::new();
+    let mut failed_repos: HashSet<String> = HashSet::new();
 
     // Warn early if ROS_DISTRO is not set — many fallbacks depend on it.
     if std::env::var("ROS_DISTRO")
@@ -283,6 +284,7 @@ pub fn resolve_launch_recursive(
         &HashMap::new(), // persisted_arg_context: empty at root
         &mut result,
         &mut fetched_packages,
+        &mut failed_repos,
         vec![], // parent_chain: empty Vec<(String, PathBuf)> for root
     );
 
@@ -580,6 +582,7 @@ fn ensure_package_fetched(
     options: &FetchOptions,
     result: &mut ResolveResult,
     fetched_packages: &mut HashSet<String>,
+    failed_repos: &mut HashSet<String>,
 ) -> bool {
     // Already fetched in this session
     if fetched_packages.contains(package) {
@@ -592,9 +595,26 @@ fn ensure_package_fetched(
         return false;
     };
 
-    // Check if already on disk
+    // Fail fast: if a previous fetch for a sibling package in the same repo
+    // already failed (e.g. Default mode verification error), skip silently.
+    if failed_repos.contains(&pkg_lock.repo) {
+        return false;
+    }
+
+    // Check if already on disk.
+    // In clean/default mode, we still need to call fetch_packages so that the
+    // repository state is verified (default) or reset (clean) — unless the repo
+    // has already been verified/reset for a sibling package in this session.
     let pkg_path = fetch_dir.join(&pkg_lock.repo).join(&pkg_lock.path);
-    if pkg_path.exists() && pkg_path.join("package.xml").exists() {
+    let repo_already_handled = options.workspace_state != crate::fetcher::WorkspaceState::Dirty
+        && fetched_packages
+            .iter()
+            .any(|p| lockfile.packages.get(p).map(|l| &l.repo) == Some(&pkg_lock.repo));
+    if pkg_path.exists()
+        && pkg_path.join("package.xml").exists()
+        && (options.workspace_state == crate::fetcher::WorkspaceState::Dirty
+            || repo_already_handled)
+    {
         debug!(
             "Package {} already fetched at {}",
             package,
@@ -614,6 +634,7 @@ fn ensure_package_fetched(
         }
         Err(e) => {
             result.add_error(format!("failed to fetch package '{}': {}", package, e));
+            failed_repos.insert(pkg_lock.repo.clone());
             false
         }
     }
@@ -941,6 +962,7 @@ fn process_parsed_file(
     locator: &PackageLocator,
     fetch_dir: &Path,
     fetched_packages: &mut HashSet<String>,
+    failed_repos: &mut HashSet<String>,
     workflow_options: &ResolveWorkflowOptions,
     options: &FetchOptions,
 ) {
@@ -1053,6 +1075,7 @@ fn process_parsed_file(
             &next_persisted,
             result,
             fetched_packages,
+            failed_repos,
             current_chain.to_vec(),
         );
 
@@ -1124,6 +1147,7 @@ fn resolve_python_file_recursive(
     persisted_arg_context: &HashMap<String, String>,
     result: &mut ResolveResult,
     fetched_packages: &mut HashSet<String>,
+    failed_repos: &mut HashSet<String>,
     parent_chain: Vec<(String, PathBuf)>,
 ) {
     // Resolve the file path based on mode (same logic as XML resolver).
@@ -1136,6 +1160,7 @@ fn resolve_python_file_recursive(
                 options,
                 result,
                 fetched_packages,
+                failed_repos,
             ) {
                 return;
             }
@@ -1259,6 +1284,7 @@ fn resolve_python_file_recursive(
                     options,
                     result,
                     fetched_packages,
+                    failed_repos,
                 ) {
                     any_fetched = true;
                 }
@@ -1332,6 +1358,7 @@ fn resolve_python_file_recursive(
         locator,
         fetch_dir,
         fetched_packages,
+        failed_repos,
         workflow_options,
         options,
     );
@@ -1353,6 +1380,7 @@ fn resolve_file_recursive(
     persisted_arg_context: &HashMap<String, String>,
     result: &mut ResolveResult,
     fetched_packages: &mut HashSet<String>,
+    failed_repos: &mut HashSet<String>,
     parent_chain: Vec<(String, PathBuf)>,
 ) {
     // Cycle detection: if this exact file already appears anywhere in the current
@@ -1394,6 +1422,7 @@ fn resolve_file_recursive(
             persisted_arg_context,
             result,
             fetched_packages,
+            failed_repos,
             parent_chain,
         );
         return;
@@ -1421,6 +1450,7 @@ fn resolve_file_recursive(
                 options,
                 result,
                 fetched_packages,
+                failed_repos,
             ) {
                 return;
             }
@@ -1674,6 +1704,7 @@ fn resolve_file_recursive(
         locator,
         fetch_dir,
         fetched_packages,
+        failed_repos,
         workflow_options,
         options,
     );

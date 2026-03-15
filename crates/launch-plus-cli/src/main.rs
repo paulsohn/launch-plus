@@ -296,14 +296,17 @@ enum Commands {
         warn_all: bool,
 
         /// Reset every repository to the pinned lockfile SHA before resolving.
-        /// Local modifications are discarded.  Guarantees reproducible output.
-        /// Exactly one of --clean or --dirty must be specified.
+        /// Dirty working trees are stashed automatically (dirty submodules
+        /// are discarded).  Guarantees reproducible output.
+        /// Without --clean or --dirty, launch-plus
+        /// verifies SHA and working tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use the current on-disk state without any git operations.
+        /// Use the current on-disk state without modifying existing repos.
         /// Only fetches repositories that are completely missing from disk.
-        /// Exactly one of --clean or --dirty must be specified.
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
         dirty: bool,
 
@@ -338,11 +341,15 @@ enum Commands {
         #[arg(long, default_value = "src")]
         src: String,
 
-        /// Use clean workspace state (reset to lockfile SHAs)
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically; dirty submodules are discarded).
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use dirty workspace state (skip re-checkout of existing repos)
+        /// Use the current on-disk state without modifying existing repos.
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
         dirty: bool,
 
@@ -429,11 +436,15 @@ enum Commands {
         #[arg(long, default_value = "src")]
         src: String,
 
-        /// Use clean workspace state (reset to lockfile SHAs)
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically; dirty submodules are discarded).
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use dirty workspace state (skip re-checkout of existing repos)
+        /// Use the current on-disk state without modifying existing repos.
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
         dirty: bool,
 
@@ -487,11 +498,15 @@ enum Commands {
         #[arg(long, default_value = "src")]
         src: String,
 
-        /// Use clean workspace state (reset to lockfile SHAs)
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically; dirty submodules are discarded).
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use dirty workspace state (skip re-checkout of existing repos)
+        /// Use the current on-disk state without modifying existing repos.
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
         dirty: bool,
 
@@ -622,15 +637,15 @@ enum Commands {
         #[arg(long)]
         warn_all: bool,
 
-        /// Reset every repository to the pinned lockfile SHA before checking.
-        /// Local modifications are discarded.  Guarantees reproducible output.
-        /// Exactly one of --clean or --dirty must be specified.
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically; dirty submodules are discarded).
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use the current on-disk state without any git operations.
-        /// Only fetches repositories that are completely missing from disk.
-        /// Exactly one of --clean or --dirty must be specified.
+        /// Use the current on-disk state without modifying existing repos.
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
         dirty: bool,
 
@@ -1407,20 +1422,16 @@ fn parse_launch_args(args: &[String]) -> Result<std::collections::HashMap<String
     Ok(map)
 }
 
-/// Validate that exactly one of `--clean` / `--dirty` is set, returning the
-/// corresponding [`WorkspaceState`].  Emits a user-friendly error when neither
-/// flag is given (clap already prevents both being set via `conflicts_with`).
+/// Map `--clean` / `--dirty` flags to [`WorkspaceState`].
+///
+/// When neither flag is given, returns [`WorkspaceState::Default`] which
+/// verifies each repository matches the lockfile SHA and has a clean working
+/// tree, erroring out if either check fails.
 fn parse_workspace_state(clean: bool, dirty: bool) -> Result<WorkspaceState> {
     match (clean, dirty) {
         (true, false) => Ok(WorkspaceState::Clean),
         (false, true) => Ok(WorkspaceState::Dirty),
-        (false, false) => {
-            anyhow::bail!(
-                "specify how to treat the source workspace:\n  \
-                 -c, --clean   reset each repository to the pinned lockfile SHA\n  \
-                 -d, --dirty   use the current on-disk state without any git operations"
-            );
-        }
+        (false, false) => Ok(WorkspaceState::Default),
         (true, true) => unreachable!("clap conflicts_with prevents --clean and --dirty together"),
     }
 }

@@ -24,12 +24,21 @@ pub struct FetchedPackage {
 /// Controls how the fetcher treats an already-present source workspace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorkspaceState {
-    /// Reset every repository to the pinned lockfile SHA, discarding any local
-    /// modifications (`git checkout -f <sha>`).  Guarantees reproducibility.
+    /// Reset every repository to the pinned lockfile SHA.  If the working tree
+    /// is dirty (including untracked files), changes are automatically stashed
+    /// before checkout.  Note: `git stash` does not cover submodules — any
+    /// dirty submodules are force-reset to the committed state (their local
+    /// changes are **discarded**, not stashed).  Guarantees reproducibility.
     Clean,
-    /// Trust whatever is currently on disk.  Repositories that already exist are
-    /// not touched by any git operation.  Only missing repos are cloned fresh.
+    /// Trust whatever is currently on disk.  Existing repositories are not
+    /// modified (read-only git commands may still run for diagnostics).
+    /// Only missing repos are cloned fresh.
     Dirty,
+    /// Verify that each existing repository matches the lockfile SHA and has a
+    /// clean working tree.  If either check fails, error out and ask the user
+    /// to explicitly choose `--clean` or `--dirty`.  Missing repos are cloned
+    /// fresh (same as the other modes).
+    Default,
 }
 
 /// Options for fetching packages
@@ -48,7 +57,7 @@ impl Default for FetchOptions {
         Self {
             recurse_submodules: true,
             shallow: false,
-            workspace_state: WorkspaceState::Clean,
+            workspace_state: WorkspaceState::Default,
         }
     }
 }
@@ -197,15 +206,34 @@ fn fetch_repo_sparse(
     options: &FetchOptions,
 ) -> crate::Result<()> {
     if repo_dir.exists() && repo_dir.join(".git").exists() {
-        if options.workspace_state == WorkspaceState::Dirty {
-            // Dirty mode: never touch existing repos — use whatever is on disk.
-            debug!(
-                "Skipping git operations for {} (--dirty)",
-                repo_dir.display()
-            );
-        } else {
-            // Clean mode: reset to pinned SHA.
-            update_sparse_checkout(repo_dir, sha, paths, options)?;
+        match options.workspace_state {
+            WorkspaceState::Dirty => {
+                // Dirty mode: never touch existing repos — use whatever is on disk.
+                // Log the current state so the user knows what they're getting.
+                if let Ok(Some(description)) = describe_repo_state(repo_dir, sha) {
+                    info!(
+                        "Using as-is (--dirty) {} :\n  {}",
+                        repo_dir.display(),
+                        description,
+                    );
+                } else {
+                    debug!(
+                        "Skipping git operations for {} (--dirty)",
+                        repo_dir.display()
+                    );
+                }
+            }
+            WorkspaceState::Default => {
+                // Default mode: verify SHA + clean working tree, error if mismatch.
+                verify_repo_state(repo_dir, sha)?;
+                // Verification passed — add any new sparse-checkout paths without
+                // resetting the working tree.
+                add_sparse_paths_if_needed(repo_dir, paths)?;
+            }
+            WorkspaceState::Clean => {
+                // Clean mode: reset to pinned SHA (with auto-stash).
+                update_sparse_checkout(repo_dir, sha, paths, options)?;
+            }
         }
     } else {
         // New repository, do sparse clone (workspace_state doesn't apply — nothing on disk yet).
@@ -299,19 +327,19 @@ fn update_sparse_checkout(
     if !sparse_enabled {
         let current_sha = get_current_sha(repo_dir).unwrap_or_default();
         if !current_sha.is_empty() {
-            if options.workspace_state != WorkspaceState::Clean {
-                // Dirty/default mode: leave the working tree untouched.
-                // Sparse-checkout disabled usually means the user set up a full clone
-                // for local development.
+            if options.workspace_state == WorkspaceState::Dirty {
+                // Dirty mode: leave the working tree untouched.
                 debug!(
-                    "Sparse-checkout disabled in {} (current SHA {}), skipping (local development)",
+                    "Sparse-checkout disabled in {} (current SHA {}), skipping (--dirty)",
                     repo_dir.display(),
                     &current_sha[..current_sha.len().min(8)],
                 );
                 return Ok(());
             }
             // Clean mode: reset to the pinned SHA even for non-sparse repos.
-            if current_sha != sha {
+            // Also stash + re-checkout if the tree is dirty (even at the correct SHA).
+            let need_checkout = current_sha != sha || is_working_tree_dirty(repo_dir)?;
+            if need_checkout {
                 info!(
                     "Clean mode: resetting {} from {} to {}",
                     repo_dir.display(),
@@ -352,11 +380,14 @@ fn update_sparse_checkout(
         add_sparse_checkout_paths(repo_dir, &paths_to_add)?;
     }
 
-    // Checkout if the SHA has changed or new paths were added.
-    // In clean mode, checkout uses -f to reset dirty files.
-    // If SHA already matches and no new paths were added, skip the checkout
-    // regardless of mode — the working tree content is already correct.
-    if !sha_matches || !paths_to_add.is_empty() {
+    // Checkout when: SHA changed, new paths added, or clean mode with dirty tree.
+    // Clean mode must guarantee a clean working tree, so even at the correct SHA
+    // we stash + re-checkout if the tree is dirty.
+    let need_checkout = !sha_matches
+        || !paths_to_add.is_empty()
+        || (options.workspace_state == WorkspaceState::Clean && is_working_tree_dirty(repo_dir)?);
+
+    if need_checkout {
         checkout_sha(repo_dir, sha, options)?;
     } else {
         debug!(
@@ -491,33 +522,233 @@ fn get_sparse_checkout_paths(repo_dir: &Path) -> crate::Result<Vec<String>> {
     Ok(stdout.lines().map(|s| s.to_string()).collect())
 }
 
-/// Checkout a specific SHA
-fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Result<()> {
-    // Fetch the SHA
-    let mut fetch_args = vec!["fetch", "origin", sha];
-    if options.shallow {
-        fetch_args.insert(1, "--depth=1");
+/// Check if the working tree has uncommitted changes (staged, unstaged, or untracked files).
+fn is_working_tree_dirty(repo_dir: &Path) -> crate::Result<bool> {
+    let output = Command::new("git")
+        .current_dir(repo_dir)
+        .args(["status", "--porcelain"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| crate::Error::Git(format!("failed to run git status: {}", e)))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(crate::Error::Git(format!(
+            "git status failed in {}: {}",
+            repo_dir.display(),
+            stderr.trim()
+        )));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(!stdout.trim().is_empty())
+}
+
+/// Describe the current state of a repository for diagnostics.
+/// Returns `None` if the repo is at the expected SHA with a clean tree.
+fn describe_repo_state(repo_dir: &Path, expected_sha: &str) -> crate::Result<Option<String>> {
+    let current_sha = get_current_sha(repo_dir)?;
+    let sha_matches = current_sha == expected_sha;
+    let dirty = is_working_tree_dirty(repo_dir)?;
+
+    if sha_matches && !dirty {
+        return Ok(None);
+    }
+
+    let mut reasons = Vec::new();
+    if !sha_matches {
+        reasons.push(format!(
+            "SHA mismatch: expected {} but found {}",
+            &expected_sha[..expected_sha.len().min(12)],
+            &current_sha[..current_sha.len().min(12)],
+        ));
+    }
+    if dirty {
+        // Capture the actual dirty files for diagnostics.
+        let status_detail = Command::new("git")
+            .current_dir(repo_dir)
+            .args(["status", "--porcelain"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .ok()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+
+        if status_detail.is_empty() {
+            reasons.push("working tree has uncommitted changes".to_string());
+        } else {
+            let lines: Vec<&str> = status_detail.lines().collect();
+            let shown = if lines.len() > 20 {
+                format!(
+                    "{}\n    ... and {} more files",
+                    lines[..20].join("\n    "),
+                    lines.len() - 20
+                )
+            } else {
+                lines.join("\n    ")
+            };
+            reasons.push(format!(
+                "working tree has uncommitted changes:\n    {shown}"
+            ));
+        }
+    }
+
+    Ok(Some(format!(
+        "HEAD is at {}\n  {}",
+        &current_sha[..current_sha.len().min(12)],
+        reasons.join("\n  "),
+    )))
+}
+
+/// Default mode: verify that the repo is at the expected SHA and has a clean
+/// working tree.  Returns an error with actionable guidance if either check fails.
+fn verify_repo_state(repo_dir: &Path, expected_sha: &str) -> crate::Result<()> {
+    let Some(description) = describe_repo_state(repo_dir, expected_sha)? else {
+        return Ok(());
+    };
+
+    let repo_name = repo_dir.file_name().unwrap_or_default().to_string_lossy();
+
+    Err(crate::Error::Git(format!(
+        "repository '{}' at {} is not in the expected state:\n  {}\n\n\
+         Specify how to proceed:\n  \
+         -c, --clean   reset to the lockfile SHA (local changes are stashed; \
+dirty submodules are discarded)\n  \
+         -d, --dirty   use the current on-disk state as-is",
+        repo_name,
+        repo_dir.display(),
+        description,
+    )))
+}
+
+/// Add sparse-checkout paths without touching the working tree or SHA.
+/// Used by Default mode after verification passes.
+fn add_sparse_paths_if_needed(repo_dir: &Path, paths: &[&str]) -> crate::Result<()> {
+    if !is_sparse_checkout_enabled(repo_dir) {
+        return Ok(());
+    }
+
+    let current_paths = get_sparse_checkout_paths(repo_dir)?;
+    let new_paths: BTreeSet<&str> = paths.iter().copied().collect();
+    let current_set: BTreeSet<&str> = current_paths.iter().map(|s| s.as_str()).collect();
+    let paths_to_add: Vec<&str> = new_paths.difference(&current_set).copied().collect();
+
+    if !paths_to_add.is_empty() {
+        info!("Adding paths to sparse-checkout: {:?}", paths_to_add);
+        add_sparse_checkout_paths(repo_dir, &paths_to_add)?;
+
+        // Reapply sparse-checkout to materialize the newly added paths
+        // without detaching HEAD or changing the checked-out commit.
+        let output = Command::new("git")
+            .current_dir(repo_dir)
+            .args(["sparse-checkout", "reapply"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| {
+                crate::Error::Git(format!("failed to run git sparse-checkout reapply: {}", e))
+            })?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(crate::Error::Git(format!(
+                "git sparse-checkout reapply failed: {}",
+                stderr.trim()
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+/// Stash any uncommitted changes in the working tree.
+/// Returns `true` if a stash was created, `false` if the tree was already clean.
+fn stash_if_dirty(repo_dir: &Path, expected_sha: &str) -> crate::Result<bool> {
+    if !is_working_tree_dirty(repo_dir)? {
+        return Ok(false);
+    }
+
+    // Log what we're about to stash.
+    // Note: git stash does not cover submodules — any dirty submodules will be
+    // force-reset by `git submodule update --force`.
+    if let Ok(Some(description)) = describe_repo_state(repo_dir, expected_sha) {
+        info!(
+            "Stashing changes in {} (clean mode; any dirty submodules will be \
+             discarded):\n  {}",
+            repo_dir.display(),
+            description,
+        );
+    } else {
+        info!(
+            "Stashing changes in {} before clean checkout \
+             (any dirty submodules will be discarded)",
+            repo_dir.display()
+        );
     }
 
     let output = Command::new("git")
         .current_dir(repo_dir)
-        .args(&fetch_args)
+        .args([
+            "stash",
+            "push",
+            "--include-untracked",
+            "-m",
+            "launch-plus auto-stash before clean checkout",
+        ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
-        .map_err(|e| crate::Error::Git(format!("failed to run git fetch: {}", e)))?;
+        .map_err(|e| crate::Error::Git(format!("failed to run git stash: {}", e)))?;
 
     if !output.status.success() {
-        // Check if the SHA is already available locally before treating as an error.
-        let have_it = Command::new("git")
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(crate::Error::Git(format!(
+            "git stash failed in {}: {}",
+            repo_dir.display(),
+            stderr.trim()
+        )));
+    }
+
+    info!("Changes stashed successfully");
+    Ok(true)
+}
+
+/// Checkout a specific SHA
+fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Result<()> {
+    // In clean mode, stash dirty changes first — before any other git operations.
+    if options.workspace_state == WorkspaceState::Clean {
+        stash_if_dirty(repo_dir, sha)?;
+    }
+
+    // Check if the SHA is already available locally before fetching.
+    let have_locally = Command::new("git")
+        .current_dir(repo_dir)
+        .args(["cat-file", "-t", sha])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if have_locally {
+        debug!("SHA {} already available locally, skipping fetch", sha);
+    } else {
+        let mut fetch_args = vec!["fetch", "origin", sha];
+        if options.shallow {
+            fetch_args.insert(1, "--depth=1");
+        }
+
+        let output = Command::new("git")
             .current_dir(repo_dir)
-            .args(["cat-file", "-t", sha])
+            .args(&fetch_args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        if !have_it {
+            .map_err(|e| crate::Error::Git(format!("failed to run git fetch: {}", e)))?;
+
+        if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(crate::Error::Git(format!(
                 "git fetch of {} failed and commit is not available locally: {}",
@@ -525,18 +756,9 @@ fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Re
                 stderr.trim()
             )));
         }
-        debug!(
-            "git fetch {} failed but commit is already available locally",
-            sha
-        );
     }
 
-    // Checkout the SHA.  In Clean mode use -f to discard local modifications.
-    let checkout_args: &[&str] = if options.workspace_state == WorkspaceState::Clean {
-        &["checkout", "-f", sha]
-    } else {
-        &["checkout", sha]
-    };
+    let checkout_args: &[&str] = &["checkout", sha];
     let output = Command::new("git")
         .current_dir(repo_dir)
         .args(checkout_args)
@@ -553,12 +775,18 @@ fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Re
         )));
     }
 
-    // Update submodules if requested
+    // Update submodules if requested.
+    // In clean mode, use --force to reset dirty submodules (stash_if_dirty only
+    // handles the superproject; git stash does not cover submodule changes).
     if options.recurse_submodules {
+        let mut sub_args = vec!["submodule", "update", "--init", "--recursive", "--depth=1"];
+        if options.workspace_state == WorkspaceState::Clean {
+            sub_args.push("--force");
+        }
         debug!("Updating submodules...");
         match Command::new("git")
             .current_dir(repo_dir)
-            .args(["submodule", "update", "--init", "--recursive", "--depth=1"])
+            .args(&sub_args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -604,11 +832,204 @@ pub fn get_package_path(pkg_name: &str, lockfile: &Lockfile, fetch_dir: &Path) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    /// Create a temporary git repo with one commit, return (TempDir, sha).
+    fn setup_test_repo() -> (tempfile::TempDir, String) {
+        let dir = tempfile::tempdir().unwrap();
+        let run = |args: &[&str]| {
+            let output = Command::new("git")
+                .current_dir(dir.path())
+                .args(args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "git {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        run(&["init", "-b", "main"]);
+        run(&["config", "user.email", "test@test.com"]);
+        run(&["config", "user.name", "Test"]);
+        run(&["config", "commit.gpgsign", "false"]);
+        fs::write(dir.path().join("file.txt"), "hello").unwrap();
+        run(&["add", "."]);
+        run(&["commit", "-m", "initial"]);
+        let sha = get_current_sha(dir.path()).unwrap();
+        (dir, sha)
+    }
+
+    /// Add a second commit to the repo, return the new SHA.
+    fn add_commit(dir: &Path, filename: &str, content: &str) -> String {
+        fs::write(dir.join(filename), content).unwrap();
+        let run = |args: &[&str]| {
+            let output = Command::new("git")
+                .current_dir(dir)
+                .args(args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+        };
+        run(&["add", "."]);
+        run(&["commit", "-m", &format!("add {filename}")]);
+        get_current_sha(dir).unwrap()
+    }
 
     #[test]
     fn test_fetch_options_default() {
         let options = FetchOptions::default();
         assert!(options.recurse_submodules);
         assert!(!options.shallow);
+        assert_eq!(options.workspace_state, WorkspaceState::Default);
+    }
+
+    // ── is_working_tree_dirty ────────────────────────────────────────────
+
+    #[test]
+    fn test_clean_tree_is_not_dirty() {
+        let (dir, _) = setup_test_repo();
+        assert!(!is_working_tree_dirty(dir.path()).unwrap());
+    }
+
+    #[test]
+    fn test_modified_file_is_dirty() {
+        let (dir, _) = setup_test_repo();
+        fs::write(dir.path().join("file.txt"), "modified").unwrap();
+        assert!(is_working_tree_dirty(dir.path()).unwrap());
+    }
+
+    #[test]
+    fn test_staged_file_is_dirty() {
+        let (dir, _) = setup_test_repo();
+        fs::write(dir.path().join("file.txt"), "staged").unwrap();
+        Command::new("git")
+            .current_dir(dir.path())
+            .args(["add", "file.txt"])
+            .output()
+            .unwrap();
+        assert!(is_working_tree_dirty(dir.path()).unwrap());
+    }
+
+    #[test]
+    fn test_untracked_file_is_dirty() {
+        let (dir, _) = setup_test_repo();
+        fs::write(dir.path().join("new.txt"), "untracked").unwrap();
+        assert!(is_working_tree_dirty(dir.path()).unwrap());
+    }
+
+    // ── verify_repo_state ────────────────────────────────────────────────
+
+    #[test]
+    fn test_verify_repo_state_ok() {
+        let (dir, sha) = setup_test_repo();
+        assert!(verify_repo_state(dir.path(), &sha).is_ok());
+    }
+
+    #[test]
+    fn test_verify_repo_state_sha_mismatch() {
+        let (dir, _) = setup_test_repo();
+        let err =
+            verify_repo_state(dir.path(), "0000000000000000000000000000000000000000").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("SHA mismatch"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn test_verify_repo_state_dirty_tree() {
+        let (dir, sha) = setup_test_repo();
+        fs::write(dir.path().join("file.txt"), "dirty").unwrap();
+        let err = verify_repo_state(dir.path(), &sha).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("uncommitted changes"),
+            "unexpected error: {msg}"
+        );
+        assert!(msg.contains("file.txt"), "should list dirty file: {msg}");
+        assert!(msg.contains("HEAD is at"), "should show HEAD SHA: {msg}");
+    }
+
+    #[test]
+    fn test_verify_repo_state_both_wrong() {
+        let (dir, _) = setup_test_repo();
+        fs::write(dir.path().join("file.txt"), "dirty").unwrap();
+        let err =
+            verify_repo_state(dir.path(), "0000000000000000000000000000000000000000").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("SHA mismatch"), "missing SHA mismatch: {msg}");
+        assert!(
+            msg.contains("uncommitted changes"),
+            "missing dirty warning: {msg}"
+        );
+    }
+
+    // ── stash_if_dirty ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_stash_clean_tree_returns_false() {
+        let (dir, sha) = setup_test_repo();
+        assert!(!stash_if_dirty(dir.path(), &sha).unwrap());
+    }
+
+    #[test]
+    fn test_stash_modified_file() {
+        let (dir, sha) = setup_test_repo();
+        fs::write(dir.path().join("file.txt"), "dirty").unwrap();
+        assert!(stash_if_dirty(dir.path(), &sha).unwrap());
+        assert!(!is_working_tree_dirty(dir.path()).unwrap());
+        // Original content restored
+        assert_eq!(
+            fs::read_to_string(dir.path().join("file.txt")).unwrap(),
+            "hello"
+        );
+    }
+
+    #[test]
+    fn test_stash_untracked_file() {
+        let (dir, sha) = setup_test_repo();
+        fs::write(dir.path().join("new.txt"), "untracked").unwrap();
+        assert!(stash_if_dirty(dir.path(), &sha).unwrap());
+        assert!(!is_working_tree_dirty(dir.path()).unwrap());
+        assert!(!dir.path().join("new.txt").exists());
+    }
+
+    // ── checkout_sha ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_checkout_sha_local() {
+        let (dir, sha1) = setup_test_repo();
+        let _sha2 = add_commit(dir.path(), "second.txt", "world");
+
+        // Checkout back to sha1 — SHA is local so no fetch needed.
+        let options = FetchOptions {
+            workspace_state: WorkspaceState::Dirty,
+            ..Default::default()
+        };
+        checkout_sha(dir.path(), &sha1, &options).unwrap();
+        assert_eq!(get_current_sha(dir.path()).unwrap(), sha1);
+    }
+
+    #[test]
+    fn test_checkout_sha_clean_mode_stashes_first() {
+        let (dir, sha1) = setup_test_repo();
+        let _sha2 = add_commit(dir.path(), "second.txt", "world");
+
+        // Make the tree dirty at sha2
+        fs::write(dir.path().join("second.txt"), "modified").unwrap();
+        assert!(is_working_tree_dirty(dir.path()).unwrap());
+
+        // Clean mode: should stash, then checkout to sha1
+        let options = FetchOptions {
+            workspace_state: WorkspaceState::Clean,
+            ..Default::default()
+        };
+        checkout_sha(dir.path(), &sha1, &options).unwrap();
+        assert_eq!(get_current_sha(dir.path()).unwrap(), sha1);
+        assert!(!is_working_tree_dirty(dir.path()).unwrap());
     }
 }

@@ -2023,6 +2023,7 @@ fn resolve_element(
             }
 
             result.nodes.push(ResolvedNode {
+                namespace_stack: ctx.namespace_stack.clone(),
                 kind: NodeKind::EventHandler {
                     handler_kind: *handler_kind,
                     target: resolved_target,
@@ -2037,8 +2038,13 @@ fn resolve_element(
         }
 
         LaunchElement::EmitEvent { .. } => {
-            // EmitEvent outside of an EventHandler — ignore silently.
+            // EmitEvent outside of an EventHandler — warn and skip.
             // Valid only as a child of EventHandler (handled inline above).
+            result.warnings.push(
+                "<emit_event> outside of an event handler has no effect; \
+                 wrap it in <on_process_start>, <on_process_exit>, etc."
+                    .to_string(),
+            );
         }
 
         LaunchElement::SetEnv {
@@ -3617,13 +3623,46 @@ fn collect_arg_var_refs_in_elem(elem: &LaunchElement, refs: &mut HashSet<String>
                 scan_str_for_arg_var_refs(&e.value, refs);
             }
         }
-        LaunchElement::EventHandler { children, .. } => {
+        LaunchElement::EventHandler {
+            target,
+            target_node,
+            namespace,
+            start_state,
+            goal_state,
+            children,
+            ..
+        } => {
+            if let Some(s) = target {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            if let Some(s) = target_node {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            if let Some(s) = namespace {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            if let Some(s) = start_state {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            if let Some(s) = goal_state {
+                scan_str_for_arg_var_refs(s, refs);
+            }
             for child in children {
                 collect_arg_var_refs_in_elem(child, refs);
             }
         }
-        LaunchElement::EmitEvent { event, .. } => {
+        LaunchElement::EmitEvent {
+            event,
+            target_node,
+            namespace,
+        } => {
             scan_str_for_arg_var_refs(event, refs);
+            if let Some(s) = target_node {
+                scan_str_for_arg_var_refs(s, refs);
+            }
+            if let Some(s) = namespace {
+                scan_str_for_arg_var_refs(s, refs);
+            }
         }
     }
 }
@@ -3908,13 +3947,46 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
                 scan_str_for_env_no_fallback(&e.value, names);
             }
         }
-        LaunchElement::EventHandler { children, .. } => {
+        LaunchElement::EventHandler {
+            target,
+            target_node,
+            namespace,
+            start_state,
+            goal_state,
+            children,
+            ..
+        } => {
+            if let Some(s) = target {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            if let Some(s) = target_node {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            if let Some(s) = namespace {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            if let Some(s) = start_state {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            if let Some(s) = goal_state {
+                scan_str_for_env_no_fallback(s, names);
+            }
             for child in children {
                 collect_env_no_fallback_in_elem(child, names);
             }
         }
-        LaunchElement::EmitEvent { event, .. } => {
+        LaunchElement::EmitEvent {
+            event,
+            target_node,
+            namespace,
+        } => {
             scan_str_for_env_no_fallback(event, names);
+            if let Some(s) = target_node {
+                scan_str_for_env_no_fallback(s, names);
+            }
+            if let Some(s) = namespace {
+                scan_str_for_env_no_fallback(s, names);
+            }
         }
     }
 }

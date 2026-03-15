@@ -804,6 +804,8 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
             })
             .collect();
         nodes.push(ResolvedNode {
+            namespace_stack: eh.namespace_stack.clone(),
+            explicit_namespace: eh.explicit_namespace.clone(),
             kind: NodeKind::EventHandler {
                 handler_kind,
                 target: eh.target.clone(),
@@ -893,8 +895,8 @@ fn apply_parent_namespace(parent_stack: &[String], node: &mut ResolvedNode) {
         ..
     } = node.kind
     {
-        // Event handler namespace = effective from combined stack (no explicit ns attr).
-        *namespace = effective_namespace(&node.namespace_stack, None);
+        // Recompute event handler namespace from combined stack + explicit namespace.
+        *namespace = effective_namespace(&node.namespace_stack, node.explicit_namespace.as_deref());
         let handler_ns = namespace.clone();
         for action in actions {
             match action {

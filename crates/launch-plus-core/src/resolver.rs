@@ -1975,11 +1975,13 @@ fn resolve_element(
             } else {
                 None
             };
-            let resolved_ns = if let Some(ns) = namespace {
+            let handler_explicit_ns = if let Some(ns) = namespace {
                 Some(resolve_substitutions(ns, ctx)?.propagate_into(result))
             } else {
                 None
             };
+            let handler_effective_ns =
+                effective_namespace(&ctx.namespace_stack, handler_explicit_ns.as_deref());
             let resolved_start = if let Some(s) = start_state {
                 Some(resolve_substitutions(s, ctx)?.propagate_into(result))
             } else {
@@ -2005,10 +2007,12 @@ fn resolve_element(
                     } else {
                         None
                     };
+                    // If emit_event has an explicit namespace=, use it; otherwise
+                    // inherit the handler's effective namespace.
                     let cn = if let Some(ns) = child_ns {
                         Some(resolve_substitutions(ns, ctx)?.propagate_into(result))
                     } else {
-                        None
+                        handler_effective_ns.clone()
                     };
                     actions.push(ResolvedEventAction::EmitEvent {
                         event: ev,
@@ -2024,11 +2028,12 @@ fn resolve_element(
 
             result.nodes.push(ResolvedNode {
                 namespace_stack: ctx.namespace_stack.clone(),
+                explicit_namespace: handler_explicit_ns,
                 kind: NodeKind::EventHandler {
                     handler_kind: *handler_kind,
                     target: resolved_target,
                     target_node: resolved_target_node,
-                    namespace: resolved_ns,
+                    namespace: handler_effective_ns,
                     start_state: resolved_start,
                     goal_state: resolved_goal,
                     actions,

@@ -129,14 +129,18 @@ fn parse_rosdep_resolve(stdout: &str, keys: &[&str]) -> crate::Result<ResolvedDe
     // Single-key format: no #ROSDEP[...] headers
     if keys.len() == 1 && !lines[0].starts_with("#ROSDEP[") {
         let mut installer: Option<&str> = None;
+        let mut has_supported = false;
         for line in &lines {
             if let Some(inst) = line.strip_prefix('#') {
                 installer = Some(inst);
+                if is_supported_installer(inst) {
+                    has_supported = true;
+                }
             } else if let Some(inst) = installer {
                 collect_packages(&mut result, inst, line);
             }
         }
-        if installer.is_none() {
+        if !has_supported {
             result.unresolved.push(keys[0].to_string());
         }
         return Ok(result);
@@ -163,7 +167,9 @@ fn parse_rosdep_resolve(stdout: &str, keys: &[&str]) -> crate::Result<ResolvedDe
             installer = None;
         } else if let Some(inst) = line.strip_prefix('#') {
             installer = Some(inst);
-            current_key_has_installer = true;
+            if is_supported_installer(inst) {
+                current_key_has_installer = true;
+            }
         } else if let Some(inst) = installer {
             collect_packages(&mut result, inst, line);
         }
@@ -185,15 +191,21 @@ fn parse_rosdep_resolve(stdout: &str, keys: &[&str]) -> crate::Result<ResolvedDe
     Ok(result)
 }
 
+/// Returns `true` if the installer is supported (`apt` or `pip`).
+fn is_supported_installer(installer: &str) -> bool {
+    matches!(installer, "apt" | "pip")
+}
+
 /// Add space-separated package names to the appropriate installer bucket.
 ///
-/// Only `apt` and `pip` are supported.  Other installers cause an error
-/// in `rosdep_install` (the key ends up in `unresolved`).
+/// Only `apt` and `pip` are supported.  Other installers are silently
+/// skipped here; callers use [`is_supported_installer`] to decide whether
+/// to mark the key as resolved.
 fn collect_packages(result: &mut ResolvedDeps, installer: &str, packages_line: &str) {
     let target = match installer {
         "apt" => &mut result.apt,
         "pip" => &mut result.pip,
-        _other => return, // unsupported installer — key stays in `unresolved`
+        _other => return,
     };
     for pkg in packages_line.split_whitespace() {
         if !pkg.is_empty() {
@@ -414,5 +426,29 @@ libnl-3-dev libnl-genl-3-dev libnl-route-3-dev
     fn parse_empty_output() {
         let result = parse_rosdep_resolve("", &["foo", "bar"]).unwrap();
         assert_eq!(result.unresolved, vec!["foo", "bar"]);
+    }
+
+    #[test]
+    fn parse_unsupported_installer_single_key() {
+        let stdout = "#brew\nhomebrew-pkg\n";
+        let result = parse_rosdep_resolve(stdout, &["some_key"]).unwrap();
+        assert!(result.apt.is_empty());
+        assert!(result.pip.is_empty());
+        assert_eq!(result.unresolved, vec!["some_key"]);
+    }
+
+    #[test]
+    fn parse_unsupported_installer_multi_key() {
+        let stdout = "\
+#ROSDEP[rclcpp]
+#apt
+ros-jazzy-rclcpp
+#ROSDEP[brew_only]
+#brew
+homebrew-pkg
+";
+        let result = parse_rosdep_resolve(stdout, &["rclcpp", "brew_only"]).unwrap();
+        assert_eq!(result.apt, vec!["ros-jazzy-rclcpp"]);
+        assert_eq!(result.unresolved, vec!["brew_only"]);
     }
 }

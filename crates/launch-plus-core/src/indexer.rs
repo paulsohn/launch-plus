@@ -274,7 +274,10 @@ fn evaluate_condition(element: &quick_xml::events::BytesStart) -> bool {
         .flatten()
         .find(|a| a.key.as_ref() == b"condition")
     {
-        Some(attr) => String::from_utf8_lossy(&attr.value).to_string(),
+        Some(attr) => match attr.unescape_value() {
+            Ok(val) => val.into_owned(),
+            Err(_) => String::from_utf8_lossy(&attr.value).into_owned(),
+        },
         None => return true, // no condition → always include
     };
 

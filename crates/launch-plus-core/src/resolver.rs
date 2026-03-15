@@ -3147,6 +3147,7 @@ fn render_event_handler(
         EventHandlerKind::OnProcessStart => "on_process_start",
         EventHandlerKind::OnProcessExit => "on_process_exit",
         EventHandlerKind::OnStateTransition => "on_state_transition",
+        EventHandlerKind::OnShutdown => "on_shutdown",
     };
 
     let mut tag = format!("{}<{}", node_ind, tag_name);

@@ -565,12 +565,23 @@ class _TrackedOnStateTransition:
 class _TrackedOnShutdown:
     """Tracked OnShutdown event handler.
 
-    OnShutdown has no XML equivalent in ROS 2 launch XML.  Rather than
-    misrepresenting it as ``on_process_exit``, we drop it with a warning.
+    OnShutdown fires when the launch system is shutting down.  It has no
+    target process — it applies system-wide.  Rendered as ``<on_shutdown>``.
     """
     def __init__(self, on_shutdown=None, **kwargs):
         self._actions = on_shutdown or []
-        _tracked["warnings"].append("OnShutdown event handler has no XML equivalent and was dropped")
+
+    def to_event_handler(self):
+        return {
+            "handler_kind": "on_shutdown",
+            "target": None,
+            "target_node": None,
+            "start_state": None,
+            "goal_state": None,
+            "namespace_stack": [],
+            "explicit_namespace": None,
+            "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
+        }
 
 
 class _TrackedRegisterEventHandler:

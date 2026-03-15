@@ -194,6 +194,7 @@ pub enum EventHandlerKind {
     OnProcessStart,
     OnProcessExit,
     OnStateTransition,
+    OnShutdown,
 }
 
 /// Argument passed to an include
@@ -596,6 +597,19 @@ fn raw_to_launch(raw: RawElement) -> crate::Result<Option<LaunchElement>> {
                 namespace,
                 start_state,
                 goal_state,
+                children,
+            }))
+        }
+        "on_shutdown" => {
+            let namespace = raw.get("namespace");
+            let children = raw_to_launch_elements(raw.children)?;
+            Ok(Some(LaunchElement::EventHandler {
+                kind: EventHandlerKind::OnShutdown,
+                target: None,
+                target_node: None,
+                namespace,
+                start_state: None,
+                goal_state: None,
                 children,
             }))
         }

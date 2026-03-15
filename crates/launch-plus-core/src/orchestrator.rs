@@ -778,6 +778,7 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
             "on_process_start" => EventHandlerKind::OnProcessStart,
             "on_process_exit" => EventHandlerKind::OnProcessExit,
             "on_state_transition" => EventHandlerKind::OnStateTransition,
+            "on_shutdown" => EventHandlerKind::OnShutdown,
             other => {
                 tracing::warn!("unknown event handler kind from Python resolver: {other}");
                 continue;

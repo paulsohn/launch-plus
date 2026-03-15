@@ -49,6 +49,8 @@ pub struct BuildPlan {
     pub build_base: PathBuf,
     /// Colcon install prefix (`--install-base`).
     pub install_base: PathBuf,
+    /// Colcon log directory (`--log-base`).
+    pub log_base: PathBuf,
 }
 
 /// Options controlling how the build is executed.
@@ -85,6 +87,7 @@ pub fn plan_build_from_packages(
     src_dir: &Path,
     build_base: &Path,
     install_base: &Path,
+    log_base: &Path,
     fetch_options: &FetchOptions,
     test_mode: bool,
 ) -> crate::Result<BuildPlan> {
@@ -127,6 +130,7 @@ pub fn plan_build_from_packages(
         src_dir: src_dir.to_path_buf(),
         build_base: build_base.to_path_buf(),
         install_base: install_base.to_path_buf(),
+        log_base: log_base.to_path_buf(),
     })
 }
 
@@ -140,7 +144,12 @@ pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<
         return Ok(());
     }
 
-    let mut args: Vec<String> = vec!["build".to_string()];
+    // --log-base is a colcon global argument (before the verb).
+    let mut args: Vec<String> = vec![
+        "--log-base".to_string(),
+        plan.log_base.to_string_lossy().into_owned(),
+        "build".to_string(),
+    ];
 
     args.push("--base-paths".to_string());
     args.push(plan.src_dir.to_string_lossy().into_owned());

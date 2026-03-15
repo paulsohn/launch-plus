@@ -389,6 +389,10 @@ enum Commands {
         #[arg(long, default_value = "install")]
         install_base: String,
 
+        /// Colcon log directory
+        #[arg(long, default_value = "log")]
+        log_base: String,
+
         /// Path to a colcon flagfile (one token per line, # comments allowed).
         ///
         /// The file contents are inserted verbatim into `colcon build` before
@@ -459,6 +463,10 @@ enum Commands {
         /// Colcon install prefix
         #[arg(long, default_value = "install")]
         install_base: String,
+
+        /// Colcon log directory
+        #[arg(long, default_value = "log")]
+        log_base: String,
 
         /// Path to a colcon flagfile (one token per line, # comments allowed).
         /// See `build --colcon-flagfile` for details.
@@ -545,6 +553,10 @@ enum Commands {
         /// Colcon install prefix
         #[arg(long, default_value = "install")]
         install_base: String,
+
+        /// Colcon log directory
+        #[arg(long, default_value = "log")]
+        log_base: String,
 
         /// Path to a colcon flagfile (one token per line, # comments allowed).
         /// See `build --colcon-flagfile` for details.
@@ -789,6 +801,7 @@ fn main() -> Result<()> {
             rosdep,
             build_base,
             install_base,
+            log_base,
             colcon_flagfile,
             dry_run,
         } => {
@@ -818,6 +831,7 @@ fn main() -> Result<()> {
                 workflow_options,
                 &build_base,
                 &install_base,
+                &log_base,
                 BuildOptions {
                     dry_run,
                     extra_colcon_args,
@@ -836,6 +850,7 @@ fn main() -> Result<()> {
             shallow,
             build_base,
             install_base,
+            log_base,
             colcon_flagfile,
             rosdep,
             dry_run,
@@ -870,6 +885,7 @@ fn main() -> Result<()> {
                 src_path,
                 std::path::Path::new(&build_base),
                 std::path::Path::new(&install_base),
+                std::path::Path::new(&log_base),
                 &fetch_options,
                 false, // test_mode
             )?;
@@ -921,6 +937,7 @@ fn main() -> Result<()> {
             rosdep,
             build_base,
             install_base,
+            log_base,
             colcon_flagfile,
             dry_run,
         } => {
@@ -950,6 +967,7 @@ fn main() -> Result<()> {
                 workflow_options,
                 &build_base,
                 &install_base,
+                &log_base,
                 BuildOptions {
                     dry_run,
                     extra_colcon_args,
@@ -1444,7 +1462,7 @@ fn parse_workspace_state(clean: bool, dirty: bool) -> Result<WorkspaceState> {
 /// The following flags are always managed by launch-plus and must **not** appear
 /// in the flagfile (an error is returned if they do):
 /// - `--packages-*` (e.g. `--packages-select`, `--packages-up-to`, `--packages-skip`)
-/// - `--base-paths`, `--build-base`, `--install-base`
+/// - `--base-paths`, `--build-base`, `--install-base`, `--log-base`
 ///
 /// Example file:
 /// ```text
@@ -1473,6 +1491,7 @@ fn read_colcon_flagfile(path: &str) -> Result<Vec<String>> {
             || token == "--base-paths"
             || token == "--build-base"
             || token == "--install-base"
+            || token == "--log-base"
         {
             anyhow::bail!(
                 "colcon flagfile {path:?}: '{}' conflicts with a launch-plus-managed \
@@ -1497,6 +1516,7 @@ fn run_build(
     workflow_options: ResolveWorkflowOptions,
     build_base: &str,
     install_base: &str,
+    log_base: &str,
     build_options: BuildOptions,
     test_mode: bool,
     verbose: bool,
@@ -1538,6 +1558,7 @@ fn run_build(
         fetch_path,
         Path::new(build_base),
         Path::new(install_base),
+        Path::new(log_base),
         &fetch_options,
         test_mode,
     )

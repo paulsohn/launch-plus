@@ -11,8 +11,10 @@
 //! use case of installing an explicit set of rosdep keys extracted from the
 //! dependency graph.
 //!
-//! Only `#apt` and `#pip` installers are supported.  Keys that resolve to
-//! other installers (e.g. `#brew`) are treated as unresolved.
+//! Only `#apt` and `#pip` installers are supported.  Keys that resolve
+//! *exclusively* to unsupported installers (e.g. `#brew`) are treated as
+//! unresolved.  If a key has both supported and unsupported installers,
+//! the supported packages are installed and the key is considered resolved.
 
 use std::collections::{BTreeSet, HashSet};
 use std::process::Command;

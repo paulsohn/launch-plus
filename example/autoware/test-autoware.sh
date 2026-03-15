@@ -3,8 +3,11 @@
 #
 # Usage:
 #   bash test-autoware.sh        # default: verify SHA + clean tree, error if wrong
-#   bash test-autoware.sh -c     # clean: reset repos to lockfile SHAs (stash dirty)
-#   bash test-autoware.sh -d     # dirty: use whatever is on disk
+#   bash test-autoware.sh -c     # test --clean: reset repos to lockfile SHAs (stash dirty)
+#   bash test-autoware.sh -d     # test --dirty: use whatever is on disk
+#
+# The -c/-d flags only select which launch-plus workspace mode to test;
+# they do NOT perform any extra cleanup themselves.
 #
 # Requires:
 #   - launch-plus binary on PATH (or built at ../../target/release/launch-plus)
@@ -20,8 +23,8 @@ MODE_FLAG="${1:-}"  # empty string if no argument given
 if [[ $# -gt 1 ]] || [[ -n "$MODE_FLAG" && "$MODE_FLAG" != "-c" && "$MODE_FLAG" != "-d" ]]; then
     echo "Usage: $0 [-c | -d]"
     echo "  (none)  default (verify SHA + clean tree, error if mismatch)"
-    echo "  -c      clean (reset repos to lockfile SHAs, stash dirty changes)"
-    echo "  -d      dirty (use whatever is on disk)"
+    echo "  -c      test --clean mode (reset repos to lockfile SHAs)"
+    echo "  -d      test --dirty mode (use whatever is on disk)"
     exit 1
 fi
 
@@ -92,14 +95,6 @@ if [[ -d /opt/acados/lib ]]; then
     export CMAKE_PREFIX_PATH="/opt/acados:${CMAKE_PREFIX_PATH:-}"
     export ACADOS_SOURCE_DIR="/opt/acados"
     export LD_LIBRARY_PATH="/opt/acados/lib:${LD_LIBRARY_PATH:-}"
-fi
-
-# ── Clean workspace if requested ─────────────────────────────────────────────
-
-if [[ "$MODE_FLAG" == "-c" ]]; then
-    echo "==> Cleaning workspace"
-    rm -rf src/ build/ install/ log/
-    echo
 fi
 
 # ── Step 1: Preview resolve (portable paths, no expand) ──────────────────────

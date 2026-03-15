@@ -645,31 +645,33 @@ fn stash_if_dirty(repo_dir: &Path) -> crate::Result<bool> {
 
 /// Checkout a specific SHA
 fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Result<()> {
-    // Fetch the SHA
-    let mut fetch_args = vec!["fetch", "origin", sha];
-    if options.shallow {
-        fetch_args.insert(1, "--depth=1");
-    }
-
-    let output = Command::new("git")
+    // Check if the SHA is already available locally before fetching.
+    let have_locally = Command::new("git")
         .current_dir(repo_dir)
-        .args(&fetch_args)
+        .args(["cat-file", "-t", sha])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
-        .map_err(|e| crate::Error::Git(format!("failed to run git fetch: {}", e)))?;
+        .map(|o| o.status.success())
+        .unwrap_or(false);
 
-    if !output.status.success() {
-        // Check if the SHA is already available locally before treating as an error.
-        let have_it = Command::new("git")
+    if have_locally {
+        debug!("SHA {} already available locally, skipping fetch", sha);
+    } else {
+        let mut fetch_args = vec!["fetch", "origin", sha];
+        if options.shallow {
+            fetch_args.insert(1, "--depth=1");
+        }
+
+        let output = Command::new("git")
             .current_dir(repo_dir)
-            .args(["cat-file", "-t", sha])
+            .args(&fetch_args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-        if !have_it {
+            .map_err(|e| crate::Error::Git(format!("failed to run git fetch: {}", e)))?;
+
+        if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(crate::Error::Git(format!(
                 "git fetch of {} failed and commit is not available locally: {}",
@@ -677,10 +679,6 @@ fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Re
                 stderr.trim()
             )));
         }
-        debug!(
-            "git fetch {} failed but commit is already available locally",
-            sha
-        );
     }
 
     // In Clean mode, stash any dirty changes before checkout instead of

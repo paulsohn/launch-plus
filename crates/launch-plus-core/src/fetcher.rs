@@ -759,11 +759,201 @@ pub fn get_package_path(pkg_name: &str, lockfile: &Lockfile, fetch_dir: &Path) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    /// Create a temporary git repo with one commit, return (TempDir, sha).
+    fn setup_test_repo() -> (tempfile::TempDir, String) {
+        let dir = tempfile::tempdir().unwrap();
+        let run = |args: &[&str]| {
+            let output = Command::new("git")
+                .current_dir(dir.path())
+                .args(args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "git {:?} failed: {}",
+                args,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        run(&["init", "-b", "main"]);
+        run(&["config", "user.email", "test@test.com"]);
+        run(&["config", "user.name", "Test"]);
+        run(&["config", "commit.gpgsign", "false"]);
+        fs::write(dir.path().join("file.txt"), "hello").unwrap();
+        run(&["add", "."]);
+        run(&["commit", "-m", "initial"]);
+        let sha = get_current_sha(dir.path()).unwrap();
+        (dir, sha)
+    }
+
+    /// Add a second commit to the repo, return the new SHA.
+    fn add_commit(dir: &Path, filename: &str, content: &str) -> String {
+        fs::write(dir.join(filename), content).unwrap();
+        let run = |args: &[&str]| {
+            let output = Command::new("git")
+                .current_dir(dir)
+                .args(args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+        };
+        run(&["add", "."]);
+        run(&["commit", "-m", &format!("add {filename}")]);
+        get_current_sha(dir).unwrap()
+    }
 
     #[test]
     fn test_fetch_options_default() {
         let options = FetchOptions::default();
         assert!(options.recurse_submodules);
         assert!(!options.shallow);
+    }
+
+    // ── is_working_tree_dirty ────────────────────────────────────────────
+
+    #[test]
+    fn test_clean_tree_is_not_dirty() {
+        let (dir, _) = setup_test_repo();
+        assert!(!is_working_tree_dirty(dir.path()).unwrap());
+    }
+
+    #[test]
+    fn test_modified_file_is_dirty() {
+        let (dir, _) = setup_test_repo();
+        fs::write(dir.path().join("file.txt"), "modified").unwrap();
+        assert!(is_working_tree_dirty(dir.path()).unwrap());
+    }
+
+    #[test]
+    fn test_staged_file_is_dirty() {
+        let (dir, _) = setup_test_repo();
+        fs::write(dir.path().join("file.txt"), "staged").unwrap();
+        Command::new("git")
+            .current_dir(dir.path())
+            .args(["add", "file.txt"])
+            .output()
+            .unwrap();
+        assert!(is_working_tree_dirty(dir.path()).unwrap());
+    }
+
+    #[test]
+    fn test_untracked_file_is_dirty() {
+        let (dir, _) = setup_test_repo();
+        fs::write(dir.path().join("new.txt"), "untracked").unwrap();
+        assert!(is_working_tree_dirty(dir.path()).unwrap());
+    }
+
+    // ── verify_repo_state ────────────────────────────────────────────────
+
+    #[test]
+    fn test_verify_repo_state_ok() {
+        let (dir, sha) = setup_test_repo();
+        assert!(verify_repo_state(dir.path(), &sha).is_ok());
+    }
+
+    #[test]
+    fn test_verify_repo_state_sha_mismatch() {
+        let (dir, _) = setup_test_repo();
+        let err =
+            verify_repo_state(dir.path(), "0000000000000000000000000000000000000000").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("SHA mismatch"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn test_verify_repo_state_dirty_tree() {
+        let (dir, sha) = setup_test_repo();
+        fs::write(dir.path().join("file.txt"), "dirty").unwrap();
+        let err = verify_repo_state(dir.path(), &sha).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("uncommitted changes"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_verify_repo_state_both_wrong() {
+        let (dir, _) = setup_test_repo();
+        fs::write(dir.path().join("file.txt"), "dirty").unwrap();
+        let err =
+            verify_repo_state(dir.path(), "0000000000000000000000000000000000000000").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("SHA mismatch"), "missing SHA mismatch: {msg}");
+        assert!(
+            msg.contains("uncommitted changes"),
+            "missing dirty warning: {msg}"
+        );
+    }
+
+    // ── stash_if_dirty ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_stash_clean_tree_returns_false() {
+        let (dir, _) = setup_test_repo();
+        assert!(!stash_if_dirty(dir.path()).unwrap());
+    }
+
+    #[test]
+    fn test_stash_modified_file() {
+        let (dir, _) = setup_test_repo();
+        fs::write(dir.path().join("file.txt"), "dirty").unwrap();
+        assert!(stash_if_dirty(dir.path()).unwrap());
+        assert!(!is_working_tree_dirty(dir.path()).unwrap());
+        // Original content restored
+        assert_eq!(
+            fs::read_to_string(dir.path().join("file.txt")).unwrap(),
+            "hello"
+        );
+    }
+
+    #[test]
+    fn test_stash_untracked_file() {
+        let (dir, _) = setup_test_repo();
+        fs::write(dir.path().join("new.txt"), "untracked").unwrap();
+        assert!(stash_if_dirty(dir.path()).unwrap());
+        assert!(!is_working_tree_dirty(dir.path()).unwrap());
+        assert!(!dir.path().join("new.txt").exists());
+    }
+
+    // ── checkout_sha ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_checkout_sha_local() {
+        let (dir, sha1) = setup_test_repo();
+        let _sha2 = add_commit(dir.path(), "second.txt", "world");
+
+        // Checkout back to sha1 — SHA is local so no fetch needed.
+        let options = FetchOptions {
+            workspace_state: WorkspaceState::Dirty,
+            ..Default::default()
+        };
+        checkout_sha(dir.path(), &sha1, &options).unwrap();
+        assert_eq!(get_current_sha(dir.path()).unwrap(), sha1);
+    }
+
+    #[test]
+    fn test_checkout_sha_clean_mode_stashes_first() {
+        let (dir, sha1) = setup_test_repo();
+        let _sha2 = add_commit(dir.path(), "second.txt", "world");
+
+        // Make the tree dirty at sha2
+        fs::write(dir.path().join("second.txt"), "modified").unwrap();
+        assert!(is_working_tree_dirty(dir.path()).unwrap());
+
+        // Clean mode: should stash, then checkout to sha1
+        let options = FetchOptions {
+            workspace_state: WorkspaceState::Clean,
+            ..Default::default()
+        };
+        checkout_sha(dir.path(), &sha1, &options).unwrap();
+        assert_eq!(get_current_sha(dir.path()).unwrap(), sha1);
+        assert!(!is_working_tree_dirty(dir.path()).unwrap());
     }
 }

@@ -2125,9 +2125,21 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
+def _emit(obj):
+    """Write JSON to the real stdout (saved before redirect)."""
+    _emit._fd.write(json.dumps(obj))
+    _emit._fd.write("\n")
+    _emit._fd.flush()
+
+
 def main():
+    # Redirect stdout → stderr so that print() calls inside user launch files
+    # (e.g. OpaqueFunction bodies) don't contaminate our JSON output.
+    _emit._fd = sys.stdout
+    sys.stdout = sys.stderr
+
     if len(sys.argv) < 3:
-        print(json.dumps({"error": "usage: py_resolver.py <launch_file> <args_json> [package_shares_json]"}))
+        _emit({"error": "usage: py_resolver.py <launch_file> <args_json> [package_shares_json]"})
         sys.exit(1)
 
     launch_file = sys.argv[1]
@@ -2174,7 +2186,7 @@ def main():
     # Load the launch file as a module
     spec = importlib.util.spec_from_file_location("_target_launch", launch_file)
     if spec is None:
-        print(json.dumps({"error": f"cannot load {launch_file}"}))
+        _emit({"error": f"cannot load {launch_file}"})
         sys.exit(1)
 
     mod = importlib.util.module_from_spec(spec)
@@ -2184,17 +2196,17 @@ def main():
         # Module-level get_package_share_directory() call failed: source not on disk.
         # Output with packages_to_fetch set so Rust fetches and retries.
         _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)
-        print(json.dumps(_tracked))
+        _emit(_tracked)
         return
     except Exception as e:
         _error(f"Error loading launch file: {e}")
-        print(json.dumps(_tracked))
+        _emit(_tracked)
         return
 
     # Call generate_launch_description()
     if not hasattr(mod, "generate_launch_description"):
         _error("No generate_launch_description() function found")
-        print(json.dumps(_tracked))
+        _emit(_tracked)
         return
 
     # Pre-populate global_params from the orchestrator's persisted context so that
@@ -2220,11 +2232,11 @@ def main():
         ld = mod.generate_launch_description()
     except _PackageNotFetchedError:
         _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)
-        print(json.dumps(_tracked))
+        _emit(_tracked)
         return
     except Exception as e:
         _error(f"generate_launch_description() failed: {e}")
-        print(json.dumps(_tracked))
+        _emit(_tracked)
         return
 
     # Walk the LaunchDescription tree — two passes, mirroring the XML resolver's behaviour:
@@ -2248,7 +2260,7 @@ def main():
 
     if _packages_to_fetch:
         _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)
-    print(json.dumps(_tracked))
+    _emit(_tracked)
 
 if __name__ == "__main__":
     main()

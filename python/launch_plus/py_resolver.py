@@ -291,7 +291,14 @@ def _track_include(path):
         # Don't deduplicate: the same file may be included multiple times under
         # different <push-ros-namespace> contexts, and each entry carries a distinct
         # namespace_stack that the orchestrator needs for correct namespace propagation.
+        entry["include_args"] = {}
         _tracked["include_deps"].append(entry)
+    # Return the index of the last entry with this path so callers can
+    # attach include_args to the correct entry.
+    for i in range(len(_tracked["include_deps"]) - 1, -1, -1):
+        if _tracked["include_deps"][i].get("path") == path:
+            return i
+    return -1
 
 def _track_param_file(path):
     if not path:
@@ -455,6 +462,9 @@ class _TrackedShutdown:
     serializes as an emit_event with event="shutdown".
     """
     _event_name = "shutdown"
+
+    def __init__(self, *args, **kwargs):
+        pass  # Accept and ignore any arguments (e.g. reason=)
 
     def to_dict(self):
         return {
@@ -805,18 +815,25 @@ class _TrackedPathJoinSubstitution:
                 parts.append(str(sub))
         return str(Path(*parts))
 
-def _resolve_include_args(path, launch_arguments, context):
-    """Capture launch_arguments for *path* into _tracked['include_args'].
+def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
+    """Capture launch_arguments for an include site.
+
+    When dep_idx >= 0, stores args directly into the include_deps entry
+    (allowing distinct args per include site).  Falls back to the shared
+    include_args dict for backward compatibility.
 
     Called both at construction time (with a stub context) and deferred during
     _walk_action (with the live context, which can resolve LaunchConfiguration
-    and PathJoinSubstitution values correctly).  A second call for the same path
-    is skipped — the first resolved value wins.
+    and PathJoinSubstitution values correctly).  A second call for the same
+    entry is skipped — the first resolved value wins.
     """
     if not launch_arguments or not path:
         return
     path = str(path)
-    if path in _tracked["include_args"]:
+    # Check if this entry already has args resolved.
+    if dep_idx >= 0 and _tracked["include_deps"][dep_idx].get("include_args"):
+        return
+    if dep_idx < 0 and path in _tracked["include_args"]:
         return
     try:
         captured = {}
@@ -846,6 +863,8 @@ def _resolve_include_args(path, launch_arguments, context):
                 v_str = str(v)
             captured[k_str] = v_str
         if captured:
+            if dep_idx >= 0:
+                _tracked["include_deps"][dep_idx]["include_args"] = captured
             _tracked["include_args"][path] = captured
     except _PackageNotFetchedError:
         raise
@@ -870,15 +889,16 @@ class _TrackedIncludeLaunchDescription:
             except Exception:
                 pass
         self._path = path
+        self._dep_idx = -1
         if path:
-            _track_include(path)
+            self._dep_idx = _track_include(path)
 
         # Capture launch_arguments so the orchestrator can forward them when it recursively
         # invokes py_resolver for the included file.  Values may be strings, lists of
         # substitution objects (common when constructed inside OpaqueFunction where pkg paths
         # are already resolved), or substitution objects; resolve eagerly where possible.
         if launch_arguments and path:
-            _resolve_include_args(path, launch_arguments, _StubLaunchContext())
+            _resolve_include_args(path, launch_arguments, _StubLaunchContext(), self._dep_idx)
 
 class _LaunchConfiguration:
     """Substitution that resolves to a launch configuration value at runtime."""
@@ -1489,8 +1509,8 @@ def _walk_action(action, context, depth):
                     _warn(f"failed to resolve IncludeLaunchDescription source: {e}")
             if path:
                 action._path = path
-                _track_include(path)
-                _resolve_include_args(path, action._raw_launch_arguments, context)
+                dep_idx = _track_include(path)
+                _resolve_include_args(path, action._raw_launch_arguments, context, dep_idx)
         return
 
     # SetParameter: append (name, value) to context['global_params'], mirroring the real

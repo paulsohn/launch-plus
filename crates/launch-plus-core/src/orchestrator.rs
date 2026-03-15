@@ -173,8 +173,8 @@ pub struct ResolveResult {
 
     /// Per-file declared arg names and defaults, keyed by (package, share_path).
     ///
-    /// Populated during resolution by scanning each parsed XML launch file with
-    /// [`collect_declared_args`].  Used by:
+    /// Populated during resolution from `parsed.declared_arg_defaults` (XML/YAML)
+    /// and `py_output.declared_args` (Python).  Used by:
     /// - the excessive-include-arg check (compares forwarded args against declared keys)
     /// - `--show-args` rendering (shows declared defaults alongside explicit args)
     pub declared_args_by_file: HashMap<(String, PathBuf), HashMap<String, String>>,
@@ -464,6 +464,9 @@ struct PyFileDep {
     /// Accumulated `PushRosNamespace` stack at the include site in the Python file.
     #[serde(default)]
     namespace_stack: Vec<String>,
+    /// Per-entry include args (allows distinct args per include site).
+    #[serde(default)]
+    include_args: HashMap<String, String>,
 }
 
 #[derive(Debug, serde::Deserialize, Default, PartialEq)]
@@ -504,7 +507,10 @@ struct PyEventAction {
     event: String,
     #[serde(default)]
     target_node: Option<String>,
+    /// Kept for serde compatibility; no longer used for namespace computation
+    /// (actions inherit the handler's recomputed namespace via apply_parent_namespace).
     #[serde(default)]
+    #[allow(dead_code)]
     namespace_stack: Vec<String>,
     #[serde(default)]
     explicit_namespace: Option<String>,
@@ -788,19 +794,17 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
             &eh.namespace_stack,
             eh.explicit_namespace.as_deref(),
         );
+        // Leave action namespaces as None unless the Python resolver recorded
+        // an explicit namespace.  apply_parent_namespace will inherit the
+        // handler's (recomputed) namespace into None actions, avoiding stale
+        // pre-prefix namespaces that would miss cross-file namespace propagation.
         let actions = eh
             .actions
             .iter()
-            .map(|a| {
-                let action_ns = crate::resolver::effective_namespace(
-                    &a.namespace_stack,
-                    a.explicit_namespace.as_deref(),
-                );
-                ResolvedEventAction::EmitEvent {
-                    event: a.event.clone(),
-                    target_node: a.target_node.clone(),
-                    namespace: action_ns,
-                }
+            .map(|a| ResolvedEventAction::EmitEvent {
+                event: a.event.clone(),
+                target_node: a.target_node.clone(),
+                namespace: a.explicit_namespace.clone(),
             })
             .collect();
         nodes.push(ResolvedNode {
@@ -823,11 +827,18 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
         .include_deps
         .iter()
         .map(|dep| {
-            let explicit_args = py_output
-                .include_args
-                .get(&dep.path)
-                .cloned()
-                .unwrap_or_default();
+            // Prefer per-entry include_args (correct when the same file is
+            // included multiple times with different args); fall back to the
+            // shared include_args dict for backward compatibility.
+            let explicit_args = if !dep.include_args.is_empty() {
+                dep.include_args.clone()
+            } else {
+                py_output
+                    .include_args
+                    .get(&dep.path)
+                    .cloned()
+                    .unwrap_or_default()
+            };
             LaunchInclude {
                 package: dep.package.clone(),
                 share_path: PathBuf::from(&dep.share_path),

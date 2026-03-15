@@ -288,8 +288,10 @@ def _track_include(path):
             "path": path,
             "namespace_stack": list(_namespace_stack),
         }
-        if not any(d["path"] == path for d in _tracked["include_deps"]):
-            _tracked["include_deps"].append(entry)
+        # Don't deduplicate: the same file may be included multiple times under
+        # different <push-ros-namespace> contexts, and each entry carries a distinct
+        # namespace_stack that the orchestrator needs for correct namespace propagation.
+        _tracked["include_deps"].append(entry)
 
 def _track_param_file(path):
     if not path:

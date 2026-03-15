@@ -901,7 +901,11 @@ fn apply_parent_namespace(parent_stack: &[String], node: &mut ResolvedNode) {
         for action in actions {
             match action {
                 ResolvedEventAction::EmitEvent { namespace, .. } => {
-                    *namespace = handler_ns.clone();
+                    // Only inherit handler namespace if the action didn't have an
+                    // explicitly set namespace (e.g. <emit_event namespace="...">).
+                    if namespace.is_none() {
+                        *namespace = handler_ns.clone();
+                    }
                 }
             }
         }

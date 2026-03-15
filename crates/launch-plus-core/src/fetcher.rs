@@ -206,10 +206,19 @@ fn fetch_repo_sparse(
         match options.workspace_state {
             WorkspaceState::Dirty => {
                 // Dirty mode: never touch existing repos — use whatever is on disk.
-                debug!(
-                    "Skipping git operations for {} (--dirty)",
-                    repo_dir.display()
-                );
+                // Log the current state so the user knows what they're getting.
+                if let Ok(Some(description)) = describe_repo_state(repo_dir, sha) {
+                    info!(
+                        "Using as-is (--dirty) {} :\n  {}",
+                        repo_dir.display(),
+                        description,
+                    );
+                } else {
+                    debug!(
+                        "Skipping git operations for {} (--dirty)",
+                        repo_dir.display()
+                    );
+                }
             }
             WorkspaceState::Default => {
                 // Default mode: verify SHA + clean working tree, error if mismatch.
@@ -533,18 +542,16 @@ fn is_working_tree_dirty(repo_dir: &Path) -> crate::Result<bool> {
     Ok(!stdout.trim().is_empty())
 }
 
-/// Default mode: verify that the repo is at the expected SHA and has a clean
-/// working tree.  Returns an error with actionable guidance if either check fails.
-fn verify_repo_state(repo_dir: &Path, expected_sha: &str) -> crate::Result<()> {
+/// Describe the current state of a repository for diagnostics.
+/// Returns `None` if the repo is at the expected SHA with a clean tree.
+fn describe_repo_state(repo_dir: &Path, expected_sha: &str) -> crate::Result<Option<String>> {
     let current_sha = get_current_sha(repo_dir)?;
     let sha_matches = current_sha == expected_sha;
     let dirty = is_working_tree_dirty(repo_dir)?;
 
     if sha_matches && !dirty {
-        return Ok(());
+        return Ok(None);
     }
-
-    let repo_name = repo_dir.file_name().unwrap_or_default().to_string_lossy();
 
     let mut reasons = Vec::new();
     if !sha_matches {
@@ -555,8 +562,51 @@ fn verify_repo_state(repo_dir: &Path, expected_sha: &str) -> crate::Result<()> {
         ));
     }
     if dirty {
-        reasons.push("working tree has uncommitted changes".to_string());
+        // Capture the actual dirty files for diagnostics.
+        let status_detail = Command::new("git")
+            .current_dir(repo_dir)
+            .args(["status", "--porcelain"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .ok()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+
+        if status_detail.is_empty() {
+            reasons.push("working tree has uncommitted changes".to_string());
+        } else {
+            let lines: Vec<&str> = status_detail.lines().collect();
+            let shown = if lines.len() > 20 {
+                format!(
+                    "{}\n    ... and {} more files",
+                    lines[..20].join("\n    "),
+                    lines.len() - 20
+                )
+            } else {
+                lines.join("\n    ")
+            };
+            reasons.push(format!(
+                "working tree has uncommitted changes:\n    {shown}"
+            ));
+        }
     }
+
+    Ok(Some(format!(
+        "HEAD is at {}\n  {}",
+        &current_sha[..current_sha.len().min(12)],
+        reasons.join("\n  "),
+    )))
+}
+
+/// Default mode: verify that the repo is at the expected SHA and has a clean
+/// working tree.  Returns an error with actionable guidance if either check fails.
+fn verify_repo_state(repo_dir: &Path, expected_sha: &str) -> crate::Result<()> {
+    let Some(description) = describe_repo_state(repo_dir, expected_sha)? else {
+        return Ok(());
+    };
+
+    let repo_name = repo_dir.file_name().unwrap_or_default().to_string_lossy();
 
     Err(crate::Error::Git(format!(
         "repository '{}' at {} is not in the expected state:\n  {}\n\n\
@@ -565,7 +615,7 @@ fn verify_repo_state(repo_dir: &Path, expected_sha: &str) -> crate::Result<()> {
          -d, --dirty   use the current on-disk state as-is",
         repo_name,
         repo_dir.display(),
-        reasons.join("\n  "),
+        description,
     )))
 }
 
@@ -611,15 +661,24 @@ fn add_sparse_paths_if_needed(repo_dir: &Path, paths: &[&str]) -> crate::Result<
 
 /// Stash any uncommitted changes in the working tree.
 /// Returns `true` if a stash was created, `false` if the tree was already clean.
-fn stash_if_dirty(repo_dir: &Path) -> crate::Result<bool> {
+fn stash_if_dirty(repo_dir: &Path, expected_sha: &str) -> crate::Result<bool> {
     if !is_working_tree_dirty(repo_dir)? {
         return Ok(false);
     }
 
-    info!(
-        "Stashing uncommitted changes in {} before clean checkout",
-        repo_dir.display()
-    );
+    // Log what we're about to stash.
+    if let Ok(Some(description)) = describe_repo_state(repo_dir, expected_sha) {
+        info!(
+            "Stashing changes in {} (clean mode):\n  {}",
+            repo_dir.display(),
+            description,
+        );
+    } else {
+        info!(
+            "Stashing uncommitted changes in {} before clean checkout",
+            repo_dir.display()
+        );
+    }
 
     let output = Command::new("git")
         .current_dir(repo_dir)
@@ -652,7 +711,7 @@ fn stash_if_dirty(repo_dir: &Path) -> crate::Result<bool> {
 fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Result<()> {
     // In clean mode, stash dirty changes first — before any other git operations.
     if options.workspace_state == WorkspaceState::Clean {
-        stash_if_dirty(repo_dir)?;
+        stash_if_dirty(repo_dir, sha)?;
     }
 
     // Check if the SHA is already available locally before fetching.
@@ -883,6 +942,8 @@ mod tests {
             msg.contains("uncommitted changes"),
             "unexpected error: {msg}"
         );
+        assert!(msg.contains("file.txt"), "should list dirty file: {msg}");
+        assert!(msg.contains("HEAD is at"), "should show HEAD SHA: {msg}");
     }
 
     #[test]
@@ -903,15 +964,15 @@ mod tests {
 
     #[test]
     fn test_stash_clean_tree_returns_false() {
-        let (dir, _) = setup_test_repo();
-        assert!(!stash_if_dirty(dir.path()).unwrap());
+        let (dir, sha) = setup_test_repo();
+        assert!(!stash_if_dirty(dir.path(), &sha).unwrap());
     }
 
     #[test]
     fn test_stash_modified_file() {
-        let (dir, _) = setup_test_repo();
+        let (dir, sha) = setup_test_repo();
         fs::write(dir.path().join("file.txt"), "dirty").unwrap();
-        assert!(stash_if_dirty(dir.path()).unwrap());
+        assert!(stash_if_dirty(dir.path(), &sha).unwrap());
         assert!(!is_working_tree_dirty(dir.path()).unwrap());
         // Original content restored
         assert_eq!(
@@ -922,9 +983,9 @@ mod tests {
 
     #[test]
     fn test_stash_untracked_file() {
-        let (dir, _) = setup_test_repo();
+        let (dir, sha) = setup_test_repo();
         fs::write(dir.path().join("new.txt"), "untracked").unwrap();
-        assert!(stash_if_dirty(dir.path()).unwrap());
+        assert!(stash_if_dirty(dir.path(), &sha).unwrap());
         assert!(!is_working_tree_dirty(dir.path()).unwrap());
         assert!(!dir.path().join("new.txt").exists());
     }

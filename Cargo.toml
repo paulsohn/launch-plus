@@ -32,7 +32,7 @@ tar = "0.4"
 pyo3 = { version = "0.24", features = ["extension-module"] }
 
 # Testing
-tempfile = "3.16"
+tempfile = "3.27"
 
 # Logging
 tracing = "0.1"

@@ -1,11 +1,18 @@
 //! Shared helpers for invoking `rosdep` from both the resolver and builder.
 //!
-//! Uses `rosdep resolve` to map rosdep keys to system package names,
-//! then installs via `apt` or `pip` directly.  This avoids `rosdep install`
-//! entirely — callers control exactly which packages are installed.
+//! Uses `rosdep resolve` to map rosdep keys → system package names, then
+//! installs via `apt-get`/`pip` directly.
 //!
-//! Only `#apt` and `#pip` installers are supported for now.  Keys that
-//! resolve to other installers (e.g. `#brew`) are treated as unresolved.
+//! **Why not `rosdep install`?**  Without `--from-paths`, `rosdep install`
+//! treats arguments as ROS **package names** (via `rospkg.expand_to_packages`)
+//! and fails on pure system keys like `asio` with `ResourceNotFound`.
+//! With `--from-paths`, it scans every `package.xml` under the source tree and
+//! pulls in unresolvable test-only dependencies.  Neither mode works for our
+//! use case of installing an explicit set of rosdep keys extracted from the
+//! dependency graph.
+//!
+//! Only `#apt` and `#pip` installers are supported.  Keys that resolve to
+//! other installers (e.g. `#brew`) are treated as unresolved.
 
 use std::collections::HashSet;
 use std::process::Command;

@@ -461,24 +461,28 @@ mod condition {
         Ok(tokens)
     }
 
-    /// Resolve a term token to its string value.
-    fn resolve_term(token: &Token) -> Result<String, String> {
-        match token {
-            Token::Var(name) => Ok(std::env::var(name).unwrap_or_default()),
-            Token::Literal(s) => Ok(s.clone()),
-            other => Err(format!("expected term, got {other:?}")),
-        }
-    }
-
     /// Recursive-descent parser and evaluator.
-    struct Parser {
+    struct Parser<F: Fn(&str) -> String> {
         tokens: Vec<Token>,
         pos: usize,
+        env_lookup: F,
     }
 
-    impl Parser {
-        fn new(tokens: Vec<Token>) -> Self {
-            Self { tokens, pos: 0 }
+    impl<F: Fn(&str) -> String> Parser<F> {
+        fn new(tokens: Vec<Token>, env_lookup: F) -> Self {
+            Self {
+                tokens,
+                pos: 0,
+                env_lookup,
+            }
+        }
+
+        fn resolve_term(&self, token: &Token) -> Result<String, String> {
+            match token {
+                Token::Var(name) => Ok((self.env_lookup)(name)),
+                Token::Literal(s) => Ok(s.clone()),
+                other => Err(format!("expected term, got {other:?}")),
+            }
         }
 
         fn peek(&self) -> Option<&Token> {
@@ -536,7 +540,7 @@ mod condition {
         /// comparison = term cmp_op term
         fn parse_comparison(&mut self) -> Result<bool, String> {
             let lhs_token = self.next().cloned().ok_or("expected term")?;
-            let lhs = resolve_term(&lhs_token)?;
+            let lhs = self.resolve_term(&lhs_token)?;
 
             let op = match self.next() {
                 Some(Token::CmpOp(op)) => *op,
@@ -546,19 +550,18 @@ mod condition {
             };
 
             let rhs_token = self.next().cloned().ok_or("expected term after operator")?;
-            let rhs = resolve_term(&rhs_token)?;
+            let rhs = self.resolve_term(&rhs_token)?;
 
             Ok(op.eval(&lhs, &rhs))
         }
     }
 
-    /// Evaluate a REP-149 condition expression against the current environment.
-    pub fn evaluate(condition: &str) -> Result<bool, String> {
+    fn evaluate_impl(condition: &str, env_lookup: impl Fn(&str) -> String) -> Result<bool, String> {
         let tokens = tokenize(condition)?;
         if tokens.is_empty() {
             return Ok(true);
         }
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens, env_lookup);
         let result = parser.parse_expr()?;
         if parser.pos != parser.tokens.len() {
             return Err(format!(
@@ -569,13 +572,20 @@ mod condition {
         Ok(result)
     }
 
+    /// Evaluate a REP-149 condition expression against the current environment.
+    pub fn evaluate(condition: &str) -> Result<bool, String> {
+        evaluate_impl(condition, |name| std::env::var(name).unwrap_or_default())
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
+        use std::collections::HashMap;
 
-        /// Helper: evaluate with known env.  We can't set env vars safely,
-        /// so we test tokenizer + parser logic using literals only, plus
-        /// a few tests that rely on unset vars (→ empty string).
+        /// Evaluate with an injected env map — no dependence on real env vars.
+        fn eval_with(condition: &str, env: &HashMap<&str, &str>) -> Result<bool, String> {
+            evaluate_impl(condition, |name| env.get(name).unwrap_or(&"").to_string())
+        }
         #[test]
         fn simple_eq_true() {
             assert!(evaluate("1 == 1").unwrap());
@@ -646,9 +656,9 @@ mod condition {
 
         #[test]
         fn unset_var_is_empty_string() {
-            // _LAUNCH_PLUS_UNSET_VAR_ should not exist
-            assert!(evaluate("$_LAUNCH_PLUS_UNSET_VAR_ == ''").unwrap());
-            assert!(!evaluate("$_LAUNCH_PLUS_UNSET_VAR_ == 1").unwrap());
+            let env = HashMap::new(); // no vars set
+            assert!(eval_with("$MISSING_VAR == ''", &env).unwrap());
+            assert!(!eval_with("$MISSING_VAR == 1", &env).unwrap());
         }
 
         #[test]
@@ -1675,30 +1685,29 @@ repositories:
 
     #[test]
     fn test_parse_package_xml_condition_filters_deps() {
-        // Use a test-specific env var that won't collide.
-        // In CI/test env, LAUNCH_PLUS_TEST_COND is unset → "" != "yes" is true,
-        // "" == "yes" is false.
+        // Use literal-only conditions to avoid env-var dependence.
+        // Env-var resolution is tested in the condition module via eval_with().
         let content = r#"<?xml version="1.0"?>
 <package format="3">
   <name>test_pkg</name>
-  <buildtool_depend condition="$LAUNCH_PLUS_TEST_COND == yes">conditional_dep</buildtool_depend>
-  <buildtool_depend condition="$LAUNCH_PLUS_TEST_COND != yes">fallback_dep</buildtool_depend>
+  <buildtool_depend condition="1 == 2">excluded_dep</buildtool_depend>
+  <buildtool_depend condition="1 == 1">included_dep</buildtool_depend>
   <depend>unconditional_dep</depend>
 </package>
 "#;
         let info = parse_package_xml(content, "test").unwrap();
-        // LAUNCH_PLUS_TEST_COND is unset → "" == "yes" is false → excluded
+        // 1 == 2 is false → excluded
         assert!(
             !info
                 .dependencies
                 .buildtool
-                .contains(&"conditional_dep".to_string())
+                .contains(&"excluded_dep".to_string())
         );
-        // "" != "yes" is true → included
+        // 1 == 1 is true → included
         assert!(
             info.dependencies
                 .buildtool
-                .contains(&"fallback_dep".to_string())
+                .contains(&"included_dep".to_string())
         );
         // Unconditional deps always included
         assert!(

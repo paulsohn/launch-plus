@@ -2008,6 +2008,10 @@ fn resolve_element(
                         target_node: tn,
                         namespace: cn,
                     });
+                } else {
+                    result.warnings.push(
+                        "event handler: ignoring unrecognized child element (expected <emit_event>)".to_string()
+                    );
                 }
             }
 
@@ -2463,8 +2467,10 @@ fn eval_python_expr(expr: &str) -> crate::Result<String> {
 /// the closing `</group>` with the originating file name.
 /// Emit `<!-- arg ... -->` comments for a given include boundary.
 ///
-/// Shows explicitly-forwarded args first, then any declared defaults from the file
-/// that aren't already covered by explicit args (marked with `(default)`).
+/// Merges explicitly-forwarded args with declared defaults (explicit wins).
+/// Entries are sorted alphabetically by name.  Explicit args render as
+/// `<!-- arg name="…" value="…" -->`, declared defaults as
+/// `<!-- arg name="…" default="…" -->`.
 fn render_show_args(
     out: &mut String,
     key: &(String, PathBuf),

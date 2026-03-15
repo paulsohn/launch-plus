@@ -447,8 +447,20 @@ class _TrackedChangeState:
 
 
 class _TrackedShutdown:
-    """Tracked Shutdown event."""
+    """Tracked Shutdown event.
+
+    When used directly as an action (rather than wrapped in EmitEvent),
+    serializes as an emit_event with event="shutdown".
+    """
     _event_name = "shutdown"
+
+    def to_dict(self):
+        return {
+            "event": "shutdown",
+            "target_node": None,
+            "namespace_stack": [],
+            "explicit_namespace": None,
+        }
 
 
 class _TrackedMatchesAction:
@@ -551,19 +563,14 @@ class _TrackedOnStateTransition:
 
 
 class _TrackedOnShutdown:
-    """Tracked OnShutdown event handler."""
+    """Tracked OnShutdown event handler.
+
+    OnShutdown has no XML equivalent in ROS 2 launch XML.  Rather than
+    misrepresenting it as ``on_process_exit``, we drop it with a warning.
+    """
     def __init__(self, on_shutdown=None, **kwargs):
         self._actions = on_shutdown or []
-
-    def to_event_handler(self):
-        return {
-            "handler_kind": "on_process_exit",  # model as on_process_exit for XML output
-            "target": None,
-            "target_node": None,
-            "start_state": None,
-            "goal_state": None,
-            "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
-        }
+        _tracked["warnings"].append("OnShutdown event handler has no XML equivalent and was dropped")
 
 
 class _TrackedRegisterEventHandler:

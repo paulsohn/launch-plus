@@ -26,7 +26,9 @@ pub struct FetchedPackage {
 pub enum WorkspaceState {
     /// Reset every repository to the pinned lockfile SHA.  If the working tree
     /// is dirty (including untracked files), changes are automatically stashed
-    /// before checkout.  Guarantees reproducibility.
+    /// before checkout.  Note: `git stash` does not cover submodules — any
+    /// dirty submodules are force-reset to the committed state (their local
+    /// changes are **discarded**, not stashed).  Guarantees reproducibility.
     Clean,
     /// Trust whatever is currently on disk.  Repositories that already exist are
     /// not touched by any git operation.  Only missing repos are cloned fresh.
@@ -667,15 +669,19 @@ fn stash_if_dirty(repo_dir: &Path, expected_sha: &str) -> crate::Result<bool> {
     }
 
     // Log what we're about to stash.
+    // Note: git stash does not cover submodules — any dirty submodules will be
+    // force-reset by `git submodule update --force`.
     if let Ok(Some(description)) = describe_repo_state(repo_dir, expected_sha) {
         info!(
-            "Stashing changes in {} (clean mode):\n  {}",
+            "Stashing changes in {} (clean mode; any dirty submodules will be \
+             discarded):\n  {}",
             repo_dir.display(),
             description,
         );
     } else {
         info!(
-            "Stashing uncommitted changes in {} before clean checkout",
+            "Stashing changes in {} before clean checkout \
+             (any dirty submodules will be discarded)",
             repo_dir.display()
         );
     }
@@ -771,11 +777,11 @@ fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Re
     // In clean mode, use --force to reset dirty submodules (stash_if_dirty only
     // handles the superproject; git stash does not cover submodule changes).
     if options.recurse_submodules {
-        debug!("Updating submodules...");
         let mut sub_args = vec!["submodule", "update", "--init", "--recursive", "--depth=1"];
         if options.workspace_state == WorkspaceState::Clean {
             sub_args.push("--force");
         }
+        debug!("Updating submodules...");
         match Command::new("git")
             .current_dir(repo_dir)
             .args(&sub_args)

@@ -869,7 +869,8 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
         if captured:
             if dep_idx >= 0:
                 _tracked["include_deps"][dep_idx]["include_args"] = captured
-            _tracked["include_args"][path] = captured
+            else:
+                _tracked["include_args"][path] = captured
     except _PackageNotFetchedError:
         raise
     except Exception as e:

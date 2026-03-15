@@ -813,6 +813,7 @@ mod tests {
         let options = FetchOptions::default();
         assert!(options.recurse_submodules);
         assert!(!options.shallow);
+        assert_eq!(options.workspace_state, WorkspaceState::Default);
     }
 
     // ── is_working_tree_dirty ────────────────────────────────────────────

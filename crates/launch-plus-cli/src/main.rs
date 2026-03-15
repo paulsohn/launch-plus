@@ -340,11 +340,15 @@ enum Commands {
         #[arg(long, default_value = "src")]
         src: String,
 
-        /// Reset repos to lockfile SHAs (stash dirty changes automatically)
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically).
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use the current on-disk state without any git operations
+        /// Use the current on-disk state without any git operations.
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
         dirty: bool,
 
@@ -431,11 +435,15 @@ enum Commands {
         #[arg(long, default_value = "src")]
         src: String,
 
-        /// Reset repos to lockfile SHAs (stash dirty changes automatically)
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically).
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use the current on-disk state without any git operations
+        /// Use the current on-disk state without any git operations.
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
         dirty: bool,
 
@@ -489,11 +497,15 @@ enum Commands {
         #[arg(long, default_value = "src")]
         src: String,
 
-        /// Reset repos to lockfile SHAs (stash dirty changes automatically)
+        /// Reset repos to lockfile SHAs (stash dirty changes automatically).
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'c', long, conflicts_with = "dirty")]
         clean: bool,
 
-        /// Use the current on-disk state without any git operations
+        /// Use the current on-disk state without any git operations.
+        /// Without --clean or --dirty, launch-plus verifies SHA and working
+        /// tree state, erroring if either is wrong.
         #[arg(short = 'd', long, conflicts_with = "clean")]
         dirty: bool,
 

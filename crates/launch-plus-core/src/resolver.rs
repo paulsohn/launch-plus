@@ -114,6 +114,7 @@ pub enum NodeKind {
         handler_kind: EventHandlerKind,
         target: Option<String>,
         target_node: Option<String>,
+        namespace: Option<String>,
         start_state: Option<String>,
         goal_state: Option<String>,
         actions: Vec<ResolvedEventAction>,
@@ -123,10 +124,11 @@ pub enum NodeKind {
 /// A resolved action inside an event handler.
 #[derive(Debug, Clone)]
 pub enum ResolvedEventAction {
-    /// `<emit_event event="..." target_node="..."/>`.
+    /// `<emit_event event="..." target_node="..." namespace="..."/>`.
     EmitEvent {
         event: String,
         target_node: Option<String>,
+        namespace: Option<String>,
     },
 }
 
@@ -801,6 +803,12 @@ pub struct IncludeArgContext {
     /// declaring `<arg name="x"/>`.  Prefer explicit forwarding; use this flag only for
     /// legacy launch files that cannot be refactored.
     pub with_cascade: HashMap<String, String>,
+
+    /// Accumulated `<push-ros-namespace>` stack at the include site.
+    ///
+    /// The orchestrator applies this as a prefix to all nodes produced by the child
+    /// file, so that cross-file namespace propagation matches ROS 2 semantics.
+    pub namespace_stack: Vec<String>,
 }
 
 /// A fully resolved launch configuration
@@ -864,6 +872,10 @@ pub struct LaunchInclude {
     pub share_path: PathBuf,
     /// Args explicitly passed at the include site (not cascaded parent args).
     pub explicit_args: HashMap<String, String>,
+    /// Accumulated `<push-ros-namespace>` stack at the include site in the parent file.
+    ///
+    /// Applied as a namespace prefix to all nodes produced by the child file.
+    pub namespace_stack: Vec<String>,
 }
 
 /// Unified per-file analysis result from any launch file format (XML, YAML, or Python).
@@ -1600,6 +1612,7 @@ fn resolve_element(
                 let inc_arg_ctx = IncludeArgContext {
                     explicit: resolved_args.clone(),
                     with_cascade: cascade_context,
+                    namespace_stack: ctx.namespace_stack.clone(),
                 };
 
                 // Extract file-level dependency and record its arg context.
@@ -1940,6 +1953,7 @@ fn resolve_element(
             kind: handler_kind,
             target,
             target_node,
+            namespace,
             start_state,
             goal_state,
             children,
@@ -1951,6 +1965,11 @@ fn resolve_element(
             };
             let resolved_target_node = if let Some(tn) = target_node {
                 Some(resolve_substitutions(tn, ctx)?.propagate_into(result))
+            } else {
+                None
+            };
+            let resolved_ns = if let Some(ns) = namespace {
+                Some(resolve_substitutions(ns, ctx)?.propagate_into(result))
             } else {
                 None
             };
@@ -1967,16 +1986,27 @@ fn resolve_element(
 
             let mut actions = Vec::new();
             for child in children {
-                if let LaunchElement::EmitEvent { event, target_node } = child {
+                if let LaunchElement::EmitEvent {
+                    event,
+                    target_node,
+                    namespace: child_ns,
+                } = child
+                {
                     let ev = resolve_substitutions(event, ctx)?.propagate_into(result);
                     let tn = if let Some(tn) = target_node {
                         Some(resolve_substitutions(tn, ctx)?.propagate_into(result))
                     } else {
                         None
                     };
+                    let cn = if let Some(ns) = child_ns {
+                        Some(resolve_substitutions(ns, ctx)?.propagate_into(result))
+                    } else {
+                        None
+                    };
                     actions.push(ResolvedEventAction::EmitEvent {
                         event: ev,
                         target_node: tn,
+                        namespace: cn,
                     });
                 }
             }
@@ -1986,6 +2016,7 @@ fn resolve_element(
                     handler_kind: *handler_kind,
                     target: resolved_target,
                     target_node: resolved_target_node,
+                    namespace: resolved_ns,
                     start_state: resolved_start,
                     goal_state: resolved_goal,
                     actions,
@@ -2823,6 +2854,7 @@ pub fn render_resolved_xml(
                 handler_kind,
                 target,
                 target_node,
+                namespace,
                 start_state,
                 goal_state,
                 actions,
@@ -2831,6 +2863,7 @@ pub fn render_resolved_xml(
                     *handler_kind,
                     target.as_deref(),
                     target_node.as_deref(),
+                    namespace.as_deref(),
                     start_state.as_deref(),
                     goal_state.as_deref(),
                     actions,
@@ -3087,6 +3120,7 @@ fn render_event_handler(
     handler_kind: EventHandlerKind,
     target: Option<&str>,
     target_node: Option<&str>,
+    namespace: Option<&str>,
     start_state: Option<&str>,
     goal_state: Option<&str>,
     actions: &[ResolvedEventAction],
@@ -3107,6 +3141,9 @@ fn render_event_handler(
     if let Some(tn) = target_node {
         tag.push_str(&format!(" target_node=\"{}\"", xml_escape(tn)));
     }
+    if let Some(ns) = namespace {
+        tag.push_str(&format!(" namespace=\"{}\"", xml_escape(ns)));
+    }
     if let Some(ss) = start_state {
         tag.push_str(&format!(" start_state=\"{}\"", xml_escape(ss)));
     }
@@ -3123,16 +3160,25 @@ fn render_event_handler(
 
         for action in actions {
             match action {
-                ResolvedEventAction::EmitEvent { event, target_node } => {
+                ResolvedEventAction::EmitEvent {
+                    event,
+                    target_node,
+                    namespace,
+                } => {
                     let tn_attr = target_node
                         .as_deref()
                         .map(|n| format!(" target_node=\"{}\"", xml_escape(n)))
                         .unwrap_or_default();
+                    let ns_attr = namespace
+                        .as_deref()
+                        .map(|n| format!(" namespace=\"{}\"", xml_escape(n)))
+                        .unwrap_or_default();
                     out.push_str(&format!(
-                        "{}<emit_event event=\"{}\"{}/>\n",
+                        "{}<emit_event event=\"{}\"{}{}/>\n",
                         child_ind,
                         xml_escape(event),
-                        tn_attr
+                        tn_attr,
+                        ns_attr,
                     ));
                 }
             }
@@ -7262,7 +7308,10 @@ launch:
             assert_eq!(*kind, EventHandlerKind::OnProcessStart);
             assert_eq!(target.as_deref(), Some("socket_can_receiver"));
             assert_eq!(children.len(), 1);
-            if let LaunchElement::EmitEvent { event, target_node } = &children[0] {
+            if let LaunchElement::EmitEvent {
+                event, target_node, ..
+            } = &children[0]
+            {
                 assert_eq!(event, "configure");
                 assert_eq!(target_node.as_deref(), Some("socket_can_receiver"));
             } else {
@@ -7342,7 +7391,9 @@ launch:
             assert_eq!(*handler_kind, EventHandlerKind::OnProcessStart);
             assert_eq!(target.as_deref(), Some("my_node"));
             assert_eq!(actions.len(), 1);
-            let ResolvedEventAction::EmitEvent { event, target_node } = &actions[0];
+            let ResolvedEventAction::EmitEvent {
+                event, target_node, ..
+            } = &actions[0];
             assert_eq!(event, "configure");
             assert_eq!(target_node.as_deref(), Some("my_node"));
         } else {

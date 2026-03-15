@@ -461,6 +461,9 @@ struct PyFileDep {
     /// Original path string (for looking up include_args keyed by path).
     #[serde(default)]
     path: String,
+    /// Accumulated `PushRosNamespace` stack at the include site in the Python file.
+    #[serde(default)]
+    namespace_stack: Vec<String>,
 }
 
 #[derive(Debug, serde::Deserialize, Default, PartialEq)]
@@ -488,6 +491,10 @@ struct PyEventHandler {
     #[serde(default)]
     goal_state: Option<String>,
     #[serde(default)]
+    namespace_stack: Vec<String>,
+    #[serde(default)]
+    explicit_namespace: Option<String>,
+    #[serde(default)]
     actions: Vec<PyEventAction>,
 }
 
@@ -497,6 +504,10 @@ struct PyEventAction {
     event: String,
     #[serde(default)]
     target_node: Option<String>,
+    #[serde(default)]
+    namespace_stack: Vec<String>,
+    #[serde(default)]
+    explicit_namespace: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -633,15 +644,18 @@ fn resolved_launch_to_parsed(resolved: ResolvedLaunch) -> ParsedLaunchFile {
     for dep in &resolved.required_files {
         match dep.kind {
             DependencyKind::Launch => {
-                let explicit_args = resolved
+                let inc_ctx = resolved
                     .include_args
-                    .get(&(dep.package.clone(), dep.share_path.clone()))
-                    .map(|ctx| ctx.explicit.clone())
+                    .get(&(dep.package.clone(), dep.share_path.clone()));
+                let explicit_args = inc_ctx.map(|ctx| ctx.explicit.clone()).unwrap_or_default();
+                let namespace_stack = inc_ctx
+                    .map(|ctx| ctx.namespace_stack.clone())
                     .unwrap_or_default();
                 launch_includes.push(LaunchInclude {
                     package: dep.package.clone(),
                     share_path: dep.share_path.clone(),
                     explicit_args,
+                    namespace_stack,
                 });
             }
             DependencyKind::Param => param_files.push(dep.clone()),
@@ -768,12 +782,23 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                 continue;
             }
         };
+        let handler_ns = crate::resolver::effective_namespace(
+            &eh.namespace_stack,
+            eh.explicit_namespace.as_deref(),
+        );
         let actions = eh
             .actions
             .iter()
-            .map(|a| ResolvedEventAction::EmitEvent {
-                event: a.event.clone(),
-                target_node: a.target_node.clone(),
+            .map(|a| {
+                let action_ns = crate::resolver::effective_namespace(
+                    &a.namespace_stack,
+                    a.explicit_namespace.as_deref(),
+                );
+                ResolvedEventAction::EmitEvent {
+                    event: a.event.clone(),
+                    target_node: a.target_node.clone(),
+                    namespace: action_ns,
+                }
             })
             .collect();
         nodes.push(ResolvedNode {
@@ -781,6 +806,7 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                 handler_kind,
                 target: eh.target.clone(),
                 target_node: eh.target_node.clone(),
+                namespace: handler_ns,
                 start_state: eh.start_state.clone(),
                 goal_state: eh.goal_state.clone(),
                 actions,
@@ -802,6 +828,7 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                 package: dep.package.clone(),
                 share_path: PathBuf::from(&dep.share_path),
                 explicit_args,
+                namespace_stack: dep.namespace_stack.clone(),
             }
         })
         .collect();
@@ -838,6 +865,57 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
 
 /// Common post-processing for any parsed launch file (XML, YAML, or Python).
 ///
+/// Apply a parent file's `<push-ros-namespace>` context to a child node.
+///
+/// Cross-file namespace propagation: when file A includes file B inside a
+/// `<push-ros-namespace>` group, nodes from B need the parent namespace prepended.
+/// This is a post-hoc adjustment — the child resolver runs namespace-agnostically,
+/// and the caller (orchestrator) applies the enclosing scope's namespace afterward.
+fn apply_parent_namespace(
+    parent_stack: &[String],
+    parent_ns: Option<&str>,
+    node: &mut ResolvedNode,
+) {
+    use crate::resolver::ros2_namespace_join;
+
+    // Prepend parent stack to the node's own namespace_stack.
+    let mut new_stack = parent_stack.to_vec();
+    new_stack.extend(node.namespace_stack.iter().cloned());
+    node.namespace_stack = new_stack;
+
+    // Recompute the node's effective namespace by joining parent onto child.
+    node.namespace = match (parent_ns, node.namespace.as_deref()) {
+        (Some(p), Some(c)) => ros2_namespace_join(Some(p), c),
+        (Some(p), None) => Some(p.to_string()),
+        (None, c) => c.map(|s| s.to_string()),
+    };
+
+    // For event handlers, also apply parent namespace to the handler and its actions.
+    if let NodeKind::EventHandler {
+        ref mut namespace,
+        ref mut actions,
+        ..
+    } = node.kind
+    {
+        *namespace = match (parent_ns, namespace.as_deref()) {
+            (Some(p), Some(c)) => ros2_namespace_join(Some(p), c),
+            (Some(p), None) => Some(p.to_string()),
+            (None, c) => c.map(|s| s.to_string()),
+        };
+        for action in actions {
+            match action {
+                ResolvedEventAction::EmitEvent { namespace, .. } => {
+                    *namespace = match (parent_ns, namespace.as_deref()) {
+                        (Some(p), Some(c)) => ros2_namespace_join(Some(p), c),
+                        (Some(p), None) => Some(p.to_string()),
+                        (None, c) => c.map(|s| s.to_string()),
+                    };
+                }
+            }
+        }
+    }
+}
+
 /// Accumulates packages/files/nodes into `result`, updates declared-arg tracking,
 /// and recurses into each launch include.  Both `resolve_file_recursive` (XML/YAML)
 /// and `resolve_python_file_recursive` (Python) call this after producing a
@@ -970,6 +1048,17 @@ fn process_parsed_file(
             fetched_packages,
             current_chain.to_vec(),
         );
+
+        // Apply parent namespace to all nodes produced by the child file.
+        // This implements cross-file <push-ros-namespace> propagation: the caller's
+        // namespace context is an enclosing scope concern that the child doesn't know
+        // about, so we apply it post-hoc.
+        if !include.namespace_stack.is_empty() {
+            let parent_ns = crate::resolver::effective_namespace(&include.namespace_stack, None);
+            for node in &mut result.nodes[nodes_before..] {
+                apply_parent_namespace(&include.namespace_stack, parent_ns.as_deref(), node);
+            }
+        }
 
         // Inject IncludeMarker if the child file (and all descendants) produced no nodes.
         if result.nodes.len() == nodes_before {
@@ -1649,6 +1738,91 @@ mod tests {
                 *expected,
                 "stack={stack:?} explicit={explicit:?}"
             );
+        }
+    }
+
+    /// Cross-file namespace propagation: parent push-ros-namespace is applied post-hoc.
+    #[test]
+    fn test_apply_parent_namespace() {
+        // Node with no namespace, parent has namespace "can0"
+        let parent_stack = vec!["can0".to_string()];
+        let parent_ns = crate::resolver::effective_namespace(&parent_stack, None);
+        let mut node = ResolvedNode {
+            namespace: None,
+            namespace_stack: vec![],
+            kind: NodeKind::LifecycleNode,
+            ..Default::default()
+        };
+        apply_parent_namespace(&parent_stack, parent_ns.as_deref(), &mut node);
+        assert_eq!(node.namespace.as_deref(), Some("/can0"));
+        assert_eq!(node.namespace_stack, vec!["can0"]);
+
+        // Node with explicit namespace="", parent has namespace "can0"
+        // Empty string explicit → effective_namespace returns None → parent applies
+        let mut node2 = ResolvedNode {
+            namespace: None, // effective_namespace([], Some("")) = None
+            namespace_stack: vec![],
+            kind: NodeKind::Node,
+            ..Default::default()
+        };
+        apply_parent_namespace(&parent_stack, parent_ns.as_deref(), &mut node2);
+        assert_eq!(node2.namespace.as_deref(), Some("/can0"));
+
+        // Node with explicit absolute namespace="/override", parent "can0"
+        // Absolute namespace should override (ros2 semantics)
+        let mut node3 = ResolvedNode {
+            namespace: Some("/override".to_string()),
+            namespace_stack: vec![],
+            kind: NodeKind::Node,
+            ..Default::default()
+        };
+        apply_parent_namespace(&parent_stack, parent_ns.as_deref(), &mut node3);
+        // ros2_namespace_join(Some("/can0"), "/override") → Some("/override")
+        assert_eq!(node3.namespace.as_deref(), Some("/override"));
+
+        // Node with relative child namespace, parent "can0"
+        let mut node4 = ResolvedNode {
+            namespace: Some("/inner".to_string()),
+            namespace_stack: vec!["inner".to_string()],
+            kind: NodeKind::Node,
+            ..Default::default()
+        };
+        apply_parent_namespace(&parent_stack, parent_ns.as_deref(), &mut node4);
+        // The child had effective namespace "/inner" from its own stack ["inner"].
+        // But "/inner" is absolute, so ros2_namespace_join("/can0", "/inner") → "/inner"
+        // This is correct: the child's push-ros-namespace produced an absolute path.
+        assert_eq!(node4.namespace.as_deref(), Some("/inner"));
+        assert_eq!(node4.namespace_stack, vec!["can0", "inner"]);
+
+        // Event handler: parent namespace should apply to handler and actions
+        let mut node5 = ResolvedNode {
+            namespace: None,
+            namespace_stack: vec![],
+            kind: NodeKind::EventHandler {
+                handler_kind: EventHandlerKind::OnProcessStart,
+                target: Some("my_node".to_string()),
+                target_node: None,
+                namespace: None,
+                start_state: None,
+                goal_state: None,
+                actions: vec![ResolvedEventAction::EmitEvent {
+                    event: "configure".to_string(),
+                    target_node: Some("my_node".to_string()),
+                    namespace: None,
+                }],
+            },
+            ..Default::default()
+        };
+        apply_parent_namespace(&parent_stack, parent_ns.as_deref(), &mut node5);
+        if let NodeKind::EventHandler {
+            namespace, actions, ..
+        } = &node5.kind
+        {
+            assert_eq!(namespace.as_deref(), Some("/can0"));
+            let ResolvedEventAction::EmitEvent { namespace, .. } = &actions[0];
+            assert_eq!(namespace.as_deref(), Some("/can0"));
+        } else {
+            panic!("expected EventHandler");
         }
     }
 

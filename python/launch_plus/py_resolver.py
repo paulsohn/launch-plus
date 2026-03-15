@@ -282,7 +282,12 @@ def _track_include(path):
         _tracked["includes"].append(path)
     dep = _extract_pkg_and_share_path(path)
     if dep:
-        entry = {"package": dep[0], "share_path": dep[1], "path": path}
+        entry = {
+            "package": dep[0],
+            "share_path": dep[1],
+            "path": path,
+            "namespace_stack": list(_namespace_stack),
+        }
         if not any(d["path"] == path for d in _tracked["include_deps"]):
             _tracked["include_deps"].append(entry)
 
@@ -404,16 +409,23 @@ class _TrackedEmitEvent:
     def __init__(self, event=None, **kwargs):
         self._event = event
         self._target_node = None
+        self._namespace_stack = []
+        self._explicit_namespace = None
         # Extract target node from ChangeState-like event objects
         if event is not None and hasattr(event, "_target_node"):
             self._target_node = event._target_node
         if event is not None and hasattr(event, "_event_name"):
             self._event = event._event_name
+        if event is not None and hasattr(event, "_namespace_stack"):
+            self._namespace_stack = event._namespace_stack
+            self._explicit_namespace = event._explicit_namespace
 
     def to_dict(self):
         return {
             "event": str(self._event) if self._event else "",
             "target_node": self._target_node,
+            "namespace_stack": self._namespace_stack,
+            "explicit_namespace": self._explicit_namespace,
         }
 
 
@@ -426,8 +438,12 @@ class _TrackedChangeState:
     def __init__(self, lifecycle_node_matcher=None, transition_id=None, **kwargs):
         self._event_name = _transition_name(transition_id)
         self._target_node = None
+        self._namespace_stack = []
+        self._explicit_namespace = None
         if lifecycle_node_matcher is not None and hasattr(lifecycle_node_matcher, "_node_name"):
             self._target_node = lifecycle_node_matcher._node_name
+            self._namespace_stack = getattr(lifecycle_node_matcher, "_namespace_stack", [])
+            self._explicit_namespace = getattr(lifecycle_node_matcher, "_explicit_namespace", None)
 
 
 class _TrackedShutdown:
@@ -439,10 +455,12 @@ class _TrackedMatchesAction:
     """Wraps ``matches_action(node)`` — carries the node name for ChangeState targeting.
 
     The real ``launch.events.matches_action`` returns a callable matcher.
-    Our version also records the node name so ``_TrackedChangeState`` can extract it.
+    Our version also records the node name and namespace so ``_TrackedChangeState``
+    can extract them.
     """
     def __init__(self, action):
         self._node_name = _action_name(action)
+        self._namespace_stack, self._explicit_namespace = _action_namespace_info(action)
 
     def __call__(self, *args, **kwargs):
         return True  # dummy matcher
@@ -469,6 +487,7 @@ class _TrackedOnProcessStart:
     """Tracked OnProcessStart event handler."""
     def __init__(self, target_action=None, on_start=None, **kwargs):
         self._target_name = _action_name(target_action)
+        self._namespace_stack, self._explicit_namespace = _action_namespace_info(target_action)
         self._actions = on_start or []
 
     def to_event_handler(self):
@@ -478,6 +497,8 @@ class _TrackedOnProcessStart:
             "target_node": None,
             "start_state": None,
             "goal_state": None,
+            "namespace_stack": self._namespace_stack,
+            "explicit_namespace": self._explicit_namespace,
             "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
         }
 
@@ -486,6 +507,7 @@ class _TrackedOnProcessExit:
     """Tracked OnProcessExit event handler."""
     def __init__(self, target_action=None, on_exit=None, **kwargs):
         self._target_name = _action_name(target_action)
+        self._namespace_stack, self._explicit_namespace = _action_namespace_info(target_action)
         self._actions = on_exit or []
 
     def to_event_handler(self):
@@ -495,6 +517,8 @@ class _TrackedOnProcessExit:
             "target_node": None,
             "start_state": None,
             "goal_state": None,
+            "namespace_stack": self._namespace_stack,
+            "explicit_namespace": self._explicit_namespace,
             "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
         }
 
@@ -508,6 +532,7 @@ class _TrackedOnStateTransition:
     def __init__(self, target_lifecycle_node=None, start_state=None, goal_state=None,
                  entities=None, **kwargs):
         self._target_node = _action_name(target_lifecycle_node)
+        self._namespace_stack, self._explicit_namespace = _action_namespace_info(target_lifecycle_node)
         self._start_state = str(start_state) if start_state else None
         self._goal_state = str(goal_state) if goal_state else None
         self._actions = entities or []
@@ -519,6 +544,8 @@ class _TrackedOnStateTransition:
             "target_node": self._target_node or None,
             "start_state": self._start_state,
             "goal_state": self._goal_state,
+            "namespace_stack": self._namespace_stack,
+            "explicit_namespace": self._explicit_namespace,
             "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
         }
 
@@ -551,6 +578,20 @@ def _action_name(action):
     if action is not None and hasattr(action, "_idx"):
         return _tracked["nodes"][action._idx].get("name", "")
     return ""
+
+
+def _action_namespace_info(action):
+    """Extract namespace_stack and explicit_namespace for a tracked node action.
+
+    Returns (namespace_stack, explicit_namespace) from the tracked entry.
+    By the time event handlers are registered, _resolve_node_details has
+    already run on the target node (LifecycleNode is processed before
+    RegisterEventHandler in _walk_actions), so these fields are populated.
+    """
+    if action is None or not hasattr(action, "_idx"):
+        return [], None
+    entry = _tracked["nodes"][action._idx]
+    return entry.get("namespace_stack", []), entry.get("explicit_namespace")
 
 
 class _TrackedComposableNode:

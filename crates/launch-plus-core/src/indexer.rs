@@ -256,6 +256,420 @@ pub struct PackageInfo {
     pub dependencies: Dependencies,
 }
 
+/// Evaluate a REP-149 `condition` attribute on a dependency element.
+///
+/// Returns `true` if the dependency should be included (no condition, or
+/// condition evaluates to true).
+///
+/// Implements the full REP-149 condition grammar:
+/// - Comparison operators: `==`, `!=`, `<`, `<=`, `>`, `>=` (string comparison)
+/// - Logical operators: `and`, `or` (left-associative, `and` binds tighter)
+/// - Parentheses for grouping
+/// - Terms: `$VAR` (env variable), bare words (alphanums/`_`/`-`), quoted strings
+///
+/// Reference: <https://ros.org/reps/rep-0149.html#condition>
+fn evaluate_condition(element: &quick_xml::events::BytesStart) -> bool {
+    let condition = match element
+        .attributes()
+        .flatten()
+        .find(|a| a.key.as_ref() == b"condition")
+    {
+        Some(attr) => String::from_utf8_lossy(&attr.value).to_string(),
+        None => return true, // no condition → always include
+    };
+
+    match condition::evaluate(&condition) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!("failed to evaluate condition '{condition}': {e}; including dependency");
+            true
+        }
+    }
+}
+
+/// REP-149 condition expression evaluator.
+///
+/// Grammar (informal):
+/// ```text
+/// expr       = or_expr
+/// or_expr    = and_expr ('or' and_expr)*
+/// and_expr   = atom ('and' atom)*
+/// atom       = '(' expr ')' | comparison
+/// comparison = term cmp_op term
+/// cmp_op     = '==' | '!=' | '<=' | '>=' | '<' | '>'
+/// term       = variable | quoted_string | bare_word
+/// variable   = '$' [A-Za-z0-9_]+
+/// bare_word  = [A-Za-z0-9_-]+
+/// ```
+mod condition {
+    /// Tokens produced by the lexer.
+    #[derive(Debug, Clone, PartialEq)]
+    enum Token {
+        /// `$VAR` — resolved to env value at eval time
+        Var(String),
+        /// Bare word or quoted string literal
+        Literal(String),
+        /// Comparison operator
+        CmpOp(CmpOp),
+        And,
+        Or,
+        LParen,
+        RParen,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    enum CmpOp {
+        Eq,
+        Ne,
+        Lt,
+        Le,
+        Gt,
+        Ge,
+    }
+
+    impl CmpOp {
+        fn eval(self, lhs: &str, rhs: &str) -> bool {
+            match self {
+                CmpOp::Eq => lhs == rhs,
+                CmpOp::Ne => lhs != rhs,
+                CmpOp::Lt => lhs < rhs,
+                CmpOp::Le => lhs <= rhs,
+                CmpOp::Gt => lhs > rhs,
+                CmpOp::Ge => lhs >= rhs,
+            }
+        }
+    }
+
+    /// Tokenize a condition string.
+    fn tokenize(input: &str) -> Result<Vec<Token>, String> {
+        let mut tokens = Vec::new();
+        let chars: Vec<char> = input.chars().collect();
+        let mut i = 0;
+
+        while i < chars.len() {
+            // Skip whitespace
+            if chars[i].is_ascii_whitespace() {
+                i += 1;
+                continue;
+            }
+
+            // Parentheses
+            if chars[i] == '(' {
+                tokens.push(Token::LParen);
+                i += 1;
+                continue;
+            }
+            if chars[i] == ')' {
+                tokens.push(Token::RParen);
+                i += 1;
+                continue;
+            }
+
+            // Comparison operators (check two-char first)
+            if i + 1 < chars.len() {
+                let two: String = chars[i..=i + 1].iter().collect();
+                match two.as_str() {
+                    "==" => {
+                        tokens.push(Token::CmpOp(CmpOp::Eq));
+                        i += 2;
+                        continue;
+                    }
+                    "!=" => {
+                        tokens.push(Token::CmpOp(CmpOp::Ne));
+                        i += 2;
+                        continue;
+                    }
+                    "<=" => {
+                        tokens.push(Token::CmpOp(CmpOp::Le));
+                        i += 2;
+                        continue;
+                    }
+                    ">=" => {
+                        tokens.push(Token::CmpOp(CmpOp::Ge));
+                        i += 2;
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+            if chars[i] == '<' {
+                tokens.push(Token::CmpOp(CmpOp::Lt));
+                i += 1;
+                continue;
+            }
+            if chars[i] == '>' {
+                tokens.push(Token::CmpOp(CmpOp::Gt));
+                i += 1;
+                continue;
+            }
+
+            // Variable: $[A-Za-z0-9_]+
+            if chars[i] == '$' {
+                let start = i + 1;
+                i += 1;
+                while i < chars.len() && (chars[i].is_ascii_alphanumeric() || chars[i] == '_') {
+                    i += 1;
+                }
+                if i == start {
+                    return Err("empty variable name after '$'".to_string());
+                }
+                let name: String = chars[start..i].iter().collect();
+                tokens.push(Token::Var(name));
+                continue;
+            }
+
+            // Quoted string
+            if chars[i] == '"' || chars[i] == '\'' {
+                let quote = chars[i];
+                i += 1;
+                let start = i;
+                while i < chars.len() && chars[i] != quote {
+                    i += 1;
+                }
+                if i >= chars.len() {
+                    return Err(format!("unterminated {quote}-quoted string"));
+                }
+                let s: String = chars[start..i].iter().collect();
+                tokens.push(Token::Literal(s));
+                i += 1; // skip closing quote
+                continue;
+            }
+
+            // Bare word: alphanums, underscore, dash
+            if chars[i].is_ascii_alphanumeric() || chars[i] == '_' || chars[i] == '-' {
+                let start = i;
+                while i < chars.len()
+                    && (chars[i].is_ascii_alphanumeric() || chars[i] == '_' || chars[i] == '-')
+                {
+                    i += 1;
+                }
+                let word: String = chars[start..i].iter().collect();
+                match word.as_str() {
+                    "and" => tokens.push(Token::And),
+                    "or" => tokens.push(Token::Or),
+                    _ => tokens.push(Token::Literal(word)),
+                }
+                continue;
+            }
+
+            return Err(format!("unexpected character '{}'", chars[i]));
+        }
+
+        Ok(tokens)
+    }
+
+    /// Resolve a term token to its string value.
+    fn resolve_term(token: &Token) -> Result<String, String> {
+        match token {
+            Token::Var(name) => Ok(std::env::var(name).unwrap_or_default()),
+            Token::Literal(s) => Ok(s.clone()),
+            other => Err(format!("expected term, got {other:?}")),
+        }
+    }
+
+    /// Recursive-descent parser and evaluator.
+    struct Parser {
+        tokens: Vec<Token>,
+        pos: usize,
+    }
+
+    impl Parser {
+        fn new(tokens: Vec<Token>) -> Self {
+            Self { tokens, pos: 0 }
+        }
+
+        fn peek(&self) -> Option<&Token> {
+            self.tokens.get(self.pos)
+        }
+
+        fn next(&mut self) -> Option<&Token> {
+            let t = self.tokens.get(self.pos);
+            if t.is_some() {
+                self.pos += 1;
+            }
+            t
+        }
+
+        /// expr = or_expr
+        fn parse_expr(&mut self) -> Result<bool, String> {
+            self.parse_or()
+        }
+
+        /// or_expr = and_expr ('or' and_expr)*
+        fn parse_or(&mut self) -> Result<bool, String> {
+            let mut result = self.parse_and()?;
+            while self.peek() == Some(&Token::Or) {
+                self.next();
+                let rhs = self.parse_and()?;
+                result = result || rhs;
+            }
+            Ok(result)
+        }
+
+        /// and_expr = atom ('and' atom)*
+        fn parse_and(&mut self) -> Result<bool, String> {
+            let mut result = self.parse_atom()?;
+            while self.peek() == Some(&Token::And) {
+                self.next();
+                let rhs = self.parse_atom()?;
+                result = result && rhs;
+            }
+            Ok(result)
+        }
+
+        /// atom = '(' expr ')' | comparison
+        fn parse_atom(&mut self) -> Result<bool, String> {
+            if self.peek() == Some(&Token::LParen) {
+                self.next(); // consume '('
+                let result = self.parse_expr()?;
+                if self.next() != Some(&Token::RParen) {
+                    return Err("expected ')'".to_string());
+                }
+                return Ok(result);
+            }
+            self.parse_comparison()
+        }
+
+        /// comparison = term cmp_op term
+        fn parse_comparison(&mut self) -> Result<bool, String> {
+            let lhs_token = self.next().cloned().ok_or("expected term")?;
+            let lhs = resolve_term(&lhs_token)?;
+
+            let op = match self.next() {
+                Some(Token::CmpOp(op)) => *op,
+                other => {
+                    return Err(format!("expected comparison operator, got {other:?}"));
+                }
+            };
+
+            let rhs_token = self.next().cloned().ok_or("expected term after operator")?;
+            let rhs = resolve_term(&rhs_token)?;
+
+            Ok(op.eval(&lhs, &rhs))
+        }
+    }
+
+    /// Evaluate a REP-149 condition expression against the current environment.
+    pub fn evaluate(condition: &str) -> Result<bool, String> {
+        let tokens = tokenize(condition)?;
+        if tokens.is_empty() {
+            return Ok(true);
+        }
+        let mut parser = Parser::new(tokens);
+        let result = parser.parse_expr()?;
+        if parser.pos != parser.tokens.len() {
+            return Err(format!(
+                "unexpected token at position {}: {:?}",
+                parser.pos, parser.tokens[parser.pos]
+            ));
+        }
+        Ok(result)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        /// Helper: evaluate with known env.  We can't set env vars safely,
+        /// so we test tokenizer + parser logic using literals only, plus
+        /// a few tests that rely on unset vars (→ empty string).
+        #[test]
+        fn simple_eq_true() {
+            assert!(evaluate("1 == 1").unwrap());
+        }
+
+        #[test]
+        fn simple_eq_false() {
+            assert!(!evaluate("1 == 2").unwrap());
+        }
+
+        #[test]
+        fn simple_ne() {
+            assert!(evaluate("1 != 2").unwrap());
+            assert!(!evaluate("1 != 1").unwrap());
+        }
+
+        #[test]
+        fn string_comparison_operators() {
+            // String comparison: "a" < "b"
+            assert!(evaluate("a < b").unwrap());
+            assert!(evaluate("a <= b").unwrap());
+            assert!(evaluate("a <= a").unwrap());
+            assert!(evaluate("b > a").unwrap());
+            assert!(evaluate("b >= a").unwrap());
+            assert!(evaluate("b >= b").unwrap());
+            assert!(!evaluate("b < a").unwrap());
+        }
+
+        #[test]
+        fn logical_and() {
+            assert!(evaluate("1 == 1 and 2 == 2").unwrap());
+            assert!(!evaluate("1 == 1 and 1 == 2").unwrap());
+        }
+
+        #[test]
+        fn logical_or() {
+            assert!(evaluate("1 == 2 or 2 == 2").unwrap());
+            assert!(!evaluate("1 == 2 or 3 == 4").unwrap());
+        }
+
+        #[test]
+        fn and_binds_tighter_than_or() {
+            // "1==2 and 1==1 or 2==2" → (false and true) or true → true
+            assert!(evaluate("1 == 2 and 1 == 1 or 2 == 2").unwrap());
+            // "1==1 or 1==2 and 1==2" → true or (false and false) → true
+            assert!(evaluate("1 == 1 or 1 == 2 and 1 == 2").unwrap());
+        }
+
+        #[test]
+        fn parentheses() {
+            // Without parens: "1==1 or 1==2 and 1==2" → true (or short-circuits)
+            // With parens: "(1==1 or 1==2) and 1==2" → true and false → false
+            assert!(!evaluate("(1 == 1 or 1 == 2) and 1 == 2").unwrap());
+        }
+
+        #[test]
+        fn quoted_strings() {
+            assert!(evaluate(r#""hello" == "hello""#).unwrap());
+            assert!(!evaluate(r#""hello" == "world""#).unwrap());
+            assert!(evaluate("'foo' == 'foo'").unwrap());
+        }
+
+        #[test]
+        fn bare_word_with_dash() {
+            assert!(evaluate("my-value == my-value").unwrap());
+            assert!(!evaluate("my-value == other-value").unwrap());
+        }
+
+        #[test]
+        fn unset_var_is_empty_string() {
+            // _LAUNCH_PLUS_UNSET_VAR_ should not exist
+            assert!(evaluate("$_LAUNCH_PLUS_UNSET_VAR_ == ''").unwrap());
+            assert!(!evaluate("$_LAUNCH_PLUS_UNSET_VAR_ == 1").unwrap());
+        }
+
+        #[test]
+        fn nested_parentheses() {
+            assert!(evaluate("((1 == 1))").unwrap());
+        }
+
+        #[test]
+        fn empty_condition() {
+            assert!(evaluate("").unwrap());
+        }
+
+        #[test]
+        fn error_on_garbage() {
+            assert!(evaluate("@#!").is_err());
+        }
+
+        #[test]
+        fn error_on_unbalanced_paren() {
+            assert!(evaluate("(1 == 1").is_err());
+        }
+    }
+}
+
 /// Parse package.xml content to extract package information
 ///
 /// # Arguments
@@ -271,12 +685,19 @@ pub fn parse_package_xml(content: &str, path: &str) -> crate::Result<PackageInfo
     let mut name = String::new();
     let mut dependencies = Dependencies::default();
     let mut current_tag = String::new();
+    let mut skip_current = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
                 current_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                // REP-149 §3: evaluate condition="$VAR == value" attributes.
+                // Dependencies whose condition evaluates to false are skipped.
+                skip_current = !evaluate_condition(&e);
+            }
+            Ok(Event::Text(_)) if skip_current => {
+                // Condition evaluated to false — skip this dependency.
             }
             Ok(Event::Text(e)) => {
                 let text = e.unescape().map_err(|err| {
@@ -1247,5 +1668,60 @@ repositories:
 "#;
         let result = parse_package_xml(content, "test");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_package_xml_condition_filters_deps() {
+        // Use a test-specific env var that won't collide.
+        // In CI/test env, LAUNCH_PLUS_TEST_COND is unset → "" != "yes" is true,
+        // "" == "yes" is false.
+        let content = r#"<?xml version="1.0"?>
+<package format="3">
+  <name>test_pkg</name>
+  <buildtool_depend condition="$LAUNCH_PLUS_TEST_COND == yes">conditional_dep</buildtool_depend>
+  <buildtool_depend condition="$LAUNCH_PLUS_TEST_COND != yes">fallback_dep</buildtool_depend>
+  <depend>unconditional_dep</depend>
+</package>
+"#;
+        let info = parse_package_xml(content, "test").unwrap();
+        // LAUNCH_PLUS_TEST_COND is unset → "" == "yes" is false → excluded
+        assert!(
+            !info
+                .dependencies
+                .buildtool
+                .contains(&"conditional_dep".to_string())
+        );
+        // "" != "yes" is true → included
+        assert!(
+            info.dependencies
+                .buildtool
+                .contains(&"fallback_dep".to_string())
+        );
+        // Unconditional deps always included
+        assert!(
+            info.dependencies
+                .build
+                .contains(&"unconditional_dep".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_package_xml_no_condition_includes_all() {
+        let content = r#"<?xml version="1.0"?>
+<package format="3">
+  <name>test_pkg</name>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>rclcpp</build_depend>
+  <exec_depend>std_msgs</exec_depend>
+</package>
+"#;
+        let info = parse_package_xml(content, "test").unwrap();
+        assert!(
+            info.dependencies
+                .buildtool
+                .contains(&"ament_cmake".to_string())
+        );
+        assert!(info.dependencies.build.contains(&"rclcpp".to_string()));
+        assert!(info.dependencies.exec.contains(&"std_msgs".to_string()));
     }
 }

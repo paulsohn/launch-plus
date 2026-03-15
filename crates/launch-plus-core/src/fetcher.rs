@@ -326,7 +326,9 @@ fn update_sparse_checkout(
                 return Ok(());
             }
             // Clean mode: reset to the pinned SHA even for non-sparse repos.
-            if current_sha != sha {
+            // Also stash + re-checkout if the tree is dirty (even at the correct SHA).
+            let need_checkout = current_sha != sha || is_working_tree_dirty(repo_dir)?;
+            if need_checkout {
                 info!(
                     "Clean mode: resetting {} from {} to {}",
                     repo_dir.display(),
@@ -367,11 +369,14 @@ fn update_sparse_checkout(
         add_sparse_checkout_paths(repo_dir, &paths_to_add)?;
     }
 
-    // Checkout if the SHA has changed or new paths were added.
-    // In clean mode, checkout uses -f to reset dirty files.
-    // If SHA already matches and no new paths were added, skip the checkout
-    // regardless of mode — the working tree content is already correct.
-    if !sha_matches || !paths_to_add.is_empty() {
+    // Checkout when: SHA changed, new paths added, or clean mode with dirty tree.
+    // Clean mode must guarantee a clean working tree, so even at the correct SHA
+    // we stash + re-checkout if the tree is dirty.
+    let need_checkout = !sha_matches
+        || !paths_to_add.is_empty()
+        || (options.workspace_state == WorkspaceState::Clean && is_working_tree_dirty(repo_dir)?);
+
+    if need_checkout {
         checkout_sha(repo_dir, sha, options)?;
     } else {
         debug!(
@@ -645,6 +650,11 @@ fn stash_if_dirty(repo_dir: &Path) -> crate::Result<bool> {
 
 /// Checkout a specific SHA
 fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Result<()> {
+    // In clean mode, stash dirty changes first — before any other git operations.
+    if options.workspace_state == WorkspaceState::Clean {
+        stash_if_dirty(repo_dir)?;
+    }
+
     // Check if the SHA is already available locally before fetching.
     let have_locally = Command::new("git")
         .current_dir(repo_dir)
@@ -679,12 +689,6 @@ fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Re
                 stderr.trim()
             )));
         }
-    }
-
-    // In Clean mode, stash any dirty changes before checkout instead of
-    // discarding them with -f.
-    if options.workspace_state == WorkspaceState::Clean {
-        stash_if_dirty(repo_dir)?;
     }
 
     let checkout_args: &[&str] = &["checkout", sha];

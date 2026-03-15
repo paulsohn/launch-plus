@@ -51,7 +51,7 @@ variables substituted — invaluable for debugging and CI validation.
 
 - **Lazy fetching** — packages are sparse-checked out on demand; no full clone required
 - **Minimal builds** — only the transitive dependencies of your launch target are built
-- **Static analysis** — resolve launch files without building or executing anything
+- **Static analysis** — resolve launch files without building packages or running ROS nodes
 - **Python launch support** — executes `generate_launch_description()` with shimmed
   `launch`/`launch_ros` imports; no ROS 2 Python packages needed on the resolver host
 - **OpaqueFunction handling** — executes arbitrary Python callables with patched
@@ -71,7 +71,7 @@ variables substituted — invaluable for debugging and CI validation.
 ### Prerequisites
 
 - **Rust toolchain** — [rustup.rs](https://rustup.rs) (edition 2024, MSRV 1.85)
-- **Python 3** in `PATH` — used to evaluate Python launch files
+- **Python 3** in `PATH` — used to evaluate Python launch files and `$(eval ...)` substitutions in XML
 - **Git** — for sparse-checkout operations
 - **ROS 2** — source your ROS 2 environment (`source /opt/ros/<distro>/setup.bash`)
 

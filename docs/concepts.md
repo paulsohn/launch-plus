@@ -34,33 +34,29 @@ every repository to a concrete commit SHA and records the ROS packages each
 repository contains.
 
 ```yaml
-version: 1
-repos:
-  autowarefoundation/autoware_msgs:
+repositories:
+  core/autoware_msgs:
+    type: git
     url: https://github.com/autowarefoundation/autoware_msgs.git
-    version: 1.11.0
-    sha: abc123def456...
-    workspace_path: core/autoware_msgs
+    version: 588f00df3acca009ea709a74acd6538897eef424  # pinned SHA
+    ref: 1.11.0                                        # original tag/branch
     packages:
+      - autoware_common_msgs
       - autoware_msgs
       - autoware_planning_msgs
 
 packages:
   autoware_msgs:
-    repo: autowarefoundation/autoware_msgs
+    repo: core/autoware_msgs
     path: autoware_msgs
-    dependencies:
-      build: [rosidl_default_generators]
-      exec: [rosidl_default_runtime]
-      test: [ament_lint_auto]
 ```
 
 The lockfile is dual-indexed:
-- **`repos`** — grouped by repository, used during fetching
+- **`repositories`** — grouped by repository, used during fetching
 - **`packages`** — indexed by package name, used for O(1) dependency lookup
 
 This gives you:
-- **Reproducibility** — `sha` pins mean identical source code every time
+- **Reproducibility** — SHA pins mean identical source code every time
 - **Sparse clone map** — the lockfile records which packages live in which
   repository and at what path, so launch-plus can sparse-checkout *only* the
   packages it needs without cloning entire repositories

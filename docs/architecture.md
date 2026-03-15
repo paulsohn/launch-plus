@@ -2,9 +2,12 @@
 
 ## Overview
 
-launch-plus is a Rust application with an embedded Python interpreter for
-resolving Python launch files.  The core library (`launch-plus-core`) contains
-all logic; the CLI (`launch-plus-cli`) is a thin `clap`-based wrapper.
+launch-plus is a Rust application that shells out to an external `python3`
+process for resolving Python launch files.  The Python resolver script
+(`py_resolver.py`) is embedded in the Rust binary via `include_str!` at compile
+time, written to a temporary file, and invoked as a subprocess.  The core
+library (`launch-plus-core`) contains all logic; the CLI (`launch-plus-cli`) is
+a thin `clap`-based wrapper.
 
 ```
 ┌───────────────────────────────────────────────────────┐

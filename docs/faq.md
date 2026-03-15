@@ -58,10 +58,11 @@ targeted builds and reproducibility without requiring a build system migration.
 
 Yes — you should have ROS 2 installed and sourced.  Since launch-plus operates on
 ROS 2 projects, a sourced ROS 2 environment (`AMENT_PREFIX_PATH`) is the expected
-baseline.  Even packages like `numpy` that are installed system-wide won't be found
-by the resolver unless they are on `AMENT_PREFIX_PATH`.
+baseline.  The resolver uses `AMENT_PREFIX_PATH` to locate installed ROS packages
+(e.g. buildfarm packages like `tf2_ros` or `rosbridge_server`), so packages that
+are only available through the ROS 2 overlay won't be found without sourcing.
 
-That said, the resolver itself (especially without `--rosdep`) does not link against any
+That said, the resolver itself (without `--rosdep`) does not link against any
 ROS 2 libraries — it only needs Python 3, Git, and the environment variables that
 `source /opt/ros/<distro>/setup.bash` provides.
 
@@ -184,8 +185,8 @@ different source code.
 ### How do I update the lockfile?
 
 ```bash
-launch-plus update              # re-resolve all refs
-launch-plus update my_msgs      # update specific repos
+launch-plus update                  # re-resolve all refs
+launch-plus update core/my_msgs     # update a specific repo (uses lockfile key)
 ```
 
 ### What if a package isn't in the lockfile?

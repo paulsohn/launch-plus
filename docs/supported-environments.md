@@ -20,10 +20,10 @@
 | Rolling | 24.04 | Should work (untested in CI) |
 
 A sourced ROS 2 environment is expected.  While the resolver does not link against
-any ROS 2 libraries, it relies on `AMENT_PREFIX_PATH` to locate installed packages
-(including system packages like `numpy` that are only visible through the ROS 2
-overlay).  Source your ROS 2 setup file (`source /opt/ros/<distro>/setup.bash`)
-before running launch-plus.
+any ROS 2 libraries, it relies on `AMENT_PREFIX_PATH` to locate installed ROS
+packages (e.g. buildfarm packages like `rosbridge_server` or `tf2_ros`).  Source
+your ROS 2 setup file (`source /opt/ros/<distro>/setup.bash`) before running
+launch-plus.
 
 ## Rust toolchain
 
@@ -33,7 +33,8 @@ before running launch-plus.
 
 ## Python
 
-- **Python 3.8+** required (for evaluating Python launch files)
+- **Python 3.8+** required (for evaluating Python launch files and `$(eval ...)`
+  substitutions in XML launch files)
 - Must be available as `python3` in `PATH`
 - No ROS 2 Python packages needed on the resolver host
 
@@ -82,6 +83,20 @@ Supported via shimmed imports.  Standard patterns work:
 - `OpaqueFunction` (with `--apply-opaque-file-access`)
 - `FindPackageShare`, `PathJoinSubstitution`
 - Conditions: `IfCondition`, `UnlessCondition`, `LaunchConfigurationEquals`
+- Event handlers: `OnProcessExit`, `OnProcessStart`, etc.
+- `EmitEvent` and other built-in event actions
+
+**Lifecycle and event handling caveats:**  `LifecycleNode` and event-related
+constructs (`RegisterEventHandler`, `OnProcessExit`, `OnProcessStart`, etc.)
+are captured by the shims and appear as static elements in the resolved XML
+(e.g. `<lifecycle_node>`, `<on_process_exit>`).  However:
+
+- There is currently **no executor that recognizes these extended XML elements**.
+  The resolved output preserves the structure for inspection, but `ros2 launch`
+  does not understand `<lifecycle_node>` or `<on_process_exit>` tags in XML.
+- Event handler **callbacks have very limited support**: built-in actions like
+  `EmitEvent` are supported, but arbitrary Python function callbacks are not —
+  they cannot be serialized to XML.
 
 ### YAML launch files (`*.launch.yaml`)
 
@@ -91,11 +106,14 @@ files in practice.
 ### Xacro (`*.xacro`, `*.urdf.xacro`)
 
 **Not supported.**  Xacro files are not launch files — they are XML macro
-templates for URDF/SDF robot descriptions.  When a launch file references a
-xacro file (e.g. via `xacro.process_file()` in an OpaqueFunction), the xacro
-processing call is preserved in the resolved output but not executed by
-launch-plus.  The actual xacro expansion happens at runtime when the system is
-launched.
+templates for URDF/SDF robot descriptions.  When an XML launch file references
+xacro (e.g. via a `$(xacro ...)` substitution), the xacro call is preserved
+in the resolved output but not executed by launch-plus — the actual xacro
+expansion happens at runtime when the system is launched.
+
+Python-side xacro calls (e.g. `xacro.process_file()` in an OpaqueFunction)
+are not supported and will fail, since the `xacro` package is not available
+through the resolver's shimmed imports.
 
 ## Known limitations
 

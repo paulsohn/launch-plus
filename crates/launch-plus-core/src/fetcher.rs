@@ -24,10 +24,9 @@ pub struct FetchedPackage {
 /// Controls how the fetcher treats an already-present source workspace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorkspaceState {
-    /// Reset every repository to the pinned lockfile SHA, discarding any local
-    /// modifications (`git checkout -f <sha>`).  If the working tree is dirty,
-    /// changes are automatically stashed before checkout.  Guarantees
-    /// reproducibility.
+    /// Reset every repository to the pinned lockfile SHA.  If the working tree
+    /// is dirty (including untracked files), changes are automatically stashed
+    /// before checkout.  Guarantees reproducibility.
     Clean,
     /// Trust whatever is currently on disk.  Repositories that already exist are
     /// not touched by any git operation.  Only missing repos are cloned fresh.
@@ -586,23 +585,23 @@ fn add_sparse_paths_if_needed(repo_dir: &Path, paths: &[&str]) -> crate::Result<
         info!("Adding paths to sparse-checkout: {:?}", paths_to_add);
         add_sparse_checkout_paths(repo_dir, &paths_to_add)?;
 
-        // After adding new sparse paths we need to checkout to materialize them.
-        // Use normal (non-force) checkout at the current SHA.
-        let current_sha = get_current_sha(repo_dir)?;
+        // Reapply sparse-checkout to materialize the newly added paths
+        // without detaching HEAD or changing the checked-out commit.
         let output = Command::new("git")
             .current_dir(repo_dir)
-            .args(["checkout", &current_sha])
+            .args(["sparse-checkout", "reapply"])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
-            .map_err(|e| crate::Error::Git(format!("failed to run git checkout: {}", e)))?;
+            .map_err(|e| {
+                crate::Error::Git(format!("failed to run git sparse-checkout reapply: {}", e))
+            })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(crate::Error::Git(format!(
-                "git checkout {} failed: {}",
-                &current_sha[..current_sha.len().min(12)],
-                stderr
+                "git sparse-checkout reapply failed: {}",
+                stderr.trim()
             )));
         }
     }
@@ -627,6 +626,7 @@ fn stash_if_dirty(repo_dir: &Path) -> crate::Result<bool> {
         .args([
             "stash",
             "push",
+            "--include-untracked",
             "-m",
             "launch-plus auto-stash before clean checkout",
         ])

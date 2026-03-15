@@ -708,12 +708,18 @@ fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Re
         )));
     }
 
-    // Update submodules if requested
+    // Update submodules if requested.
+    // In clean mode, use --force to reset dirty submodules (stash_if_dirty only
+    // handles the superproject; git stash does not cover submodule changes).
     if options.recurse_submodules {
         debug!("Updating submodules...");
+        let mut sub_args = vec!["submodule", "update", "--init", "--recursive", "--depth=1"];
+        if options.workspace_state == WorkspaceState::Clean {
+            sub_args.push("--force");
+        }
         match Command::new("git")
             .current_dir(repo_dir)
-            .args(["submodule", "update", "--init", "--recursive", "--depth=1"])
+            .args(&sub_args)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()

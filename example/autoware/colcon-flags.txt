@@ -4,3 +4,4 @@
 --symlink-install
 --cmake-args
 -DBUILD_TESTING=OFF
+--catkin-skip-building-tests

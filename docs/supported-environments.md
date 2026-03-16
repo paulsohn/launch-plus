@@ -33,7 +33,7 @@ launch-plus.
 
 ## Python
 
-- **Python 3.8+** required (for evaluating Python launch files and `$(eval ...)`
+- **Python 3.10+** required (for evaluating Python launch files and `$(eval ...)`
   substitutions in XML launch files)
 - Must be available as `python3` in `PATH`
 - No ROS 2 Python packages needed on the resolver host
@@ -46,7 +46,7 @@ command — the table below shows which tools are needed and when.
 | Executable | Required for | Notes |
 |---|---|---|
 | `git` | All commands | Sparse-checkout, ls-remote, archive |
-| `python3` | `resolve`, `build`, `check` | Evaluating Python launch files |
+| `python3` | `resolve`, `build`, `check`, `test` | Evaluating Python launch files and `$(eval ...)` |
 | `colcon` | `build`, `test` | Build orchestration; **planned to be replaceable** |
 | `rosdep` | `--rosdep` flag only | System dependency resolution; **planned to be replaceable** |
 | `apt-get` | `--rosdep` with `#apt` deps | Called via `sudo` |

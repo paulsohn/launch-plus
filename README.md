@@ -71,7 +71,7 @@ variables substituted — invaluable for debugging and CI validation.
 ### Prerequisites
 
 - **Rust toolchain** — [rustup.rs](https://rustup.rs) (edition 2024, MSRV 1.85)
-- **Python 3** in `PATH` — used to evaluate Python launch files and `$(eval ...)` substitutions in XML
+- **Python 3.10+** in `PATH` — used to evaluate Python launch files and `$(eval ...)` substitutions in XML
 - **Git** — for sparse-checkout operations
 - **ROS 2** — source your ROS 2 environment (`source /opt/ros/<distro>/setup.bash`)
 

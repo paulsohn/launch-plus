@@ -5,8 +5,8 @@ This guide walks through using launch-plus with your own ROS 2 project.
 ## Prerequisites
 
 - **Rust toolchain** (edition 2024, MSRV 1.85) — install via [rustup.rs](https://rustup.rs)
-- **Python 3** — used to evaluate Python launch files and `$(eval ...)` substitutions
-  in XML launch files
+- **Python 3.10+** — used to evaluate Python launch files and `$(eval ...)`
+  substitutions in XML launch files
 - **Git** — for sparse-checkout operations
 - **ROS 2** — required for `--rosdep` (system dependency resolution) and
   post-build resolution; the resolver itself does not depend on ROS 2 Python

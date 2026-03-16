@@ -128,23 +128,25 @@ executing your launch file, so `print()` still works — it just goes to stderr.
 
 ## Building
 
-### Why doesn't launch-plus build `exec_depend` packages?
+### Why does launch-plus still build `exec_depend` packages?
 
-By design.  `exec_depend` declares packages needed at *runtime*, not at build
-time.  `colcon build --packages-up-to` treats `exec_depend` as a build
-dependency, pulling in packages (and their transitive closures) that never
-needed to be compiled from source — they're already available as installed
-system packages.
+It shouldn't have to — `exec_depend` declares packages needed at *runtime*, not
+at build time.  However, launch-plus currently delegates to `colcon build`, which
+validates that **all** `package.xml` dependencies (including `exec_depend`) have
+install artifacts before running cmake.  There is no colcon flag to disable this
+check, so launch-plus must include `exec_depend` in the build set today.
 
-This is a well-known problem.  The Autoware project maintains
+This is a well-known pain point.  The Autoware project maintains
 [`remove-exec-depend`](https://github.com/autowarefoundation/autoware-github-actions/tree/main/remove-exec-depend),
 a CI action that strips `<exec_depend>` from every `package.xml` before
 building, just to work around colcon's behavior.
 
-launch-plus computes the build closure using only `build_depend` and
-`buildtool_depend`.  Runtime dependencies are expected to be satisfied by
-installed system packages — exactly the role `exec_depend` was designed to
-express.  See [Dependency closure](concepts.md#dependency-closure) for details.
+Once colcon is replaced with direct ament invocations
+([#18](https://github.com/paulsohn/launch-plus/issues/18)), the build closure
+will use only `build_depend` and `buildtool_depend`.  Runtime dependencies will
+be expected to be satisfied by installed system packages — exactly the role
+`exec_depend` was designed to express.  See
+[Dependency closure](concepts.md#dependency-closure) for details.
 
 ### How does `--colcon-flagfile` work?
 

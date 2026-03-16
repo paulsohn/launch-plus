@@ -224,11 +224,17 @@ that strips `<exec_depend>` entries from every `package.xml` before building —
 a workaround for colcon's inability to distinguish build-time from runtime
 dependencies.
 
-launch-plus avoids this entirely.  Because the resolver already knows which
-packages are actually needed (it read the launch file), it computes the build
-closure using only `build_depend` and `buildtool_depend`.  Packages that are
-only referenced at runtime are expected to be available as installed system
-packages — exactly the role `exec_depend` was designed to express.
+launch-plus's goal is to avoid this entirely: because the resolver already knows
+which packages are actually needed (it read the launch file), it *should* compute
+the build closure using only `build_depend` and `buildtool_depend`.
+
+**Current status:** today, launch-plus still includes `exec_depend` in the build
+set because it delegates to `colcon build`, which validates that all
+`package.xml` dependencies — including `exec_depend` — have install artifacts
+before running cmake.  There is no colcon flag to disable this check.  Replacing
+colcon with direct ament invocations (see [#18](https://github.com/paulsohn/launch-plus/issues/18))
+will remove this constraint, allowing the build closure to use only true
+build-time dependencies.
 
 ## Static analysis: what the resolver can verify
 

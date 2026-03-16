@@ -2457,7 +2457,7 @@ fn eval_python_expr(expr: &str) -> crate::Result<String> {
     // (e.g. `<let name="x" value="[\'ndt\',\'yabloc\']"/>`) and are meant to
     // become Python string quotes.  When the expression reaches eval_python_expr
     // through indirect paths (e.g. stored in a variable and evaluated via
-    // `$(eval $(var x))`), the parse-time stripping in strip_eval_outer_quotes
+    // `$(eval $(var x))`), the parse-time normalization in normalize_eval_expr
     // has no outer wrapper to trigger on, leaving the escapes intact.
     let expr = expr.replace("\\'", "'").replace("\\\"", "\"");
     let expr = expr.as_str();

@@ -334,7 +334,8 @@ pub fn parse_substitutions(input: &str) -> crate::Result<Vec<Substitution>> {
     Ok(parts)
 }
 
-/// Strip the outer quote wrapper from a `$(eval ...)` expression at parse time.
+/// Normalize a `$(eval ...)` expression at parse time: strip outer quote
+/// wrappers and unescape `\'`/`\"` sequences.
 ///
 /// XML launch files use three quoting styles for `$(eval)`:
 ///
@@ -353,7 +354,7 @@ pub fn parse_substitutions(input: &str) -> crate::Result<Vec<Substitution>> {
 /// `$(var ...)` substitutions are resolved.  If a variable value contains `"`,
 /// those characters collide with the outer `"` wrapper and corrupt the Python
 /// expression via adjacent-string-literal concatenation.
-fn strip_eval_outer_quotes(expr: &str) -> String {
+fn normalize_eval_expr(expr: &str) -> String {
     // Returns true if `s` contains `ch` that is NOT preceded by `\`.
     fn has_unescaped(s: &str, ch: u8) -> bool {
         let b = s.as_bytes();
@@ -454,7 +455,7 @@ fn parse_substitution_expr(expr: &str) -> crate::Result<Substitution> {
             // delimiters must be removed before substitution, not after — otherwise
             // variable values containing " or ' corrupt the expression via Python's
             // adjacent-string-literal concatenation.
-            let stripped = strip_eval_outer_quotes(python_expr);
+            let stripped = normalize_eval_expr(python_expr);
             Ok(Substitution::Eval(stripped))
         }
         "command" => {
@@ -2442,7 +2443,7 @@ pub(crate) fn effective_namespace(stack: &[String], node_ns: Option<&str>) -> Op
 /// Evaluate a Python expression via `python3` and return the result as a string.
 ///
 /// The outer quote wrapper (Style A/B) is already stripped at parse time by
-/// [`strip_eval_outer_quotes`]; see that function for details.
+/// [`normalize_eval_expr`]; see that function for details.
 ///
 /// The expression is passed via **stdin** to avoid quoting collisions between
 /// the expression content and the Python `-c` script string.
@@ -2480,7 +2481,9 @@ fn eval_python_expr(expr: &str) -> crate::Result<String> {
     // Write the expression to stdin and close it so Python sees EOF.
     if let Some(mut stdin) = child.stdin.take() {
         use std::io::Write;
-        let _ = stdin.write_all(expr.as_bytes());
+        stdin.write_all(expr.as_bytes()).map_err(|e| {
+            crate::Error::LaunchParse(format!("$(eval): failed to write to python3 stdin: {e}"))
+        })?;
         // stdin is dropped here, closing the pipe
     }
 
@@ -4783,6 +4786,66 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.value, "False");
+        assert!(
+            result.errors.is_empty(),
+            "unexpected errors: {:?}",
+            result.errors
+        );
+    }
+
+    #[test]
+    fn test_resolve_eval_var_with_quotes_no_corruption() {
+        // Regression: outer " wrapper (Style A, from XML &quot;) must be stripped
+        // at parse time, BEFORE $(var) substitution.  Otherwise a variable value
+        // containing " corrupts the expression via Python adjacent-string-literal
+        // concatenation.
+        //
+        // Autoware pattern (after XML decode of &quot; → "):
+        //   $(eval "'$(var modules)' + '$(var list_end)'")
+        //   where list_end = ""]  (from <arg default="&quot;&quot;]"/>)
+        //
+        // Parse-time normalize strips the outer ", leaving:
+        //   '$(var modules)' + '$(var list_end)'
+        // After var sub: '[Foo, ' + '""]' → Python concat → [Foo, ""]
+        let mut ctx = SubstitutionContext::default();
+        ctx.vars.insert("modules".to_string(), "[Foo, ".to_string());
+        ctx.vars
+            .insert("list_end".to_string(), r#"""]"#.to_string());
+        let input = r#"$(eval "'$(var modules)' + '$(var list_end)'")"#;
+        let result = resolve_substitutions(input, &mut ctx).unwrap();
+        assert_eq!(result.value, r#"[Foo, ""]"#);
+        assert!(
+            result.errors.is_empty(),
+            "unexpected errors: {:?}",
+            result.errors
+        );
+    }
+
+    #[test]
+    fn test_resolve_eval_backslash_escaped_quotes_in_var() {
+        // Regression: \' escapes stored in variables and assembled into an
+        // expression indirectly (e.g. $(eval $(var expr))) must be unescaped
+        // before Python evaluation.
+        //
+        // Autoware pattern (pose_twist_estimator.launch.xml):
+        //   <let name="available" value="[\'ndt\',\'yabloc\']"/>
+        //   <let name="func" value="list(set('ndt'.split('_')).intersection($(var available)))"/>
+        //   $(eval $(var func))
+        let mut ctx = SubstitutionContext::default();
+        ctx.vars.insert(
+            "func".to_string(),
+            r"list(set('ndt'.split('_')).intersection(['ndt','yabloc']))".to_string(),
+        );
+        let result = resolve_substitutions(r"$(eval $(var func))", &mut ctx).unwrap();
+        assert_eq!(result.value, "['ndt']");
+
+        // Also test with literal \' that needs unescaping at eval time
+        ctx.vars.insert(
+            "func2".to_string(),
+            r"list(set('ndt'.split('_')).intersection([\'ndt\',\'yabloc\']))".to_string(),
+        );
+        let result = resolve_substitutions(r"$(eval $(var func2))", &mut ctx).unwrap();
+        assert_eq!(result.value, "['ndt']");
         assert!(
             result.errors.is_empty(),
             "unexpected errors: {:?}",

@@ -334,6 +334,70 @@ pub fn parse_substitutions(input: &str) -> crate::Result<Vec<Substitution>> {
     Ok(parts)
 }
 
+/// Normalize a `$(eval ...)` expression at parse time: strip outer quote
+/// wrappers and unescape `\'`/`\"` sequences.
+///
+/// XML launch files use three quoting styles for `$(eval)`:
+///
+///   **Style A** — outer `&quot;` wrapper: `$(eval &quot;expr&quot;)` → after XML decode
+///   the argument is `"expr"`.  Strip the outer `"` pair.
+///
+///   **Style B** — outer `'` wrapper with escaped inner quotes:
+///   `$(eval '\'string\' == \'string\'')` → strip outer `'`, then unescape `\'` → `'`.
+///
+///   **Style C** — bare expression: `$(eval '1' == '1')` → no stripping.
+///
+/// Detection is on the **original** (pre-unescape) string so that escaped `\'`
+/// inside are not mistaken for bare Python `'` delimiters.
+///
+/// **Why at parse time?**  The outer wrapper must be removed *before* nested
+/// `$(var ...)` substitutions are resolved.  If a variable value contains `"`,
+/// those characters collide with the outer `"` wrapper and corrupt the Python
+/// expression via adjacent-string-literal concatenation.
+fn normalize_eval_expr(expr: &str) -> String {
+    // Returns true if `s` contains `ch` that is NOT preceded by `\`.
+    fn has_unescaped(s: &str, ch: u8) -> bool {
+        let b = s.as_bytes();
+        let mut i = 0;
+        while i < b.len() {
+            if b[i] == b'\\' {
+                i += 2; // skip the escaped character
+            } else if b[i] == ch {
+                return true;
+            } else {
+                i += 1;
+            }
+        }
+        false
+    }
+
+    // Style B: outer ' wrapper with escaped inner quotes.
+    let expr: &str = if expr.len() >= 2
+        && expr.starts_with('\'')
+        && expr.ends_with('\'')
+        && !has_unescaped(&expr[1..expr.len() - 1], b'\'')
+    {
+        &expr[1..expr.len() - 1]
+    } else {
+        expr
+    };
+
+    // Unescape \' and \" (from XML/XPath escaping).
+    let unescaped = expr.replace("\\'", "'").replace("\\\"", "\"");
+
+    // Style A: outer " wrapper (no unescaped " in inner part after unescaping).
+    let s = unescaped.as_str();
+    if s.len() >= 2
+        && s.starts_with('"')
+        && s.ends_with('"')
+        && !has_unescaped(&s[1..s.len() - 1], b'"')
+    {
+        s[1..s.len() - 1].to_string()
+    } else {
+        unescaped
+    }
+}
+
 /// Parse a single substitution expression (without the $(...) wrapper)
 fn parse_substitution_expr(expr: &str) -> crate::Result<Substitution> {
     let expr = expr.trim();
@@ -383,7 +447,16 @@ fn parse_substitution_expr(expr: &str) -> crate::Result<Substitution> {
             let python_expr = arg.ok_or_else(|| {
                 crate::Error::LaunchParse("$(eval) requires an expression".to_string())
             })?;
-            Ok(Substitution::Eval(python_expr.to_string()))
+            // Strip the outer quote wrapper NOW, before nested $(var) substitutions
+            // inject characters that could collide with the wrapper.
+            //
+            // XML launch files commonly wrap $(eval) expressions in &quot;...&quot;
+            // (Style A) or '...' with escaped inner quotes (Style B).  These outer
+            // delimiters must be removed before substitution, not after — otherwise
+            // variable values containing " or ' corrupt the expression via Python's
+            // adjacent-string-literal concatenation.
+            let stripped = normalize_eval_expr(python_expr);
+            Ok(Substitution::Eval(stripped))
         }
         "command" => {
             // $(command 'shell cmd' ['on_error']) — executes a shell command at ROS 2 launch
@@ -2367,98 +2440,56 @@ pub(crate) fn effective_namespace(stack: &[String], node_ns: Option<&str>) -> Op
     current
 }
 
-/// Evaluate a Python expression via `python3 -c` and return the result as a string.
+/// Evaluate a Python expression via `python3` and return the result as a string.
 ///
-/// The result is lowercased so that Python `True`/`False` map to `"true"`/`"false"`,
-/// which the condition evaluator understands.  Numeric and string results are returned
-/// as-is (lowercased).
+/// The outer quote wrapper (Style A/B) is already stripped at parse time by
+/// [`normalize_eval_expr`]; see that function for details.
+///
+/// The expression is passed via **stdin** to avoid quoting collisions between
+/// the expression content and the Python `-c` script string.
 ///
 /// Returns `Err` if python3 is not available or the expression raises an exception.
 fn eval_python_expr(expr: &str) -> crate::Result<String> {
     use std::process::{Command, Stdio};
 
-    // Returns true if `s` contains `ch` that is NOT preceded by `\`.
-    // Used to distinguish outer-delimiter quotes from Python-syntax quotes.
-    fn has_unescaped(s: &str, ch: u8) -> bool {
-        let b = s.as_bytes();
-        let mut i = 0;
-        while i < b.len() {
-            if b[i] == b'\\' {
-                i += 2; // skip the escaped character
-            } else if b[i] == ch {
-                return true;
-            } else {
-                i += 1;
-            }
-        }
-        false
-    }
+    // Unescape \' → ' and \" → " that may remain from XML $(eval) quoting
+    // conventions.  These backslash-escaped quotes originate from the XML source
+    // (e.g. `<let name="x" value="[\'ndt\',\'yabloc\']"/>`) and are meant to
+    // become Python string quotes.  When the expression reaches eval_python_expr
+    // through indirect paths (e.g. stored in a variable and evaluated via
+    // `$(eval $(var x))`), the parse-time normalization in normalize_eval_expr
+    // has no outer wrapper to trigger on, leaving the escapes intact.
+    let expr = expr.replace("\\'", "'").replace("\\\"", "\"");
+    let expr = expr.as_str();
 
-    // XML attribute values may contain backslash-escaped quotes (e.g. \' or \") from
-    // XPath-style or CDATA escaping.
-    //
-    // Three quoting styles appear in ROS 2 launch files.  Detection is on the ORIGINAL
-    // string (before unescaping) so that escaped `\'` inside are not mistaken for
-    // bare Python `'` delimiters:
-    //
-    //   B) Outer single-quote wrapper with escaped inner quotes:
-    //      $(eval '\'string\' == \'string\'') — outer ' are delimiters; inner \'
-    //      are Python single-quotes.  Detected by: starts/ends with ' AND inner
-    //      part (raw) has no unescaped '.  Strip outer ', then unescape.
-    //
-    //   A) Outer double-quote wrapper: $(eval "expr") — outer "" from XML &quot;.
-    //      Detected by: starts/ends with " AND inner part has no unescaped ".
-    //      Strip outer ", then unescape.
-    //
-    //   Also handles $(eval '"foo"=="bar"') — outer ' stripped (style B detection),
-    //   yields '"foo"=="bar"', then outer " check: inner has unescaped " → don't strip.
-    //
-    //   C) Bare expression: $(eval '1' == '1') — inner has unescaped ' → no stripping.
-    //
-    // Check the ORIGINAL (pre-unescape) string for outer delimiters.
-    let expr_str = expr;
-    let expr: &str = if expr_str.len() >= 2
-        && expr_str.starts_with('\'')
-        && expr_str.ends_with('\'')
-        && !has_unescaped(&expr_str[1..expr_str.len() - 1], b'\'')
-    {
-        // Style B: strip outer ' from the raw string, then unescape everything.
-        // SAFETY: we verified the string starts/ends with ASCII '.
-        &expr_str[1..expr_str.len() - 1]
-    } else {
-        expr_str
-    };
-    // Apply unescaping to whichever form we have now.
-    let unescaped = expr.replace("\\'", "'").replace("\\\"", "\"");
-    // Style A: outer double-quote wrapper (no unescaped " inside after unescaping).
-    let expr: &str = {
-        let s = unescaped.as_str();
-        if s.len() >= 2
-            && s.starts_with('"')
-            && s.ends_with('"')
-            && !has_unescaped(&s[1..s.len() - 1], b'"')
-        {
-            &s[1..s.len() - 1]
-        } else {
-            s
-        }
-    };
-
-    // Build a one-liner that evaluates the expression and prints the result.
     // Use str() directly, matching ROS 2's PythonExpression.perform() which does
     // str(eval(expr)) with no lowercasing.  Python booleans produce "True"/"False"
     // which our parse_bool_value already accepts.  Crucially, if the result is later
     // substituted into another $(eval ...) expression (e.g. "$(var flag) or ..."),
     // the capitalised form "True"/"False" is valid Python — lowercase "true"/"false"
     // would cause a NameError.
-    let script = format!("import sys; _r=({expr}); sys.stdout.write(str(_r))");
+    let script = "import sys; _r=eval(sys.stdin.read()); sys.stdout.write(str(_r))";
 
-    let output = Command::new("python3")
-        .args(["-c", &script])
+    let mut child = Command::new("python3")
+        .args(["-c", script])
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .output()
+        .spawn()
         .map_err(|e| crate::Error::LaunchParse(format!("$(eval): python3 not available: {e}")))?;
+
+    // Write the expression to stdin and close it so Python sees EOF.
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin.write_all(expr.as_bytes()).map_err(|e| {
+            crate::Error::LaunchParse(format!("$(eval): failed to write to python3 stdin: {e}"))
+        })?;
+        // stdin is dropped here, closing the pipe
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| crate::Error::LaunchParse(format!("$(eval): python3 failed: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -4755,6 +4786,66 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.value, "False");
+        assert!(
+            result.errors.is_empty(),
+            "unexpected errors: {:?}",
+            result.errors
+        );
+    }
+
+    #[test]
+    fn test_resolve_eval_var_with_quotes_no_corruption() {
+        // Regression: outer " wrapper (Style A, from XML &quot;) must be stripped
+        // at parse time, BEFORE $(var) substitution.  Otherwise a variable value
+        // containing " corrupts the expression via Python adjacent-string-literal
+        // concatenation.
+        //
+        // Autoware pattern (after XML decode of &quot; → "):
+        //   $(eval "'$(var modules)' + '$(var list_end)'")
+        //   where list_end = ""]  (from <arg default="&quot;&quot;]"/>)
+        //
+        // Parse-time normalize strips the outer ", leaving:
+        //   '$(var modules)' + '$(var list_end)'
+        // After var sub: '[Foo, ' + '""]' → Python concat → [Foo, ""]
+        let mut ctx = SubstitutionContext::default();
+        ctx.vars.insert("modules".to_string(), "[Foo, ".to_string());
+        ctx.vars
+            .insert("list_end".to_string(), r#"""]"#.to_string());
+        let input = r#"$(eval "'$(var modules)' + '$(var list_end)'")"#;
+        let result = resolve_substitutions(input, &mut ctx).unwrap();
+        assert_eq!(result.value, r#"[Foo, ""]"#);
+        assert!(
+            result.errors.is_empty(),
+            "unexpected errors: {:?}",
+            result.errors
+        );
+    }
+
+    #[test]
+    fn test_resolve_eval_backslash_escaped_quotes_in_var() {
+        // Regression: \' escapes stored in variables and assembled into an
+        // expression indirectly (e.g. $(eval $(var expr))) must be unescaped
+        // before Python evaluation.
+        //
+        // Autoware pattern (pose_twist_estimator.launch.xml):
+        //   <let name="available" value="[\'ndt\',\'yabloc\']"/>
+        //   <let name="func" value="list(set('ndt'.split('_')).intersection($(var available)))"/>
+        //   $(eval $(var func))
+        let mut ctx = SubstitutionContext::default();
+        ctx.vars.insert(
+            "func".to_string(),
+            r"list(set('ndt'.split('_')).intersection(['ndt','yabloc']))".to_string(),
+        );
+        let result = resolve_substitutions(r"$(eval $(var func))", &mut ctx).unwrap();
+        assert_eq!(result.value, "['ndt']");
+
+        // Also test with literal \' that needs unescaping at eval time
+        ctx.vars.insert(
+            "func2".to_string(),
+            r"list(set('ndt'.split('_')).intersection([\'ndt\',\'yabloc\']))".to_string(),
+        );
+        let result = resolve_substitutions(r"$(eval $(var func2))", &mut ctx).unwrap();
+        assert_eq!(result.value, "['ndt']");
         assert!(
             result.errors.is_empty(),
             "unexpected errors: {:?}",

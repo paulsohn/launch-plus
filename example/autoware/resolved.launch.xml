@@ -3983,7 +3983,7 @@
                 <!-- end params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/no_drivable_lane.param.yaml -->
                 <param name="enable_all_modules_auto_mode" value="false"/>
                 <param name="is_simulation" value="false"/>
-                <param name="launch_modules" value="'[autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin, autoware::behavior_velocity_planner::experimental::WalkwayModulePlugin, autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin, autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin, autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin, autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin, autoware::behavior_velocity_planner::experimental::VirtualTrafficLightModulePlugin, autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin, autoware::behavior_velocity_planner::experimental::StopLineModulePlugin, ' + ']'"/>
+                <param name="launch_modules" value="[autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin, autoware::behavior_velocity_planner::experimental::WalkwayModulePlugin, autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin, autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin, autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin, autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin, autoware::behavior_velocity_planner::experimental::VirtualTrafficLightModulePlugin, autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin, autoware::behavior_velocity_planner::experimental::StopLineModulePlugin, &quot;&quot;]"/>
                 <remap from="~/input/path_with_lane_id" to="path_with_lane_id"/>
                 <remap from="~/input/vector_map" to="/map/vector_map"/>
                 <remap from="~/input/vehicle_odometry" to="/localization/kinematic_state"/>
@@ -4911,7 +4911,7 @@
                 <!-- end params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/behavior_path_planner.param.yaml -->
                 <param name="enable_all_modules_auto_mode" value="false"/>
                 <param name="is_simulation" value="false"/>
-                <param name="launch_modules" value="'[autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager, autoware::behavior_path_planner::SideShiftModuleManager, autoware::behavior_path_planner::BidirectionalTrafficModuleManager, autoware::behavior_path_planner::StartPlannerModuleManager, autoware::behavior_path_planner::GoalPlannerModuleManager, autoware::behavior_path_planner::LaneChangeRightModuleManager, autoware::behavior_path_planner::LaneChangeLeftModuleManager, autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager, ' + ']'"/>
+                <param name="launch_modules" value="[autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager, autoware::behavior_path_planner::SideShiftModuleManager, autoware::behavior_path_planner::BidirectionalTrafficModuleManager, autoware::behavior_path_planner::StartPlannerModuleManager, autoware::behavior_path_planner::GoalPlannerModuleManager, autoware::behavior_path_planner::LaneChangeRightModuleManager, autoware::behavior_path_planner::LaneChangeLeftModuleManager, autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager, &quot;&quot;]"/>
                 <remap from="~/input/route" to="/planning/mission_planning/route"/>
                 <remap from="~/input/vector_map" to="/map/vector_map"/>
                 <remap from="~/input/perception" to="/perception/object_recognition/objects"/>
@@ -5639,7 +5639,7 @@
                 <param name="road_user_stop.stopped_object_tracking.ego_reached_wall_distance_threshold" value="0.5"/>
                 <param name="road_user_stop.stopped_object_tracking.stopped_duration_after_ego_arrival" value="3.0"/>
                 <!-- end params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/road_user_stop.param.yaml -->
-                <param name="launch_modules" value="'[autoware::motion_velocity_planner::ObstacleStopModule, autoware::motion_velocity_planner::ObstacleSlowDownModule, autoware::motion_velocity_planner::ObstacleCruiseModule, autoware::motion_velocity_planner::OutOfLaneModule, autoware::motion_velocity_planner::ObstacleVelocityLimiterModule, autoware::motion_velocity_planner::DynamicObstacleStopModule, autoware::motion_velocity_planner::RunOutModule, autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule, autoware::motion_velocity_planner::RoadUserStopModule, ' + ']'"/>
+                <param name="launch_modules" value="[autoware::motion_velocity_planner::ObstacleStopModule, autoware::motion_velocity_planner::ObstacleSlowDownModule, autoware::motion_velocity_planner::ObstacleCruiseModule, autoware::motion_velocity_planner::OutOfLaneModule, autoware::motion_velocity_planner::ObstacleVelocityLimiterModule, autoware::motion_velocity_planner::DynamicObstacleStopModule, autoware::motion_velocity_planner::RunOutModule, autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule, autoware::motion_velocity_planner::RoadUserStopModule, &quot;&quot;]"/>
                 <remap from="~/input/trajectory" to="path_optimizer/trajectory"/>
                 <remap from="~/input/vector_map" to="/map/vector_map"/>
                 <remap from="~/input/vehicle_odometry" to="/localization/kinematic_state"/>
@@ -5933,7 +5933,7 @@
             <param name="common.adjacent_lane.participants.max_velocity" value="16.6"/>
             <param name="common.adjacent_lane.participants.max_deceleration" value="-2.0"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/rear_collision_checker.param.yaml -->
-            <param name="launch_modules" value="'[autoware::planning_validator::LatencyChecker, autoware::planning_validator::TrajectoryChecker, autoware::planning_validator::IntersectionCollisionChecker, autoware::planning_validator::RearCollisionChecker, ' + ']'"/>
+            <param name="launch_modules" value="[autoware::planning_validator::LatencyChecker, autoware::planning_validator::TrajectoryChecker, autoware::planning_validator::IntersectionCollisionChecker, autoware::planning_validator::RearCollisionChecker, &quot;&quot;]"/>
             <remap from="~/input/objects" to="/perception/object_recognition/objects"/>
             <remap from="~/input/pointcloud" to="/perception/obstacle_segmentation/pointcloud"/>
             <remap from="~/input/trajectory" to="/planning/scenario_planning/velocity_smoother/trajectory"/>

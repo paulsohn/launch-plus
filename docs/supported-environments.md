@@ -36,6 +36,8 @@ launch-plus.
 - **Python 3.10+** required (for evaluating Python launch files and `$(eval ...)`
   substitutions in XML launch files)
 - Must be available as `python3` in `PATH`
+- **PyYAML** (`python3-yaml`) must be installed — the Python resolver imports it
+  to parse parameter files in OpaqueFunction bodies
 - No ROS 2 Python packages needed on the resolver host
 
 ## External executables

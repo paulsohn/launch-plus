@@ -60,8 +60,9 @@ This gives you:
 - **Sparse clone map** — the lockfile records which packages live in which
   repository and at what path, so launch-plus can sparse-checkout *only* the
   packages it needs without cloning entire repositories
-- **Offline dependency graph** — transitive build closures can be computed from
-  the lockfile alone, without cloning anything
+- **On-demand dependency expansion** — the lockfile maps every package to its
+  repository and path, enabling launch-plus to fetch only the `package.xml`
+  files it needs and expand the dependency graph incrementally
 - **`.repos` compatibility** — the lockfile is a valid `.repos` file.  You can
   pass it to `vcs import` as a drop-in replacement for your original manifest,
   getting the same repos at the exact pinned SHAs.  This means adopting
@@ -197,8 +198,9 @@ build-dependency closure** from the resolved launch graph:
 
 1. **Direct packages** — every package referenced in the launch file
    (`<node pkg="...">`, `$(find-pkg-share ...)`, `<include>`)
-2. **Transitive build deps** — `build_depend`, `buildtool_depend`, and `<depend>`
-   from each package's `package.xml`, expanded recursively
+2. **Transitive build deps** — `build_depend`, `buildtool_depend`,
+   `build_export_depend`, `buildtool_export_depend`, and `<depend>` from each
+   package's `package.xml`, expanded recursively
 3. **System deps** — packages not in the lockfile are resolved via `rosdep`
    (with `--rosdep`)
 

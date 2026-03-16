@@ -62,7 +62,6 @@ repository for ROS packages, and writes `manifest.lock.repos`.
 The lockfile records:
 - Exact commit SHAs for every repository
 - Package names and their locations within each repository
-- Dependencies from `package.xml`
 
 **Commit the lockfile** alongside your `.repos` manifest.  This ensures
 reproducible builds — anyone with the same lockfile will get exactly the same

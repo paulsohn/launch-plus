@@ -143,7 +143,8 @@ building, just to work around colcon's behavior.
 
 Once colcon is replaced with direct ament invocations
 ([#18](https://github.com/paulsohn/launch-plus/issues/18)), the build closure
-will use only `build_depend` and `buildtool_depend`.  Runtime dependencies will
+will use only `build_depend`, `buildtool_depend`, `build_export_depend`, and
+`buildtool_export_depend`.  Runtime dependencies will
 be expected to be satisfied by installed system packages — exactly the role
 `exec_depend` was designed to express.  See
 [Dependency closure](concepts.md#dependency-closure) for details.

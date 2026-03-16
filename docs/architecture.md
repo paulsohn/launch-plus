@@ -38,7 +38,7 @@ a thin `clap`-based wrapper.
 [indexer]
     ├── git ls-remote → resolve versions to SHAs
     ├── git archive → fetch package.xml files (no full clone)
-    └── parse package.xml → extract dependencies
+    └── parse package.xml → discover package names and paths
     │
     ▼
 manifest.lock.repos (lockfile)

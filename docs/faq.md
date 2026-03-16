@@ -195,8 +195,9 @@ launch-plus update core/my_msgs     # update a specific repo (uses lockfile key)
 ### What if a package isn't in the lockfile?
 
 If a package is referenced in a launch file but not in the lockfile:
-1. With `--rosdep`: launch-plus checks `AMENT_PREFIX_PATH` first, then tries
-   `rosdep install` to install it as a system package
+1. With `--rosdep`: launch-plus checks `AMENT_PREFIX_PATH` first, then runs
+   `rosdep resolve` to map the key to a system package name and installs it
+   via `apt-get` or `pip`
 2. Without `--rosdep`: the resolver reports an error
 
 This is by design — the lockfile is the single source of truth for your

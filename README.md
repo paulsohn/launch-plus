@@ -35,7 +35,7 @@ and builds the minimal set:
 
 ```
 # launch-plus workflow
-launch-plus index                    # generate lockfile (one-time)
+launch-plus index autoware.repos     # generate lockfile (one-time)
 launch-plus build autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \

@@ -206,10 +206,10 @@ build-dependency closure** from the resolved launch graph:
 
 Only the resulting minimal set is passed to `colcon build --packages-select`.
 
-### Why `exec_depend` is excluded
+### The `exec_depend` problem
 
-A critical difference from `colcon build --packages-up-to` is that launch-plus
-**does not follow `exec_depend`** when computing the build closure.
+A key design goal is to exclude `exec_depend` from the build closure — a critical
+difference from `colcon build --packages-up-to`.
 
 `exec_depend` declares packages needed at *runtime* — not at build time.  When
 you run `colcon build --packages-up-to my_node`, colcon treats `exec_depend` as

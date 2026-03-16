@@ -124,11 +124,11 @@ condition attributes for conditional dependencies.
 
 ### Fetcher (`fetcher.rs`)
 
-Manages git sparse-checkout.  Two levels of fetching:
-- **`fetch_file()`** — sparse-checks out only a specific launch file; creates
-  the package directory but does *not* include `package.xml` or other files
-- **`ensure_package_fetched()`** — full sparse-checkout of an entire package
-  subtree, including `package.xml` and all files
+Manages git sparse-checkout.  The primary API is:
+- **`fetch_packages()`** — full sparse-checkout of one or more package subtrees,
+  including `package.xml` and all files
+- **`is_package_fetched()`** — checks whether a package has been fetched
+  (sentinel: `package.xml` exists on disk)
 
 Sparse-checkout is additive: new paths are added without removing previously
 checked-out files.

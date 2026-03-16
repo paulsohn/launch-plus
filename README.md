@@ -1,46 +1,103 @@
 # launch-plus
 
-Static analyser and lazy resolver for ROS 2 launch files.
+**Bazel-like build system for ROS 2** — resolve, fetch, and build only what your
+launch file actually needs.
 
-Instead of cloning and building an entire workspace upfront, launch-plus
-reads a `.repos` manifest, generates a lockfile, and resolves a launch
-file on demand — fetching only the packages actually needed, then
-producing a single flattened XML that shows every node, parameter, and
-remap that would be active at runtime.
+Instead of cloning and building an entire workspace upfront, launch-plus reads a
+`.repos` manifest, generates a lockfile, and resolves a launch file on demand —
+fetching only the packages actually referenced, then producing a single flattened
+XML that shows every node, parameter, and remap that would be active at runtime.
 
-> **Status:** early development — API and CLI flags may change.
+## The problem
 
-## Prerequisites
+A typical ROS 2 workspace like [Autoware](https://github.com/autowarefoundation/autoware)
+contains **200+ packages** across dozens of repositories.  The standard workflow
+requires cloning everything, installing all system dependencies, and building the
+full workspace before you can launch a single node — even if your launch file
+only touches 30 of those packages.
 
-- Rust toolchain (`cargo`) — https://rustup.rs
-- `python3` in `PATH` (used to evaluate `$(eval ...)` substitutions and to resolve Python launch files)
-- ROS 2 sourced — only required for `--rosdep` (system package resolution); the resolver itself does not depend on any ROS 2 Python packages
+```
+# Traditional ROS 2 workflow
+vcs import src < autoware.repos      # clone ~50 repos
+rosdep install --from-paths src      # install ALL system deps
+colcon build                         # build ALL ~235 packages (30+ min)
+ros2 launch autoware_launch ...      # finally launch
+```
 
-## Quickstart
+This is slow, wasteful, and makes it hard to iterate on a subset of the system.
 
-### 1. Clone and build
+## The solution
+
+launch-plus treats **launch files as build targets**.  It parses the launch
+graph statically, determines exactly which packages are needed, fetches only
+those via [git sparse-checkout](https://git-scm.com/docs/git-sparse-checkout),
+and builds the minimal set:
+
+```
+# launch-plus workflow
+launch-plus index autoware.repos     # generate lockfile (one-time)
+launch-plus build autoware_launch autoware.launch.xml \
+  sensor_model:=sample_sensor_kit \
+  vehicle_model:=sample_vehicle \
+  map_path:=/path/to/map \
+  --clean --rosdep                   # fetch + build only what's needed
+```
+
+The resolver also produces a **flattened, fully-resolved XML** that shows the
+complete launch graph with all includes inlined, conditionals evaluated, and
+variables substituted — invaluable for debugging and CI validation.
+
+## Key features
+
+- **Lazy fetching** — packages are sparse-checked out on demand; no full clone required
+- **Minimal builds** — only the transitive dependencies of your launch target are built
+- **Static analysis** — resolve launch files without building packages or running ROS nodes
+- **Python launch support** — executes `generate_launch_description()` with shimmed
+  `launch`/`launch_ros` imports; no ROS 2 Python packages needed on the resolver host
+- **OpaqueFunction handling** — executes arbitrary Python callables with patched
+  filesystem access, transparently fetching packages as they are accessed
+- **Portable output** — resolved XML uses `$(find-pkg-share pkg)/...` paths that
+  work across machines and environments
+- **Lockfile pinning** — reproducible builds via commit-SHA-pinned lockfiles
+- **rosdep integration** — automatically installs system dependencies for the
+  packages being built
+
+> **Current scope:** launch-plus is a build-time tool today (resolve + build).
+> Execution support — both a built-in executor and integration with `ros2 launch`
+> and third-party launchers — is on the roadmap.
+
+## Quick start
+
+### Prerequisites
+
+- **Rust toolchain** — [rustup.rs](https://rustup.rs) (edition 2024, MSRV 1.85)
+- **Python 3.10+** in `PATH` — used to evaluate Python launch files and `$(eval ...)` substitutions in XML
+- **Git** — for sparse-checkout operations
+- **ROS 2** — source your ROS 2 environment (`source /opt/ros/<distro>/setup.bash`)
+
+### Install
 
 ```bash
 git clone https://github.com/paulsohn/launch-plus.git
 cd launch-plus
 cargo build --bin launch-plus --release
 # binary: target/release/launch-plus
-# or use `cargo run --bin launch-plus --` in place of the binary below
 ```
 
-### 2. Try the bundled Autoware example
+### Try the bundled Autoware example
 
-A pre-generated lockfile for a full [Autoware workspace](https://github.com/autowarefoundation/autoware/tree/a06b188d3275da9de561ef4aa5ce0c4bfd87d716/repositories) is included in
-[`example/autoware/`](example/autoware/).  You can run the resolver against it
-immediately without writing a manifest or running `index` first.
+A pre-generated lockfile for a full [Autoware workspace](https://github.com/autowarefoundation/autoware)
+is included in [`example/autoware/`](example/autoware/).  You can run the
+resolver immediately without writing a manifest or running `index` first.
 
 ```bash
-# Source ROS 2 first so that rosdep and ament can locate system packages.
+# Source ROS 2 first (only needed for --rosdep)
 source /opt/ros/humble/setup.bash
 
 cd example/autoware
 
-cargo run --bin launch-plus -- resolve -c autoware_launch autoware.launch.xml \
+# Preview-resolve: produces flattened XML without building
+cargo run --bin launch-plus -- resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   map_path:="[map_path]" \
@@ -56,25 +113,18 @@ cargo run --bin launch-plus -- resolve -c autoware_launch autoware.launch.xml \
   > resolved.launch.xml
 ```
 
-On first run, the resolver will sparse-clone only the packages it needs into
-`example/autoware/src/` (this may take a few minutes). Subsequent runs reuse
+On first run, the resolver sparse-clones only the packages it needs into
+`example/autoware/src/` (this may take a few minutes).  Subsequent runs reuse
 the already-fetched packages and are fast.
 
-`--preview` keeps `$(find-pkg-share pkg)/...` placeholders in the output
-instead of absolute filesystem paths, making the result portable across machines.
-
-The pre-generated output files (paths anonymized, `[home]` replaces the home
-directory) are included for reference:
+The pre-generated output files are included for reference:
 - [`example/autoware/resolved.launch.xml`](example/autoware/resolved.launch.xml)
 - [`example/autoware/resolver.log`](example/autoware/resolver.log)
 
-To build the resolved packages with colcon (requires a sourced ROS 2 environment
-and `colcon` installed):
+To build the resolved packages (requires a sourced ROS 2 environment and `colcon`):
 
 ```bash
-cd example/autoware
-
-cargo run --bin launch-plus -- build -c autoware_launch autoware.launch.xml \
+cargo run --bin launch-plus -- build -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   map_path:="[map_path]" \
@@ -86,135 +136,64 @@ cargo run --bin launch-plus -- build -c autoware_launch autoware.launch.xml \
   --colcon-flagfile colcon-flags.txt
 ```
 
-`colcon-flags.txt` enables `--symlink-install` by default; edit it to add
-`--cmake-args`, `--parallel-workers`, etc.
+### Use your own project
 
-### 3. Use your own manifest
+1. Write a `.repos` file listing your repositories (standard
+   [vcstool](https://github.com/dirk-thomas/vcstool) format)
+2. Generate a lockfile: `launch-plus index`
+3. Resolve: `launch-plus resolve <pkg> <launcher> [args...]`
+4. Build: `launch-plus build <pkg> <launcher> [args...] --clean --rosdep`
 
-Write a `.repos` file listing the repositories you need — see
-[`example/autoware/manifest.repos`](example/autoware/manifest.repos) for the
-format — then generate a lockfile:
+See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
 
-```bash
-cd example/autoware
-
-cargo run --bin launch-plus -- index
-```
-
-The lockfile pins every repository to a concrete commit SHA and records the ROS
-packages it contains.  Commit it alongside your manifest, then run `resolve` as
-above pointing `--lockfile` at it.
-
-## Key commands
+## Commands
 
 | Command | Description |
 |---|---|
-| `index <manifest.repos>` | Parse `.repos` file and generate a lockfile |
-| `update [REPOS...]` | Re-resolve refs and update lockfile SHAs |
-| `resolve <pkg> <launcher> [args...]` | Resolve launch file to a flat XML |
-| `check <pkg> <launcher> [args...]` | Like `resolve` but exits non-zero on errors |
-| `fetch <pkg>...` | Sparse-checkout specific packages from the lockfile |
-| `build <pkg> <launcher> [args...]` | Resolve, plan dependencies, and run `colcon build` |
-| `test <pkg> <launcher> [args...]` | Like `build` but includes `test_depend` packages |
+| `index` | Parse `.repos` files and generate a lockfile |
+| `update` | Re-resolve refs and update lockfile SHAs |
+| `resolve` | Resolve and flatten a launch file to XML (no build) |
+| `check` | Like `resolve` but exits non-zero on warnings/errors |
+| `build` | Resolve, fetch dependencies, and run `colcon build` |
+| `build-pkg` | Build package(s) by name with transitive dependency fetching |
+| `test` | Like `build` but includes `test_depend` packages |
+| `fetch` | Sparse-checkout specific packages from the lockfile |
 | `clean` | Remove fetched packages |
 
-## Notable `resolve` / `check` flags
+Run `launch-plus <command> --help` for detailed usage of each command.
 
-### Workspace state (required — exactly one)
+## Workspace state flags
 
-| Flag | Short | Description |
+Commands that refer to source code support workspace state flags:
+
+| Flag | Short | When to use |
 |---|---|---|
-| `--clean` | `-c` | Reset every repository to the pinned lockfile SHA; discard local modifications |
-| `--dirty` | `-d` | Use whatever is on disk; skip all git operations for existing repos |
+| `--clean` | `-c` | CI / reproducible runs — resets repos to lockfile SHAs |
+| `--dirty` | `-d` | Local iteration — uses whatever is on disk |
+| *(default)* | | Verifies HEAD matches lockfile SHA; errors on mismatch |
 
-Use `--dirty` during local iteration (edits survive).
-Use `--clean` for reproducible CI runs.
+## Documentation
 
-### Resolution options
-
-| Flag | Description |
+| Document | Description |
 |---|---|
-| `--lockfile <path>` | Lockfile to use (default: `manifest.lock.repos`) |
-| `--src <dir>` | Directory where packages are fetched (default: `src/`) |
-| `--preview` | Use portable `$(find-pkg-share ...)` paths in output |
-| `--inline-params` | Expand `<param from="file.yaml"/>` entries inline |
-| `--flatten-namespaces` | Fold namespace into each node's name/topic |
-| `--show-args` | Emit `<!-- arg name=... -->` comments at include boundaries |
-| `--apply-opaque-file-access` | Let OpaqueFunction bodies read param files |
-| `--apply-launch-arg-defaults` | Fill unset args from their declared defaults |
-| `--allow-global-arg-cascade` | Propagate parent args into included files |
-| `--rosdep` | Resolve system packages via rosdep (requires sourced ROS 2) |
+| [Motivation](docs/motivation.md) | Why launch-plus exists and what problems it solves |
+| [Core Concepts](docs/concepts.md) | Lockfiles, sparse checkout, portable paths, and more |
+| [Getting Started](docs/getting-started.md) | Step-by-step tutorial for your own project |
+| [Architecture](docs/architecture.md) | How the resolver, fetcher, and builder work internally |
+| [Supported Environments](docs/supported-environments.md) | Platforms, ROS distros, and known limitations |
+| [FAQ](docs/faq.md) | Common questions and answers |
+| [Contributing](CONTRIBUTING.md) | Development setup and contribution guidelines |
 
-## `build` / `test` flags
+## Who is this for?
 
-`build` resolves the launch file, computes the transitive build-dependency closure
-(`build_depend`, `buildtool_depend`, `<depend>`, …), and calls `colcon build
---packages-select <exact list>`.  `test` does the same but also pulls in
-`test_depend` packages.
-
-### Workspace state (required — exactly one)
-
-| Flag | Short | Description |
-|---|---|---|
-| `--clean` | `-c` | Reset every repository to the pinned lockfile SHA |
-| `--dirty` | `-d` | Use whatever is on disk; skip git operations |
-
-### Build / install directories
-
-| Flag | Default | Description |
-|---|---|---|
-| `--build-base <dir>` | `build` | Colcon build output directory |
-| `--install-base <dir>` | `install` | Colcon install prefix |
-
-### Extra colcon flags (flagfile)
-
-Pass arbitrary colcon flags via a flagfile — one shell token per line,
-`#` comments allowed:
-
-```bash
-launch-plus build autoware_launch autoware.launch.xml \
-  sensor_model:=sample_sensor_kit vehicle_model:=sample_vehicle map_path:=/ \
-  --clean --colcon-flagfile example/colcon-flags.example.txt
-```
-
-Each line of the flagfile is inserted verbatim into `colcon build` before
-`--packages-select`.  Flags that conflict with launch-plus-managed arguments
-(`--packages-*`, `--base-paths`, `--build-base`, `--install-base`) are
-rejected as errors.  See [`example/colcon-flags.example.txt`](example/colcon-flags.example.txt)
-for an annotated template.
-
-| Flag | Description |
-|---|---|
-| `--colcon-flagfile <file>` | Path to a flagfile with extra colcon arguments |
-| `--dry-run` | Print the colcon command without running it |
-
-## How the resolver works
-
-**XML launch files** are parsed and resolved in Rust. Substitution expressions
-(`$(find-pkg-share ...)`, `$(var ...)`, `$(eval ...)`) are evaluated, `<include>`
-tags are followed recursively, and all `<node>`, `<param>`, and `<remap>` elements
-are collected into the output.
-
-**Python launch files** are executed with `importlib`, but before the file loads,
-a `MetaPathFinder` intercepts all imports of `launch`, `launch_ros`, and
-`ament_index_python` and replaces them with shim modules built entirely from the
-standard library.  The shims record constructor arguments (package, executable,
-parameters, remaps, included files) into a structured trace instead of scheduling
-anything for execution.  No ROS 2 packages need to be installed.
-
-**OpaqueFunction** bodies are arbitrary Python callables and cannot be statically
-analysed — they are executed directly.  `open()`, `yaml.safe_load()`, and
-`os.path.*` are patched so filesystem reads go through portable
-`$(find-pkg-share pkg)/...` paths; the package is sparse-checked out on demand if
-not yet present locally.
-
-## Development
-
-```bash
-cargo test --workspace
-cargo clippy --all-targets
-cargo fmt --check
-```
+- **ROS 2 developers** working with large multi-repository workspaces who want
+  faster iteration cycles
+- **CI/CD pipelines** that need to build and test only the packages affected by
+  a launch configuration change
+- **System integrators** who want a clear, auditable view of what a launch file
+  actually does — every node, parameter, and remap in one flat XML
+- **Anyone** tired of waiting 30+ minutes for a full workspace build when they
+  only need a handful of packages
 
 ## License
 

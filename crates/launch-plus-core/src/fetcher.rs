@@ -1047,4 +1047,68 @@ mod tests {
         assert_eq!(get_current_sha(dir.path()).unwrap(), sha1);
         assert!(!is_working_tree_dirty(dir.path()).unwrap());
     }
+
+    // ── no-checkout clone handling ──────────────────────────────────────
+
+    #[test]
+    fn test_default_mode_handles_no_checkout_clone() {
+        // Simulate the indexer's blobless --no-checkout clone, then verify
+        // that fetch_repo_sparse in Default mode initializes sparse-checkout
+        // and checks out the pinned SHA instead of failing verification.
+        let (origin, _sha) = setup_test_repo();
+        // Add a file in a subdirectory so we can test sparse-checkout paths.
+        fs::create_dir_all(origin.path().join("pkg")).unwrap();
+        fs::write(origin.path().join("pkg/package.xml"), "<package/>").unwrap();
+        let run = |args: &[&str]| {
+            Command::new("git")
+                .current_dir(origin.path())
+                .args(args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .unwrap()
+        };
+        run(&["add", "."]);
+        run(&["commit", "-m", "add pkg"]);
+        let target_sha = get_current_sha(origin.path()).unwrap();
+
+        // Create a --no-checkout clone (like the indexer does).
+        let clone_dir = tempfile::tempdir().unwrap();
+        let clone_path = clone_dir.path().join("repo");
+        let output = Command::new("git")
+            .args([
+                "clone",
+                "--filter=blob:none",
+                "--no-checkout",
+                origin.path().to_str().unwrap(),
+                clone_path.to_str().unwrap(),
+            ])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+
+        // Verify precondition: .git/index does not exist.
+        assert!(!clone_path.join(".git").join("index").exists());
+
+        // fetch_repo_sparse in Default mode should succeed (not error).
+        let options = FetchOptions {
+            workspace_state: WorkspaceState::Default,
+            ..Default::default()
+        };
+        fetch_repo_sparse(
+            origin.path().to_str().unwrap(),
+            &target_sha,
+            &clone_path,
+            &["pkg"],
+            &options,
+        )
+        .unwrap();
+
+        // After fetch, HEAD should be at the pinned SHA.
+        assert_eq!(get_current_sha(&clone_path).unwrap(), target_sha);
+        // The sparse-checkout path should be materialized.
+        assert!(clone_path.join("pkg/package.xml").exists());
+    }
 }

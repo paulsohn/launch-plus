@@ -272,6 +272,18 @@ enum Commands {
         #[arg(long)]
         inline_params: bool,
 
+        /// Allow SetLaunchConfiguration calls in child include files to propagate
+        /// back to the parent file, patching unresolved LaunchConfiguration references.
+        ///
+        /// In real ROS 2, included files share a LaunchContext so SetLaunchConfiguration
+        /// in a child mutates the parent's context.  This is an anti-pattern but some
+        /// launch trees (e.g. Autoware's agnocast_env.launch.py) depend on it.
+        ///
+        /// Without this flag, cross-include SetLaunchConfiguration side-effects are
+        /// reported as errors.  The flag name is intentionally verbose.
+        #[arg(long)]
+        allow_cross_include_set_launch_config: bool,
+
         /// Automatically install packages not in the lockfile via rosdep.
         ///
         /// When a required package is not in the lockfile (e.g. a ROS buildfarm package
@@ -370,6 +382,11 @@ enum Commands {
         /// Allow OpaqueFunction bodies to open files via portable paths
         #[arg(long)]
         apply_opaque_file_access: bool,
+
+        /// Allow cross-include SetLaunchConfiguration propagation.
+        /// See `resolve --allow-cross-include-set-launch-config` for details.
+        #[arg(long)]
+        allow_cross_include_set_launch_config: bool,
 
         /// Allow raw filesystem paths in `<include>` and `<param from>` during resolution.
         /// See `resolve --allow-including-unportable-path` for details.
@@ -536,6 +553,11 @@ enum Commands {
         #[arg(long)]
         apply_opaque_file_access: bool,
 
+        /// Allow cross-include SetLaunchConfiguration propagation.
+        /// See `resolve --allow-cross-include-set-launch-config` for details.
+        #[arg(long)]
+        allow_cross_include_set_launch_config: bool,
+
         /// Allow raw filesystem paths in `<include>` and `<param from>` during resolution.
         /// See `resolve --allow-including-unportable-path` for details.
         #[arg(long)]
@@ -630,6 +652,11 @@ enum Commands {
         /// See `resolve --apply-opaque-file-access` for details.
         #[arg(long)]
         apply_opaque_file_access: bool,
+
+        /// Allow cross-include SetLaunchConfiguration propagation.
+        /// See `resolve --allow-cross-include-set-launch-config` for details.
+        #[arg(long)]
+        allow_cross_include_set_launch_config: bool,
 
         /// Automatically install packages not in the lockfile via rosdep.
         /// See `resolve --rosdep` for details.
@@ -745,6 +772,7 @@ fn main() -> Result<()> {
             allow_including_unportable_path,
             apply_opaque_file_access,
             inline_params,
+            allow_cross_include_set_launch_config,
             flatten,
             flatten_namespaces,
             show_args,
@@ -764,6 +792,7 @@ fn main() -> Result<()> {
                 apply_opaque_file_access,
                 rosdep_fallback: rosdep,
                 inline_params,
+                allow_cross_include_set_launch_config,
             };
             cmd_resolve(
                 &package,
@@ -797,6 +826,7 @@ fn main() -> Result<()> {
             allow_global_arg_cascade,
             apply_launch_arg_defaults,
             apply_opaque_file_access,
+            allow_cross_include_set_launch_config,
             allow_including_unportable_path,
             rosdep,
             build_base,
@@ -814,6 +844,7 @@ fn main() -> Result<()> {
                 apply_opaque_file_access,
                 allow_unportable_paths: allow_including_unportable_path,
                 rosdep_fallback: rosdep,
+                allow_cross_include_set_launch_config,
                 ..Default::default()
             };
             let extra_colcon_args = colcon_flagfile
@@ -933,6 +964,7 @@ fn main() -> Result<()> {
             allow_global_arg_cascade,
             apply_launch_arg_defaults,
             apply_opaque_file_access,
+            allow_cross_include_set_launch_config,
             allow_including_unportable_path,
             rosdep,
             build_base,
@@ -950,6 +982,7 @@ fn main() -> Result<()> {
                 apply_opaque_file_access,
                 allow_unportable_paths: allow_including_unportable_path,
                 rosdep_fallback: rosdep,
+                allow_cross_include_set_launch_config,
                 ..Default::default()
             };
             let extra_colcon_args = colcon_flagfile
@@ -992,6 +1025,7 @@ fn main() -> Result<()> {
             preview,
             allow_including_unportable_path,
             apply_opaque_file_access,
+            allow_cross_include_set_launch_config,
             rosdep,
             strict,
             warn_all,
@@ -1009,6 +1043,7 @@ fn main() -> Result<()> {
                 apply_opaque_file_access,
                 rosdep_fallback: rosdep,
                 inline_params: false, // check suppresses XML anyway
+                allow_cross_include_set_launch_config,
             };
             cmd_resolve(
                 &package,
@@ -1708,6 +1743,23 @@ fn cmd_resolve(
                 eprintln!("    → include tag: add <arg name=\"x\" value=\"$(var x)\"/>");
                 eprintln!("    → Or: --allow-global-arg-cascade  (inherits parent context)");
             }
+            eprintln!();
+            eprintln!("  Flags are intentionally verbose — prefer fixing the launch files.");
+        }
+
+        if !workflow_options.allow_cross_include_set_launch_config
+            && all_errors
+                .iter()
+                .any(|e| e.contains("cross-include side-effect"))
+        {
+            eprintln!();
+            eprintln!(
+                "  hint: LaunchConfiguration set by a child include (cross-include side-effect)."
+            );
+            eprintln!("    → Refactor: move SetLaunchConfiguration to the parent file");
+            eprintln!(
+                "    → Or: --allow-cross-include-set-launch-config  (allows child→parent propagation)"
+            );
             eprintln!();
             eprintln!("  Flags are intentionally verbose — prefer fixing the launch files.");
         }

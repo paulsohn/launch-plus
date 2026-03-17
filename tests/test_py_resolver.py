@@ -1,5 +1,5 @@
 """Tests for py_resolver internals — substitution handling, node tracking,
-and inline Python include resolution."""
+and unresolved substitution tracking."""
 
 import os
 import textwrap
@@ -102,11 +102,11 @@ class TestResolveSubstitution:
         ctx = _make_context({"my_var": "resolved_value"})
         assert R._resolve_substitution(lc, ctx) == "resolved_value"
 
-    def test_unresolved_falls_back_to_str(self):
+    def test_unresolved_falls_back_to_sentinel(self):
         lc = R._LaunchConfiguration("missing")
         ctx = _make_context({})
-        # perform() returns None → _resolve_substitution falls back to str(lc)
-        assert R._resolve_substitution(lc, ctx) == "missing"
+        # perform() returns None → sentinel for LaunchConfiguration
+        assert R._resolve_substitution(lc, ctx) == "${{unresolved:missing}}"
 
     def test_plain_string_passthrough(self):
         assert R._resolve_substitution("hello", None) == "hello"
@@ -130,8 +130,8 @@ class TestResolveSubstitution:
             R._LaunchConfiguration("unresolved_var"),
         ]
         ctx = _make_context({"resolved_var": "abc"})
-        # Unresolved element falls back to str(lc) = variable name
-        assert R._resolve_substitution(parts, ctx) == "abc/unresolved_var"
+        # Unresolved element produces sentinel for LaunchConfiguration
+        assert R._resolve_substitution(parts, ctx) == "abc/${{unresolved:unresolved_var}}"
 
 
 # ─── Node deferred resolution ────────────────────────────────────────────────
@@ -154,9 +154,9 @@ class TestNodeDeferredResolution:
         assert R._tracked["nodes"][node._idx]["package"] == "actual_package"
         assert "actual_package" in R._tracked["packages"]
 
-    def test_tracked_node_unresolved_package_stays_as_name(self):
+    def test_tracked_node_unresolved_package_stays_as_sentinel(self):
         """When the LaunchConfiguration cannot be resolved (not in context),
-        the entry keeps the variable name but does NOT track it as a package."""
+        the entry keeps the sentinel but does NOT track it as a package."""
         ctx = _make_context({})
         node = R._TrackedNode(
             package=R._LaunchConfiguration("unknown_pkg"),
@@ -164,9 +164,9 @@ class TestNodeDeferredResolution:
         )
         R._resolve_node_details(node, ctx)
 
-        # The entry shows the variable name (display fallback from str(lc))
-        assert R._tracked["nodes"][node._idx]["package"] == "unknown_pkg"
-        # But it must NOT be tracked as a real package dependency
+        # The entry shows the sentinel (not the plain variable name)
+        assert R._tracked["nodes"][node._idx]["package"] == "${{unresolved:unknown_pkg}}"
+        # It must NOT be tracked as a real package dependency
         assert "unknown_pkg" not in R._tracked["packages"]
 
     def test_tracked_container_resolves_all_fields(self):
@@ -216,182 +216,87 @@ class TestComposablePluginResolution:
             plugin="foo::Bar",
         )
         plugins = R._resolve_composable_plugins([desc], ctx)
-        assert plugins[0]["package"] == "unknown"  # display fallback
+        assert plugins[0]["package"] == "${{unresolved:unknown}}"  # sentinel
         assert "unknown" not in R._tracked["packages"]
 
 
-# ─── Inline Python include resolution ────────────────────────────────────────
+# ─── Unresolved substitution tracking ────────────────────────────────────────
 
-class TestInlinePythonInclude:
-    def test_set_launch_configuration_propagates(self):
-        """A child Python launch file that calls SetLaunchConfiguration
-        should update the parent context."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
-                from launch import LaunchDescription
-                from launch.actions import SetLaunchConfiguration
+class TestUnresolvedSubstitutions:
+    def test_unresolved_launch_config_tracked(self):
+        """Node with LaunchConfiguration("x") for package where x is not
+        in the context should produce an unresolved_substitutions entry."""
+        lc = R._LaunchConfiguration("container_package")
+        node = R._TrackedNode(package=lc, executable="my_exec")
 
-                def generate_launch_description():
-                    return LaunchDescription([
-                        SetLaunchConfiguration("child_var", "child_value"),
-                    ])
-            """)
+        ctx = _make_context({})  # container_package NOT in context
+        R._resolve_node_details(node, ctx)
 
-            ctx = _make_context({"parent_var": "parent_value"})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+        unsubs = R._tracked["unresolved_substitutions"]
+        assert len(unsubs) == 1
+        assert unsubs[0]["node_idx"] == node._idx
+        assert unsubs[0]["field"] == "package"
+        assert unsubs[0]["variable_name"] == "container_package"
+        assert "${{unresolved:container_package}}" in unsubs[0]["full_template"]
 
-            assert ctx._launch_configurations["child_var"] == "child_value"
-            assert ctx._launch_configurations["parent_var"] == "parent_value"
+    def test_no_unresolved_when_variable_set(self):
+        """When the variable IS in the context, no unresolved_substitutions entry."""
+        lc = R._LaunchConfiguration("container_package")
+        node = R._TrackedNode(package=lc, executable="my_exec")
 
-    def test_child_declared_args_do_not_leak(self):
-        """DeclareLaunchArgument defaults from a child file should NOT
-        persist in the parent context (only SetLaunchConfiguration should)."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
-                from launch import LaunchDescription
-                from launch.actions import DeclareLaunchArgument
-                from launch.actions import SetLaunchConfiguration
+        ctx = _make_context({"container_package": "rclcpp_components"})
+        R._resolve_node_details(node, ctx)
 
-                def generate_launch_description():
-                    return LaunchDescription([
-                        DeclareLaunchArgument("child_only_arg", default_value="should_not_leak"),
-                        SetLaunchConfiguration("sticky_var", "persists"),
-                    ])
-            """)
+        unsubs = R._tracked["unresolved_substitutions"]
+        assert len(unsubs) == 0
+        # And the node's package should be resolved
+        entry = R._tracked["nodes"][node._idx]
+        assert entry["package"] == "rclcpp_components"
 
-            ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+    def test_unresolved_sentinel_format(self):
+        """The sentinel ${{unresolved:x}} should appear in the node's tracked field."""
+        lc = R._LaunchConfiguration("my_var")
+        node = R._TrackedNode(package=lc, executable="my_exec")
 
-            assert "child_only_arg" not in ctx._launch_configurations
-            assert ctx._launch_configurations["sticky_var"] == "persists"
+        ctx = _make_context({})  # my_var NOT in context
+        R._resolve_node_details(node, ctx)
 
-    def test_child_args_forwarded(self):
-        """launch_arguments passed to the include should be available
-        in the child's context."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
-                from launch import LaunchDescription
-                from launch.actions import DeclareLaunchArgument
-                from launch.actions import SetLaunchConfiguration
-                from launch.substitutions import LaunchConfiguration
+        entry = R._tracked["nodes"][node._idx]
+        assert entry["package"] == "${{unresolved:my_var}}"
 
-                def generate_launch_description():
-                    return LaunchDescription([
-                        DeclareLaunchArgument("mode", default_value="default"),
-                        SetLaunchConfiguration("resolved_mode",
-                                               LaunchConfiguration("mode")),
-                    ])
-            """)
+    def test_set_launch_configuration_still_recorded(self):
+        """SetLaunchConfiguration should still be recorded in
+        _tracked['set_launch_configurations']."""
+        slc = R._SetLaunchConfiguration("my_key", "my_value")
 
-            ctx = _make_context({})
-            R._inline_resolve_python_launch(
-                child_path, ctx, {"mode": "custom"}, depth=1
-            )
-
-            assert ctx._launch_configurations["resolved_mode"] == "custom"
-
-    def test_depth_limit_prevents_infinite_recursion(self):
-        """Exceeding the depth limit should warn, not crash."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
-                from launch import LaunchDescription
-
-                def generate_launch_description():
-                    return LaunchDescription([])
-            """)
-
-            ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=21)
-            # Should not raise; just warns
-            assert any("depth" in w.lower() for w in R._tracked["warnings"])
-
-    def test_missing_file_silently_skipped(self):
-        """A non-existent include file should not raise."""
         ctx = _make_context({})
-        R._inline_resolve_python_launch("/nonexistent/path.py", ctx, {}, depth=1)
-        # No error, no crash
+        R._walk_action(slc, ctx, depth=0)
 
-    def test_inline_include_does_not_duplicate_tracked_nodes(self):
-        """Inline include must NOT create tracked node entries — the Rust
-        orchestrator resolves the child file separately, so any entries
-        created by the inline walk would be duplicates."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
-                from launch import LaunchDescription
-                from launch_ros.actions import Node
+        assert R._tracked["set_launch_configurations"]["my_key"] == "my_value"
+        assert ctx._launch_configurations["my_key"] == "my_value"
 
-                def generate_launch_description():
-                    return LaunchDescription([
-                        Node(package="my_pkg", executable="my_exec"),
-                    ])
-            """)
+    def test_unresolved_in_executable_field(self):
+        """Unresolved LaunchConfiguration in executable field should also be tracked."""
+        lc = R._LaunchConfiguration("my_executable")
+        node = R._TrackedNode(package="my_pkg", executable=lc)
 
-            nodes_before = len(R._tracked["nodes"])
-            pkgs_before = list(R._tracked["packages"])
-            ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+        ctx = _make_context({})
+        R._resolve_node_details(node, ctx)
 
-            # No new tracked nodes or packages from the inline walk
-            assert len(R._tracked["nodes"]) == nodes_before
-            assert R._tracked["packages"] == pkgs_before
+        unsubs = R._tracked["unresolved_substitutions"]
+        assert len(unsubs) == 1
+        assert unsubs[0]["field"] == "executable"
+        assert unsubs[0]["variable_name"] == "my_executable"
 
-    def test_inline_include_does_not_duplicate_global_params(self):
-        """SetParameter inside an inline-included child must NOT create
-        tracked global_params entries — only context mutations survive."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
-                from launch import LaunchDescription
-                from launch_ros.actions import SetParameter
+    def test_unresolved_not_tracked_as_package(self):
+        """An unresolved LaunchConfiguration for a package field should NOT
+        be tracked in _tracked['packages'] (it's not a real package name)."""
+        lc = R._LaunchConfiguration("container_package")
+        node = R._TrackedNode(package=lc, executable="my_exec")
 
-                def generate_launch_description():
-                    return LaunchDescription([
-                        SetParameter(name="wheel_radius", value="0.383"),
-                    ])
-            """)
+        ctx = _make_context({})
+        R._resolve_node_details(node, ctx)
 
-            gp_before = len(R._tracked["global_params"])
-            ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
-
-            # No new tracked global_params
-            assert len(R._tracked["global_params"]) == gp_before
-            # But context should have the global_params for downstream use
-            gp_list = ctx._launch_configurations.get("global_params", [])
-            assert any(name == "wheel_radius" for name, _ in gp_list)
-
-    def test_inline_include_does_not_duplicate_include_deps(self):
-        """Include dependencies discovered during inline walk should NOT
-        be tracked — the Rust orchestrator tracks them when it processes
-        the child file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a grandchild that the child includes
-            _write_launch_py(tmpdir, "grandchild.launch.py", """\
-                from launch import LaunchDescription
-
-                def generate_launch_description():
-                    return LaunchDescription([])
-            """)
-
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
-                import os
-                from launch import LaunchDescription
-                from launch.actions import IncludeLaunchDescription
-                from launch.launch_description_sources import PythonLaunchDescriptionSource
-
-                def generate_launch_description():
-                    here = os.path.dirname(__file__)
-                    return LaunchDescription([
-                        IncludeLaunchDescription(
-                            PythonLaunchDescriptionSource(
-                                os.path.join(here, "grandchild.launch.py")
-                            ),
-                        ),
-                    ])
-            """)
-
-            deps_before = len(R._tracked["include_deps"])
-            ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
-
-            # No new include deps
-            assert len(R._tracked["include_deps"]) == deps_before
+        # The sentinel should not be in packages
+        assert "${{unresolved:container_package}}" not in R._tracked["packages"]
+        assert "container_package" not in R._tracked["packages"]

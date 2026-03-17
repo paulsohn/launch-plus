@@ -955,6 +955,24 @@ pub struct LaunchInclude {
 ///
 /// Both `resolved_launch_to_parsed` (XML/YAML) and `py_output_to_parsed` (Python)
 /// produce this type.  The orchestrator's `process_parsed_file` consumes it uniformly.
+/// A node field that could not be resolved because the `LaunchConfiguration` variable
+/// was not set in the current context.  The orchestrator uses these to patch node fields
+/// post-hoc using `set_launch_configurations` from child includes.
+#[derive(Debug, Clone)]
+pub struct UnresolvedSubstitution {
+    /// Index into `ParsedLaunchFile::nodes`.
+    pub node_idx: usize,
+    /// Which field is unresolved (e.g. "package", "executable", "name",
+    /// "plugin_package", "plugin_plugin").
+    pub field: String,
+    /// The `LaunchConfiguration` variable name that was missing.
+    pub variable_name: String,
+    /// The full template string with sentinel (e.g. `${{unresolved:container_package}}`).
+    pub full_template: String,
+    /// For plugin fields, which plugin within the container node.
+    pub plugin_idx: Option<usize>,
+}
+
 #[derive(Debug, Default)]
 pub struct ParsedLaunchFile {
     pub packages: Vec<String>,
@@ -971,6 +989,12 @@ pub struct ParsedLaunchFile {
     pub warnings: Vec<String>,
     pub errors: Vec<String>,
     pub infos: Vec<String>,
+    /// SetLaunchConfiguration calls from this file: {name: value}.
+    /// Used by the orchestrator to patch unresolved substitutions in parent files.
+    pub set_launch_configurations: HashMap<String, String>,
+    /// Node fields that contain unresolved `LaunchConfiguration` references.
+    /// The orchestrator patches these using `set_launch_configurations` from child includes.
+    pub unresolved_substitutions: Vec<UnresolvedSubstitution>,
 }
 
 /// A fully resolved node

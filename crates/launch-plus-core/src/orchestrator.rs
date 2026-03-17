@@ -129,6 +129,19 @@ pub struct ResolveWorkflowOptions {
     ///
     /// Exposed via `--inline-params` in the CLI.
     pub inline_params: bool,
+
+    /// Allow `SetLaunchConfiguration` calls in child include files to propagate
+    /// back to the parent file, patching unresolved `LaunchConfiguration` references.
+    ///
+    /// **Default: `false` (strict mode).**  In strict mode, unresolved `LaunchConfiguration`
+    /// references that depend on child includes are reported as errors.
+    ///
+    /// In real ROS 2, included files share a `LaunchContext` so `SetLaunchConfiguration`
+    /// in a child mutates the parent's context.  This is an anti-pattern but some launch
+    /// trees (e.g. Autoware's `agnocast_env.launch.py`) depend on it.
+    ///
+    /// Exposed via `--allow-cross-include-set-launch-config` in the CLI (intentionally verbose).
+    pub allow_cross_include_set_launch_config: bool,
 }
 
 /// Result of recursive launch file resolution
@@ -193,6 +206,11 @@ pub struct ResolveResult {
     /// Stored here so the renderer can emit them as top-level arg comments when
     /// `--show-args` is active.
     pub initial_args: HashMap<String, String>,
+
+    /// Per-file `SetLaunchConfiguration` values: `(package, share_path) → {name: value}`.
+    /// Used to patch unresolved substitutions in parent files when
+    /// `--allow-cross-include-set-launch-config` is enabled.
+    pub set_launch_configs_by_file: HashMap<(String, PathBuf), HashMap<String, String>>,
 }
 
 impl ResolveResult {
@@ -212,6 +230,7 @@ impl ResolveResult {
             declared_args_by_file: HashMap::new(),
             global_params: Vec::new(),
             initial_args: HashMap::new(),
+            set_launch_configs_by_file: HashMap::new(),
         }
     }
 
@@ -454,6 +473,19 @@ struct PyResolverOutput {
     /// Event handlers detected in the Python launch file.
     #[serde(default)]
     event_handlers: Vec<PyEventHandler>,
+    /// Node fields that contain unresolved `LaunchConfiguration` references.
+    #[serde(default)]
+    unresolved_substitutions: Vec<PyUnresolvedSubstitution>,
+}
+
+#[derive(Debug, serde::Deserialize, Clone)]
+struct PyUnresolvedSubstitution {
+    node_idx: usize,
+    field: String,
+    variable_name: String,
+    full_template: String,
+    #[serde(default)]
+    plugin_idx: Option<usize>,
 }
 
 #[derive(Debug, serde::Deserialize, Clone, PartialEq)]
@@ -710,6 +742,8 @@ fn resolved_launch_to_parsed(resolved: ResolvedLaunch) -> ParsedLaunchFile {
         warnings: resolved.warnings,
         errors,
         infos: resolved.infos,
+        set_launch_configurations: HashMap::new(), // XML uses $(var) inline
+        unresolved_substitutions: Vec::new(),      // XML resolves $(var) at parse time
     }
 }
 
@@ -885,6 +919,18 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
         })
         .collect();
 
+    let unresolved_substitutions = py_output
+        .unresolved_substitutions
+        .into_iter()
+        .map(|u| crate::resolver::UnresolvedSubstitution {
+            node_idx: u.node_idx,
+            field: u.field,
+            variable_name: u.variable_name,
+            full_template: u.full_template,
+            plugin_idx: u.plugin_idx,
+        })
+        .collect();
+
     ParsedLaunchFile {
         packages: py_output.packages,
         nodes,
@@ -896,6 +942,8 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
         warnings: Vec::new(), // warnings emitted separately by the caller with py_resolver formatting
         errors: Vec::new(),
         infos: Vec::new(),
+        set_launch_configurations: py_output.set_launch_configurations,
+        unresolved_substitutions,
     }
 }
 
@@ -1000,6 +1048,19 @@ fn process_parsed_file(
     // Record parsed file
     result.parsed_files.push(file_path.to_path_buf());
 
+    // Store this file's SetLaunchConfiguration values so parent files can patch
+    // unresolved substitutions using them.
+    if !parsed.set_launch_configurations.is_empty() {
+        result.set_launch_configs_by_file.insert(
+            (package.to_string(), share_path.to_path_buf()),
+            parsed.set_launch_configurations.clone(),
+        );
+    }
+
+    // Record node base index before adding this file's nodes — needed for
+    // post-hoc patching of unresolved substitutions.
+    let nodes_base = result.nodes.len();
+
     // Set include_chain and source on all nodes, then accumulate.
     // IncludeMarker nodes (from inline resolver) get a chain that includes their own source.
     let source = (package.to_string(), share_path.to_path_buf());
@@ -1029,6 +1090,14 @@ fn process_parsed_file(
         .chain(parsed.declared_arg_defaults.iter())
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
+
+    // Save include keys and unresolved substitutions for post-loop patching.
+    let include_keys: Vec<(String, PathBuf)> = parsed
+        .launch_includes
+        .iter()
+        .map(|inc| (inc.package.clone(), inc.share_path.clone()))
+        .collect();
+    let unresolved_substitutions = parsed.unresolved_substitutions;
 
     // Recurse into launch includes
     for include in parsed.launch_includes {
@@ -1127,6 +1196,82 @@ fn process_parsed_file(
                     arg_name
                 ));
             }
+        }
+    }
+
+    // ── Cross-include SetLaunchConfiguration patching ──────────────────────
+    //
+    // If the parent file has unresolved LaunchConfiguration references (e.g.
+    // LaunchConfiguration("container_package") where no SetLaunchConfiguration
+    // was called in the parent), check if any child include set the variable
+    // via SetLaunchConfiguration and patch the parent's node fields.
+    if !unresolved_substitutions.is_empty() {
+        // Collect set_launch_configurations from direct child includes.
+        let mut child_configs: HashMap<String, String> = HashMap::new();
+        for (inc_pkg, inc_path) in &include_keys {
+            if let Some(configs) = result
+                .set_launch_configs_by_file
+                .get(&(inc_pkg.clone(), inc_path.clone()))
+            {
+                child_configs.extend(configs.clone());
+            }
+        }
+
+        for unsub in &unresolved_substitutions {
+            if let Some(value) = child_configs.get(&unsub.variable_name) {
+                if !workflow_options.allow_cross_include_set_launch_config {
+                    // The child *would* provide the value, but the flag is not set.
+                    result.add_error(format!(
+                        "{}://{}: LaunchConfiguration('{}') in node field '{}' is set by a \
+                         child include via SetLaunchConfiguration (cross-include side-effect); \
+                         use --allow-cross-include-set-launch-config to allow this pattern",
+                        package,
+                        share_path.display(),
+                        unsub.variable_name,
+                        unsub.field
+                    ));
+                    continue;
+                }
+
+                // Patch the node field by replacing the sentinel with the actual value.
+                let global_idx = nodes_base + unsub.node_idx;
+                if global_idx < result.nodes.len() {
+                    let sentinel = format!("${{{{unresolved:{}}}}}", unsub.variable_name);
+                    let patched = unsub.full_template.replace(&sentinel, value);
+                    let node = &mut result.nodes[global_idx];
+                    match unsub.field.as_str() {
+                        "package" => {
+                            node.package = patched;
+                            result.direct_packages.insert(value.clone());
+                        }
+                        "executable" => node.executable = patched,
+                        "name" => node.name = Some(patched),
+                        "plugin_package" | "plugin_plugin" => {
+                            // Patch composable plugin fields.
+                            if let Some(pi) = unsub.plugin_idx {
+                                match &mut node.kind {
+                                    NodeKind::Container { plugins }
+                                    | NodeKind::LoadComposable { plugins, .. } => {
+                                        if let Some(plugin) = plugins.get_mut(pi) {
+                                            if unsub.field == "plugin_package" {
+                                                plugin.package = patched.clone();
+                                                result.direct_packages.insert(patched);
+                                            } else {
+                                                plugin.plugin = patched;
+                                            }
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            // If no child provides it and the sentinel remains, that's fine —
+            // the sentinel will appear in the output as a visible marker of
+            // an unresolved variable.
         }
     }
 }

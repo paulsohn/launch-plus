@@ -87,6 +87,7 @@ docs: update architecture diagram in context.md
 - Unit tests for all public functions
 - Integration tests for each milestone
 - At least one end-to-end test per major feature
+- Every bug fix or code change addressing PR review comments must include corresponding unit tests
 
 ### Naming
 - Rust: `test_<function>_<scenario>`

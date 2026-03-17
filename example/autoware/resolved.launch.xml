@@ -36,7 +36,11 @@
   <group>
     <!-- arg name="container_name" value="pointcloud_container" -->
     <!-- arg name="use_multithread" value="true" -->
-    <node_container pkg="rclcpp_components" exec="container_executable" name="container_name"/>
+    <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container"/>
+    <!-- source: autoware_agnocast_wrapper://launch/agnocast_env.launch.py -->
+      <!-- arg name="agnocast_heaphook_path" default="/opt/ros/humble/lib/libagnocast_heaphook.so" -->
+      <!-- arg name="use_multithread" default="false" -->
+    <!-- end: autoware_agnocast_wrapper://launch/agnocast_env.launch.py -->
   </group>
   <!-- end: autoware_launch://launch/pointcloud_container.launch.py -->
   <!-- source: tier4_vehicle_launch://launch/vehicle.launch.xml -->
@@ -526,6 +530,7 @@
         <!-- arg name="graph_vars" value="" -->
         <!-- arg name="param_file" value="$(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml" -->
         <!-- arg name="~/availability" default="/system/command_mode/availability" -->
+        <!-- arg name="~/diagnostics" default="/diagnostics" -->
         <!-- arg name="~/reset" value="/diagnostics_graph/reset" -->
         <!-- arg name="~/status" value="/diagnostics_graph/status" -->
         <!-- arg name="~/struct" value="/diagnostics_graph/struct" -->
@@ -541,6 +546,7 @@
           <!-- end params from: $(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml -->
           <param name="graph_file" value="$(find-pkg-share autoware_launch)/config/system/diagnostics/autoware-main.yaml"/>
           <param name="graph_vars" value=""/>
+          <remap from="~/diagnostics" to="/diagnostics"/>
           <remap from="~/struct" to="/diagnostics_graph/struct"/>
           <remap from="~/status" to="/diagnostics_graph/status"/>
           <remap from="~/unknowns" to="/diagnostics_graph/unknowns"/>
@@ -813,7 +819,7 @@
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
-              <node_container pkg="rclcpp_components" exec="container_executable" name="container_name" namespace="/sensing/lidar/top/pointcloud_preprocessor">
+              <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/top/pointcloud_preprocessor">
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
                   <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
                   <param name="cloud_max_angle" value="360"/>
@@ -947,7 +953,7 @@
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
-              <node_container pkg="rclcpp_components" exec="container_executable" name="container_name" namespace="/sensing/lidar/rear/pointcloud_preprocessor">
+              <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/rear/pointcloud_preprocessor">
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
                   <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLP16.yaml"/>
                   <param name="cloud_max_angle" value="60"/>
@@ -1960,7 +1966,7 @@
           <!-- arg name="use_intra_process" value="true" -->
           <!-- arg name="use_multithread" value="true" -->
           <!-- arg name="use_pointcloud_container" value="true" -->
-          <node_container pkg="rclcpp_components" exec="container_executable" name="individual_container_name" namespace="/perception/occupancy_grid_map">
+          <node_container pkg="rclcpp_components" exec="component_container_mt" name="occupancy_grid_map_container" namespace="/perception/occupancy_grid_map">
             <composable_node pkg="autoware_probabilistic_occupancy_grid_map" plugin="autoware::occupancy_grid_map::PointcloudBasedOccupancyGridMapNode" name="occupancy_grid_map_node">
               <param name="OccupancyGridMapFixedBlindSpot" value="{'distance_margin': 1.0}"/>
               <param name="OccupancyGridMapProjectiveBlindSpot" value="{'projection_dz_threshold': 0.01, 'obstacle_separation_threshold': 1.0, 'pub_debug_grid': False}"/>
@@ -2819,7 +2825,7 @@
           <!-- arg name="whole_image_detection/label_path" value="[home]/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
           <!-- arg name="whole_image_detection/model_path" value="[home]/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
           <!-- arg name="yolox_traffic_light_detector_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml" -->
-          <node_container pkg="rclcpp_components" exec="container_executable" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera6">
+          <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera6">
             <composable_node pkg="autoware_traffic_light_classifier" plugin="autoware::traffic_light::TrafficLightClassifierNodelet" name="car_traffic_light_classifier">
               <param name="build_only" value="False"/>
               <param name="label_path" value="[home]/autoware_data/traffic_light_classifier/lamp_labels.txt"/>
@@ -2892,7 +2898,7 @@
               <remap from="output/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/traffic_signals"/>
             </composable_node>
           </load_composable_node>
-          <node_container pkg="rclcpp_components" exec="container_executable" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera7">
+          <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera7">
             <composable_node pkg="autoware_traffic_light_classifier" plugin="autoware::traffic_light::TrafficLightClassifierNodelet" name="car_traffic_light_classifier">
               <param name="build_only" value="False"/>
               <param name="label_path" value="[home]/autoware_data/traffic_light_classifier/lamp_labels.txt"/>
@@ -4489,6 +4495,10 @@
                 <param name="lane_change.lane_change_finish_judge_buffer" value="2.0"/>
                 <param name="lane_change.finish_judge_lateral_threshold" value="0.1"/>
                 <param name="lane_change.finish_judge_lateral_angle_deviation" value="1.0"/>
+                <param name="lane_change.path_miss.enable_path_miss_detection" value="true"/>
+                <param name="lane_change.path_miss.threshold_longitudinal" value="1.0"/>
+                <param name="lane_change.path_miss.velocity_points" value="[0.0, 0.1, 0.11, 2.77, 2.78, 20.0]"/>
+                <param name="lane_change.path_miss.lateral_thresholds" value="[3.0, 3.0, 5.0, 5.0, 1.5, 0.8]"/>
                 <param name="lane_change.publish_debug_marker" value="true"/>
                 <!-- end params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/lane_change/lane_change.param.yaml -->
                 <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/goal_planner/goal_planner.param.yaml -->

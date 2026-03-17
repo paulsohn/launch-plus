@@ -30,7 +30,7 @@ repositories:
   core/autoware_core:
     type: git
     url: https://github.com/autowarefoundation/autoware_core.git
-    version: 4d092e8e974446e05aa09638d73cf59024010043
+    version: 9fe7ac2cfc28dae8d7529dd3eb17dd737f1f3b27
     ref: main
     packages:
     - autoware_adapi_adaptors
@@ -173,7 +173,7 @@ repositories:
   launcher/autoware_launch:
     type: git
     url: https://github.com/autowarefoundation/autoware_launch.git
-    version: 1fe467463098cef2a4ace98635632df9c72ec1a3
+    version: 8a4b2ec1140fdc88f3b61fdf7697acd20654095c
     ref: main
     packages:
     - autoware_launch
@@ -379,7 +379,7 @@ repositories:
   universe/autoware_universe:
     type: git
     url: https://github.com/autowarefoundation/autoware_universe.git
-    version: 1fa7b5558de3d1261fdad09b8996bd593756151d
+    version: d702d678392837529fad335c4fce38cfff95f64b
     ref: main
     packages:
     - autoware_accel_brake_map_calibrator
@@ -598,8 +598,8 @@ repositories:
     - autoware_trajectory_modifier
     - autoware_trajectory_optimizer
     - autoware_trajectory_ranker
-    - autoware_trajectory_safety_filter
     - autoware_trajectory_traffic_rule_filter
+    - autoware_trajectory_validator
     - autoware_universe_utils
     - autoware_vehicle_cmd_gate
     - autoware_vehicle_door_simulator
@@ -1738,12 +1738,12 @@ packages:
   autoware_trajectory_ranker:
     repo: universe/autoware_universe
     path: planning/autoware_trajectory_ranker
-  autoware_trajectory_safety_filter:
-    repo: universe/autoware_universe
-    path: planning/autoware_trajectory_safety_filter
   autoware_trajectory_traffic_rule_filter:
     repo: universe/autoware_universe
     path: planning/autoware_trajectory_traffic_rule_filter
+  autoware_trajectory_validator:
+    repo: universe/autoware_universe
+    path: planning/autoware_trajectory_validator
   autoware_twist2accel:
     repo: core/autoware_core
     path: localization/autoware_twist2accel

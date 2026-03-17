@@ -310,3 +310,88 @@ class TestInlinePythonInclude:
         ctx = _make_context({})
         R._inline_resolve_python_launch("/nonexistent/path.py", ctx, {}, depth=1)
         # No error, no crash
+
+    def test_inline_include_does_not_duplicate_tracked_nodes(self):
+        """Inline include must NOT create tracked node entries — the Rust
+        orchestrator resolves the child file separately, so any entries
+        created by the inline walk would be duplicates."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+                from launch import LaunchDescription
+                from launch_ros.actions import Node
+
+                def generate_launch_description():
+                    return LaunchDescription([
+                        Node(package="my_pkg", executable="my_exec"),
+                    ])
+            """)
+
+            nodes_before = len(R._tracked["nodes"])
+            pkgs_before = list(R._tracked["packages"])
+            ctx = _make_context({})
+            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+
+            # No new tracked nodes or packages from the inline walk
+            assert len(R._tracked["nodes"]) == nodes_before
+            assert R._tracked["packages"] == pkgs_before
+
+    def test_inline_include_does_not_duplicate_global_params(self):
+        """SetParameter inside an inline-included child must NOT create
+        tracked global_params entries — only context mutations survive."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+                from launch import LaunchDescription
+                from launch_ros.actions import SetParameter
+
+                def generate_launch_description():
+                    return LaunchDescription([
+                        SetParameter(name="wheel_radius", value="0.383"),
+                    ])
+            """)
+
+            gp_before = len(R._tracked["global_params"])
+            ctx = _make_context({})
+            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+
+            # No new tracked global_params
+            assert len(R._tracked["global_params"]) == gp_before
+            # But context should have the global_params for downstream use
+            gp_list = ctx._launch_configurations.get("global_params", [])
+            assert any(name == "wheel_radius" for name, _ in gp_list)
+
+    def test_inline_include_does_not_duplicate_include_deps(self):
+        """Include dependencies discovered during inline walk should NOT
+        be tracked — the Rust orchestrator tracks them when it processes
+        the child file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a grandchild that the child includes
+            _write_launch_py(tmpdir, "grandchild.launch.py", """\
+                from launch import LaunchDescription
+
+                def generate_launch_description():
+                    return LaunchDescription([])
+            """)
+
+            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+                import os
+                from launch import LaunchDescription
+                from launch.actions import IncludeLaunchDescription
+                from launch.launch_description_sources import PythonLaunchDescriptionSource
+
+                def generate_launch_description():
+                    here = os.path.dirname(__file__)
+                    return LaunchDescription([
+                        IncludeLaunchDescription(
+                            PythonLaunchDescriptionSource(
+                                os.path.join(here, "grandchild.launch.py")
+                            ),
+                        ),
+                    ])
+            """)
+
+            deps_before = len(R._tracked["include_deps"])
+            ctx = _make_context({})
+            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+
+            # No new include deps
+            assert len(R._tracked["include_deps"]) == deps_before

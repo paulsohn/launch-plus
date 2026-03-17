@@ -1546,6 +1546,16 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
     if not hasattr(mod, "generate_launch_description"):
         return
 
+    # Save tracking state BEFORE generate_launch_description() — constructors
+    # (e.g. _TrackedNode, _TrackedSetParameter) append to _tracked["nodes"]
+    # at construction time.  The Rust orchestrator will resolve this same
+    # child file separately and produce its own tracked entries, so we must
+    # discard everything created by the inline execution.
+    saved_nodes_len = len(_tracked["nodes"])
+    saved_gp_len = len(_tracked["global_params"])
+    saved_deps_len = len(_tracked["include_deps"])
+    saved_pkgs = list(_tracked["packages"])
+
     try:
         ld = mod.generate_launch_description()
     except _PackageNotFetchedError:
@@ -1569,19 +1579,26 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
 
     # Pass 2: walk actions — SetLaunchConfiguration, OpaqueFunction, etc.
     # all mutate parent_context directly, which is the desired effect.
+    # Only context mutations survive; tracked state is rolled back.
     try:
         _walk_actions(entities, parent_context, depth)
     except _PackageNotFetchedError:
         raise
+    finally:
+        del _tracked["nodes"][saved_nodes_len:]
+        del _tracked["global_params"][saved_gp_len:]
+        del _tracked["include_deps"][saved_deps_len:]
+        _tracked["packages"][:] = saved_pkgs
 
     # Restore child-only args that were not SetLaunchConfiguration'd —
     # child DeclareLaunchArgument defaults should NOT leak into the parent
     # scope, only SetLaunchConfiguration is a deliberate side-effect.
     # Keep keys that were either already in the parent or were set via
-    # SetLaunchConfiguration (tracked globally in _tracked["set_launch_configurations"]).
+    # SetLaunchConfiguration.  Also preserve "global_params" — this is the
+    # accumulation list for SetParameter, not a launch argument.
     set_configs = set(_tracked["set_launch_configurations"].keys())
     for k in list(parent_context._launch_configurations):
-        if k not in saved_configs and k not in set_configs:
+        if k not in saved_configs and k not in set_configs and k != "global_params":
             del parent_context._launch_configurations[k]
 
 

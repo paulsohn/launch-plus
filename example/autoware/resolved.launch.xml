@@ -34,9 +34,10 @@
   <!-- end: autoware_global_parameter_loader://launch/global_params.launch.py -->
   <!-- source: autoware_launch://launch/pointcloud_container.launch.py -->
   <group>
+    <!-- arg name="agnocast_heaphook_path" default="/opt/ros/humble/lib/libagnocast_heaphook.so" -->
     <!-- arg name="container_name" value="pointcloud_container" -->
     <!-- arg name="use_multithread" value="true" -->
-    <node_container pkg="container_package" exec="container_executable" name="pointcloud_container"/>
+    <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container"/>
     <!-- source: autoware_agnocast_wrapper://launch/agnocast_env.launch.py -->
       <!-- arg name="agnocast_heaphook_path" default="/opt/ros/humble/lib/libagnocast_heaphook.so" -->
       <!-- arg name="use_multithread" default="false" -->
@@ -765,7 +766,6 @@
         <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
         <!-- source: sample_sensor_kit_launch://launch/lidar.launch.xml -->
         <group>
-          <!-- arg name="container_executable" default="component_container_mt" -->
           <!-- arg name="host_ip" default="192.168.1.10" -->
           <!-- arg name="launch_driver" value="true" -->
           <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
@@ -1754,7 +1754,6 @@
       <!-- arg name="common_downsample_voxel_size_x" default="0.05" -->
       <!-- arg name="common_downsample_voxel_size_y" default="0.05" -->
       <!-- arg name="common_downsample_voxel_size_z" default="0.05" -->
-      <!-- arg name="container_executable" default="component_container_mt" -->
       <!-- arg name="crosswalk_traffic_light_estimator_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/crosswalk_traffic_light_estimator/crosswalk_traffic_light_estimator.param.yaml" -->
       <!-- arg name="cuda_pointcloud_preprocessing" default="false" -->
       <!-- arg name="data_path" value="[home]/autoware_data" -->

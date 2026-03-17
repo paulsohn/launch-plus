@@ -224,11 +224,26 @@ fn fetch_repo_sparse(
                 }
             }
             WorkspaceState::Default => {
-                // Default mode: verify SHA + clean working tree, error if mismatch.
-                verify_repo_state(repo_dir, sha)?;
-                // Verification passed — add any new sparse-checkout paths without
-                // resetting the working tree.
-                add_sparse_paths_if_needed(repo_dir, paths)?;
+                if !repo_dir.join(".git").join("index").exists() {
+                    // The indexer leaves a blobless --no-checkout clone: .git exists
+                    // but no index file (nothing was ever checked out).  HEAD points
+                    // at the default branch, not the lockfile SHA.  Initialize
+                    // sparse-checkout and check out the pinned SHA instead of failing
+                    // verification against the wrong HEAD.
+                    info!(
+                        "Initializing sparse-checkout for no-checkout clone at {}",
+                        repo_dir.display()
+                    );
+                    init_sparse_checkout(repo_dir)?;
+                    set_sparse_checkout_paths(repo_dir, paths)?;
+                    checkout_sha(repo_dir, sha, options)?;
+                } else {
+                    // Default mode: verify SHA + clean working tree, error if mismatch.
+                    verify_repo_state(repo_dir, sha)?;
+                    // Verification passed — add any new sparse-checkout paths without
+                    // resetting the working tree.
+                    add_sparse_paths_if_needed(repo_dir, paths)?;
+                }
             }
             WorkspaceState::Clean => {
                 // Clean mode: reset to pinned SHA (with auto-stash).
@@ -1031,5 +1046,57 @@ mod tests {
         checkout_sha(dir.path(), &sha1, &options).unwrap();
         assert_eq!(get_current_sha(dir.path()).unwrap(), sha1);
         assert!(!is_working_tree_dirty(dir.path()).unwrap());
+    }
+
+    // ── no-checkout clone handling ──────────────────────────────────────
+
+    #[test]
+    fn test_default_mode_handles_no_checkout_clone() {
+        // Simulate the indexer's blobless --no-checkout clone, then verify
+        // that fetch_repo_sparse in Default mode initializes sparse-checkout
+        // and checks out the pinned SHA instead of failing verification.
+        let (origin, _sha) = setup_test_repo();
+        // Add a file in a subdirectory so we can test sparse-checkout paths.
+        fs::create_dir_all(origin.path().join("pkg")).unwrap();
+        let target_sha = add_commit(origin.path(), "pkg/package.xml", "<package/>");
+
+        // Create a --no-checkout clone (like the indexer does).
+        let clone_dir = tempfile::tempdir().unwrap();
+        let clone_path = clone_dir.path().join("repo");
+        let output = Command::new("git")
+            .args([
+                "clone",
+                "--filter=blob:none",
+                "--no-checkout",
+                origin.path().to_str().unwrap(),
+                clone_path.to_str().unwrap(),
+            ])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+
+        // Verify precondition: .git/index does not exist.
+        assert!(!clone_path.join(".git").join("index").exists());
+
+        // fetch_repo_sparse in Default mode should succeed (not error).
+        let options = FetchOptions {
+            workspace_state: WorkspaceState::Default,
+            ..Default::default()
+        };
+        fetch_repo_sparse(
+            origin.path().to_str().unwrap(),
+            &target_sha,
+            &clone_path,
+            &["pkg"],
+            &options,
+        )
+        .unwrap();
+
+        // After fetch, HEAD should be at the pinned SHA.
+        assert_eq!(get_current_sha(&clone_path).unwrap(), target_sha);
+        // The sparse-checkout path should be materialized.
+        assert!(clone_path.join("pkg/package.xml").exists());
     }
 }

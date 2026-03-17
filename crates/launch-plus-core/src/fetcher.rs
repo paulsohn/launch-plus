@@ -224,11 +224,26 @@ fn fetch_repo_sparse(
                 }
             }
             WorkspaceState::Default => {
-                // Default mode: verify SHA + clean working tree, error if mismatch.
-                verify_repo_state(repo_dir, sha)?;
-                // Verification passed — add any new sparse-checkout paths without
-                // resetting the working tree.
-                add_sparse_paths_if_needed(repo_dir, paths)?;
+                if !repo_dir.join(".git").join("index").exists() {
+                    // The indexer leaves a blobless --no-checkout clone: .git exists
+                    // but no index file (nothing was ever checked out).  HEAD points
+                    // at the default branch, not the lockfile SHA.  Initialize
+                    // sparse-checkout and check out the pinned SHA instead of failing
+                    // verification against the wrong HEAD.
+                    info!(
+                        "Initializing sparse-checkout for no-checkout clone at {}",
+                        repo_dir.display()
+                    );
+                    init_sparse_checkout(repo_dir)?;
+                    set_sparse_checkout_paths(repo_dir, paths)?;
+                    checkout_sha(repo_dir, sha, options)?;
+                } else {
+                    // Default mode: verify SHA + clean working tree, error if mismatch.
+                    verify_repo_state(repo_dir, sha)?;
+                    // Verification passed — add any new sparse-checkout paths without
+                    // resetting the working tree.
+                    add_sparse_paths_if_needed(repo_dir, paths)?;
+                }
             }
             WorkspaceState::Clean => {
                 // Clean mode: reset to pinned SHA (with auto-stash).

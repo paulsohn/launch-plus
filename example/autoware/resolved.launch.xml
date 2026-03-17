@@ -34,7 +34,6 @@
   <!-- end: autoware_global_parameter_loader://launch/global_params.launch.py -->
   <!-- source: autoware_launch://launch/pointcloud_container.launch.py -->
   <group>
-    <!-- arg name="agnocast_heaphook_path" default="/opt/ros/humble/lib/libagnocast_heaphook.so" -->
     <!-- arg name="container_name" value="pointcloud_container" -->
     <!-- arg name="use_multithread" value="true" -->
     <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container"/>

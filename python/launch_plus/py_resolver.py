@@ -1394,12 +1394,15 @@ def _resolve_node_details(node, context):
         raw = getattr(node, f"_raw_{field}", None)
         if _is_substitution(raw):
             resolved = _resolve_substitution(raw, context)
-            if resolved:
+            if resolved is not None:
                 entry[field] = resolved
                 if field == "package":
-                    # Only track when perform() actually resolved (not display fallback)
-                    performed = raw.perform(context) if context and hasattr(raw, "perform") else None
-                    if performed is not None:
+                    # Only track when _resolve_substitution returned a real
+                    # value (not the display-name fallback).  We detect the
+                    # fallback case by checking whether the resolved string
+                    # equals str(raw) — if so, perform() failed or returned
+                    # None and _resolve_substitution fell back to str(sub).
+                    if resolved != str(raw):
                         _track_package(resolved)
 
     # Namespace: emit raw inputs — Rust computes effective_namespace from these
@@ -1478,21 +1481,21 @@ def _resolve_composable_plugins(descs, context):
         pkg = desc._package
         if _is_substitution(desc._raw_package):
             resolved_pkg = _resolve_substitution(desc._raw_package, context)
-            if resolved_pkg:
+            if resolved_pkg is not None:
                 pkg = resolved_pkg
-                # Only track when perform() actually resolved (not display fallback)
-                performed = desc._raw_package.perform(context) if context and hasattr(desc._raw_package, "perform") else None
-                if performed is not None:
+                # Only track when resolution returned a real value, not the
+                # display-name fallback (same heuristic as _resolve_node_details).
+                if resolved_pkg != str(desc._raw_package):
                     _track_package(resolved_pkg)
         plg = desc._plugin
         if _is_substitution(desc._raw_plugin):
             resolved_plg = _resolve_substitution(desc._raw_plugin, context)
-            if resolved_plg:
+            if resolved_plg is not None:
                 plg = resolved_plg
         nm = desc._name
         if _is_substitution(desc._raw_name):
             resolved_nm = _resolve_substitution(desc._raw_name, context)
-            if resolved_nm:
+            if resolved_nm is not None:
                 nm = resolved_nm
         plugins.append({
             "package": pkg,
@@ -1514,6 +1517,7 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
     the child mutate the shared ``LaunchContext``.  The orchestrator still
     handles the recursive node/include dependency resolution separately.
     """
+    global _declared_arg_names
     if depth > 20:
         _warn(f"Max inline include depth for {launch_file}")
         return
@@ -1538,7 +1542,7 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
         spec = importlib.util.spec_from_file_location(
             f"_inline_launch_{depth}", real_path
         )
-        if spec is None:
+        if spec is None or spec.loader is None:
             _warn(f"cannot load included launch file: {real_path}")
             return
         mod = importlib.util.module_from_spec(spec)
@@ -1565,6 +1569,10 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
     saved_include_args_keys = set(_tracked["include_args"])
     saved_param_files_len = len(_tracked["param_files"])
     saved_param_file_deps_len = len(_tracked["param_file_deps"])
+    saved_declared_args_len = len(_tracked["declared_args"])
+    saved_declared_arg_names = set(_declared_arg_names)
+    saved_event_handlers_len = len(_tracked["event_handlers"])
+    saved_namespace_depth = len(_namespace_stack)
 
     try:
         ld = mod.generate_launch_description()
@@ -1576,11 +1584,16 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
 
     entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
-    # Apply child launch arguments to the context (parent values take precedence
-    # for identically-named args, but child-only args need their defaults).
+    # Snapshot parent context BEFORE applying child_args so we can fully
+    # restore it after the inline walk.  Only deliberate side-effects
+    # (SetLaunchConfiguration) survive.
     saved_configs = dict(parent_context._launch_configurations)
+
+    # Apply child launch arguments: only set keys that the parent hasn't
+    # already defined, so parent values are never overwritten.
     for k, v in child_args.items():
-        parent_context._launch_configurations[k] = v
+        if k not in parent_context._launch_configurations:
+            parent_context._launch_configurations[k] = v
 
     # Pass 1: apply DeclareLaunchArgument defaults (child-only args).
     for entity in entities:
@@ -1605,6 +1618,11 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
         del _tracked["param_files"][saved_param_files_len:]
         del _tracked["param_file_deps"][saved_param_file_deps_len:]
         _tracked["packages"][:] = saved_pkgs
+        del _tracked["declared_args"][saved_declared_args_len:]
+        _declared_arg_names.clear()
+        _declared_arg_names.update(saved_declared_arg_names)
+        del _tracked["event_handlers"][saved_event_handlers_len:]
+        del _namespace_stack[saved_namespace_depth:]
 
     # Restore child-only args that were not SetLaunchConfiguration'd —
     # child DeclareLaunchArgument defaults should NOT leak into the parent

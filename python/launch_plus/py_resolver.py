@@ -702,10 +702,12 @@ class _TrackedComposableNodeContainer:
         self._raw_env = kwargs.get("env") or []
         self._descs = list(composable_node_descriptions or [])
         self._detailed = False
-        # Eager: track packages from descriptions
+        # Eager: track packages from descriptions — pass raw object so
+        # _track_package can filter out substitution objects.
         for desc in self._descs:
-            if hasattr(desc, "_package") and desc._package:
-                _track_package(desc._package)
+            raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
+            if raw_pkg:
+                _track_package(raw_pkg)
 
 class _TrackedLoadComposableNodes:
     """Loads composable nodes into an existing container.
@@ -724,7 +726,8 @@ class _TrackedLoadComposableNodes:
             target_str = _tracked["nodes"][target_container._idx].get("name", "")
         elif hasattr(target_container, "perform"):
             try:
-                target_str = str(target_container.perform(_StubLaunchContext()))
+                result = target_container.perform(_StubLaunchContext())
+                target_str = str(result) if result is not None else str(target_container)
             except Exception:
                 target_str = str(target_container)
         else:
@@ -747,10 +750,12 @@ class _TrackedLoadComposableNodes:
         })
         self._descs = list(composable_node_descriptions or [])
         self._detailed = False
-        # Eager: track packages from descriptions
+        # Eager: track packages from descriptions — pass raw object so
+        # _track_package can filter out substitution objects.
         for desc in self._descs:
-            if hasattr(desc, "_package") and desc._package:
-                _track_package(desc._package)
+            raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
+            if raw_pkg:
+                _track_package(raw_pkg)
 
 class _TrackedPushRosNamespace:
     """Tracks PushRosNamespace so _walk_action can update _namespace_stack."""
@@ -770,7 +775,8 @@ class _TrackedParameterFile:
                 path = param_file  # Keep portable; Rust handles $(find-pkg-share ...) format
             elif hasattr(param_file, "perform"):
                 try:
-                    path = str(param_file.perform(_StubLaunchContext()))
+                    result = param_file.perform(_StubLaunchContext())
+                    path = str(result) if result is not None else str(param_file)
                 except Exception:
                     path = str(param_file)
             else:
@@ -1555,6 +1561,10 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
     saved_gp_len = len(_tracked["global_params"])
     saved_deps_len = len(_tracked["include_deps"])
     saved_pkgs = list(_tracked["packages"])
+    saved_includes_len = len(_tracked["includes"])
+    saved_include_args_keys = set(_tracked["include_args"])
+    saved_param_files_len = len(_tracked["param_files"])
+    saved_param_file_deps_len = len(_tracked["param_file_deps"])
 
     try:
         ld = mod.generate_launch_description()
@@ -1588,6 +1598,12 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
         del _tracked["nodes"][saved_nodes_len:]
         del _tracked["global_params"][saved_gp_len:]
         del _tracked["include_deps"][saved_deps_len:]
+        del _tracked["includes"][saved_includes_len:]
+        for k in list(_tracked["include_args"]):
+            if k not in saved_include_args_keys:
+                del _tracked["include_args"][k]
+        del _tracked["param_files"][saved_param_files_len:]
+        del _tracked["param_file_deps"][saved_param_file_deps_len:]
         _tracked["packages"][:] = saved_pkgs
 
     # Restore child-only args that were not SetLaunchConfiguration'd —
@@ -1695,7 +1711,8 @@ def _walk_action(action, context, depth):
             if action._raw_launch_arguments:
                 for k, v in action._raw_launch_arguments:
                     k_str = str(k)
-                    v_str = _resolve_substitution(v, context) or str(v)
+                    resolved = _resolve_substitution(v, context)
+                    v_str = resolved if resolved is not None else str(v)
                     child_args[k_str] = v_str
             _inline_resolve_python_launch(action._path, context, child_args, depth + 1)
 
@@ -2116,7 +2133,8 @@ def _build_patched_launch_launch_description_sources():
                 self._location = None
             elif hasattr(location, "perform"):
                 try:
-                    self._location = str(location.perform(_StubLaunchContext()))
+                    result = location.perform(_StubLaunchContext())
+                    self._location = str(result) if result is not None else str(location)
                 except Exception:
                     self._location = None
             elif isinstance(location, list):
@@ -2125,7 +2143,8 @@ def _build_patched_launch_launch_description_sources():
                 for sub in location:
                     if hasattr(sub, "perform"):
                         try:
-                            parts.append(str(sub.perform(stub_ctx)))
+                            result = sub.perform(stub_ctx)
+                            parts.append(str(result) if result is not None else str(sub))
                         except Exception:
                             parts.append(str(sub))
                     else:

@@ -1,0 +1,312 @@
+"""Tests for py_resolver internals — substitution handling, node tracking,
+and inline Python include resolution."""
+
+import os
+import textwrap
+import tempfile
+
+from launch_plus import py_resolver as R
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _make_context(configs=None):
+    """Build a _StubLaunchContext with the given launch configurations."""
+    ctx = R._StubLaunchContext()
+    ctx._launch_configurations = dict(configs or {})
+    return ctx
+
+
+def _write_launch_py(directory, filename, body):
+    """Write a minimal Python launch file into *directory*."""
+    path = os.path.join(directory, filename)
+    with open(path, "w") as f:
+        f.write(textwrap.dedent(body))
+    return path
+
+
+# ─── _LaunchConfiguration ────────────────────────────────────────────────────
+
+class TestLaunchConfiguration:
+    def test_perform_returns_value_when_set(self):
+        lc = R._LaunchConfiguration("my_var")
+        ctx = _make_context({"my_var": "hello"})
+        assert lc.perform(ctx) == "hello"
+
+    def test_perform_returns_none_when_unset(self):
+        lc = R._LaunchConfiguration("missing_var")
+        ctx = _make_context({})
+        assert lc.perform(ctx) is None
+
+    def test_perform_returns_default_when_unset_but_default_given(self):
+        lc = R._LaunchConfiguration("missing_var", default="fallback")
+        ctx = _make_context({})
+        assert lc.perform(ctx) == "fallback"
+
+    def test_perform_prefers_context_over_default(self):
+        lc = R._LaunchConfiguration("my_var", default="fallback")
+        ctx = _make_context({"my_var": "from_context"})
+        assert lc.perform(ctx) == "from_context"
+
+    def test_perform_returns_none_without_context(self):
+        lc = R._LaunchConfiguration("x")
+        assert lc.perform(None) is None
+
+    def test_str_returns_variable_name(self):
+        lc = R._LaunchConfiguration("pkg_name")
+        assert str(lc) == "pkg_name"
+
+
+# ─── _is_substitution ────────────────────────────────────────────────────────
+
+class TestIsSubstitution:
+    def test_launch_configuration_is_substitution(self):
+        assert R._is_substitution(R._LaunchConfiguration("x"))
+
+    def test_string_is_not_substitution(self):
+        assert not R._is_substitution("rclcpp_components")
+
+    def test_none_is_not_substitution(self):
+        assert not R._is_substitution(None)
+
+
+# ─── _track_package ──────────────────────────────────────────────────────────
+
+class TestTrackPackage:
+    def test_tracks_plain_string(self):
+        R._track_package("my_pkg")
+        assert "my_pkg" in R._tracked["packages"]
+
+    def test_skips_substitution_object(self):
+        lc = R._LaunchConfiguration("container_pkg")
+        R._track_package(lc)
+        assert "container_pkg" not in R._tracked["packages"]
+        assert len(R._tracked["packages"]) == 0
+
+    def test_skips_empty_and_none(self):
+        R._track_package(None)
+        R._track_package("")
+        assert len(R._tracked["packages"]) == 0
+
+    def test_deduplicates(self):
+        R._track_package("pkg_a")
+        R._track_package("pkg_a")
+        assert R._tracked["packages"].count("pkg_a") == 1
+
+
+# ─── _resolve_substitution ───────────────────────────────────────────────────
+
+class TestResolveSubstitution:
+    def test_resolves_launch_configuration(self):
+        lc = R._LaunchConfiguration("my_var")
+        ctx = _make_context({"my_var": "resolved_value"})
+        assert R._resolve_substitution(lc, ctx) == "resolved_value"
+
+    def test_unresolved_falls_back_to_str(self):
+        lc = R._LaunchConfiguration("missing")
+        ctx = _make_context({})
+        # perform() returns None → _resolve_substitution falls back to str(lc)
+        assert R._resolve_substitution(lc, ctx) == "missing"
+
+    def test_plain_string_passthrough(self):
+        assert R._resolve_substitution("hello", None) == "hello"
+
+    def test_none_returns_none(self):
+        assert R._resolve_substitution(None, None) is None
+
+    def test_list_of_substitutions(self):
+        parts = [
+            R._LaunchConfiguration("prefix"),
+            "_",
+            R._LaunchConfiguration("suffix"),
+        ]
+        ctx = _make_context({"prefix": "foo", "suffix": "bar"})
+        assert R._resolve_substitution(parts, ctx) == "foo_bar"
+
+    def test_list_with_unresolved_element(self):
+        parts = [
+            R._LaunchConfiguration("resolved_var"),
+            "/",
+            R._LaunchConfiguration("unresolved_var"),
+        ]
+        ctx = _make_context({"resolved_var": "abc"})
+        # Unresolved element falls back to str(lc) = variable name
+        assert R._resolve_substitution(parts, ctx) == "abc/unresolved_var"
+
+
+# ─── Node deferred resolution ────────────────────────────────────────────────
+
+class TestNodeDeferredResolution:
+    def test_tracked_node_resolves_package_substitution(self):
+        """When package is a LaunchConfiguration, _resolve_node_details should
+        resolve it to the concrete value and track the resolved package."""
+        ctx = _make_context({"my_pkg_var": "actual_package"})
+        node = R._TrackedNode(
+            package=R._LaunchConfiguration("my_pkg_var"),
+            executable="my_exec",
+        )
+        # Before resolution: str(LaunchConfiguration) = variable name
+        assert R._tracked["nodes"][node._idx]["package"] == "my_pkg_var"
+        assert "my_pkg_var" not in R._tracked["packages"]  # not tracked eagerly
+
+        R._resolve_node_details(node, ctx)
+
+        assert R._tracked["nodes"][node._idx]["package"] == "actual_package"
+        assert "actual_package" in R._tracked["packages"]
+
+    def test_tracked_node_unresolved_package_stays_as_name(self):
+        """When the LaunchConfiguration cannot be resolved (not in context),
+        the entry keeps the variable name but does NOT track it as a package."""
+        ctx = _make_context({})
+        node = R._TrackedNode(
+            package=R._LaunchConfiguration("unknown_pkg"),
+            executable="exec",
+        )
+        R._resolve_node_details(node, ctx)
+
+        # The entry shows the variable name (display fallback from str(lc))
+        assert R._tracked["nodes"][node._idx]["package"] == "unknown_pkg"
+        # But it must NOT be tracked as a real package dependency
+        assert "unknown_pkg" not in R._tracked["packages"]
+
+    def test_tracked_container_resolves_all_fields(self):
+        ctx = _make_context({
+            "pkg": "rclcpp_components",
+            "exe": "component_container_mt",
+            "cname": "my_container",
+        })
+        container = R._TrackedComposableNodeContainer(
+            package=R._LaunchConfiguration("pkg"),
+            executable=R._LaunchConfiguration("exe"),
+            name=R._LaunchConfiguration("cname"),
+        )
+        R._resolve_node_details(container, ctx)
+
+        entry = R._tracked["nodes"][container._idx]
+        assert entry["package"] == "rclcpp_components"
+        assert entry["executable"] == "component_container_mt"
+        assert entry["name"] == "my_container"
+        assert "rclcpp_components" in R._tracked["packages"]
+
+    def test_plain_string_package_tracked_eagerly(self):
+        """When package is a plain string, it should be tracked at construction."""
+        R._TrackedNode(package="my_real_pkg", executable="exec")
+        assert "my_real_pkg" in R._tracked["packages"]
+
+
+# ─── Composable plugin deferred resolution ────────────────────────────────────
+
+class TestComposablePluginResolution:
+    def test_composable_node_resolves_package(self):
+        ctx = _make_context({"plugin_pkg": "sensor_driver"})
+        desc = R._TrackedComposableNode(
+            package=R._LaunchConfiguration("plugin_pkg"),
+            plugin="sensor_driver::SensorNode",
+            name="sensor",
+        )
+        plugins = R._resolve_composable_plugins([desc], ctx)
+        assert len(plugins) == 1
+        assert plugins[0]["package"] == "sensor_driver"
+        assert "sensor_driver" in R._tracked["packages"]
+
+    def test_composable_node_unresolved_package_not_tracked(self):
+        ctx = _make_context({})
+        desc = R._TrackedComposableNode(
+            package=R._LaunchConfiguration("unknown"),
+            plugin="foo::Bar",
+        )
+        plugins = R._resolve_composable_plugins([desc], ctx)
+        assert plugins[0]["package"] == "unknown"  # display fallback
+        assert "unknown" not in R._tracked["packages"]
+
+
+# ─── Inline Python include resolution ────────────────────────────────────────
+
+class TestInlinePythonInclude:
+    def test_set_launch_configuration_propagates(self):
+        """A child Python launch file that calls SetLaunchConfiguration
+        should update the parent context."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+                from launch import LaunchDescription
+                from launch.actions import SetLaunchConfiguration
+
+                def generate_launch_description():
+                    return LaunchDescription([
+                        SetLaunchConfiguration("child_var", "child_value"),
+                    ])
+            """)
+
+            ctx = _make_context({"parent_var": "parent_value"})
+            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+
+            assert ctx._launch_configurations["child_var"] == "child_value"
+            assert ctx._launch_configurations["parent_var"] == "parent_value"
+
+    def test_child_declared_args_do_not_leak(self):
+        """DeclareLaunchArgument defaults from a child file should NOT
+        persist in the parent context (only SetLaunchConfiguration should)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+                from launch import LaunchDescription
+                from launch.actions import DeclareLaunchArgument
+                from launch.actions import SetLaunchConfiguration
+
+                def generate_launch_description():
+                    return LaunchDescription([
+                        DeclareLaunchArgument("child_only_arg", default_value="should_not_leak"),
+                        SetLaunchConfiguration("sticky_var", "persists"),
+                    ])
+            """)
+
+            ctx = _make_context({})
+            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+
+            assert "child_only_arg" not in ctx._launch_configurations
+            assert ctx._launch_configurations["sticky_var"] == "persists"
+
+    def test_child_args_forwarded(self):
+        """launch_arguments passed to the include should be available
+        in the child's context."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+                from launch import LaunchDescription
+                from launch.actions import DeclareLaunchArgument
+                from launch.actions import SetLaunchConfiguration
+                from launch.substitutions import LaunchConfiguration
+
+                def generate_launch_description():
+                    return LaunchDescription([
+                        DeclareLaunchArgument("mode", default_value="default"),
+                        SetLaunchConfiguration("resolved_mode",
+                                               LaunchConfiguration("mode")),
+                    ])
+            """)
+
+            ctx = _make_context({})
+            R._inline_resolve_python_launch(
+                child_path, ctx, {"mode": "custom"}, depth=1
+            )
+
+            assert ctx._launch_configurations["resolved_mode"] == "custom"
+
+    def test_depth_limit_prevents_infinite_recursion(self):
+        """Exceeding the depth limit should warn, not crash."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+                from launch import LaunchDescription
+
+                def generate_launch_description():
+                    return LaunchDescription([])
+            """)
+
+            ctx = _make_context({})
+            R._inline_resolve_python_launch(child_path, ctx, {}, depth=21)
+            # Should not raise; just warns
+            assert any("depth" in w.lower() for w in R._tracked["warnings"])
+
+    def test_missing_file_silently_skipped(self):
+        """A non-existent include file should not raise."""
+        ctx = _make_context({})
+        R._inline_resolve_python_launch("/nonexistent/path.py", ctx, {}, depth=1)
+        # No error, no crash

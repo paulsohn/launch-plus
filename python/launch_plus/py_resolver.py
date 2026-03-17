@@ -1391,7 +1391,10 @@ def _resolve_node_details(node, context):
             if resolved:
                 entry[field] = resolved
                 if field == "package":
-                    _track_package(resolved)
+                    # Only track when perform() actually resolved (not display fallback)
+                    performed = raw.perform(context) if context and hasattr(raw, "perform") else None
+                    if performed is not None:
+                        _track_package(resolved)
 
     # Namespace: emit raw inputs — Rust computes effective_namespace from these
     ns = _resolve_substitution(node._raw_namespace, context) if node._raw_namespace is not None else None
@@ -1471,7 +1474,10 @@ def _resolve_composable_plugins(descs, context):
             resolved_pkg = _resolve_substitution(desc._raw_package, context)
             if resolved_pkg:
                 pkg = resolved_pkg
-                _track_package(resolved_pkg)
+                # Only track when perform() actually resolved (not display fallback)
+                performed = desc._raw_package.perform(context) if context and hasattr(desc._raw_package, "perform") else None
+                if performed is not None:
+                    _track_package(resolved_pkg)
         plg = desc._plugin
         if _is_substitution(desc._raw_plugin):
             resolved_plg = _resolve_substitution(desc._raw_plugin, context)

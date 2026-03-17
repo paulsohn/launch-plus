@@ -243,8 +243,19 @@ _declared_arg_names: set = set()
 _namespace_stack: list = []
 
 def _is_substitution(value):
-    """Return True if *value* is a launch substitution (not yet resolved to a string)."""
-    return value is not None and not isinstance(value, str) and hasattr(value, "perform")
+    """Return True if *value* is a launch substitution (not yet resolved to a string).
+
+    Handles both single substitution objects (with a ``perform`` method) and
+    list-of-substitutions (``SomeSubstitutionsType`` in ROS 2), where any
+    element may be a substitution object.
+    """
+    if value is None or isinstance(value, str):
+        return False
+    if hasattr(value, "perform"):
+        return True
+    if isinstance(value, (list, tuple)):
+        return any(hasattr(item, "perform") for item in value)
+    return False
 
 
 def _track_package(pkg):

@@ -69,6 +69,20 @@ class TestIsSubstitution:
     def test_none_is_not_substitution(self):
         assert not R._is_substitution(None)
 
+    def test_list_of_substitutions_is_substitution(self):
+        parts = [R._LaunchConfiguration("x"), "_suffix"]
+        assert R._is_substitution(parts)
+
+    def test_list_of_plain_strings_is_not_substitution(self):
+        assert not R._is_substitution(["hello", "world"])
+
+    def test_empty_list_is_not_substitution(self):
+        assert not R._is_substitution([])
+
+    def test_tuple_of_substitutions_is_substitution(self):
+        parts = (R._LaunchConfiguration("x"),)
+        assert R._is_substitution(parts)
+
 
 # ─── _track_package ──────────────────────────────────────────────────────────
 
@@ -92,6 +106,11 @@ class TestTrackPackage:
         R._track_package("pkg_a")
         R._track_package("pkg_a")
         assert R._tracked["packages"].count("pkg_a") == 1
+
+    def test_skips_list_of_substitutions(self):
+        parts = [R._LaunchConfiguration("pkg_var"), "_suffix"]
+        R._track_package(parts)
+        assert len(R._tracked["packages"]) == 0
 
 
 # ─── _resolve_substitution ───────────────────────────────────────────────────
@@ -132,6 +151,39 @@ class TestResolveSubstitution:
         ctx = _make_context({"resolved_var": "abc"})
         # Unresolved element falls back to str(lc) = variable name
         assert R._resolve_substitution(parts, ctx) == "abc/unresolved_var"
+
+    def test_ex_returns_not_fallback_when_resolved(self):
+        lc = R._LaunchConfiguration("my_var")
+        ctx = _make_context({"my_var": "resolved_value"})
+        value, is_fallback = R._resolve_substitution_ex(lc, ctx)
+        assert value == "resolved_value"
+        assert is_fallback is False
+
+    def test_ex_returns_fallback_when_unresolved(self):
+        lc = R._LaunchConfiguration("missing")
+        ctx = _make_context({})
+        value, is_fallback = R._resolve_substitution_ex(lc, ctx)
+        assert value == "missing"
+        assert is_fallback is True
+
+    def test_ex_list_fallback_when_any_unresolved(self):
+        parts = [R._LaunchConfiguration("a"), "_", R._LaunchConfiguration("b")]
+        ctx = _make_context({"a": "resolved"})
+        value, is_fallback = R._resolve_substitution_ex(parts, ctx)
+        assert value == "resolved_b"
+        assert is_fallback is True
+
+    def test_ex_list_not_fallback_when_all_resolved(self):
+        parts = [R._LaunchConfiguration("a"), "_", R._LaunchConfiguration("b")]
+        ctx = _make_context({"a": "foo", "b": "bar"})
+        value, is_fallback = R._resolve_substitution_ex(parts, ctx)
+        assert value == "foo_bar"
+        assert is_fallback is False
+
+    def test_ex_plain_string_not_fallback(self):
+        value, is_fallback = R._resolve_substitution_ex("hello", None)
+        assert value == "hello"
+        assert is_fallback is False
 
 
 # ─── Node deferred resolution ────────────────────────────────────────────────

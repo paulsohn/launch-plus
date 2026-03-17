@@ -482,3 +482,108 @@ class TestInlinePythonInclude:
 
             # No new include deps
             assert len(R._tracked["include_deps"]) == deps_before
+
+
+# ─── Environment Variable Stack ──────────────────────────────────────────────
+
+class TestEnvStack:
+    """Tests for SetEnvironmentVariable / UnsetEnvironmentVariable tracking,
+    env inheritance to nodes, and group scoping."""
+
+    def test_set_env_inherits_to_node(self):
+        """SetEnvironmentVariable then Node → node's env includes the var."""
+        ctx = _make_context()
+        set_env = R._TrackedSetEnvironmentVariable(name="FOO", value="bar")
+        node = R._TrackedNode(package="p", executable="e", name="n")
+        R._walk_action(set_env, ctx, 0)
+        R._walk_action(node, ctx, 0)
+        entry = R._tracked["nodes"][node._idx]
+        assert entry["env"]["FOO"] == "bar"
+
+    def test_unset_env_removes_from_node(self):
+        """SetEnv then UnsetEnv → node's env does NOT include the var."""
+        ctx = _make_context()
+        R._walk_action(R._TrackedSetEnvironmentVariable(name="FOO", value="bar"), ctx, 0)
+        R._walk_action(R._TrackedUnsetEnvironmentVariable(name="FOO"), ctx, 0)
+        node = R._TrackedNode(package="p", executable="e", name="n")
+        R._walk_action(node, ctx, 0)
+        entry = R._tracked["nodes"][node._idx]
+        assert "FOO" not in entry["env"]
+
+    def test_unset_env_nonexistent_errors(self):
+        """UnsetEnvironmentVariable for a var never set → error."""
+        ctx = _make_context()
+        R._walk_action(R._TrackedUnsetEnvironmentVariable(name="NONEXISTENT"), ctx, 0)
+        assert any("NONEXISTENT" in e for e in R._tracked["errors"])
+
+    def test_group_scoped_env_does_not_leak(self):
+        """GroupAction(scoped=True) → env mutations don't leak to siblings."""
+        ctx = _make_context()
+        group = R._TrackedGroupAction(
+            actions=[R._TrackedSetEnvironmentVariable(name="SCOPED_VAR", value="val")],
+            scoped=True,
+        )
+        R._walk_action(group, ctx, 0)
+        node = R._TrackedNode(package="p", executable="e", name="n")
+        R._walk_action(node, ctx, 0)
+        entry = R._tracked["nodes"][node._idx]
+        assert "SCOPED_VAR" not in entry["env"]
+
+    def test_group_unscoped_env_leaks(self):
+        """GroupAction(scoped=False) → env mutations leak to siblings."""
+        ctx = _make_context()
+        group = R._TrackedGroupAction(
+            actions=[R._TrackedSetEnvironmentVariable(name="LEAKED_VAR", value="val")],
+            scoped=False,
+        )
+        R._walk_action(group, ctx, 0)
+        node = R._TrackedNode(package="p", executable="e", name="n")
+        R._walk_action(node, ctx, 0)
+        entry = R._tracked["nodes"][node._idx]
+        assert entry["env"]["LEAKED_VAR"] == "val"
+
+    def test_node_local_env_overrides_inherited(self):
+        """Node-local env overrides inherited env for the same key."""
+        ctx = _make_context()
+        R._walk_action(R._TrackedSetEnvironmentVariable(name="FOO", value="inherited"), ctx, 0)
+        node = R._TrackedNode(
+            package="p", executable="e", name="n",
+            env=[("FOO", "local")],
+        )
+        R._walk_action(node, ctx, 0)
+        entry = R._tracked["nodes"][node._idx]
+        assert entry["env"]["FOO"] == "local"
+
+    def test_inline_include_env_rollback(self):
+        """Env set by inline-included child does NOT leak to parent."""
+        import tempfile, textwrap
+        with tempfile.TemporaryDirectory() as d:
+            child_path = os.path.join(d, "child.launch.py")
+            with open(child_path, "w") as f:
+                f.write(textwrap.dedent("""\
+                    from launch import LaunchDescription
+                    from launch.actions import SetEnvironmentVariable
+                    def generate_launch_description():
+                        return LaunchDescription([
+                            SetEnvironmentVariable(name="CHILD_VAR", value="child_val"),
+                        ])
+                """))
+            ctx = _make_context()
+            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+            assert "CHILD_VAR" not in R._env
+
+    def test_env_diff_excludes_baseline(self):
+        """Only env vars that differ from baseline appear in the diff."""
+        R._env_baseline["EXISTING"] = "original"
+        R._env["EXISTING"] = "original"
+        R._env["NEW_VAR"] = "new_val"
+        diff = R._compute_env_diff()
+        assert "EXISTING" not in diff
+        assert diff["NEW_VAR"] == "new_val"
+
+    def test_env_diff_includes_changed_baseline(self):
+        """An env var changed from its baseline value appears in the diff."""
+        R._env_baseline["CHANGED"] = "old"
+        R._env["CHANGED"] = "new"
+        diff = R._compute_env_diff()
+        assert diff["CHANGED"] == "new"

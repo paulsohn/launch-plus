@@ -80,11 +80,6 @@ pub enum NodeKind {
     /// in the include chain are opened persistently so that sibling real nodes share the
     /// correct group context.  Excluded from semantic comparison.
     IncludeMarker,
-    /// A `<set_env name="..." value="..."/>` statement.  Affects the OS environment of
-    /// all subsequently-launched processes.  Excluded from semantic comparison.
-    SetEnv { name: String, value: String },
-    /// A `<unset_env name="..."/>` statement.  Excluded from semantic comparison.
-    UnsetEnv { name: String },
     /// A `<log message="..."/>` action.  Excluded from semantic comparison.
     Log { message: String },
     /// A `<set_parameter name="..." value="..."/>` statement.  Sets a ROS parameter
@@ -172,6 +167,14 @@ pub struct SubstitutionContext {
     /// When `true`, missing packages are not treated as errors because `--rosdep`
     /// may install them later.  The portable form is kept silently.
     pub rosdep_fallback: bool,
+    /// Full environment variable map.  Initialized from `std::env::vars()` at the
+    /// resolver entry point, then mutated by `<set_env>`/`<unset_env>` actions.
+    /// `$(env X)` reads from this map.  Scoped groups clone/restore it.
+    pub env: HashMap<String, String>,
+    /// Frozen snapshot of the process environment at init time.  Used to compute
+    /// per-node env diffs (only env vars that differ from the baseline are emitted
+    /// as `<env>` children in the resolved XML).
+    pub baseline_env: Arc<HashMap<String, String>>,
 }
 
 impl Default for SubstitutionContext {
@@ -187,6 +190,8 @@ impl Default for SubstitutionContext {
             preview_mode: false,
             lockfile_packages: Arc::new(HashSet::new()),
             rosdep_fallback: false,
+            env: HashMap::new(),
+            baseline_env: Arc::new(HashMap::new()),
         }
     }
 }
@@ -572,7 +577,7 @@ fn resolve_substitutions_inner(
                 result.push_str(&value);
             }
             Substitution::Env { name, default } => {
-                let value = std::env::var(&name).ok().or(default).ok_or_else(|| {
+                let value = ctx.env.get(&name).cloned().or(default).ok_or_else(|| {
                     crate::Error::LaunchParse(format!("environment variable not set: {}", name))
                 })?;
                 result.push_str(&value);
@@ -1076,8 +1081,6 @@ pub fn semantic_eq(a: &[ResolvedNode], b: &[ResolvedNode]) -> bool {
         !matches!(
             n.kind,
             NodeKind::IncludeMarker
-                | NodeKind::SetEnv { .. }
-                | NodeKind::UnsetEnv { .. }
                 | NodeKind::SetParameter { .. }
                 | NodeKind::SetRemap { .. }
                 | NodeKind::Log { .. }
@@ -1234,6 +1237,24 @@ pub fn resolve_launch(
             .declared_arg_defaults
             .entry(k.clone())
             .or_insert_with(|| v.clone());
+    }
+
+    // Net-zero check: error on env vars that leaked (set/changed but not restored).
+    for (k, v) in &ctx.env {
+        if ctx.baseline_env.get(k.as_str()) != Some(v) {
+            result.errors.push(format!(
+                "env var '{}' was set to '{}' but not restored (leaked from file scope)",
+                k, v
+            ));
+        }
+    }
+    for k in ctx.baseline_env.keys() {
+        if !ctx.env.contains_key(k) {
+            result.errors.push(format!(
+                "env var '{}' was unset but not restored (leaked from file scope)",
+                k
+            ));
+        }
     }
 
     Ok(result)
@@ -1491,6 +1512,8 @@ fn resolve_element(
                         preview_mode: ctx.preview_mode,
                         lockfile_packages: ctx.lockfile_packages.clone(),
                         rosdep_fallback: ctx.rosdep_fallback,
+                        env: ctx.env.clone(),
+                        baseline_env: ctx.baseline_env.clone(),
                     };
                     resolve_elements(children, &mut scoped_ctx, result, options, include_stack)?;
                     // Propagate newly declared args (with defaults) from the scoped context
@@ -1790,6 +1813,8 @@ fn resolve_element(
                         preview_mode: ctx.preview_mode,
                         lockfile_packages: ctx.lockfile_packages.clone(),
                         rosdep_fallback: ctx.rosdep_fallback,
+                        env: ctx.env.clone(),
+                        baseline_env: ctx.baseline_env.clone(),
                     };
 
                     let nodes_before_xml = result.nodes.len();
@@ -1878,12 +1903,17 @@ fn resolve_element(
                     resolve_params(params, ctx, result, options)?;
                 let resolved_remaps = resolve_remaps(remaps, ctx, result)?;
 
-                // Resolve envs
-                let mut resolved_envs = BTreeMap::new();
+                // Resolve envs: start with inherited env diff, then node-local overrides
+                let mut merged_envs: BTreeMap<String, String> = ctx
+                    .env
+                    .iter()
+                    .filter(|(k, v)| ctx.baseline_env.get(k.as_str()) != Some(*v))
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
                 for env in envs {
                     let name_val = resolve_substitutions(&env.name, ctx)?.propagate_into(result);
                     let env_val = resolve_substitutions(&env.value, ctx)?.propagate_into(result);
-                    resolved_envs.insert(name_val, env_val);
+                    merged_envs.insert(name_val, env_val);
                 }
 
                 // Resolve output / args / respawn / respawn_delay
@@ -1917,7 +1947,7 @@ fn resolve_element(
                     namespace_stack: ctx.namespace_stack.clone(),
                     parameters: resolved_params,
                     remappings: resolved_remaps,
-                    env: resolved_envs,
+                    env: merged_envs,
                     source: None,          // stamped by the orchestrator
                     include_chain: vec![], // stamped by the orchestrator
                     kind: NodeKind::Node,
@@ -1980,11 +2010,16 @@ fn resolve_element(
                 let (resolved_params, resolved_param_files) =
                     resolve_params(params, ctx, result, options)?;
                 let resolved_remaps = resolve_remaps(remaps, ctx, result)?;
-                let mut resolved_envs = BTreeMap::new();
+                let mut merged_envs: BTreeMap<String, String> = ctx
+                    .env
+                    .iter()
+                    .filter(|(k, v)| ctx.baseline_env.get(k.as_str()) != Some(*v))
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
                 for env in envs {
                     let name_val = resolve_substitutions(&env.name, ctx)?.propagate_into(result);
                     let env_val = resolve_substitutions(&env.value, ctx)?.propagate_into(result);
-                    resolved_envs.insert(name_val, env_val);
+                    merged_envs.insert(name_val, env_val);
                 }
                 let resolved_output = if let Some(o) = output {
                     Some(resolve_substitutions(o, ctx)?.propagate_into(result))
@@ -2016,7 +2051,7 @@ fn resolve_element(
                     namespace_stack: ctx.namespace_stack.clone(),
                     parameters: resolved_params,
                     remappings: resolved_remaps,
-                    env: resolved_envs,
+                    env: merged_envs,
                     source: None,
                     include_chain: vec![],
                     kind: NodeKind::LifecycleNode,
@@ -2156,13 +2191,7 @@ fn resolve_element(
             if should_set {
                 let name_val = resolve_substitutions(name, ctx)?.propagate_into(result);
                 let env_val = resolve_substitutions(value, ctx)?.propagate_into(result);
-                result.nodes.push(ResolvedNode {
-                    kind: NodeKind::SetEnv {
-                        name: name_val,
-                        value: env_val,
-                    },
-                    ..Default::default()
-                });
+                ctx.env.insert(name_val, env_val);
             }
         }
 
@@ -2176,10 +2205,12 @@ fn resolve_element(
             };
             if should_unset {
                 let name_val = resolve_substitutions(name, ctx)?.propagate_into(result);
-                result.nodes.push(ResolvedNode {
-                    kind: NodeKind::UnsetEnv { name: name_val },
-                    ..Default::default()
-                });
+                if ctx.env.remove(&name_val).is_none() {
+                    result.errors.push(format!(
+                        "unset_env: environment variable '{}' is not set",
+                        name_val
+                    ));
+                }
             }
         }
 
@@ -2227,6 +2258,14 @@ fn resolve_element(
                     }
                 }
 
+                // Compute inherited env diff for the container process.
+                let container_env: BTreeMap<String, String> = ctx
+                    .env
+                    .iter()
+                    .filter(|(k, v)| ctx.baseline_env.get(k.as_str()) != Some(*v))
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+
                 // Emit the container process as a node with its plugins.
                 result.nodes.push(ResolvedNode {
                     package: pkg_val,
@@ -2237,7 +2276,7 @@ fn resolve_element(
                     namespace_stack: ctx.namespace_stack.clone(),
                     parameters: BTreeMap::new(),
                     remappings: vec![],
-                    env: BTreeMap::new(),
+                    env: container_env,
                     source: None,
                     include_chain: vec![],
                     kind: NodeKind::Container { plugins },
@@ -2296,6 +2335,14 @@ fn resolve_element(
                     ctx.namespace_stack.pop();
                 }
 
+                // Compute inherited env diff for composable nodes loaded into the container.
+                let composable_env: BTreeMap<String, String> = ctx
+                    .env
+                    .iter()
+                    .filter(|(k, v)| ctx.baseline_env.get(k.as_str()) != Some(*v))
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+
                 // A LoadComposableNode is not itself a process; package/executable are empty.
                 result.nodes.push(ResolvedNode {
                     package: String::new(),
@@ -2306,7 +2353,7 @@ fn resolve_element(
                     namespace_stack: ctx.namespace_stack.clone(),
                     parameters: BTreeMap::new(),
                     remappings: vec![],
-                    env: BTreeMap::new(),
+                    env: composable_env,
                     source: None,
                     include_chain: vec![],
                     kind: NodeKind::LoadComposable {
@@ -2860,24 +2907,9 @@ pub fn render_resolved_xml(
                 );
             }
             NodeKind::LoadComposable { target, plugins } => {
-                render_load_composable_node(target, plugins, &node_ind, &child_ind, &mut out);
+                render_load_composable_node(node, target, plugins, &node_ind, &child_ind, &mut out);
             }
             NodeKind::IncludeMarker => unreachable!("markers handled above"),
-            NodeKind::SetEnv { name, value } => {
-                out.push_str(&format!(
-                    "{}<set_env name=\"{}\" value=\"{}\"/>\n",
-                    node_ind,
-                    xml_escape(name),
-                    xml_escape(value)
-                ));
-            }
-            NodeKind::UnsetEnv { name } => {
-                out.push_str(&format!(
-                    "{}<unset_env name=\"{}\"/>\n",
-                    node_ind,
-                    xml_escape(name)
-                ));
-            }
             NodeKind::Log { message } => {
                 out.push_str(&format!(
                     "{}<log message=\"{}\"/>\n",
@@ -3284,12 +3316,21 @@ fn render_container_node(
             tag.push_str(&format!(" namespace=\"{}\"", xml_escape(ns)));
         }
     }
-    if plugins.is_empty() {
+    let has_children = !plugins.is_empty() || !node.env.is_empty();
+    if !has_children {
         tag.push_str("/>\n");
         out.push_str(&tag);
     } else {
         tag.push_str(">\n");
         out.push_str(&tag);
+        for (name, value) in &node.env {
+            out.push_str(&format!(
+                "{}<env name=\"{}\" value=\"{}\"/>\n",
+                child_ind,
+                xml_escape(name),
+                xml_escape(value)
+            ));
+        }
         for plugin in plugins {
             render_composable_plugin(plugin, child_ind, out);
         }
@@ -3299,13 +3340,14 @@ fn render_container_node(
 
 /// Emit a `<load_composable_node>` element with `<composable_node>` children.
 fn render_load_composable_node(
+    node: &ResolvedNode,
     target: &str,
     plugins: &[ComposablePlugin],
     node_ind: &str,
     child_ind: &str,
     out: &mut String,
 ) {
-    if plugins.is_empty() {
+    if plugins.is_empty() && node.env.is_empty() {
         return;
     }
     out.push_str(&format!("{}<load_composable_node", node_ind));
@@ -3313,6 +3355,14 @@ fn render_load_composable_node(
         out.push_str(&format!(" target=\"{}\"", xml_escape(target)));
     }
     out.push_str(">\n");
+    for (name, value) in &node.env {
+        out.push_str(&format!(
+            "{}<env name=\"{}\" value=\"{}\"/>\n",
+            child_ind,
+            xml_escape(name),
+            xml_escape(value)
+        ));
+    }
     for plugin in plugins {
         render_composable_plugin(plugin, child_ind, out);
     }
@@ -4919,21 +4969,13 @@ mod tests {
     }
 
     #[test]
-    #[allow(unsafe_code)]
     fn test_resolve_env() {
-        // Set a test env var
-        // SAFETY: This test runs in a single thread and the var is unique to this test
-        unsafe {
-            std::env::set_var("TEST_LAUNCH_VAR", "test_value");
-        }
-        let ctx = SubstitutionContext::default();
+        let mut ctx = SubstitutionContext::default();
+        ctx.env
+            .insert("TEST_LAUNCH_VAR".to_string(), "test_value".to_string());
 
         let result = resolve_substitutions("$(env TEST_LAUNCH_VAR)", &ctx).unwrap();
         assert_eq!(result.value, "test_value");
-
-        unsafe {
-            std::env::remove_var("TEST_LAUNCH_VAR");
-        }
     }
 
     #[test]
@@ -4943,6 +4985,13 @@ mod tests {
         // Unset var should use default
         let result = resolve_substitutions("$(env NONEXISTENT_VAR fallback)", &ctx).unwrap();
         assert_eq!(result.value, "fallback");
+    }
+
+    #[test]
+    fn test_resolve_env_unset_without_default_errors() {
+        let ctx = SubstitutionContext::default();
+        let result = resolve_substitutions("$(env NONEXISTENT_VAR)", &ctx);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -5066,14 +5115,8 @@ mod tests {
 
     #[test]
     #[allow(unsafe_code)]
-    fn test_resolve_error_undefined_env() {
+    fn test_resolve_undefined_env_errors() {
         let ctx = SubstitutionContext::default();
-
-        // Make sure this var doesn't exist
-        // SAFETY: This test runs in a single thread and the var is unique to this test
-        unsafe {
-            std::env::remove_var("DEFINITELY_NOT_A_REAL_VAR_12345");
-        }
         let result = resolve_substitutions("$(env DEFINITELY_NOT_A_REAL_VAR_12345)", &ctx);
         assert!(result.is_err());
     }
@@ -7669,5 +7712,140 @@ launch:
         assert!(rendered.contains("<on_process_exit target=\"can_rx\">"));
         assert!(rendered.contains("<emit_event event=\"shutdown\"/>"));
         assert!(rendered.contains("</on_process_exit>"));
+    }
+
+    // ─── Environment Variable Stack Tests ────────────────────────────────
+
+    #[test]
+    fn test_set_env_inherits_to_node() {
+        let xml = r#"
+            <launch>
+                <set_env name="FOO" value="bar"/>
+                <node pkg="p" exec="e"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let baseline: HashMap<String, String> = [("PATH".into(), "/usr/bin".into())].into();
+        ctx.env = baseline.clone();
+        ctx.baseline_env = Arc::new(baseline);
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        let node = result
+            .nodes
+            .iter()
+            .find(|n| matches!(n.kind, NodeKind::Node))
+            .unwrap();
+        assert_eq!(node.env.get("FOO"), Some(&"bar".to_string()));
+        // set_env leaks → net-zero error expected
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.contains("FOO") && e.contains("leaked"))
+        );
+    }
+
+    #[test]
+    fn test_scoped_group_env_isolation() {
+        let xml = r#"
+            <launch>
+                <group scoped="true">
+                    <set_env name="SCOPED_VAR" value="inner"/>
+                    <node pkg="inner_pkg" exec="inner_exec"/>
+                </group>
+                <node pkg="outer_pkg" exec="outer_exec"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        let nodes: Vec<_> = result
+            .nodes
+            .iter()
+            .filter(|n| matches!(n.kind, NodeKind::Node))
+            .collect();
+        assert_eq!(nodes.len(), 2);
+        // Inner node should have SCOPED_VAR
+        assert_eq!(nodes[0].env.get("SCOPED_VAR"), Some(&"inner".to_string()));
+        // Outer node should NOT have SCOPED_VAR (scoped group restored env)
+        assert_eq!(nodes[1].env.get("SCOPED_VAR"), None);
+    }
+
+    #[test]
+    fn test_env_substitution_reads_from_ctx_env() {
+        let xml = r#"
+            <launch>
+                <set_env name="MY_VAR" value="hello"/>
+                <node pkg="p" exec="e">
+                    <param name="p" value="$(env MY_VAR)"/>
+                </node>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        let node = result
+            .nodes
+            .iter()
+            .find(|n| matches!(n.kind, NodeKind::Node))
+            .unwrap();
+        assert_eq!(node.parameters.get("p"), Some(&"hello".to_string()));
+    }
+
+    #[test]
+    fn test_unset_env_nonexistent_errors() {
+        let xml = r#"
+            <launch>
+                <unset_env name="NONEXISTENT"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.contains("NONEXISTENT") && e.contains("not set"))
+        );
+    }
+
+    #[test]
+    fn test_net_zero_error_on_leaked_env() {
+        let xml = r#"
+            <launch>
+                <set_env name="LEAKED" value="val"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.contains("LEAKED") && e.contains("leaked"))
+        );
+    }
+
+    #[test]
+    fn test_net_zero_no_error_when_scoped() {
+        let xml = r#"
+            <launch>
+                <group scoped="true">
+                    <set_env name="SCOPED" value="val"/>
+                </group>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        assert!(!result.errors.iter().any(|e| e.contains("SCOPED")));
     }
 }

@@ -79,7 +79,7 @@ another file or hidden behind a recursive include chain).
 | `<let>` | ✅ Allow — **idiomatic** | Leaked variable is right there in the group; reader can see exactly what propagates |
 | `<arg>` | ✅ Allow — unusual but readable | Arg declaration is visible; reader knows what becomes available |
 | `<node>` | ✅ Allow — neutral | Nodes produce no launch-scope variables; `scoped` attribute has no effect |
-| `<set_env>` / `<unset_env>` | ✅ Allow — neutral | Environment variables are process-global, not launch-scoped; `scoped` is irrelevant |
+| `<set_env>` / `<unset_env>` | ✅ Allow — scoped | Env vars are tracked in `ctx.env`; `scoped=true` groups save/restore env (mutations don't leak); `scoped=false` lets mutations propagate |
 | `<push-ros-namespace>` | ✅ Allow — neutral | Namespace pushes are always group-scoped in our resolver regardless of `scoped` flag; the push does not leak |
 | `<group scoped="true">` (default) | ✅ Allow | Acts as a scoping barrier; nothing inside can leak further |
 | `<group scoped="false">` (nested) | ⚠️ Inherit | Apply the same rules recursively; warn if the nested unscoped group contains `<include>` |
@@ -1145,9 +1145,11 @@ a.launch.xml → b.launch.xml → c.launch.xml → d.launch.xml → e.launch.xml
 ```xml
 <arg name="path" default="$(env CUSTOM_PATH)"/>
 ```
-**Warning:** `Environment variable CUSTOM_PATH has no fallback - may fail if unset`
+**Error** at resolve time if the variable is not in `ctx.env` and no default is provided
+(matching ROS 2 behavior). The parse-time lint (`collect_env_without_fallback`) separately
+flags `$(env VAR)` expressions that lack a default — that's informational, not an error.
 
-vs. safe pattern:
+Safe pattern with fallback:
 ```xml
 <arg name="path" default="$(env CUSTOM_PATH /default/path)"/>
 ```

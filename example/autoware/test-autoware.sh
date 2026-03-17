@@ -97,6 +97,10 @@ if [[ -d /opt/acados/lib ]]; then
     export LD_LIBRARY_PATH="/opt/acados/lib:${LD_LIBRARY_PATH:-}"
 fi
 
+# ── Agnocast environment ────────────────────────────────────────────────────
+
+export ENABLE_AGNOCAST="${ENABLE_AGNOCAST:-1}"
+
 # ── Step 1: Preview resolve (portable paths, no expand) ──────────────────────
 
 echo "==> Step 1: Preview resolve"

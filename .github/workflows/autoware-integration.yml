@@ -28,8 +28,7 @@ jobs:
             pkg-config \
             libssl-dev \
             python3-venv \
-            ros-dev-tools \
-            ros-jazzy-ublox-gps
+            ros-dev-tools
 
       - name: Initialize rosdep
         run: |

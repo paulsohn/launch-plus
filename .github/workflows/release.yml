@@ -8,8 +8,26 @@ permissions:
   contents: write
 
 jobs:
+  version-check:
+    name: Verify tag matches Cargo.toml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Compare tag version with Cargo.toml version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CARGO_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('Cargo.toml','rb'))['workspace']['package']['version'])")
+          echo "Tag version:       $TAG_VERSION"
+          echo "Cargo.toml version: $CARGO_VERSION"
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::Version mismatch: tag is v${TAG_VERSION} but Cargo.toml has ${CARGO_VERSION}"
+            exit 1
+          fi
+
   build:
     name: Build (${{ matrix.target }}, ${{ matrix.os }})
+    needs: version-check
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

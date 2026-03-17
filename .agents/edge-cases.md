@@ -124,6 +124,14 @@ Cross-include `<let>` / `SetLaunchConfiguration` propagation should only be allo
 `--allow-cross-include-set-launch-config` is set, with a clear error message otherwise.
 The flag name is intentionally verbose to discourage the anti-pattern.
 
+**Analogous pattern:** this is structurally identical to the YAML preset pattern (Section 13).
+Both are "include a file for its side-effects on the context" — presets inject `<arg>` defaults
+via implicit scope inheritance (`--allow-global-arg-cascade`), while agnocast-style includes
+inject `<let>` / `SetLaunchConfiguration` values (`--allow-cross-include-set-launch-config`).
+The difference is the mechanism (`DeclareLaunchArgument` defaults vs `SetLaunchConfiguration`
+mutation), but the intent and the anti-pattern are the same: a child include exists solely to
+configure the parent's context for subsequent siblings.
+
 ### Conditional Includes
 ```xml
 <include file="..." if="$(var launch_driver)">
@@ -634,6 +642,17 @@ It **works and is used widely in Autoware**, but has downsides:
 
 The idiomatic alternative is explicit arg passing through each `<include>`, which is more
 verbose but makes dependencies legible.
+
+**Analogous pattern:** this is structurally identical to the cross-include `<let>` /
+`SetLaunchConfiguration` pattern (Section 2 → "Cross-Include `<let>` / `SetLaunchConfiguration`
+Propagation"). Both are "include a file for its side-effects on the context":
+
+| Aspect | Preset YAML | Cross-include `<let>` / `SetLaunchConfiguration` |
+|--------|-------------|--------------------------------------------------|
+| Mechanism | `DeclareLaunchArgument` defaults via scope inheritance | `SetLaunchConfiguration` / `<let>` context mutation |
+| Gate flag | `--allow-global-arg-cascade` | `--allow-cross-include-set-launch-config` |
+| Real-world example | `default_preset.yaml` → `launch_parking_module` | `agnocast_env.launch.py` → `container_package` |
+| Anti-pattern | Child exists solely to inject arg defaults for siblings | Child exists solely to mutate parent context for siblings |
 
 ### Support Status (as of M4.5)
 

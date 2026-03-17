@@ -185,6 +185,27 @@ class TestResolveSubstitution:
         assert value == "hello"
         assert is_fallback is False
 
+    def test_ex_tuple_resolves_same_as_list(self):
+        parts = (R._LaunchConfiguration("a"), "_", R._LaunchConfiguration("b"))
+        ctx = _make_context({"a": "foo", "b": "bar"})
+        value, is_fallback = R._resolve_substitution_ex(parts, ctx)
+        assert value == "foo_bar"
+        assert is_fallback is False
+
+    def test_ex_tuple_fallback_when_unresolved(self):
+        parts = (R._LaunchConfiguration("a"), "_suffix")
+        ctx = _make_context({})
+        value, is_fallback = R._resolve_substitution_ex(parts, ctx)
+        assert value == "a_suffix"
+        assert is_fallback is True
+
+    def test_ex_list_fallback_when_no_context(self):
+        """When context is None, substitutions with perform() should be fallback."""
+        parts = [R._LaunchConfiguration("x"), "_literal"]
+        value, is_fallback = R._resolve_substitution_ex(parts, None)
+        assert value == "x_literal"
+        assert is_fallback is True
+
 
 # ─── Node deferred resolution ────────────────────────────────────────────────
 

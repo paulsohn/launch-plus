@@ -356,21 +356,25 @@ def _resolve_substitution_ex(sub, context):
         # _resolve_ros_substitutions here — that would eagerly expand portable
         # $(find-pkg-share ...) paths back to machine-specific filesystem paths.
         return sub, False
-    if isinstance(sub, list):
+    if isinstance(sub, (list, tuple)):
         parts = []
         any_fallback = False
         for s in sub:
-            if context is not None and hasattr(s, "perform"):
-                try:
-                    result = s.perform(context)
-                    if result is not None:
-                        parts.append(str(result))
-                    else:
+            if hasattr(s, "perform"):
+                if context is not None:
+                    try:
+                        result = s.perform(context)
+                        if result is not None:
+                            parts.append(str(result))
+                        else:
+                            parts.append(str(s))
+                            any_fallback = True
+                    except _PackageNotFetchedError:
+                        raise
+                    except Exception:
                         parts.append(str(s))
                         any_fallback = True
-                except _PackageNotFetchedError:
-                    raise
-                except Exception:
+                else:
                     parts.append(str(s))
                     any_fallback = True
             else:

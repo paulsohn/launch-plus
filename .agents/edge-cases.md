@@ -94,6 +94,36 @@ intentional design choice — namespace scope is always group-bounded regardless
 the parent `SubstitutionContext` so `<let>` assignments propagate, while `scoped=true`
 (default) creates a new context that is discarded on exit.
 
+### Cross-Include `<let>` / `SetLaunchConfiguration` Propagation
+
+**ROS 2 design fact:** XML `<let>` is `@expose_action('let')` on `SetLaunchConfiguration`.
+It mutates `context.launch_configurations` — the same global dict used by `LaunchConfiguration`
+substitutions and Python's `SetLaunchConfiguration`.
+
+`IncludeLaunchDescription.execute()` does **not** scope the child (no
+`PushLaunchConfigurations` / `PopLaunchConfigurations`). Only `GroupAction(scoped=True)`
+provides scoping. This means a `<let>` or `SetLaunchConfiguration` in **any** nested
+include — child, grandchild, etc. — mutates the entrypoint's context and is visible to
+every subsequently-executed action at any depth.
+
+**Real-world example:** Autoware's `agnocast_env.launch.xml` sets `container_package` and
+`container_executable` via `<let>`. The parent `pointcloud_container.launch.py` reads them
+via `LaunchConfiguration("container_package")`. Both the
+[XML](https://github.com/autowarefoundation/autoware_core/blob/main/common/autoware_agnocast_wrapper/launch/agnocast_env.launch.xml)
+and Python versions use the same `SetLaunchConfiguration` mechanism.
+
+**launch-plus behavior:**
+
+| Path | Current behavior | Correct behavior |
+|------|-----------------|------------------|
+| Python `SetLaunchConfiguration` in child include | Tracked in `set_launch_configurations`; orchestrator patches unresolved sentinels when `--allow-cross-include-set-launch-config` is set | ✅ Correct (PR #25) |
+| XML `<let>` in child include | Stored in file-local `ctx.vars`; `HashMap::new()` for includes means no propagation in either direction | ❌ Needs fix (issue #26) |
+
+**Design principle:** our resolver should maintain file-boundary context isolation by default.
+Cross-include `<let>` / `SetLaunchConfiguration` propagation should only be allowed when
+`--allow-cross-include-set-launch-config` is set, with a clear error message otherwise.
+The flag name is intentionally verbose to discourage the anti-pattern.
+
 ### Conditional Includes
 ```xml
 <include file="..." if="$(var launch_driver)">

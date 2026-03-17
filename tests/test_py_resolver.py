@@ -292,6 +292,20 @@ class TestComposablePluginResolution:
         assert plugins[0]["package"] == "unknown"  # display fallback
         assert "unknown" not in R._tracked["packages"]
 
+    def test_composable_node_empty_string_remapping_preserved(self):
+        """Remapping resolved to empty string should be preserved, not
+        replaced with the substitution display name."""
+        ctx = _make_context({"remap_src": "", "remap_dst": ""})
+        desc = R._TrackedComposableNode(
+            package="my_pkg",
+            plugin="my_pkg::Node",
+        )
+        desc._raw_remappings = [
+            (R._LaunchConfiguration("remap_src"), R._LaunchConfiguration("remap_dst")),
+        ]
+        plugins = R._resolve_composable_plugins([desc], ctx)
+        assert plugins[0]["remappings"] == [["", ""]]
+
 
 # ─── Inline Python include resolution ────────────────────────────────────────
 

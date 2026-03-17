@@ -1521,7 +1521,10 @@ def _resolve_composable_plugins(descs, context):
             if isinstance(r, (tuple, list)) and len(r) == 2:
                 src = _resolve_substitution(r[0], context)
                 dst = _resolve_substitution(r[1], context)
-                remaps.append([src or str(r[0]), dst or str(r[1])])
+                remaps.append([
+                    src if src is not None else str(r[0]),
+                    dst if dst is not None else str(r[1]),
+                ])
         # Resolve package/plugin/name substitutions with the live context
         pkg = desc._package
         if _is_substitution(desc._raw_package):
@@ -1622,9 +1625,14 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
     # (SetLaunchConfiguration) survive.
     saved_configs = dict(parent_context._launch_configurations)
 
-    # All _tracked mutations (from constructors in generate_launch_description
+    # Most _tracked mutations (from constructors in generate_launch_description
     # AND from _walk_actions) must be rolled back on any exit path, including
     # exceptions from generate_launch_description() itself.
+    #
+    # Intentionally preserved side-effects (NOT rolled back):
+    #   - set_launch_configurations: the whole purpose of inline includes
+    #   - warnings / errors: diagnostic messages should propagate to the user
+    # Everything else in _tracked is rolled back in the finally block below.
     try:
         try:
             ld = mod.generate_launch_description()

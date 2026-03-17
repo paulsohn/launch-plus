@@ -1058,19 +1058,7 @@ mod tests {
         let (origin, _sha) = setup_test_repo();
         // Add a file in a subdirectory so we can test sparse-checkout paths.
         fs::create_dir_all(origin.path().join("pkg")).unwrap();
-        fs::write(origin.path().join("pkg/package.xml"), "<package/>").unwrap();
-        let run = |args: &[&str]| {
-            Command::new("git")
-                .current_dir(origin.path())
-                .args(args)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .output()
-                .unwrap()
-        };
-        run(&["add", "."]);
-        run(&["commit", "-m", "add pkg"]);
-        let target_sha = get_current_sha(origin.path()).unwrap();
+        let target_sha = add_commit(origin.path(), "pkg/package.xml", "<package/>");
 
         // Create a --no-checkout clone (like the indexer does).
         let clone_dir = tempfile::tempdir().unwrap();

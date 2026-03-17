@@ -379,10 +379,12 @@ def _resolve_substitution_ex(sub, context):
 
 
 def _track_node(package, executable, name=None):
+    # Pass raw package to _track_package BEFORE stringifying — _track_package
+    # has an _is_substitution guard that filters out substitution objects.
+    _track_package(package)
     package = str(package) if package else ""
     executable = str(executable) if executable else ""
     name = str(name) if name else ""
-    _track_package(package)
     _tracked["nodes"].append({
         "package": package,
         "executable": executable,
@@ -823,30 +825,44 @@ class _TrackedFindPackageShare:
             _track_package(package)
 
     def _resolve_name(self, context=None):
-        """Concatenate package name from string or list of substitution objects."""
+        """Concatenate package name from string or list of substitution objects.
+
+        Returns ``(name, is_fallback)`` where *is_fallback* is ``True`` when
+        any part could not be resolved and the display name was used instead.
+        """
         subs = self._package_subs
         if isinstance(subs, str):
-            return subs
+            return subs, False
         if isinstance(subs, list):
             parts = []
+            any_fallback = False
             for sub in subs:
                 if context is not None and hasattr(sub, "perform"):
                     result = sub.perform(context)
-                    parts.append(str(result) if result is not None else str(sub))
+                    if result is not None:
+                        parts.append(str(result))
+                    else:
+                        parts.append(str(sub))
+                        any_fallback = True
                 else:
                     parts.append(str(sub))
-            return "".join(parts)
-        return str(subs)
+                    if hasattr(sub, "perform"):
+                        any_fallback = True
+            return "".join(parts), any_fallback
+        if hasattr(subs, "perform"):
+            return str(subs), True
+        return str(subs), False
 
     def perform(self, context):
-        pkg = self._resolve_name(context)
-        _track_package(pkg)
+        pkg, is_fallback = self._resolve_name(context)
+        if not is_fallback:
+            _track_package(pkg)
         if not _preview_mode and pkg in _package_shares:
             return _package_shares[pkg]
         return f"$(find-pkg-share {pkg})"
 
     def __str__(self):
-        pkg = self._resolve_name(None)
+        pkg, is_fallback = self._resolve_name(None)
         if not _preview_mode and pkg in _package_shares:
             return _package_shares[pkg]
         return f"$(find-pkg-share {pkg})"
@@ -857,7 +873,9 @@ class _TrackedPathJoinSubstitution:
         # Track packages from nested FindPackageShare
         for sub in substitutions:
             if isinstance(sub, _TrackedFindPackageShare):
-                _track_package(sub._resolve_name())
+                pkg, is_fallback = sub._resolve_name()
+                if not is_fallback:
+                    _track_package(pkg)
     def perform(self, context):
         parts = []
         for sub in self._subs:

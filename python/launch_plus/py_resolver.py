@@ -325,39 +325,57 @@ def _track_param_file(path):
 
 def _resolve_substitution(sub, context):
     """Resolve a substitution, list-of-substitutions, or plain string to str."""
+    value, _fallback = _resolve_substitution_ex(sub, context)
+    return value
+
+
+def _resolve_substitution_ex(sub, context):
+    """Resolve a substitution and report whether the result is a fallback.
+
+    Returns ``(resolved_str_or_None, is_fallback)`` where *is_fallback* is
+    ``True`` when ``perform()`` returned ``None`` or raised and the display
+    name was used instead.  Callers that need to distinguish "really resolved"
+    from "fell back to variable name" (e.g. package tracking) should use this.
+    """
     if sub is None:
-        return None
+        return None, False
     if isinstance(sub, str):
         # Plain strings from Python launch code are already resolved (they come from
         # Python expressions, not unresolved XML/YAML text).  Do NOT call
         # _resolve_ros_substitutions here — that would eagerly expand portable
         # $(find-pkg-share ...) paths back to machine-specific filesystem paths.
-        return sub
+        return sub, False
     if isinstance(sub, list):
         parts = []
+        any_fallback = False
         for s in sub:
             if context is not None and hasattr(s, "perform"):
                 try:
                     result = s.perform(context)
-                    parts.append(str(result) if result is not None else str(s))
+                    if result is not None:
+                        parts.append(str(result))
+                    else:
+                        parts.append(str(s))
+                        any_fallback = True
                 except _PackageNotFetchedError:
                     raise
                 except Exception:
                     parts.append(str(s))
+                    any_fallback = True
             else:
                 parts.append(str(s))
-        return "".join(parts)
+        return "".join(parts), any_fallback
     if context is not None and hasattr(sub, "perform"):
         try:
             result = sub.perform(context)
             if result is None:
-                return str(sub)  # unresolved — use display name
-            return str(result)
+                return str(sub), True  # unresolved — use display name
+            return str(result), False
         except _PackageNotFetchedError:
             raise
         except Exception:
-            return str(sub)
-    return str(sub)
+            return str(sub), True
+    return str(sub), True
 
 
 def _track_node(package, executable, name=None):
@@ -1393,17 +1411,11 @@ def _resolve_node_details(node, context):
     for field in ("package", "executable", "name"):
         raw = getattr(node, f"_raw_{field}", None)
         if _is_substitution(raw):
-            resolved = _resolve_substitution(raw, context)
+            resolved, is_fallback = _resolve_substitution_ex(raw, context)
             if resolved is not None:
                 entry[field] = resolved
-                if field == "package":
-                    # Only track when _resolve_substitution returned a real
-                    # value (not the display-name fallback).  We detect the
-                    # fallback case by checking whether the resolved string
-                    # equals str(raw) — if so, perform() failed or returned
-                    # None and _resolve_substitution fell back to str(sub).
-                    if resolved != str(raw):
-                        _track_package(resolved)
+                if field == "package" and not is_fallback:
+                    _track_package(resolved)
 
     # Namespace: emit raw inputs — Rust computes effective_namespace from these
     ns = _resolve_substitution(node._raw_namespace, context) if node._raw_namespace is not None else None
@@ -1480,12 +1492,10 @@ def _resolve_composable_plugins(descs, context):
         # Resolve package/plugin/name substitutions with the live context
         pkg = desc._package
         if _is_substitution(desc._raw_package):
-            resolved_pkg = _resolve_substitution(desc._raw_package, context)
+            resolved_pkg, is_fallback = _resolve_substitution_ex(desc._raw_package, context)
             if resolved_pkg is not None:
                 pkg = resolved_pkg
-                # Only track when resolution returned a real value, not the
-                # display-name fallback (same heuristic as _resolve_node_details).
-                if resolved_pkg != str(desc._raw_package):
+                if not is_fallback:
                     _track_package(resolved_pkg)
         plg = desc._plugin
         if _is_substitution(desc._raw_plugin):
@@ -1574,36 +1584,39 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
     saved_event_handlers_len = len(_tracked["event_handlers"])
     saved_namespace_depth = len(_namespace_stack)
 
-    try:
-        ld = mod.generate_launch_description()
-    except _PackageNotFetchedError:
-        raise
-    except Exception as e:
-        _warn(f"generate_launch_description() failed in {launch_file}: {e}")
-        return
-
-    entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
-
-    # Snapshot parent context BEFORE applying child_args so we can fully
-    # restore it after the inline walk.  Only deliberate side-effects
+    # Snapshot parent context BEFORE generate_launch_description() so we can
+    # fully restore it after the inline walk.  Only deliberate side-effects
     # (SetLaunchConfiguration) survive.
     saved_configs = dict(parent_context._launch_configurations)
 
-    # Apply child launch arguments: only set keys that the parent hasn't
-    # already defined, so parent values are never overwritten.
-    for k, v in child_args.items():
-        if k not in parent_context._launch_configurations:
-            parent_context._launch_configurations[k] = v
-
-    # Pass 1: apply DeclareLaunchArgument defaults (child-only args).
-    for entity in entities:
-        if isinstance(entity, _DeclaredArg):
-            _apply_declared_arg(entity, parent_context)
-
-    # Pass 2: walk actions — SetLaunchConfiguration, OpaqueFunction, etc.
-    # all mutate parent_context directly, which is the desired effect.
-    # Only context mutations survive; tracked state is rolled back.
+    # All _tracked mutations (from constructors in generate_launch_description
+    # AND from _walk_actions) must be rolled back on any exit path, including
+    # exceptions from generate_launch_description() itself.
     try:
+        try:
+            ld = mod.generate_launch_description()
+        except _PackageNotFetchedError:
+            raise
+        except Exception as e:
+            _warn(f"generate_launch_description() failed in {launch_file}: {e}")
+            return
+
+        entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
+
+        # Apply child launch arguments: only set keys that the parent hasn't
+        # already defined, so parent values are never overwritten.
+        for k, v in child_args.items():
+            if k not in parent_context._launch_configurations:
+                parent_context._launch_configurations[k] = v
+
+        # Pass 1: apply DeclareLaunchArgument defaults (child-only args).
+        for entity in entities:
+            if isinstance(entity, _DeclaredArg):
+                _apply_declared_arg(entity, parent_context)
+
+        # Pass 2: walk actions — SetLaunchConfiguration, OpaqueFunction, etc.
+        # all mutate parent_context directly, which is the desired effect.
+        # Only context mutations survive; tracked state is rolled back.
         _walk_actions(entities, parent_context, depth)
     except _PackageNotFetchedError:
         raise

@@ -471,6 +471,424 @@ def _error(msg: str) -> None:
     _tracked["errors"].append(msg)
 
 
+# ─── XML/YAML Launch File Parser ──────────────────────────────────────────────
+#
+# Produces a list of element dicts matching the Rust LaunchElement schema.
+# Each element is a single-key dict: {"Arg": {...}}, {"Node": {...}}, etc.
+# Substitutions in attribute values are left as raw strings for the resolver
+# (Phase 2/3) to process — the parser does not resolve them.
+
+import xml.etree.ElementTree as ET
+
+
+def _parse_condition(attrs: dict[str, str]) -> dict[str, str] | None:
+    """Extract if=/unless= condition from an attribute dict."""
+    if "if" in attrs:
+        return {"kind": "If", "expr": attrs["if"]}
+    if "unless" in attrs:
+        return {"kind": "Unless", "expr": attrs["unless"]}
+    return None
+
+
+def _parse_param_children(children: list[ET.Element]) -> list[dict[str, str | None]]:
+    """Extract <param> child elements."""
+    params = []
+    for child in children:
+        if child.tag == "param":
+            params.append(
+                {
+                    "name": child.get("name"),
+                    "value": child.get("value"),
+                    "from": child.get("from"),
+                }
+            )
+    return params
+
+
+def _parse_remap_children(children: list[ET.Element]) -> list[dict[str, str]]:
+    """Extract <remap> child elements."""
+    remaps = []
+    for child in children:
+        if child.tag == "remap":
+            f = child.get("from", "")
+            t = child.get("to", "")
+            remaps.append({"from": f, "to": t})
+    return remaps
+
+
+def _parse_env_children(children: list[ET.Element]) -> list[dict[str, str]]:
+    """Extract <env> child elements."""
+    envs = []
+    for child in children:
+        if child.tag == "env":
+            envs.append({"name": child.get("name", ""), "value": child.get("value", "")})
+    return envs
+
+
+def _parse_composable_node_children(
+    children: list[ET.Element],
+) -> list[dict[str, Any]]:
+    """Extract <composable_node> child elements."""
+    nodes = []
+    for child in children:
+        if child.tag == "composable_node":
+            sub = list(child)
+            nodes.append(
+                {
+                    "pkg": child.get("pkg", ""),
+                    "plugin": child.get("plugin", ""),
+                    "name": child.get("name"),
+                    "namespace": child.get("namespace"),
+                    "condition": _parse_condition(child.attrib),
+                    "params": _parse_param_children(sub),
+                    "remaps": _parse_remap_children(sub),
+                }
+            )
+    return nodes
+
+
+def _parse_include_arg_children(children: list[ET.Element]) -> list[dict[str, str]]:
+    """Extract <arg> children inside an <include> element."""
+    args = []
+    for child in children:
+        if child.tag == "arg":
+            name = child.get("name", "")
+            value = child.get("value", "")
+            args.append({"name": name, "value": value})
+    return args
+
+
+_KNOWN_NODE_ATTRS = frozenset(
+    {
+        "pkg",
+        "package",
+        "exec",
+        "executable",
+        "name",
+        "namespace",
+        "output",
+        "args",
+        "respawn",
+        "respawn_delay",
+        "if",
+        "unless",
+    }
+)
+
+
+def _parse_xml_element(elem: ET.Element) -> dict[str, Any] | None:
+    """Parse a single XML element into a LaunchElement dict."""
+    tag = elem.tag
+    children = list(elem)
+
+    if tag == "arg":
+        return {
+            "Arg": {
+                "name": elem.get("name", ""),
+                "default": elem.get("default"),
+                "description": elem.get("description"),
+            }
+        }
+
+    if tag == "let":
+        return {
+            "Let": {
+                "name": elem.get("name", ""),
+                "value": elem.get("value", ""),
+                "condition": _parse_condition(elem.attrib),
+            }
+        }
+
+    if tag == "group":
+        scoped_str = elem.get("scoped", "true")
+        scoped = scoped_str.lower() not in ("false", "0", "no")
+        child_elems = [_parse_xml_element(c) for c in children]
+        return {
+            "Group": {
+                "condition": _parse_condition(elem.attrib),
+                "scoped": scoped,
+                "children": [e for e in child_elems if e is not None],
+            }
+        }
+
+    if tag == "include":
+        return {
+            "Include": {
+                "file": elem.get("file", ""),
+                "condition": _parse_condition(elem.attrib),
+                "args": _parse_include_arg_children(children),
+            }
+        }
+
+    if tag in ("node", "lifecycle_node"):
+        pkg = elem.get("pkg") or elem.get("package", "")
+        exe = elem.get("exec") or elem.get("executable", "")
+        unknown_attrs = [k for k in elem.attrib if k not in _KNOWN_NODE_ATTRS]
+        variant = "Node" if tag == "node" else "LifecycleNode"
+        return {
+            variant: {
+                "pkg": pkg,
+                "exec": exe,
+                "name": elem.get("name"),
+                "namespace": elem.get("namespace"),
+                "condition": _parse_condition(elem.attrib),
+                "params": _parse_param_children(children),
+                "remaps": _parse_remap_children(children),
+                "envs": _parse_env_children(children),
+                "output": elem.get("output"),
+                "args": elem.get("args"),
+                "respawn": elem.get("respawn"),
+                "respawn_delay": elem.get("respawn_delay"),
+                "unknown_attrs": unknown_attrs,
+            }
+        }
+
+    if tag in ("node_container", "composable_node_container"):
+        pkg = elem.get("pkg") or elem.get("package", "")
+        exe = elem.get("exec") or elem.get("executable", "")
+        return {
+            "NodeContainer": {
+                "pkg": pkg,
+                "exec": exe,
+                "name": elem.get("name"),
+                "namespace": elem.get("namespace"),
+                "condition": _parse_condition(elem.attrib),
+                "composable_nodes": _parse_composable_node_children(children),
+                "envs": _parse_env_children(children),
+            }
+        }
+
+    if tag == "load_composable_node":
+        return {
+            "LoadComposableNode": {
+                "target": elem.get("target"),
+                "namespace": elem.get("namespace"),
+                "condition": _parse_condition(elem.attrib),
+                "composable_nodes": _parse_composable_node_children(children),
+            }
+        }
+
+    if tag == "set_env":
+        return {
+            "SetEnv": {
+                "name": elem.get("name", ""),
+                "value": elem.get("value", ""),
+                "condition": _parse_condition(elem.attrib),
+            }
+        }
+
+    if tag == "unset_env":
+        return {
+            "UnsetEnv": {
+                "name": elem.get("name", ""),
+                "condition": _parse_condition(elem.attrib),
+            }
+        }
+
+    if tag == "push-ros-namespace":
+        return {
+            "PushRosNamespace": {
+                "namespace": elem.get("namespace", ""),
+                "condition": _parse_condition(elem.attrib),
+            }
+        }
+
+    if tag == "set_parameter":
+        return {
+            "SetParameter": {
+                "name": elem.get("name", ""),
+                "value": elem.get("value", ""),
+            }
+        }
+
+    if tag == "set_remap":
+        return {
+            "SetRemap": {
+                "from": elem.get("from", ""),
+                "to": elem.get("to", ""),
+            }
+        }
+
+    if tag == "log":
+        return {"Log": {"message": elem.get("message", "")}}
+
+    if tag == "executable":
+        shell_str = elem.get("shell", "false")
+        return {
+            "Executable": {
+                "cmd": elem.get("cmd", ""),
+                "name": elem.get("name"),
+                "shell": shell_str.lower() in ("true", "1", "yes"),
+                "condition": _parse_condition(elem.attrib),
+            }
+        }
+
+    event_kind_map = {
+        "on_process_start": "OnProcessStart",
+        "on_process_exit": "OnProcessExit",
+        "on_state_transition": "OnStateTransition",
+        "on_shutdown": "OnShutdown",
+    }
+    if tag in event_kind_map:
+        child_elems = [_parse_xml_element(c) for c in children]
+        unknown_attrs = [
+            k
+            for k in elem.attrib
+            if k
+            not in {
+                "target",
+                "target_node",
+                "namespace",
+                "start_state",
+                "goal_state",
+                "if",
+                "unless",
+            }
+        ]
+        return {
+            "EventHandler": {
+                "kind": event_kind_map[tag],
+                "target": elem.get("target"),
+                "target_node": elem.get("target_node"),
+                "namespace": elem.get("namespace"),
+                "start_state": elem.get("start_state"),
+                "goal_state": elem.get("goal_state"),
+                "children": [e for e in child_elems if e is not None],
+                "unknown_attrs": unknown_attrs,
+            }
+        }
+
+    if tag == "emit_event":
+        unknown_attrs = [
+            k for k in elem.attrib if k not in {"event", "target_node", "namespace", "if", "unless"}
+        ]
+        return {
+            "EmitEvent": {
+                "event": elem.get("event", ""),
+                "target_node": elem.get("target_node"),
+                "namespace": elem.get("namespace"),
+                "unknown_attrs": unknown_attrs,
+            }
+        }
+
+    # Unknown element — warn during resolution
+    return {"UnknownElement": {"tag_name": tag}}
+
+
+def parse_xml_launch(content: str, file_path: str) -> list[dict[str, Any]]:
+    """Parse an XML launch file to a list of LaunchElement dicts.
+
+    The root ``<launch>`` tag is unwrapped; its children become the element list.
+    Substitutions in attribute values are left as raw strings.
+    """
+    root = ET.fromstring(content)
+    if root.tag != "launch":
+        _warn(f"XML root tag is '{root.tag}', expected 'launch' — parsing children anyway")
+    elements = []
+    for child in root:
+        elem = _parse_xml_element(child)
+        if elem is not None:
+            elements.append(elem)
+    return elements
+
+
+def _yaml_tag_to_xml(tag: str) -> str:
+    """Normalize YAML tag names to match XML conventions."""
+    mapping = {
+        "push_ros_namespace": "push-ros-namespace",
+        "composable_node_container": "node_container",
+    }
+    return mapping.get(tag, tag)
+
+
+def _yaml_element_to_xml_element(tag: str, attrs: dict[str, Any]) -> ET.Element:
+    """Convert a YAML element dict to an xml.etree Element for uniform parsing."""
+    xml_tag = _yaml_tag_to_xml(tag)
+    elem = ET.Element(xml_tag)
+
+    # Scalar attributes become XML attributes
+    for k, v in attrs.items():
+        if k == "children":
+            # Recursively convert children
+            for child_dict in v:
+                if isinstance(child_dict, dict) and len(child_dict) == 1:
+                    child_tag = next(iter(child_dict))
+                    child_attrs = child_dict[child_tag]
+                    if isinstance(child_attrs, dict):
+                        elem.append(_yaml_element_to_xml_element(child_tag, child_attrs))
+        elif isinstance(v, list):
+            # List values are child elements (param, remap, env, arg, composable_node)
+            for item in v:
+                if isinstance(item, dict):
+                    child = ET.Element(k if not k.endswith("s") else k)
+                    # Try singular form for common plurals
+                    child_tag = k
+                    # Common YAML list keys that map to child element tags
+                    if k in ("param", "remap", "env", "arg", "composable_node"):
+                        child_tag = k
+                    child = ET.Element(child_tag)
+                    for ck, cv in item.items():
+                        if isinstance(cv, list):
+                            # Nested list (e.g. composable_node with params)
+                            for sub_item in cv:
+                                if isinstance(sub_item, dict):
+                                    sub_child = ET.Element(ck)
+                                    for sk, sv in sub_item.items():
+                                        sub_child.set(sk, str(sv) if sv is not None else "")
+                                    child.append(sub_child)
+                        elif cv is not None:
+                            child.set(ck, str(cv))
+                    elem.append(child)
+        elif v is not None:
+            elem.set(k, str(v))
+
+    return elem
+
+
+def parse_yaml_launch(content: str, file_path: str) -> list[dict[str, Any]]:
+    """Parse a YAML launch file to a list of LaunchElement dicts.
+
+    Expects the top-level structure::
+
+        launch:
+          - arg:
+              name: my_arg
+              default: value
+          - node:
+              pkg: my_pkg
+              ...
+
+    Each list entry is a single-key dict whose key is the element type.
+    """
+    import yaml
+
+    data = yaml.safe_load(content)
+    if not isinstance(data, dict) or "launch" not in data:
+        _warn(f"YAML launch file '{file_path}' missing 'launch' root key")
+        return []
+
+    launch_list = data["launch"]
+    if not isinstance(launch_list, list):
+        _warn(f"YAML 'launch' key in '{file_path}' is not a list")
+        return []
+
+    elements = []
+    for entry in launch_list:
+        if not isinstance(entry, dict) or len(entry) != 1:
+            continue
+        tag = next(iter(entry))
+        attrs = entry[tag]
+        if not isinstance(attrs, dict):
+            continue
+        # Convert to ET.Element for uniform parsing with _parse_xml_element
+        xml_elem = _yaml_element_to_xml_element(tag, attrs)
+        parsed = _parse_xml_element(xml_elem)
+        if parsed is not None:
+            elements.append(parsed)
+
+    return elements
+
+
 # ─── Shim classes ─────────────────────────────────────────────────────────────
 
 

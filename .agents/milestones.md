@@ -32,13 +32,15 @@ Substitution engine supporting `$(arg ...)`, `$(var ...)`, `$(env ...)`,
 recursively, tracks file and package dependencies, computes effective
 namespaces, and renders resolved XML with source annotations.
 
-Environment variable stack: `<set_env>`/`<unset_env>` (XML) and
-`SetEnvironmentVariable`/`UnsetEnvironmentVariable` (Python) mutate a
-tracked `ctx.env` map initialized from `std::env::vars()` / `os.environ`.
-Scoped groups (`scoped="true"`) save/restore env; unscoped groups let
-mutations propagate.  `$(env X)` reads from the tracked map.  Per-node
-`<env>` children reflect only the diff vs process baseline.  Net-zero check
-reports an error for env mutations leaked from file scope.
+Environment variable override tracking: `<set_env>` (XML) and
+`SetEnvironmentVariable` (Python) add entries to an override-only map
+(`ctx.env` / `_env`) that starts empty.  `$(env X)` checks overrides
+first, then falls back to the real process environment.  Scoped groups
+(`scoped="true"`) save/restore overrides; unscoped groups let mutations
+propagate.  Per-node `<env>` children are exactly the override map —
+process env vars are never copied or exposed.  `<unset_env>` is only
+accepted for override-only vars not in process env; otherwise it errors.
+Net-zero check reports an error for overrides leaked from file scope.
 
 Preview mode emits portable `$(find-pkg-share ...)` tokens; non-preview mode
 resolves to actual AMENT install paths.

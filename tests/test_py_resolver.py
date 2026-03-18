@@ -578,8 +578,10 @@ class TestEnvStack:
         R._env["NEW_VAR"] = "new_val"
         overrides = R._env_overrides()
         assert overrides["NEW_VAR"] == "new_val"
-        # Process env vars should NOT appear in overrides
-        assert "PATH" not in overrides or "PATH" in R._env
+        # Process env vars must NOT appear in overrides.
+        import os
+        assert "PATH" in os.environ, "PATH should exist in process env for this test"
+        assert "PATH" not in overrides
 
     def test_env_overrides_empty_when_no_overrides(self):
         """Empty overrides when nothing has been set."""

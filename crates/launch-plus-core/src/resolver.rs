@@ -1833,6 +1833,26 @@ fn resolve_element(
                         include_stack,
                     )?;
                     include_stack.pop();
+                    // Net-zero check for included file: env overrides that differ
+                    // from the parent snapshot are leaked by the included file.
+                    for (k, v) in &include_ctx.env {
+                        if ctx.env.get(k) != Some(v) {
+                            result.errors.push(format!(
+                                "env var '{}' was set to '{}' but not restored \
+                                 (leaked from included file)",
+                                k, v
+                            ));
+                        }
+                    }
+                    for k in ctx.env.keys() {
+                        if !include_ctx.env.contains_key(k) {
+                            result.errors.push(format!(
+                                "env var '{}' was unset but not restored \
+                                 (leaked from included file)",
+                                k
+                            ));
+                        }
+                    }
                     // Inject a marker if the included XML added no nodes at all.
                     if result.nodes.len() == nodes_before_xml {
                         if let Some(file_dep) =
@@ -5100,7 +5120,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(unsafe_code)]
     fn test_resolve_undefined_env_errors() {
         let ctx = SubstitutionContext::default();
         let result = resolve_substitutions("$(env DEFINITELY_NOT_A_REAL_VAR_12345)", &ctx);

@@ -359,6 +359,8 @@ def _to_str(value, context=None):
         try:
             res = value.perform(context)
             return str(res) if res is not None else None
+        except _PackageNotFetchedError:
+            raise
         except Exception:
             return str(value)
     return str(value)
@@ -2222,16 +2224,25 @@ def _build_patched_launch_substitutions():
     mod.FindPackageShare = _TrackedFindPackageShare
     mod.PathJoinSubstitution = _TrackedPathJoinSubstitution
     mod.LaunchConfiguration = _LaunchConfiguration
+    _SENTINEL = object()
     class _DeferredEnvironmentVariable:
         """Deferred substitution: reads _env at perform() time, not construction."""
         def __init__(self, name, **kw):
             self._name = name
-            self._default = kw.get("default_value", "")
+            self._default = kw.get("default_value", _SENTINEL)
         def perform(self, context=None):
-            # Resolve name and default to concrete strings.
+            # Resolve name to a concrete string via _to_str.
             name = _to_str(self._name, context) or ""
-            default = _to_str(self._default, context) or ""
-            return _env.get(name, os.environ.get(name, default))
+            # Look up in override env, then process env.
+            if name in _env:
+                return _env[name]
+            if name in os.environ:
+                return os.environ[name]
+            # No match — use default if provided, otherwise error.
+            if self._default is not _SENTINEL:
+                return _to_str(self._default, context) or ""
+            _error(f"EnvironmentVariable: '{name}' is not set and no default was provided")
+            return ""
         def __str__(self):
             # Avoid calling perform() without context — return the raw name.
             return str(self._name) if self._name is not None else ""

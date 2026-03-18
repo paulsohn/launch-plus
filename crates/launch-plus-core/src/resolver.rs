@@ -2246,6 +2246,7 @@ fn resolve_element(
             namespace,
             condition,
             composable_nodes,
+            envs,
         } => {
             let should_include = if let Some(cond) = condition {
                 let (include, cond_sub) = evaluate_condition(cond, ctx)?;
@@ -2283,8 +2284,15 @@ fn resolve_element(
                     }
                 }
 
-                // Compute inherited env diff for the container process.
-                let container_env = ctx.env_overrides();
+                // Compute inherited env + node-local <env> children.
+                let mut container_env = ctx.env_overrides();
+                for env_entry in envs {
+                    let env_name =
+                        resolve_substitutions(&env_entry.name, ctx)?.propagate_into(result);
+                    let env_value =
+                        resolve_substitutions(&env_entry.value, ctx)?.propagate_into(result);
+                    container_env.insert(env_name, env_value);
+                }
 
                 // Emit the container process as a node with its plugins.
                 result.nodes.push(ResolvedNode {
@@ -3624,6 +3632,7 @@ fn collect_arg_var_refs_in_elem(elem: &LaunchElement, refs: &mut HashSet<String>
             namespace,
             condition,
             composable_nodes,
+            envs,
         } => {
             scan_str_for_arg_var_refs(pkg, refs);
             scan_str_for_arg_var_refs(exec, refs);
@@ -3645,6 +3654,10 @@ fn collect_arg_var_refs_in_elem(elem: &LaunchElement, refs: &mut HashSet<String>
                 if let Some(c) = &cn.condition {
                     scan_str_for_arg_var_refs(&c.expr, refs);
                 }
+            }
+            for env_entry in envs {
+                scan_str_for_arg_var_refs(&env_entry.name, refs);
+                scan_str_for_arg_var_refs(&env_entry.value, refs);
             }
         }
         LaunchElement::LoadComposableNode {
@@ -3949,6 +3962,7 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
             namespace,
             condition,
             composable_nodes,
+            envs,
         } => {
             scan_str_for_env_no_fallback(pkg, names);
             scan_str_for_env_no_fallback(exec, names);
@@ -3970,6 +3984,10 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
                 if let Some(c) = &cn.condition {
                     scan_str_for_env_no_fallback(&c.expr, names);
                 }
+            }
+            for env_entry in envs {
+                scan_str_for_env_no_fallback(&env_entry.name, names);
+                scan_str_for_env_no_fallback(&env_entry.value, names);
             }
         }
         LaunchElement::LoadComposableNode {

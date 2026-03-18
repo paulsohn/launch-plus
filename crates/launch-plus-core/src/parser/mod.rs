@@ -112,6 +112,7 @@ pub enum LaunchElement {
         namespace: Option<String>,
         condition: Option<Condition>,
         composable_nodes: Vec<ComposableNode>,
+        envs: Vec<Env>,
     },
     /// Load composable nodes into a running container: `<load_composable_node target="...">`
     ///
@@ -461,6 +462,7 @@ fn raw_to_launch(raw: RawElement) -> crate::Result<Option<LaunchElement>> {
             let namespace = raw.get("namespace");
             let condition = raw.condition()?;
             let composable_nodes = extract_composable_nodes(&raw.children)?;
+            let envs = extract_env_children(&raw.children)?;
             Ok(Some(LaunchElement::NodeContainer {
                 pkg,
                 exec,
@@ -468,6 +470,7 @@ fn raw_to_launch(raw: RawElement) -> crate::Result<Option<LaunchElement>> {
                 namespace,
                 condition,
                 composable_nodes,
+                envs,
             }))
         }
         "load_composable_node" => {
@@ -732,4 +735,17 @@ fn extract_composable_nodes(children: &[RawElement]) -> crate::Result<Vec<Compos
     }
 
     Ok(nodes)
+}
+
+/// Extract `<env>` children from a raw element's child list.
+fn extract_env_children(children: &[RawElement]) -> crate::Result<Vec<Env>> {
+    let mut envs = Vec::new();
+    for child in children {
+        if child.tag == "env" {
+            let name = child.require("name")?;
+            let value = child.require("value")?;
+            envs.push(Env { name, value });
+        }
+    }
+    Ok(envs)
 }

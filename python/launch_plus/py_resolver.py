@@ -1940,6 +1940,9 @@ def _walk_action(action, context, depth):
                 _warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
                 return
         name = _resolve_substitution(action._name, context) or str(action._name)
+        if not name or name == "None":
+            _error("SetEnvironmentVariable: resolved name is empty or None — skipping")
+            return
         value = _resolve_substitution(action._value, context) or ""
         _env[name] = value
         return
@@ -2192,7 +2195,16 @@ def _build_patched_launch_substitutions():
     mod.FindPackageShare = _TrackedFindPackageShare
     mod.PathJoinSubstitution = _TrackedPathJoinSubstitution
     mod.LaunchConfiguration = _LaunchConfiguration
-    mod.EnvironmentVariable = lambda name, **kw: _env.get(name, os.environ.get(name, kw.get("default_value", "")))
+    class _DeferredEnvironmentVariable:
+        """Deferred substitution: reads _env at perform() time, not construction."""
+        def __init__(self, name, **kw):
+            self._name = name
+            self._default = kw.get("default_value", "")
+        def perform(self, context=None):
+            return _env.get(self._name, os.environ.get(self._name, self._default))
+        def __str__(self):
+            return self.perform()
+    mod.EnvironmentVariable = _DeferredEnvironmentVariable
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None
     mod.ThisLaunchFileDir = lambda: Path(__file__).parent

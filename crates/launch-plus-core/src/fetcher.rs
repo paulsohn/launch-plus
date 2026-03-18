@@ -209,7 +209,6 @@ fn fetch_repo_sparse(
         match options.workspace_state {
             WorkspaceState::Dirty => {
                 // Dirty mode: never touch existing repos — use whatever is on disk.
-                // Log the current state so the user knows what they're getting.
                 if let Ok(Some(description)) = describe_repo_state(repo_dir, sha) {
                     info!(
                         "Using as-is (--dirty) {} :\n  {}",
@@ -224,6 +223,9 @@ fn fetch_repo_sparse(
                 }
             }
             WorkspaceState::Default => {
+                // Sync origin for partial clones so lazy blob fetches work.
+                crate::indexer::ensure_remote_url(repo_dir, url)?;
+
                 if !repo_dir.join(".git").join("index").exists() {
                     // The indexer leaves a blobless --no-checkout clone: .git exists
                     // but no index file (nothing was ever checked out).  HEAD points
@@ -236,7 +238,7 @@ fn fetch_repo_sparse(
                     );
                     init_sparse_checkout(repo_dir)?;
                     set_sparse_checkout_paths(repo_dir, paths)?;
-                    checkout_sha(repo_dir, sha, options)?;
+                    checkout_sha(repo_dir, url, sha, options)?;
                 } else {
                     // Default mode: verify SHA + clean working tree, error if mismatch.
                     verify_repo_state(repo_dir, sha)?;
@@ -246,8 +248,10 @@ fn fetch_repo_sparse(
                 }
             }
             WorkspaceState::Clean => {
+                // Sync origin for partial clones so lazy blob fetches work.
+                crate::indexer::ensure_remote_url(repo_dir, url)?;
                 // Clean mode: reset to pinned SHA (with auto-stash).
-                update_sparse_checkout(repo_dir, sha, paths, options)?;
+                update_sparse_checkout(repo_dir, url, sha, paths, options)?;
             }
         }
     } else {
@@ -319,7 +323,7 @@ fn sparse_clone(
     set_sparse_checkout_paths(repo_dir, paths)?;
 
     // Fetch and checkout the specific SHA
-    checkout_sha(repo_dir, sha, options)?;
+    checkout_sha(repo_dir, url, sha, options)?;
 
     Ok(())
 }
@@ -327,6 +331,7 @@ fn sparse_clone(
 /// Update sparse-checkout for an existing repository
 fn update_sparse_checkout(
     repo_dir: &Path,
+    url: &str,
     sha: &str,
     paths: &[&str],
     options: &FetchOptions,
@@ -336,6 +341,26 @@ fn update_sparse_checkout(
         repo_dir.display(),
         paths
     );
+
+    // The indexer leaves a blobless --no-checkout clone: .git exists but no
+    // index file.  Detect this and bootstrap sparse-checkout before anything
+    // else, regardless of workspace_state.
+    if !repo_dir.join(".git").join("index").exists() {
+        info!(
+            "Initializing sparse-checkout for no-checkout clone at {}",
+            repo_dir.display()
+        );
+        init_sparse_checkout(repo_dir)?;
+        set_sparse_checkout_paths(repo_dir, paths)?;
+        // Use Default mode: there are no user changes to stash — the tree
+        // artifact of sparse-checkout initialization is not real dirt.
+        let bootstrap_options = FetchOptions {
+            workspace_state: WorkspaceState::Default,
+            ..options.clone()
+        };
+        checkout_sha(repo_dir, url, sha, &bootstrap_options)?;
+        return Ok(());
+    }
 
     let sparse_enabled = is_sparse_checkout_enabled(repo_dir);
 
@@ -361,7 +386,7 @@ fn update_sparse_checkout(
                     &current_sha[..current_sha.len().min(8)],
                     &sha[..sha.len().min(8)],
                 );
-                checkout_sha(repo_dir, sha, options)?;
+                checkout_sha(repo_dir, url, sha, options)?;
             } else {
                 debug!(
                     "Already at SHA {} (non-sparse repo), skipping checkout",
@@ -374,7 +399,7 @@ fn update_sparse_checkout(
         info!("Initializing sparse-checkout with paths: {:?}", paths);
         init_sparse_checkout(repo_dir)?;
         set_sparse_checkout_paths(repo_dir, paths)?;
-        checkout_sha(repo_dir, sha, options)?;
+        checkout_sha(repo_dir, url, sha, options)?;
         return Ok(());
     }
 
@@ -403,7 +428,7 @@ fn update_sparse_checkout(
         || (options.workspace_state == WorkspaceState::Clean && is_working_tree_dirty(repo_dir)?);
 
     if need_checkout {
-        checkout_sha(repo_dir, sha, options)?;
+        checkout_sha(repo_dir, url, sha, options)?;
     } else {
         debug!(
             "Already at SHA {} with correct paths, skipping checkout",
@@ -731,7 +756,16 @@ fn stash_if_dirty(repo_dir: &Path, expected_sha: &str) -> crate::Result<bool> {
 }
 
 /// Checkout a specific SHA
-fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Result<()> {
+///
+/// Fetches directly from `url` instead of the named "origin" remote, so the
+/// fetch works even when the lockfile URL differs from what origin points to
+/// (e.g. after switching to a fork).
+fn checkout_sha(
+    repo_dir: &Path,
+    url: &str,
+    sha: &str,
+    options: &FetchOptions,
+) -> crate::Result<()> {
     // In clean mode, stash dirty changes first — before any other git operations.
     if options.workspace_state == WorkspaceState::Clean {
         stash_if_dirty(repo_dir, sha)?;
@@ -750,10 +784,11 @@ fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Re
     if have_locally {
         debug!("SHA {} already available locally, skipping fetch", sha);
     } else {
-        let mut fetch_args = vec!["fetch", "origin", sha];
+        let mut fetch_args = vec!["fetch"];
         if options.shallow {
-            fetch_args.insert(1, "--depth=1");
+            fetch_args.push("--depth=1");
         }
+        fetch_args.extend(["--", url, sha]);
 
         let output = Command::new("git")
             .current_dir(repo_dir)
@@ -766,8 +801,9 @@ fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Re
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(crate::Error::Git(format!(
-                "git fetch of {} failed and commit is not available locally: {}",
+                "git fetch of {} from {} failed and commit is not available locally: {}",
                 sha,
+                url,
                 stderr.trim()
             )));
         }
@@ -1025,7 +1061,8 @@ mod tests {
             workspace_state: WorkspaceState::Dirty,
             ..Default::default()
         };
-        checkout_sha(dir.path(), &sha1, &options).unwrap();
+        // URL is unused here because the SHA is available locally (no fetch needed).
+        checkout_sha(dir.path(), "unused://url", &sha1, &options).unwrap();
         assert_eq!(get_current_sha(dir.path()).unwrap(), sha1);
     }
 
@@ -1043,7 +1080,7 @@ mod tests {
             workspace_state: WorkspaceState::Clean,
             ..Default::default()
         };
-        checkout_sha(dir.path(), &sha1, &options).unwrap();
+        checkout_sha(dir.path(), "unused://url", &sha1, &options).unwrap();
         assert_eq!(get_current_sha(dir.path()).unwrap(), sha1);
         assert!(!is_working_tree_dirty(dir.path()).unwrap());
     }

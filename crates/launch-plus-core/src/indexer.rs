@@ -204,15 +204,21 @@ pub fn serialize_lockfile(lockfile: &Lockfile) -> crate::Result<String> {
 ///
 /// # Arguments
 /// * `repo_dir` - Path to local git clone
+/// * `url` - Git remote URL to fetch from (used directly, not via a named remote)
 /// * `version_ref` - Branch or tag name to resolve
 ///
 /// # Returns
 /// The full 40-character SHA of the fetched ref (via `FETCH_HEAD`)
-pub fn resolve_version_local(repo_dir: &Path, version_ref: &str) -> crate::Result<String> {
-    // Fetch the specific ref from origin
+pub fn resolve_version_local(
+    repo_dir: &Path,
+    url: &str,
+    version_ref: &str,
+) -> crate::Result<String> {
+    // Fetch directly from the URL so we never depend on the named "origin" remote,
+    // which may point to a different URL than the manifest specifies.
     let output = Command::new("git")
         .current_dir(repo_dir)
-        .args(["fetch", "origin", version_ref])
+        .args(["fetch", "--", url, version_ref])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -221,7 +227,7 @@ pub fn resolve_version_local(repo_dir: &Path, version_ref: &str) -> crate::Resul
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(crate::Error::Git(format!(
-            "git fetch origin {version_ref} failed: {stderr}"
+            "git fetch {url} {version_ref} failed: {stderr}"
         )));
     }
 
@@ -831,7 +837,7 @@ pub fn discover_packages(
     if let Some(dir) = repo_dir {
         if dir.exists() && dir.join(".git").exists() {
             debug!("Using existing repo at {}", dir.display());
-            return discover_packages_from_existing_repo(dir, sha, recurse_submodules);
+            return discover_packages_from_existing_repo(dir, url, sha, recurse_submodules);
         }
     }
 
@@ -862,7 +868,7 @@ pub fn discover_packages(
     })?;
 
     blobless_clone(url, dir)?;
-    discover_packages_from_existing_repo(dir, sha, recurse_submodules)
+    discover_packages_from_existing_repo(dir, url, sha, recurse_submodules)
 }
 
 /// Discover packages from a tar archive (git archive output)
@@ -919,14 +925,16 @@ fn discover_packages_from_tar(tar_data: &[u8]) -> crate::Result<Vec<PackageInfo>
 /// modifying the working directory. This is safe for sparse-checkout repos.
 fn discover_packages_from_existing_repo(
     repo_dir: &Path,
+    url: &str,
     sha: &str,
     recurse_submodules: bool,
 ) -> crate::Result<Vec<PackageInfo>> {
-    // Fetch the SHA (in case it's not available locally)
-    debug!("Fetching {} in existing repo...", sha);
+    // Fetch the SHA directly from the URL (not via named remote "origin",
+    // which may point elsewhere if the user changed it).
+    debug!("Fetching {} from {} in existing repo...", sha, url);
     let fetch_result = Command::new("git")
         .current_dir(repo_dir)
-        .args(["fetch", "origin", sha, "--depth=1"])
+        .args(["fetch", "--depth=1", "--", url, sha])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output();
@@ -937,7 +945,7 @@ fn discover_packages_from_existing_repo(
             debug!("Specific SHA fetch failed, trying general fetch...");
             let _ = Command::new("git")
                 .current_dir(repo_dir)
-                .args(["fetch", "origin", "--depth=1"])
+                .args(["fetch", "--depth=1", "--", url])
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .output();
@@ -1087,10 +1095,14 @@ fn discover_packages_from_submodules(
                                     &submodule_sha[..8.min(submodule_sha.len())]
                                 );
 
-                                // Fetch the submodule SHA
+                                // Use "origin" here: submodules are initialized by
+                                // `git submodule init` which resolves .gitmodules URLs
+                                // (often relative) against the superproject remote and
+                                // sets origin accordingly.  Unlike the superproject,
+                                // submodule origin is managed by git, not the user.
                                 let _ = Command::new("git")
                                     .current_dir(&submodule_dir)
-                                    .args(["fetch", "origin", submodule_sha, "--depth=1"])
+                                    .args(["fetch", "--depth=1", "origin", submodule_sha])
                                     .stdout(Stdio::piped())
                                     .stderr(Stdio::piped())
                                     .output();
@@ -1157,6 +1169,75 @@ pub fn blobless_clone(url: &str, repo_dir: &Path) -> crate::Result<()> {
     Ok(())
 }
 
+/// Ensure the origin remote URL matches `expected_url` for partial clones.
+///
+/// Blobless/partial clones use origin as the promisor remote for lazy blob
+/// fetches (e.g. `git show`, `git checkout`).  If the manifest URL changed,
+/// origin must be updated so that lazy object requests go to the correct
+/// server.
+///
+/// This is a no-op when:
+/// - The URL already matches
+/// - The repo has no `origin` remote (e.g. a manually created repo)
+/// - The repo is not a partial clone (no promisor remote to fix)
+pub fn ensure_remote_url(repo_dir: &Path, expected_url: &str) -> crate::Result<()> {
+    // Only act on partial clones — full clones don't have a promisor remote,
+    // so rewriting origin would be a surprising side effect.
+    let is_partial = Command::new("git")
+        .current_dir(repo_dir)
+        .args(["config", "--get", "remote.origin.partialclonefilter"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if !is_partial {
+        return Ok(());
+    }
+
+    let current_url = Command::new("git")
+        .current_dir(repo_dir)
+        .args(["remote", "get-url", "origin"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+
+    // No origin remote — unusual, but not our concern.
+    let Some(current_url) = current_url else {
+        return Ok(());
+    };
+
+    if current_url == expected_url {
+        return Ok(());
+    }
+
+    debug!(
+        "Updating origin URL for {} to {}",
+        repo_dir.display(),
+        expected_url
+    );
+    let output = Command::new("git")
+        .current_dir(repo_dir)
+        .args(["remote", "set-url", "origin", expected_url])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| crate::Error::Git(format!("failed to run git remote set-url: {e}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(crate::Error::Git(format!(
+            "git remote set-url origin failed: {stderr}"
+        )));
+    }
+
+    Ok(())
+}
+
 /// Resolve a version (tag, branch, or SHA) to a concrete SHA.
 ///
 /// Resolution strategy:
@@ -1189,9 +1270,15 @@ fn resolve_version_from_repo(
     // Ensure a local clone exists to resolve from.
     if !dir.join(".git").exists() {
         blobless_clone(url, dir)?;
+    } else {
+        // Blobless clones use origin as the promisor remote for lazy blob
+        // fetches.  If the manifest URL changed (e.g. switched to a fork),
+        // update origin so that both explicit fetches and lazy blob requests
+        // go to the right place.
+        ensure_remote_url(dir, url)?;
     }
 
-    resolve_version_local(dir, version)
+    resolve_version_local(dir, url, version)
 }
 
 /// Generate a lockfile from a .repos file
@@ -1735,5 +1822,114 @@ repositories:
         );
         assert!(info.dependencies.build.contains(&"rclcpp".to_string()));
         assert!(info.dependencies.exec.contains(&"std_msgs".to_string()));
+    }
+
+    // ── ensure_remote_url ───────────────────────────────────────────────
+
+    /// Helper: create a git repo and run commands in it.
+    fn git(dir: &std::path::Path, args: &[&str]) {
+        let output = Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    /// Helper: read origin URL from a repo.
+    fn get_origin_url(dir: &std::path::Path) -> Option<String> {
+        Command::new("git")
+            .current_dir(dir)
+            .args(["remote", "get-url", "origin"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+    }
+
+    #[test]
+    fn test_ensure_remote_url_noop_for_full_clone() {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-b", "main"]);
+        git(
+            dir.path(),
+            &[
+                "remote",
+                "add",
+                "origin",
+                "https://old.example.com/repo.git",
+            ],
+        );
+
+        // Full clone (no partialclonefilter) — should not touch origin.
+        ensure_remote_url(dir.path(), "https://new.example.com/repo.git").unwrap();
+        assert_eq!(
+            get_origin_url(dir.path()).as_deref(),
+            Some("https://old.example.com/repo.git")
+        );
+    }
+
+    #[test]
+    fn test_ensure_remote_url_updates_partial_clone() {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-b", "main"]);
+        git(
+            dir.path(),
+            &[
+                "remote",
+                "add",
+                "origin",
+                "https://old.example.com/repo.git",
+            ],
+        );
+        // Simulate partial clone config.
+        git(
+            dir.path(),
+            &["config", "remote.origin.partialclonefilter", "blob:none"],
+        );
+
+        ensure_remote_url(dir.path(), "https://new.example.com/repo.git").unwrap();
+        assert_eq!(
+            get_origin_url(dir.path()).as_deref(),
+            Some("https://new.example.com/repo.git")
+        );
+    }
+
+    #[test]
+    fn test_ensure_remote_url_noop_when_url_matches() {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-b", "main"]);
+        git(
+            dir.path(),
+            &["remote", "add", "origin", "https://example.com/repo.git"],
+        );
+        git(
+            dir.path(),
+            &["config", "remote.origin.partialclonefilter", "blob:none"],
+        );
+
+        // URL already matches — no-op.
+        ensure_remote_url(dir.path(), "https://example.com/repo.git").unwrap();
+        assert_eq!(
+            get_origin_url(dir.path()).as_deref(),
+            Some("https://example.com/repo.git")
+        );
+    }
+
+    #[test]
+    fn test_ensure_remote_url_noop_without_origin() {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-b", "main"]);
+        // No origin remote at all — should not error.
+        ensure_remote_url(dir.path(), "https://example.com/repo.git").unwrap();
     }
 }

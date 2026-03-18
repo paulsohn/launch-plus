@@ -1210,3 +1210,552 @@ class TestResolveSubstitutions:
         R.resolve_substitutions("$(find-pkg-share pkg1)/$(find-pkg-share pkg2)", ctx)
         assert "pkg1" in R._tracked["packages"]
         assert "pkg2" in R._tracked["packages"]
+
+
+# ─── AST Walker (resolve_xml_elements) ───────────────────────────────────────
+
+
+def _fresh_walker_ctx(**kwargs):
+    """Create a fresh _SubstitutionContext and reset ALL module-level state for walker tests."""
+    # Reset tracked state
+    for key in R._tracked:
+        if isinstance(R._tracked[key], list):
+            R._tracked[key] = []
+        elif isinstance(R._tracked[key], dict):
+            R._tracked[key] = {}
+    # Reset module-level state
+    R._namespace_stack.clear()
+    R._env.clear()
+    R._declared_arg_names.clear()
+    ctx = R._SubstitutionContext()
+    for k, v in kwargs.items():
+        setattr(ctx, k, v)
+    return ctx
+
+
+def _parse_and_walk(xml_str, ctx=None, **ctx_kwargs):
+    """Parse XML string and walk it.  Returns (ctx, tracked)."""
+    if ctx is None:
+        ctx = _fresh_walker_ctx(**ctx_kwargs)
+    elements = R.parse_xml_launch(xml_str, "test.launch.xml")
+    R.resolve_xml_elements(elements, ctx)
+    return ctx, R._tracked
+
+
+class TestResolveXmlElements:
+    """Tests for resolve_xml_elements() — the XML/YAML AST walker."""
+
+    # ── Basic node resolution ──
+
+    def test_simple_node(self):
+        xml = '<launch><node pkg="my_pkg" exec="my_node" name="node1"/></launch>'
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["nodes"]) == 1
+        assert tracked["nodes"][0]["package"] == "my_pkg"
+        assert tracked["nodes"][0]["executable"] == "my_node"
+        assert tracked["nodes"][0]["name"] == "node1"
+        assert "my_pkg" in tracked["packages"]
+
+    def test_lifecycle_node(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <lifecycle_node pkg="ros2_socketcan" exec="socket_can_receiver" name="receiver">
+                <param name="interface" value="can0"/>
+              </lifecycle_node>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["nodes"]) == 1
+        assert tracked["nodes"][0]["kind"] == "lifecycle_node"
+        assert tracked["nodes"][0]["package"] == "ros2_socketcan"
+        assert tracked["nodes"][0]["parameters"]["interface"] == "can0"
+
+    # ── Arg and Let ──
+
+    def test_arg_default_applied(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="vehicle" default="sample"/>
+              <node pkg="$(arg vehicle)_pkg" exec="node" name="n"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert tracked["nodes"][0]["package"] == "sample_pkg"
+        assert "sample_pkg" in tracked["packages"]
+
+    def test_arg_override(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="vehicle" default="sample"/>
+              <node pkg="$(arg vehicle)_pkg" exec="node" name="n"/>
+            </launch>
+        """)
+        ctx = _fresh_walker_ctx(args={"vehicle": "custom"})
+        _, tracked = _parse_and_walk(xml, ctx=ctx)
+        assert tracked["nodes"][0]["package"] == "custom_pkg"
+
+    def test_let_variable(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <let name="pkg_name" value="my_package"/>
+              <node pkg="$(var pkg_name)" exec="node" name="n"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert tracked["nodes"][0]["package"] == "my_package"
+
+    def test_declared_args_tracked(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="a" default="1"/>
+              <arg name="b" default="2"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        names = [a["name"] for a in tracked["declared_args"]]
+        assert "a" in names
+        assert "b" in names
+
+    # ── Conditions ──
+
+    def test_condition_if_true(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="enable" default="true"/>
+              <node pkg="p" exec="e" name="n" if="$(arg enable)"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["nodes"]) == 1
+
+    def test_condition_if_false(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="enable" default="false"/>
+              <node pkg="p" exec="e" name="n" if="$(arg enable)"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["nodes"]) == 0
+
+    def test_condition_unless(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="use_sim" default="true"/>
+              <group if="$(arg use_sim)">
+                <node pkg="sim_pkg" exec="sim" name="sim"/>
+              </group>
+              <group unless="$(arg use_sim)">
+                <node pkg="real_pkg" exec="real" name="real"/>
+              </group>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["nodes"]) == 1
+        assert tracked["nodes"][0]["package"] == "sim_pkg"
+
+    def test_let_with_condition(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="flag" default="false"/>
+              <let name="x" value="set" if="$(arg flag)"/>
+              <node pkg="$(var x)" exec="e" name="n"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        # $(var x) is undefined → error recorded, placeholder kept
+        assert any("undefined variable" in e for e in tracked["errors"])
+
+    # ── Group scoping ──
+
+    def test_scoped_group_env_isolation(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <group scoped="true">
+                <set_env name="SCOPED_VAR" value="inner"/>
+                <node pkg="inner_pkg" exec="e" name="inner"/>
+              </group>
+              <node pkg="outer_pkg" exec="e" name="outer"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        nodes = tracked["nodes"]
+        assert len(nodes) == 2
+        # Inner node has SCOPED_VAR
+        assert nodes[0]["env"].get("SCOPED_VAR") == "inner"
+        # Outer node does NOT
+        assert nodes[1]["env"].get("SCOPED_VAR") is None
+
+    def test_scoped_group_namespace_isolation(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <group scoped="true">
+                <push-ros-namespace namespace="/scoped_ns"/>
+                <node pkg="p1" exec="e" name="n1"/>
+              </group>
+              <node pkg="p2" exec="e" name="n2"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert tracked["nodes"][0]["namespace_stack"] == ["/scoped_ns"]
+        assert tracked["nodes"][1]["namespace_stack"] == []
+
+    def test_unscoped_group_shares_namespace(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <group scoped="false">
+                <push-ros-namespace namespace="/shared"/>
+                <node pkg="p1" exec="e" name="n1"/>
+              </group>
+              <node pkg="p2" exec="e" name="n2"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        # Unscoped: namespace persists
+        assert tracked["nodes"][0]["namespace_stack"] == ["/shared"]
+        assert tracked["nodes"][1]["namespace_stack"] == ["/shared"]
+
+    # ── Env handling ──
+
+    def test_set_env_inherits_to_node(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <set_env name="FOO" value="bar"/>
+              <node pkg="p" exec="e" name="n"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert tracked["nodes"][0]["env"].get("FOO") == "bar"
+
+    def test_unset_env(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <set_env name="X" value="1"/>
+              <unset_env name="X"/>
+              <node pkg="p" exec="e" name="n"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert tracked["nodes"][0]["env"].get("X") is None
+
+    def test_env_substitution_reads_ctx_env(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <set_env name="MY_VAR" value="hello"/>
+              <node pkg="p" exec="e" name="n">
+                <param name="p" value="$(env MY_VAR)"/>
+              </node>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert tracked["nodes"][0]["parameters"]["p"] == "hello"
+
+    def test_node_local_env_override(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <set_env name="A" value="from_launch"/>
+              <node pkg="p" exec="e" name="n">
+                <env name="B" value="from_node"/>
+              </node>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        env = tracked["nodes"][0]["env"]
+        assert env.get("A") == "from_launch"
+        assert env.get("B") == "from_node"
+
+    # ── Namespace ──
+
+    def test_push_ros_namespace(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <push-ros-namespace namespace="/robot"/>
+              <node pkg="p" exec="e" name="n"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert tracked["nodes"][0]["namespace_stack"] == ["/robot"]
+
+    def test_push_ros_namespace_with_condition(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="flag" default="false"/>
+              <push-ros-namespace namespace="/ns" if="$(arg flag)"/>
+              <node pkg="p" exec="e" name="n"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert tracked["nodes"][0]["namespace_stack"] == []
+
+    def test_node_explicit_namespace(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <push-ros-namespace namespace="/robot"/>
+              <node pkg="p" exec="e" name="n" namespace="/override"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert tracked["nodes"][0]["namespace_stack"] == ["/robot"]
+        assert tracked["nodes"][0]["explicit_namespace"] == "/override"
+
+    # ── Node params, remaps, env ──
+
+    def test_node_params_and_remaps(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="ns" default="/robot"/>
+              <node pkg="controller" exec="node" name="ctrl" namespace="$(arg ns)">
+                <param name="rate" value="100"/>
+                <remap from="/cmd_vel" to="$(arg ns)/cmd_vel"/>
+                <env name="DEBUG" value="1"/>
+              </node>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        node = tracked["nodes"][0]
+        assert node["explicit_namespace"] == "/robot"
+        assert node["parameters"]["rate"] == "100"
+        assert ["/cmd_vel", "/robot/cmd_vel"] in node["remappings"]
+        assert node["env"]["DEBUG"] == "1"
+
+    def test_param_from_file(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <node pkg="p" exec="e" name="n">
+                <param from="$(find-pkg-share config_pkg)/params.yaml"/>
+              </node>
+            </launch>
+        """)
+        ctx = _fresh_walker_ctx(preview_mode=True)
+        _, tracked = _parse_and_walk(xml, ctx=ctx)
+        node = tracked["nodes"][0]
+        assert len(node["param_files"]) == 1
+        assert "config_pkg" in node["param_files"][0]
+        assert "config_pkg" in tracked["packages"]
+
+    # ── Container and composable nodes ──
+
+    def test_node_container_with_plugins(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <node_container pkg="rclcpp" exec="container" name="my_container">
+                <composable_node pkg="pkg_a" plugin="pkg_a::NodeA" name="node_a"/>
+                <composable_node pkg="pkg_b" plugin="pkg_b::NodeB" name="node_b"/>
+              </node_container>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["nodes"]) == 1
+        node = tracked["nodes"][0]
+        assert node["kind"] == "container"
+        assert len(node["plugins"]) == 2
+        assert node["plugins"][0]["plugin"] == "pkg_a::NodeA"
+        assert node["plugins"][1]["plugin"] == "pkg_b::NodeB"
+        assert "pkg_a" in tracked["packages"]
+        assert "pkg_b" in tracked["packages"]
+
+    def test_load_composable_node(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <load_composable_node target="/my_container">
+                <composable_node pkg="extra" plugin="extra::Plugin" name="extra"/>
+              </load_composable_node>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["nodes"]) == 1
+        node = tracked["nodes"][0]
+        assert node["kind"] == "load_composable"
+        assert node["target"] == "/my_container"
+        assert len(node["plugins"]) == 1
+        assert node["plugins"][0]["plugin"] == "extra::Plugin"
+
+    # ── Event handlers ──
+
+    def test_event_handler(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <on_process_start target="my_node">
+                <emit_event event="configure" target_node="my_node"/>
+              </on_process_start>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["event_handlers"]) == 1
+        eh = tracked["event_handlers"][0]
+        assert eh["handler_kind"] == "on_process_start"
+        assert eh["target"] == "my_node"
+        assert len(eh["actions"]) == 1
+        assert eh["actions"][0]["event"] == "configure"
+        assert eh["actions"][0]["target_node"] == "my_node"
+
+    def test_on_shutdown(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <on_shutdown>
+                <emit_event event="shutdown"/>
+              </on_shutdown>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["event_handlers"]) == 1
+        assert tracked["event_handlers"][0]["handler_kind"] == "on_shutdown"
+
+    # ── SetParameter, SetRemap, Log, Executable ──
+
+    def test_set_parameter(self):
+        xml = '<launch><set_parameter name="use_sim_time" value="true"/></launch>'
+        _, tracked = _parse_and_walk(xml)
+        assert ["use_sim_time", "true"] in tracked["global_params"]
+
+    def test_log_element(self):
+        xml = '<launch><log message="Hello world"/></launch>'
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["nodes"]) == 1
+        assert tracked["nodes"][0]["kind"] == "log"
+        assert tracked["nodes"][0]["message"] == "Hello world"
+
+    def test_executable(self):
+        xml = '<launch><executable cmd="echo hello" name="echo_cmd" shell="true"/></launch>'
+        _, tracked = _parse_and_walk(xml)
+        assert len(tracked["nodes"]) == 1
+        assert tracked["nodes"][0]["kind"] == "executable"
+        assert tracked["nodes"][0]["cmd"] == "echo hello"
+        assert tracked["nodes"][0]["shell"] is True
+
+    # ── Include (with file on disk) ──
+
+    def test_include_xml_inline(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Write child launch file
+            child_xml = textwrap.dedent("""\
+                <launch>
+                  <arg name="param1"/>
+                  <node pkg="included_pkg" exec="node" name="$(arg param1)_node"/>
+                </launch>
+            """)
+            child_path = os.path.join(tmpdir, "child.launch.xml")
+            with open(child_path, "w") as f:
+                f.write(child_xml)
+
+            main_xml = f"""\
+                <launch>
+                  <include file="{child_path}">
+                    <arg name="param1" value="test"/>
+                  </include>
+                </launch>
+            """
+            _, tracked = _parse_and_walk(main_xml)
+            assert len(tracked["nodes"]) == 1
+            assert tracked["nodes"][0]["name"] == "test_node"
+            assert "included_pkg" in tracked["packages"]
+
+    def test_include_args_sequential_resolution(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_xml = textwrap.dedent("""\
+                <launch>
+                  <arg name="base"/>
+                  <arg name="full"/>
+                  <node pkg="p" exec="e" name="n">
+                    <param name="path" value="$(arg full)"/>
+                  </node>
+                </launch>
+            """)
+            child_path = os.path.join(tmpdir, "child.launch.xml")
+            with open(child_path, "w") as f:
+                f.write(child_xml)
+
+            main_xml = f"""\
+                <launch>
+                  <include file="{child_path}">
+                    <arg name="base" value="/config"/>
+                    <arg name="full" value="$(arg base)/params.yaml"/>
+                  </include>
+                </launch>
+            """
+            _, tracked = _parse_and_walk(main_xml)
+            assert tracked["nodes"][0]["parameters"]["path"] == "/config/params.yaml"
+
+    def test_include_tracks_include_args(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_xml = '<launch><arg name="x"/></launch>'
+            child_path = os.path.join(tmpdir, "child.launch.xml")
+            with open(child_path, "w") as f:
+                f.write(child_xml)
+
+            main_xml = f"""\
+                <launch>
+                  <include file="{child_path}">
+                    <arg name="x" value="42"/>
+                  </include>
+                </launch>
+            """
+            _, tracked = _parse_and_walk(main_xml)
+            assert tracked["include_args"][child_path] == {"x": "42"}
+
+    def test_circular_include_detected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # File includes itself
+            self_path = os.path.join(tmpdir, "self.launch.xml")
+            with open(self_path, "w") as f:
+                f.write(f'<launch><include file="{self_path}"/></launch>')
+
+            ctx = _fresh_walker_ctx()
+            elements = R.parse_xml_launch(
+                f'<launch><include file="{self_path}"/></launch>', "test.launch.xml"
+            )
+            R.resolve_xml_elements(elements, ctx)
+            assert any("circular" in e for e in R._tracked["errors"])
+
+    # ── Unknown element ──
+
+    def test_unknown_element_warns(self):
+        xml = '<launch><foobar attr="val"/></launch>'
+        _, tracked = _parse_and_walk(xml)
+        assert any("unknown XML element" in w for w in tracked["warnings"])
+
+    # ── Namespace helper functions ──
+
+    def test_effective_namespace_basic(self):
+        assert R._effective_namespace([]) is None
+        assert R._effective_namespace(["/ns"]) == "/ns"
+        assert R._effective_namespace(["ns1", "ns2"]) == "/ns1/ns2"
+        assert R._effective_namespace(["/a", "b"]) == "/a/b"
+
+    def test_effective_namespace_absolute_resets(self):
+        assert R._effective_namespace(["/a", "/b"]) == "/b"
+        assert R._effective_namespace(["a", "/b", "c"]) == "/b/c"
+
+    def test_effective_namespace_with_explicit(self):
+        assert R._effective_namespace(["/robot"], "/override") == "/override"
+        assert R._effective_namespace(["/robot"], "local") == "/robot/local"
+
+    def test_is_truthy(self):
+        assert R._is_truthy("true") is True
+        assert R._is_truthy("True") is True
+        assert R._is_truthy("1") is True
+        assert R._is_truthy("yes") is True
+        assert R._is_truthy("on") is True
+        assert R._is_truthy("false") is False
+        assert R._is_truthy("0") is False
+        assert R._is_truthy("no") is False
+        assert R._is_truthy("") is False
+
+    # ── YAML walker (same function, different parser) ──
+
+    def test_yaml_walker(self):
+        yaml_content = textwrap.dedent("""\
+            launch:
+              - arg:
+                  name: model
+                  default: default_model
+              - node:
+                  pkg: $(arg model)_pkg
+                  exec: node
+                  name: n
+        """)
+        ctx = _fresh_walker_ctx()
+        elements = R.parse_yaml_launch(yaml_content, "test.yaml")
+        R.resolve_xml_elements(elements, ctx)
+        assert len(R._tracked["nodes"]) == 1
+        assert R._tracked["nodes"][0]["package"] == "default_model_pkg"

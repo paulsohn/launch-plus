@@ -1154,6 +1154,607 @@ def resolve_substitutions(
     return "".join(parts)
 
 
+# ─── XML/YAML AST Walker (Phase 3) ──────────────────────────────────────────
+#
+# Walks the element list produced by parse_xml_launch / parse_yaml_launch,
+# resolves substitutions, evaluates conditions, and populates _tracked.
+# This is the XML/YAML counterpart of the Python _walk_actions mechanism.
+
+
+def _is_truthy(value: str) -> bool:
+    """Check if a resolved condition value is truthy (ROS 2 convention)."""
+    return value.strip().lower() in ("true", "1", "yes", "on")
+
+
+def _evaluate_condition(
+    condition: dict[str, str] | None,
+    ctx: _SubstitutionContext,
+) -> bool:
+    """Evaluate an if/unless condition dict.  Returns True if the element should execute."""
+    if condition is None:
+        return True
+    kind = condition["kind"]
+    expr = condition["expr"]
+    resolved = resolve_substitutions(expr, ctx)
+    truthy = _is_truthy(resolved)
+    if kind == "If":
+        return truthy
+    # Unless
+    return not truthy
+
+
+def _ros2_namespace_join(base: str | None, next_ns: str) -> str | None:
+    """Join two ROS 2 namespace components.  Matches Rust effective_namespace."""
+    next_ns = next_ns.rstrip("/")
+    if not next_ns:
+        return base
+    if next_ns.startswith("/"):
+        # Absolute — resets
+        return next_ns
+    if not base or base in ("", "/"):
+        return f"/{next_ns}"
+    return f"{base.rstrip('/')}/{next_ns}"
+
+
+def _effective_namespace(
+    stack: list[str],
+    explicit_ns: str | None = None,
+) -> str | None:
+    """Compute effective namespace from stack + optional node-level namespace."""
+    current: str | None = None
+    for component in stack:
+        current = _ros2_namespace_join(current, component)
+    if explicit_ns:
+        current = _ros2_namespace_join(current, explicit_ns)
+    return current
+
+
+def _resolve_params_xml(
+    params: list[dict[str, str]],
+    ctx: _SubstitutionContext,
+) -> tuple[dict[str, str], list[str]]:
+    """Resolve parameter children from parsed XML.
+
+    Returns (resolved_params_dict, param_file_paths).
+    """
+    resolved: dict[str, str] = {}
+    param_files: list[str] = []
+    for p in params:
+        name = p.get("name")
+        value = p.get("value")
+        from_file = p.get("from")
+        if from_file:
+            path = resolve_substitutions(from_file, ctx)
+            if path not in param_files:
+                param_files.append(path)
+            _track_param_file(path)
+        elif name:
+            resolved_name = resolve_substitutions(name, ctx)
+            resolved_value = resolve_substitutions(value or "", ctx)
+            resolved[resolved_name] = resolved_value
+    return resolved, param_files
+
+
+def _resolve_remaps_xml(
+    remaps: list[dict[str, str]],
+    ctx: _SubstitutionContext,
+) -> list[list[str]]:
+    """Resolve remap children from parsed XML."""
+    result: list[list[str]] = []
+    for r in remaps:
+        src = resolve_substitutions(r.get("from", ""), ctx)
+        dst = resolve_substitutions(r.get("to", ""), ctx)
+        result.append([src, dst])
+    return result
+
+
+def _resolve_envs_xml(
+    envs: list[dict[str, str]],
+    ctx: _SubstitutionContext,
+) -> dict[str, str]:
+    """Resolve env children from parsed XML into a dict of node-local env overrides."""
+    result: dict[str, str] = {}
+    for e in envs:
+        name = resolve_substitutions(e.get("name", ""), ctx)
+        value = resolve_substitutions(e.get("value", ""), ctx)
+        result[name] = value
+    return result
+
+
+def _resolve_composable_plugins_xml(
+    composable_nodes: list[dict[str, Any]],
+    ctx: _SubstitutionContext,
+) -> list[dict[str, Any]]:
+    """Resolve composable_node children from parsed XML."""
+    plugins: list[dict[str, Any]] = []
+    for cn in composable_nodes:
+        cond = cn.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            continue
+        pkg = resolve_substitutions(cn.get("pkg", ""), ctx)
+        plugin = resolve_substitutions(cn.get("plugin", ""), ctx)
+        name = cn.get("name")
+        if name:
+            name = resolve_substitutions(name, ctx)
+        _track_package(pkg)
+        params, param_files = _resolve_params_xml(cn.get("params", []), ctx)
+        remaps = _resolve_remaps_xml(cn.get("remaps", []), ctx)
+        plugins.append(
+            {
+                "package": pkg,
+                "plugin": plugin,
+                "name": name,
+                "parameters": params,
+                "remappings": remaps,
+                "param_files": param_files,
+            }
+        )
+    return plugins
+
+
+def resolve_xml_elements(
+    elements: list[dict[str, Any]],
+    ctx: _SubstitutionContext,
+    *,
+    include_stack: list[str] | None = None,
+) -> None:
+    """Walk parsed XML/YAML elements, resolve substitutions, populate _tracked.
+
+    This is the XML/YAML counterpart of the Python ``_walk_actions`` mechanism.
+    All output goes into the module-level ``_tracked`` dict, ``_namespace_stack``,
+    and ``_env``, matching the same format the Rust orchestrator expects.
+    """
+    if include_stack is None:
+        include_stack = []
+    for elem_dict in elements:
+        _resolve_xml_element(elem_dict, ctx, include_stack)
+
+
+def _resolve_xml_element(
+    elem_dict: dict[str, Any],
+    ctx: _SubstitutionContext,
+    include_stack: list[str],
+) -> None:
+    """Dispatch a single LaunchElement dict to its handler."""
+    global _env
+
+    # Each element is a single-key dict: {"Arg": {...}}, {"Node": {...}}, etc.
+    if not elem_dict:
+        return
+    kind = next(iter(elem_dict))
+    data = elem_dict[kind]
+
+    if kind == "Arg":
+        name = data.get("name", "")
+        default = data.get("default")
+        # Record declaration
+        if name and name not in _declared_arg_names:
+            _declared_arg_names.add(name)
+            _tracked["declared_args"].append(
+                {
+                    "name": name,
+                    "default": default or "",
+                }
+            )
+        # Apply default if arg not already set (from caller)
+        if name and name not in ctx.args and default is not None:
+            ctx.args[name] = resolve_substitutions(default, ctx)
+
+    elif kind == "Let":
+        cond = data.get("condition")
+        if _evaluate_condition(cond, ctx):
+            name = data.get("name", "")
+            value = resolve_substitutions(data.get("value", ""), ctx)
+            ctx.vars[name] = value
+
+    elif kind == "Group":
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return
+        scoped = data.get("scoped", True)
+        children = data.get("children", [])
+        if scoped:
+            # Save and restore full context
+            saved_args = dict(ctx.args)
+            saved_vars = dict(ctx.vars)
+            saved_env = dict(_env)
+            saved_ns_depth = len(_namespace_stack)
+            resolve_xml_elements(children, ctx, include_stack=include_stack)
+            # Restore — but propagate newly declared args
+            new_args = {k: v for k, v in ctx.args.items() if k not in saved_args}
+            ctx.args = saved_args
+            ctx.args.update(new_args)
+            ctx.vars = saved_vars
+            _env = saved_env
+            del _namespace_stack[saved_ns_depth:]
+        else:
+            # Unscoped: share context, but track namespace depth for cleanup
+            saved_ns_depth = len(_namespace_stack)
+            resolve_xml_elements(children, ctx, include_stack=include_stack)
+            # Namespace pushed inside an unscoped group persists (unlike scoped)
+
+    elif kind == "Include":
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return
+        file_path = resolve_substitutions(data.get("file", ""), ctx)
+        include_args = data.get("args", [])
+
+        # Circular include detection
+        if file_path in include_stack:
+            _error(f"circular include detected: {file_path}")
+            return
+        if len(include_stack) > 20:
+            _warn(f"max include depth exceeded for {file_path}")
+            return
+
+        # Track the include
+        dep_idx = _track_include(file_path)
+
+        # Build child args — resolve sequentially (later args can use $(arg earlier))
+        child_ctx_args: dict[str, str] = {}
+        for ia in include_args:
+            arg_name = ia.get("name", "")
+            arg_value = ia.get("value")
+            if arg_value is not None:
+                # Create a temporary ctx with resolved include args so far
+                # so that later args can reference earlier ones
+                tmp_ctx = _SubstitutionContext()
+                tmp_ctx.args = {**ctx.args, **child_ctx_args}
+                tmp_ctx.vars = dict(ctx.vars)
+                tmp_ctx.env = dict(ctx.env)
+                tmp_ctx.launch_file_dir = ctx.launch_file_dir
+                tmp_ctx.preview_mode = ctx.preview_mode
+                child_ctx_args[arg_name] = resolve_substitutions(arg_value, tmp_ctx)
+
+        # Record include_args for the orchestrator
+        if dep_idx >= 0 and child_ctx_args:
+            _tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
+        if child_ctx_args:
+            _tracked["include_args"][file_path] = child_ctx_args
+
+        # Determine file type and resolve inline
+        real_path = file_path
+        parsed = _parse_portable_path(file_path)
+        if parsed:
+            pkg, rest = parsed
+            try:
+                pkg_share = _resolve_pkg_share(pkg)
+                real_path = os.path.join(pkg_share, rest)
+            except _PackageNotFetchedError:
+                raise
+            except Exception:
+                return  # Package not available — orchestrator handles
+
+        if os.path.isfile(real_path):
+            new_stack = include_stack + [file_path]
+            if real_path.endswith((".launch.xml", ".xml")):
+                with open(real_path) as f:
+                    content = f.read()
+                child_elements = parse_xml_launch(content, real_path)
+                # Build child context
+                child_ctx = _SubstitutionContext()
+                child_ctx.args = {**ctx.args, **child_ctx_args}
+                child_ctx.vars = {}  # vars don't cascade
+                child_ctx.env = dict(ctx.env)
+                child_ctx.launch_file_dir = os.path.dirname(real_path)
+                child_ctx.preview_mode = ctx.preview_mode
+                resolve_xml_elements(child_elements, child_ctx, include_stack=new_stack)
+            elif real_path.endswith((".yaml", ".yml")):
+                with open(real_path) as f:
+                    content = f.read()
+                child_elements = parse_yaml_launch(content, real_path)
+                child_ctx = _SubstitutionContext()
+                child_ctx.args = {**ctx.args, **child_ctx_args}
+                child_ctx.vars = {}
+                child_ctx.env = dict(ctx.env)
+                child_ctx.launch_file_dir = os.path.dirname(real_path)
+                child_ctx.preview_mode = ctx.preview_mode
+                resolve_xml_elements(child_elements, child_ctx, include_stack=new_stack)
+            elif real_path.endswith((".launch.py", ".py")):
+                # Delegate to existing Python inline resolver
+                _inline_resolve_python_launch(
+                    file_path, None, child_ctx_args, len(include_stack) + 1
+                )
+
+    elif kind in ("Node", "LifecycleNode"):
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return
+        pkg = resolve_substitutions(data.get("pkg", ""), ctx)
+        exe = resolve_substitutions(data.get("exec", ""), ctx)
+        name = data.get("name")
+        if name:
+            name = resolve_substitutions(name, ctx)
+        ns = data.get("namespace")
+        if ns:
+            ns = resolve_substitutions(ns, ctx)
+        _track_package(pkg)
+
+        params, param_files = _resolve_params_xml(data.get("params", []), ctx)
+        remaps = _resolve_remaps_xml(data.get("remaps", []), ctx)
+        # Env: start with inherited overrides, then node-local envs
+        env = dict(_env)
+        env.update(_resolve_envs_xml(data.get("envs", []), ctx))
+
+        node_kind = "node" if kind == "Node" else "lifecycle_node"
+        _tracked["nodes"].append(
+            {
+                "package": pkg,
+                "executable": exe,
+                "name": name or "",
+                "namespace_stack": list(_namespace_stack),
+                "explicit_namespace": ns,
+                "parameters": params,
+                "param_files": param_files,
+                "remappings": remaps,
+                "env": env,
+                "kind": node_kind,
+                "plugins": [],
+                "target": None,
+                "output": data.get("output"),
+                "args": data.get("args"),
+                "respawn": data.get("respawn"),
+                "respawn_delay": data.get("respawn_delay"),
+            }
+        )
+
+    elif kind == "NodeContainer":
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return
+        pkg = resolve_substitutions(data.get("pkg", ""), ctx)
+        exe = resolve_substitutions(data.get("exec", ""), ctx)
+        name = data.get("name")
+        if name:
+            name = resolve_substitutions(name, ctx)
+        ns = data.get("namespace")
+        if ns:
+            ns = resolve_substitutions(ns, ctx)
+        _track_package(pkg)
+
+        env = dict(_env)
+        env.update(_resolve_envs_xml(data.get("envs", []), ctx))
+        plugins = _resolve_composable_plugins_xml(data.get("composable_nodes", []), ctx)
+
+        _tracked["nodes"].append(
+            {
+                "package": pkg,
+                "executable": exe,
+                "name": name or "",
+                "namespace_stack": list(_namespace_stack),
+                "explicit_namespace": ns,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": env,
+                "kind": "container",
+                "plugins": plugins,
+                "target": None,
+            }
+        )
+
+    elif kind == "LoadComposableNode":
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return
+        target = data.get("target")
+        if target:
+            target = resolve_substitutions(target, ctx)
+        ns = data.get("namespace")
+        if ns:
+            ns = resolve_substitutions(ns, ctx)
+
+        plugins = _resolve_composable_plugins_xml(data.get("composable_nodes", []), ctx)
+
+        _tracked["nodes"].append(
+            {
+                "package": "",
+                "executable": "",
+                "name": "",
+                "namespace_stack": list(_namespace_stack),
+                "explicit_namespace": ns,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "load_composable",
+                "plugins": plugins,
+                "target": target or "",
+            }
+        )
+
+    elif kind == "SetEnv":
+        cond = data.get("condition")
+        if _evaluate_condition(cond, ctx):
+            name = resolve_substitutions(data.get("name", ""), ctx)
+            value = resolve_substitutions(data.get("value", ""), ctx)
+            _env[name] = value
+            ctx.env[name] = value
+
+    elif kind == "UnsetEnv":
+        cond = data.get("condition")
+        if _evaluate_condition(cond, ctx):
+            name = resolve_substitutions(data.get("name", ""), ctx)
+            _env.pop(name, None)
+            ctx.env.pop(name, None)
+
+    elif kind == "PushRosNamespace":
+        cond = data.get("condition")
+        if _evaluate_condition(cond, ctx):
+            ns = resolve_substitutions(data.get("namespace", ""), ctx)
+            if ns:
+                _namespace_stack.append(ns)
+
+    elif kind == "SetParameter":
+        name = resolve_substitutions(data.get("name", ""), ctx)
+        value = resolve_substitutions(data.get("value", ""), ctx)
+        _tracked["global_params"].append([name, value])
+
+    elif kind == "SetRemap":
+        src = resolve_substitutions(data.get("from", ""), ctx)
+        dst = resolve_substitutions(data.get("to", ""), ctx)
+        _tracked["nodes"].append(
+            {
+                "package": "",
+                "executable": "",
+                "name": "",
+                "namespace_stack": list(_namespace_stack),
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "set_remap",
+                "plugins": [],
+                "target": None,
+                "param_value": None,
+                "remap_from": src,
+                "remap_to": dst,
+            }
+        )
+
+    elif kind == "Log":
+        msg = resolve_substitutions(data.get("message", ""), ctx)
+        _tracked["nodes"].append(
+            {
+                "package": "",
+                "executable": "",
+                "name": "",
+                "namespace_stack": list(_namespace_stack),
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "log",
+                "plugins": [],
+                "target": None,
+                "message": msg,
+            }
+        )
+
+    elif kind == "Executable":
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return
+        cmd = resolve_substitutions(data.get("cmd", ""), ctx)
+        name = data.get("name")
+        if name:
+            name = resolve_substitutions(name, ctx)
+        shell = data.get("shell", False)
+        _tracked["nodes"].append(
+            {
+                "package": "",
+                "executable": "",
+                "name": name or "",
+                "namespace_stack": list(_namespace_stack),
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": dict(_env),
+                "kind": "executable",
+                "plugins": [],
+                "target": None,
+                "cmd": cmd,
+                "shell": shell,
+            }
+        )
+
+    elif kind == "EventHandler":
+        handler_kind = data.get("kind", "")
+        target = data.get("target")
+        if target:
+            target = resolve_substitutions(target, ctx)
+        target_node = data.get("target_node")
+        if target_node:
+            target_node = resolve_substitutions(target_node, ctx)
+        handler_ns = data.get("namespace")
+        if handler_ns:
+            handler_ns = resolve_substitutions(handler_ns, ctx)
+        start_state = data.get("start_state")
+        if start_state:
+            start_state = resolve_substitutions(start_state, ctx)
+        goal_state = data.get("goal_state")
+        if goal_state:
+            goal_state = resolve_substitutions(goal_state, ctx)
+
+        # Resolve child EmitEvent actions
+        actions: list[dict[str, Any]] = []
+        for child in data.get("children", []):
+            if "EmitEvent" in child:
+                ee = child["EmitEvent"]
+                event = resolve_substitutions(ee.get("event", ""), ctx)
+                ee_target = ee.get("target_node")
+                if ee_target:
+                    ee_target = resolve_substitutions(ee_target, ctx)
+                ee_ns = ee.get("namespace")
+                if ee_ns:
+                    ee_ns = resolve_substitutions(ee_ns, ctx)
+                actions.append(
+                    {
+                        "event": event,
+                        "target_node": ee_target,
+                        "namespace_stack": list(_namespace_stack),
+                        "explicit_namespace": ee_ns,
+                    }
+                )
+
+        # Map kind to snake_case for output
+        kind_map = {
+            "OnProcessStart": "on_process_start",
+            "OnProcessExit": "on_process_exit",
+            "OnStateTransition": "on_state_transition",
+            "OnShutdown": "on_shutdown",
+        }
+        _tracked["event_handlers"].append(
+            {
+                "handler_kind": kind_map.get(handler_kind, handler_kind),
+                "target": target,
+                "target_node": target_node,
+                "start_state": start_state,
+                "goal_state": goal_state,
+                "namespace_stack": list(_namespace_stack),
+                "explicit_namespace": handler_ns,
+                "actions": actions,
+            }
+        )
+
+    elif kind == "EmitEvent":
+        # Standalone emit_event (not inside an event handler)
+        event = resolve_substitutions(data.get("event", ""), ctx)
+        target_node = data.get("target_node")
+        if target_node:
+            target_node = resolve_substitutions(target_node, ctx)
+        ee_ns = data.get("namespace")
+        if ee_ns:
+            ee_ns = resolve_substitutions(ee_ns, ctx)
+        _tracked["event_handlers"].append(
+            {
+                "handler_kind": "emit_event",
+                "target": None,
+                "target_node": target_node,
+                "start_state": None,
+                "goal_state": None,
+                "namespace_stack": list(_namespace_stack),
+                "explicit_namespace": ee_ns,
+                "actions": [
+                    {
+                        "event": event,
+                        "target_node": target_node,
+                        "namespace_stack": list(_namespace_stack),
+                        "explicit_namespace": ee_ns,
+                    }
+                ],
+            }
+        )
+
+    elif kind == "UnknownElement":
+        tag_name = data.get("tag_name", "")
+        _warn(f"unknown XML element: <{tag_name}>")
+
+
 # ─── Shim classes ─────────────────────────────────────────────────────────────
 
 

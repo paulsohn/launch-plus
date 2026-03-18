@@ -1169,15 +1169,33 @@ pub fn blobless_clone(url: &str, repo_dir: &Path) -> crate::Result<()> {
     Ok(())
 }
 
-/// Ensure the origin remote URL matches `expected_url`.
+/// Ensure the origin remote URL matches `expected_url` for partial clones.
 ///
-/// Blobless clones use origin as the promisor remote for lazy blob fetches
-/// (e.g. `git show`, `git checkout`).  If the manifest URL changed, origin
-/// must be updated so that both explicit fetches and lazy object requests
-/// go to the correct server.
+/// Blobless/partial clones use origin as the promisor remote for lazy blob
+/// fetches (e.g. `git show`, `git checkout`).  If the manifest URL changed,
+/// origin must be updated so that lazy object requests go to the correct
+/// server.
 ///
-/// This is a no-op when the URL already matches.
+/// This is a no-op when:
+/// - The URL already matches
+/// - The repo has no `origin` remote (e.g. a manually created repo)
+/// - The repo is not a partial clone (no promisor remote to fix)
 pub fn ensure_remote_url(repo_dir: &Path, expected_url: &str) -> crate::Result<()> {
+    // Only act on partial clones — full clones don't have a promisor remote,
+    // so rewriting origin would be a surprising side effect.
+    let is_partial = Command::new("git")
+        .current_dir(repo_dir)
+        .args(["config", "--get", "remote.origin.partialclonefilter"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if !is_partial {
+        return Ok(());
+    }
+
     let current_url = Command::new("git")
         .current_dir(repo_dir)
         .args(["remote", "get-url", "origin"])
@@ -1188,7 +1206,12 @@ pub fn ensure_remote_url(repo_dir: &Path, expected_url: &str) -> crate::Result<(
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
 
-    if current_url.as_deref() == Some(expected_url) {
+    // No origin remote — unusual, but not our concern.
+    let Some(current_url) = current_url else {
+        return Ok(());
+    };
+
+    if current_url == expected_url {
         return Ok(());
     }
 

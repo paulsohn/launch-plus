@@ -206,15 +206,9 @@ fn fetch_repo_sparse(
     options: &FetchOptions,
 ) -> crate::Result<()> {
     if repo_dir.exists() && repo_dir.join(".git").exists() {
-        // Blobless/partial clones use origin as the promisor remote for lazy
-        // blob fetches.  Ensure it points to the lockfile URL so that both
-        // explicit fetches and lazy object requests work after a URL change.
-        crate::indexer::ensure_remote_url(repo_dir, url)?;
-
         match options.workspace_state {
             WorkspaceState::Dirty => {
                 // Dirty mode: never touch existing repos — use whatever is on disk.
-                // Log the current state so the user knows what they're getting.
                 if let Ok(Some(description)) = describe_repo_state(repo_dir, sha) {
                     info!(
                         "Using as-is (--dirty) {} :\n  {}",
@@ -229,6 +223,9 @@ fn fetch_repo_sparse(
                 }
             }
             WorkspaceState::Default => {
+                // Sync origin for partial clones so lazy blob fetches work.
+                crate::indexer::ensure_remote_url(repo_dir, url)?;
+
                 if !repo_dir.join(".git").join("index").exists() {
                     // The indexer leaves a blobless --no-checkout clone: .git exists
                     // but no index file (nothing was ever checked out).  HEAD points
@@ -251,6 +248,8 @@ fn fetch_repo_sparse(
                 }
             }
             WorkspaceState::Clean => {
+                // Sync origin for partial clones so lazy blob fetches work.
+                crate::indexer::ensure_remote_url(repo_dir, url)?;
                 // Clean mode: reset to pinned SHA (with auto-stash).
                 update_sparse_checkout(repo_dir, url, sha, paths, options)?;
             }

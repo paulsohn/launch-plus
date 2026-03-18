@@ -12,10 +12,18 @@ concurrency:
 
 jobs:
   integration:
-    name: Resolve + Build + Verify
-    runs-on: ubuntu-24.04
-    container: ros:jazzy
+    name: Resolve + Build + Verify (${{ matrix.ros_distro }})
+    runs-on: ${{ matrix.os }}
+    container: ros:${{ matrix.ros_distro }}
     timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            ros_distro: humble
+          - os: ubuntu-24.04
+            ros_distro: jazzy
     steps:
       - uses: actions/checkout@v6
 
@@ -54,5 +62,5 @@ jobs:
         working-directory: example/autoware
         shell: bash
         run: |
-          source /opt/ros/jazzy/setup.bash
+          source /opt/ros/${{ matrix.ros_distro }}/setup.bash
           bash test-autoware.sh

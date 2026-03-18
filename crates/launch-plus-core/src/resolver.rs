@@ -2359,6 +2359,14 @@ fn resolve_element(
 
                 // A LoadComposableNode is not itself a process — it runs inside
                 // the container's process, so it has no env of its own.
+                if !ctx.env.is_empty() {
+                    result.warnings.push(format!(
+                        "load_composable_node: env overrides ({}) are active but \
+                         will not apply — composable nodes run inside the container's \
+                         process. Consider setting env on the container instead",
+                        ctx.env.keys().cloned().collect::<Vec<_>>().join(", ")
+                    ));
+                }
                 result.nodes.push(ResolvedNode {
                     package: String::new(),
                     executable: String::new(),
@@ -7917,6 +7925,14 @@ launch:
         assert!(
             lcn.env.is_empty(),
             "LoadComposableNode should have empty env"
+        );
+        // Should warn that env overrides won't apply to composable nodes.
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.contains("load_composable_node") && w.contains("FOO")),
+            "should warn about active env overrides on load_composable_node"
         );
     }
 

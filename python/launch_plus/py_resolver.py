@@ -1939,9 +1939,12 @@ def _walk_action(action, context, depth):
             except Exception as e:
                 _warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
                 return
+        if action._name is None:
+            _error("SetEnvironmentVariable: name is None — skipping")
+            return
         name = _resolve_substitution(action._name, context) or str(action._name)
-        if not name or name == "None":
-            _error("SetEnvironmentVariable: resolved name is empty or None — skipping")
+        if not name:
+            _error("SetEnvironmentVariable: resolved name is empty — skipping")
             return
         value = _resolve_substitution(action._value, context) or ""
         _env[name] = value
@@ -1958,9 +1961,12 @@ def _walk_action(action, context, depth):
             except Exception as e:
                 _warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
                 return
+        if action._name is None:
+            _error("UnsetEnvironmentVariable: name is None — skipping")
+            return
         name = _resolve_substitution(action._name, context) or str(action._name)
-        if not name or name == "None":
-            _error("UnsetEnvironmentVariable: resolved name is empty or None — skipping")
+        if not name:
+            _error("UnsetEnvironmentVariable: resolved name is empty — skipping")
             return
         if name in os.environ:
             # In process env (cases 2 & 3) — can't unset baseline.

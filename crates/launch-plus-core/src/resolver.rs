@@ -1262,6 +1262,8 @@ pub fn resolve_launch(
             k, v
         ));
     }
+    // Clear leaked overrides so callers don't inherit stale env state.
+    ctx.env.clear();
 
     Ok(result)
 }

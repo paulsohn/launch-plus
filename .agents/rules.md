@@ -43,6 +43,11 @@ tar = "0.4"           # Archive handling
 - Keep all logic in Rust, Python is just glue
 - Type stubs must match Rust implementation exactly
 
+### None Handling
+- **Never** use `str(x)` then check `== "None"` to detect Python `None`. This conflates the literal string `"None"` with the absence of a value.
+- Check `x is None` **before** stringifying: `if x is None: handle_missing()`, then `name = str(x)`.
+- For optional values from ROS 2 APIs, always guard with `is None` first.
+
 ## Git Rules
 
 ### Commit Messages

@@ -128,23 +128,40 @@ fn configure(ctx: &PackageBuildContext) -> crate::Result<()> {
     run_command(ctx, "cmake", &args, Some(&ctx.build_dir), "configure")
 }
 
-/// Step 2: make (parallel build).
+/// Step 2: cmake --build (parallel build).
+///
+/// Uses `cmake --build` instead of bare `make` for portability and to handle
+/// edge cases like empty builds (no targets) gracefully.
 fn build(ctx: &PackageBuildContext) -> crate::Result<()> {
-    let mut args = vec![format!("-j{}", ctx.options.parallel_workers)];
+    let mut args = vec![
+        "--build".to_string(),
+        ctx.build_dir.to_string_lossy().into_owned(),
+        "--parallel".to_string(),
+        ctx.options.parallel_workers.to_string(),
+    ];
 
-    // User make args.
-    args.extend(ctx.options.make_args.iter().cloned());
+    // Pass make-specific args after `--`.
+    if !ctx.options.make_args.is_empty() {
+        args.push("--".to_string());
+        args.extend(ctx.options.make_args.iter().cloned());
+    }
 
-    run_command(ctx, "make", &args, Some(&ctx.build_dir), "build")
+    run_command(ctx, "cmake", &args, None, "build")
 }
 
-/// Step 3: make install.
+/// Step 3: cmake --install.
+///
+/// Uses `cmake --install` instead of `make install` — handles empty builds
+/// (where cmake produced no install rules) without error.
 fn install(ctx: &PackageBuildContext) -> crate::Result<()> {
     run_command(
         ctx,
-        "make",
-        &["install".to_string()],
-        Some(&ctx.build_dir),
+        "cmake",
+        &[
+            "--install".to_string(),
+            ctx.build_dir.to_string_lossy().into_owned(),
+        ],
+        None,
         "install",
     )
 }

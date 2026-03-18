@@ -51,7 +51,9 @@ struct SchedulerState {
     nodes: HashMap<String, PackageNode>,
     /// Total package count (for progress display).
     total: usize,
-    /// Counter for progress display.
+    /// Counter for "started" progress display.
+    started_count: usize,
+    /// Counter for "finished" progress display.
     finished_count: usize,
 }
 
@@ -145,6 +147,7 @@ pub fn run_parallel_build(
         poisoned: false,
         nodes,
         total,
+        started_count: 0,
         finished_count: 0,
     });
     let cvar = Condvar::new();
@@ -194,7 +197,7 @@ fn worker_loop(
 ) {
     loop {
         // === Pick next package ===
-        let (pkg_name, build_type, built_deps) = {
+        let (pkg_name, build_type, built_deps, seq) = {
             let mut guard = state.lock().unwrap();
 
             // Wait until there's work or we should exit.
@@ -206,7 +209,9 @@ fn worker_loop(
                     let bt = guard.nodes[&pkg].build_type;
                     let deps = guard.completed.clone();
                     guard.in_progress.insert(pkg.clone());
-                    break (pkg, bt, deps);
+                    guard.started_count += 1;
+                    let seq = guard.started_count;
+                    break (pkg, bt, deps, seq);
                 }
                 // No work available — check if we're done.
                 if guard.in_progress.is_empty() {
@@ -237,11 +242,10 @@ fn worker_loop(
 
         // Progress: starting.
         if !dry_run {
-            let guard = state.lock().unwrap();
             eprintln!(
                 "[{}/{}] Building {} ({})",
-                guard.finished_count + guard.in_progress.len(),
-                guard.total,
+                seq,
+                plan.packages.len(),
                 pkg_name,
                 match build_type {
                     BuildType::AmentCmake => "ament_cmake",
@@ -267,8 +271,7 @@ fn worker_loop(
                 Ok(()) => {
                     if !dry_run {
                         eprintln!(
-                            "[{}/{}] \u{2713} {} ({:.1}s)",
-                            guard.finished_count,
+                            "[{seq}/{}] \u{2713} {} ({:.1}s)",
                             guard.total,
                             pkg_name,
                             elapsed.as_secs_f64()
@@ -290,8 +293,7 @@ fn worker_loop(
                 }
                 Err(e) => {
                     eprintln!(
-                        "[{}/{}] \u{2717} {} ({:.1}s): {}",
-                        guard.finished_count,
+                        "[{seq}/{}] \u{2717} {} ({:.1}s): {}",
                         guard.total,
                         pkg_name,
                         elapsed.as_secs_f64(),

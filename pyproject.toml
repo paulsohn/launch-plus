@@ -54,7 +54,15 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
-ignore = []
+ignore = [
+    "N806",   # uppercase variable names in functions (_SENTINEL, _TRANSITION_MAP) — module-level constants in nested scope
+    "N812",   # import R alias in tests — idiomatic shorthand
+    "E402",   # module-level imports not at top — py_resolver has required ordering
+    "SIM105", # contextlib.suppress — many try/except/pass blocks have side effects before pass
+]
+
+[tool.ruff.lint.per-file-ignores]
+"python/launch_plus/py_resolver.py" = ["E501"]  # long lines in comment/docstring — acceptable in data declarations
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -62,4 +70,12 @@ python_files = ["test_*.py"]
 
 [tool.mypy]
 python_version = "3.10"
-strict = true
+# Gradual adoption: typed functions are checked, untyped functions are allowed.
+# New code should have type hints; existing code is migrated incrementally.
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false

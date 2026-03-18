@@ -4,10 +4,6 @@ This is a thin Python wrapper that delegates to the Rust CLI or provides
 fallback functionality when the Rust extension is not available.
 """
 
-import subprocess
-import sys
-from pathlib import Path
-
 import click
 
 

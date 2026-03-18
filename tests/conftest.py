@@ -2,10 +2,9 @@
 
 import copy
 import sys
+
 import pytest
-
 from launch_plus import py_resolver as R
-
 
 # Snapshot the initial state of all py_resolver globals so each test starts clean.
 _TRACKED_TEMPLATE = copy.deepcopy(R._tracked)

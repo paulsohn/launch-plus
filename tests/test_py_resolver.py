@@ -2,13 +2,13 @@
 and inline Python include resolution."""
 
 import os
-import textwrap
 import tempfile
+import textwrap
 
 from launch_plus import py_resolver as R
 
-
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
 
 def _make_context(configs=None):
     """Build a _StubLaunchContext with the given launch configurations."""
@@ -26,6 +26,7 @@ def _write_launch_py(directory, filename, body):
 
 
 # ─── _LaunchConfiguration ────────────────────────────────────────────────────
+
 
 class TestLaunchConfiguration:
     def test_perform_returns_value_when_set(self):
@@ -59,6 +60,7 @@ class TestLaunchConfiguration:
 
 # ─── _is_substitution ────────────────────────────────────────────────────────
 
+
 class TestIsSubstitution:
     def test_launch_configuration_is_substitution(self):
         assert R._is_substitution(R._LaunchConfiguration("x"))
@@ -85,6 +87,7 @@ class TestIsSubstitution:
 
 
 # ─── _track_package ──────────────────────────────────────────────────────────
+
 
 class TestTrackPackage:
     def test_tracks_plain_string(self):
@@ -114,6 +117,7 @@ class TestTrackPackage:
 
 
 # ─── _resolve_substitution ───────────────────────────────────────────────────
+
 
 class TestResolveSubstitution:
     def test_resolves_launch_configuration(self):
@@ -209,6 +213,7 @@ class TestResolveSubstitution:
 
 # ─── Node deferred resolution ────────────────────────────────────────────────
 
+
 class TestNodeDeferredResolution:
     def test_tracked_node_resolves_package_substitution(self):
         """When package is a LaunchConfiguration, _resolve_node_details should
@@ -243,11 +248,13 @@ class TestNodeDeferredResolution:
         assert "unknown_pkg" not in R._tracked["packages"]
 
     def test_tracked_container_resolves_all_fields(self):
-        ctx = _make_context({
-            "pkg": "rclcpp_components",
-            "exe": "component_container_mt",
-            "cname": "my_container",
-        })
+        ctx = _make_context(
+            {
+                "pkg": "rclcpp_components",
+                "exe": "component_container_mt",
+                "cname": "my_container",
+            }
+        )
         container = R._TrackedComposableNodeContainer(
             package=R._LaunchConfiguration("pkg"),
             executable=R._LaunchConfiguration("exe"),
@@ -268,6 +275,7 @@ class TestNodeDeferredResolution:
 
 
 # ─── Composable plugin deferred resolution ────────────────────────────────────
+
 
 class TestComposablePluginResolution:
     def test_composable_node_resolves_package(self):
@@ -309,12 +317,16 @@ class TestComposablePluginResolution:
 
 # ─── Inline Python include resolution ────────────────────────────────────────
 
+
 class TestInlinePythonInclude:
     def test_set_launch_configuration_propagates(self):
         """A child Python launch file that calls SetLaunchConfiguration
         should update the parent context."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+            child_path = _write_launch_py(
+                tmpdir,
+                "child.launch.py",
+                """\
                 from launch import LaunchDescription
                 from launch.actions import SetLaunchConfiguration
 
@@ -322,7 +334,8 @@ class TestInlinePythonInclude:
                     return LaunchDescription([
                         SetLaunchConfiguration("child_var", "child_value"),
                     ])
-            """)
+            """,
+            )
 
             ctx = _make_context({"parent_var": "parent_value"})
             R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
@@ -334,7 +347,10 @@ class TestInlinePythonInclude:
         """DeclareLaunchArgument defaults from a child file should NOT
         persist in the parent context (only SetLaunchConfiguration should)."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+            child_path = _write_launch_py(
+                tmpdir,
+                "child.launch.py",
+                """\
                 from launch import LaunchDescription
                 from launch.actions import DeclareLaunchArgument
                 from launch.actions import SetLaunchConfiguration
@@ -344,7 +360,8 @@ class TestInlinePythonInclude:
                         DeclareLaunchArgument("child_only_arg", default_value="should_not_leak"),
                         SetLaunchConfiguration("sticky_var", "persists"),
                     ])
-            """)
+            """,
+            )
 
             ctx = _make_context({})
             R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
@@ -356,7 +373,10 @@ class TestInlinePythonInclude:
         """launch_arguments passed to the include should be available
         in the child's context."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+            child_path = _write_launch_py(
+                tmpdir,
+                "child.launch.py",
+                """\
                 from launch import LaunchDescription
                 from launch.actions import DeclareLaunchArgument
                 from launch.actions import SetLaunchConfiguration
@@ -368,24 +388,27 @@ class TestInlinePythonInclude:
                         SetLaunchConfiguration("resolved_mode",
                                                LaunchConfiguration("mode")),
                     ])
-            """)
+            """,
+            )
 
             ctx = _make_context({})
-            R._inline_resolve_python_launch(
-                child_path, ctx, {"mode": "custom"}, depth=1
-            )
+            R._inline_resolve_python_launch(child_path, ctx, {"mode": "custom"}, depth=1)
 
             assert ctx._launch_configurations["resolved_mode"] == "custom"
 
     def test_depth_limit_prevents_infinite_recursion(self):
         """Exceeding the depth limit should warn, not crash."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+            child_path = _write_launch_py(
+                tmpdir,
+                "child.launch.py",
+                """\
                 from launch import LaunchDescription
 
                 def generate_launch_description():
                     return LaunchDescription([])
-            """)
+            """,
+            )
 
             ctx = _make_context({})
             R._inline_resolve_python_launch(child_path, ctx, {}, depth=21)
@@ -403,7 +426,10 @@ class TestInlinePythonInclude:
         orchestrator resolves the child file separately, so any entries
         created by the inline walk would be duplicates."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+            child_path = _write_launch_py(
+                tmpdir,
+                "child.launch.py",
+                """\
                 from launch import LaunchDescription
                 from launch_ros.actions import Node
 
@@ -411,7 +437,8 @@ class TestInlinePythonInclude:
                     return LaunchDescription([
                         Node(package="my_pkg", executable="my_exec"),
                     ])
-            """)
+            """,
+            )
 
             nodes_before = len(R._tracked["nodes"])
             pkgs_before = list(R._tracked["packages"])
@@ -426,7 +453,10 @@ class TestInlinePythonInclude:
         """SetParameter inside an inline-included child must NOT create
         tracked global_params entries — only context mutations survive."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+            child_path = _write_launch_py(
+                tmpdir,
+                "child.launch.py",
+                """\
                 from launch import LaunchDescription
                 from launch_ros.actions import SetParameter
 
@@ -434,7 +464,8 @@ class TestInlinePythonInclude:
                     return LaunchDescription([
                         SetParameter(name="wheel_radius", value="0.383"),
                     ])
-            """)
+            """,
+            )
 
             gp_before = len(R._tracked["global_params"])
             ctx = _make_context({})
@@ -452,14 +483,21 @@ class TestInlinePythonInclude:
         the child file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a grandchild that the child includes
-            _write_launch_py(tmpdir, "grandchild.launch.py", """\
+            _write_launch_py(
+                tmpdir,
+                "grandchild.launch.py",
+                """\
                 from launch import LaunchDescription
 
                 def generate_launch_description():
                     return LaunchDescription([])
-            """)
+            """,
+            )
 
-            child_path = _write_launch_py(tmpdir, "child.launch.py", """\
+            child_path = _write_launch_py(
+                tmpdir,
+                "child.launch.py",
+                """\
                 import os
                 from launch import LaunchDescription
                 from launch.actions import IncludeLaunchDescription
@@ -474,7 +512,8 @@ class TestInlinePythonInclude:
                             ),
                         ),
                     ])
-            """)
+            """,
+            )
 
             deps_before = len(R._tracked["include_deps"])
             ctx = _make_context({})
@@ -485,6 +524,7 @@ class TestInlinePythonInclude:
 
 
 # ─── Environment Variable Stack ──────────────────────────────────────────────
+
 
 class TestEnvStack:
     """Tests for SetEnvironmentVariable / UnsetEnvironmentVariable tracking,
@@ -503,6 +543,7 @@ class TestEnvStack:
     def test_unset_env_nonexistent_errors(self):
         """UnsetEnvironmentVariable on a var that doesn't exist → 'not set' error."""
         import uuid
+
         name = f"NONEXISTENT_VAR_{uuid.uuid4().hex[:8]}"
         assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
@@ -513,6 +554,7 @@ class TestEnvStack:
     def test_unset_env_override_only_accepted(self):
         """UnsetEnv on an override-only var (not in process env) → accepted."""
         import uuid
+
         name = f"OVERRIDE_ONLY_{uuid.uuid4().hex[:8]}"
         assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
@@ -554,7 +596,9 @@ class TestEnvStack:
         ctx = _make_context()
         R._walk_action(R._TrackedSetEnvironmentVariable(name="FOO", value="inherited"), ctx, 0)
         node = R._TrackedNode(
-            package="p", executable="e", name="n",
+            package="p",
+            executable="e",
+            name="n",
             env=[("FOO", "local")],
         )
         R._walk_action(node, ctx, 0)
@@ -563,18 +607,22 @@ class TestEnvStack:
 
     def test_inline_include_env_rollback(self):
         """Env set by inline-included child does NOT leak to parent."""
-        import tempfile, textwrap
+        import tempfile
+        import textwrap
+
         with tempfile.TemporaryDirectory() as d:
             child_path = os.path.join(d, "child.launch.py")
             with open(child_path, "w") as f:
-                f.write(textwrap.dedent("""\
+                f.write(
+                    textwrap.dedent("""\
                     from launch import LaunchDescription
                     from launch.actions import SetEnvironmentVariable
                     def generate_launch_description():
                         return LaunchDescription([
                             SetEnvironmentVariable(name="CHILD_VAR", value="child_val"),
                         ])
-                """))
+                """)
+                )
             ctx = _make_context()
             R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
             assert "CHILD_VAR" not in R._env
@@ -586,6 +634,7 @@ class TestEnvStack:
         assert overrides["NEW_VAR"] == "new_val"
         # Process env vars must NOT appear in overrides.
         import os
+
         assert "PATH" in os.environ, "PATH should exist in process env for this test"
         assert "PATH" not in overrides
 
@@ -599,7 +648,9 @@ class TestEnvStack:
         # Simulate the net-zero check inline (same logic as main())
         errors = []
         for k, v in R._env.items():
-            errors.append(f"env var '{k}' was set to '{v}' but not restored (leaked from file scope)")
+            errors.append(
+                f"env var '{k}' was set to '{v}' but not restored (leaked from file scope)"
+            )
         err = [e for e in errors if "MY_KEY" in e]
         assert len(err) == 1
         assert "my_value" in err[0]

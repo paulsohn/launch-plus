@@ -16,17 +16,18 @@ Output (JSON to stdout):
         "warnings": ["..."]
     }
 """
-import sys
-import json
+
 import importlib
 import importlib.abc
 import importlib.machinery
 import importlib.util
+import json
 import os
 import re
+import sys
 import types
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 # ─── Output schema contract ───────────────────────────────────────────────────
 # Defines the exact JSON schema emitted to stdout.  Rust's PyResolvedNode /
@@ -38,23 +39,23 @@ if TYPE_CHECKING:
     class _PluginDict(TypedDict):
         package: str
         plugin: str
-        name: Optional[str]
+        name: str | None
         parameters: dict[str, str]
-        remappings: list[list[str]]       # [[src, dst], ...]
+        remappings: list[list[str]]  # [[src, dst], ...]
 
     class _NodeDict(TypedDict):
         package: str
         executable: str
         name: str
-        namespace_stack: list[str]        # PushRosNamespace stack at resolution time
-        explicit_namespace: Optional[str]  # node's own namespace= kwarg, resolved
+        namespace_stack: list[str]  # PushRosNamespace stack at resolution time
+        explicit_namespace: str | None  # node's own namespace= kwarg, resolved
         parameters: dict[str, str]
         param_files: list[str]
-        remappings: list[list[str]]        # [[src, dst], ...]
+        remappings: list[list[str]]  # [[src, dst], ...]
         env: dict[str, str]
-        kind: str                          # "node" | "container" | "load_composable"
+        kind: str  # "node" | "container" | "load_composable"
         plugins: list[_PluginDict]
-        target: Optional[str]
+        target: str | None
 
     class _DeclaredArgDict(TypedDict):
         name: str
@@ -79,6 +80,7 @@ if TYPE_CHECKING:
 _real_get_package_share_directory = None
 try:
     from ament_index_python.packages import get_package_share_directory as _real_gps
+
     _real_get_package_share_directory = _real_gps
 except Exception:
     pass
@@ -132,6 +134,7 @@ class _PackageNotFetchedError(RuntimeError):
     but the failure is recoverable: Rust reads `packages_to_fetch` from the JSON output,
     clones the missing repos, and re-invokes py_resolver.
     """
+
     def __init__(self, pkg_name: str):
         super().__init__(f"package '{pkg_name}' source not on disk; needs fetch")
         self.pkg_name = pkg_name
@@ -147,7 +150,7 @@ class _PackageNotFetchedError(RuntimeError):
 #
 # This regex extracts the package name and the optional suffix from a portable path.
 
-_PORTABLE_PATH_RE = re.compile(r'^\$\(find-pkg-share ([^)]+)\)(.*)')
+_PORTABLE_PATH_RE = re.compile(r"^\$\(find-pkg-share ([^)]+)\)(.*)")
 
 
 def _parse_portable_path(path_str: str):
@@ -164,7 +167,7 @@ def _parse_portable_path(path_str: str):
     if not m:
         return None
     pkg = m.group(1).strip()
-    rest = m.group(2).lstrip('/').lstrip(os.sep)
+    rest = m.group(2).lstrip("/").lstrip(os.sep)
     return pkg, rest
 
 
@@ -180,14 +183,17 @@ def _resolve_pkg_share(package: str) -> str:
     """
     # 1. Workspace source packages (from orchestrator lockfile).
     if package in _package_shares:
-        pkg_path = _package_shares[package]
+        pkg_path: str = _package_shares[package]
         # For lockfile packages, enforce full fetch: if package.xml is absent the
         # package has been sparse-checked at the file level but not fully cloned.
         # Raise _PackageNotFetchedError rather than returning a dangling path.
-        if _lockfile_packages and package in _lockfile_packages:
-            if not os.path.isfile(os.path.join(pkg_path, "package.xml")):
-                _packages_to_fetch.add(package)
-                raise _PackageNotFetchedError(package)
+        if (
+            _lockfile_packages
+            and package in _lockfile_packages
+            and not os.path.isfile(os.path.join(pkg_path, "package.xml"))
+        ):
+            _packages_to_fetch.add(package)
+            raise _PackageNotFetchedError(package)
         return pkg_path
     # 2. Lockfile package not found in _package_shares — shouldn't happen when the
     #    lockfile is configured, but guard against it: trigger fetch instead of
@@ -198,7 +204,7 @@ def _resolve_pkg_share(package: str) -> str:
     # 3. Non-lockfile packages (system / rosdep): use AMENT_PREFIX_PATH.
     if _real_get_package_share_directory is not None:
         try:
-            return _real_get_package_share_directory(package)
+            return str(_real_get_package_share_directory(package))
         except _PackageNotFetchedError:
             raise
         except Exception as e:
@@ -212,27 +218,30 @@ def _resolve_pkg_share(package: str) -> str:
 def _resolve_ros_substitutions(value: str) -> str:
     """Replace $(find-pkg-share X) patterns in a string with real paths."""
     return re.sub(
-        r'\$\(find-pkg-share ([^)]+)\)',
+        r"\$\(find-pkg-share ([^)]+)\)",
         lambda m: _resolve_pkg_share(m.group(1).strip()),
         value,
     )
 
+
 # ─── Result accumulator ──────────────────────────────────────────────────────
 
-_tracked = {
+from typing import Any
+
+_tracked: dict[str, Any] = {
     "packages": [],
     "includes": [],
     "nodes": [],
     "warnings": [],
     "errors": [],
-    "declared_args": [],              # [{name, default}] — for Rust to forward based on apply_arg_defaults
-    "global_params": [],              # [[name, value], ...] — SetParameter accumulations (real ROS 2 behavior)
-    "include_args": {},               # {path: {arg: value}} — launch_arguments captured from IncludeLaunchDescription
-    "param_files": [],                # [path_string, ...] — ParameterFile paths referenced by nodes
+    "declared_args": [],  # [{name, default}] — for Rust to forward based on apply_arg_defaults
+    "global_params": [],  # [[name, value], ...] — SetParameter accumulations (real ROS 2 behavior)
+    "include_args": {},  # {path: {arg: value}} — launch_arguments captured from IncludeLaunchDescription
+    "param_files": [],  # [path_string, ...] — ParameterFile paths referenced by nodes
     "set_launch_configurations": {},  # {name: value} — SetLaunchConfiguration calls
-    "include_deps": [],               # [{package, share_path}] — structured include dependencies
-    "param_file_deps": [],            # [{package, share_path}] — structured param file dependencies
-    "event_handlers": [],              # [{handler_kind, target, target_node, start_state, goal_state, actions}]
+    "include_deps": [],  # [{package, share_path}] — structured include dependencies
+    "param_file_deps": [],  # [{package, share_path}] — structured param file dependencies
+    "event_handlers": [],  # [{handler_kind, target, target_node, start_state, goal_state, actions}]
 }
 
 # Names of args already recorded in declared_args (first declaration wins).
@@ -247,6 +256,7 @@ _namespace_stack: list = []
 # substitution checks this first, then falls back to os.environ.
 # Scoped groups clone/restore this.
 _env: dict = {}
+
 
 def _is_substitution(value):
     """Return True if *value* is a launch substitution (not yet resolved to a string).
@@ -276,6 +286,7 @@ def _track_package(pkg):
     if pkg and pkg not in _tracked["packages"]:
         _tracked["packages"].append(pkg)
 
+
 def _extract_pkg_and_share_path(path_str: str):
     """Extract (package, share_path) from a portable or AMENT install path.
 
@@ -291,11 +302,11 @@ def _extract_pkg_and_share_path(path_str: str):
     # AMENT install path: .../share/<package>/<rest>
     idx = path_str.find("/share/")
     if idx >= 0 and "$(" not in path_str:
-        after_share = path_str[idx + 7:]  # skip "/share/"
+        after_share = path_str[idx + 7 :]  # skip "/share/"
         slash = after_share.find("/")
         if slash > 0:
             pkg = after_share[:slash]
-            rest = after_share[slash + 1:]
+            rest = after_share[slash + 1 :]
             if rest:
                 return pkg, rest
     return None
@@ -327,6 +338,7 @@ def _track_include(path):
             return i
     return -1
 
+
 def _track_param_file(path):
     if not path:
         return
@@ -340,7 +352,7 @@ def _track_param_file(path):
             _tracked["param_file_deps"].append(entry)
 
 
-def _to_str(value, context=None):
+def _to_str(value: object, context: Any = None) -> str | None:
     """Coerce a str, substitution object, or None to ``str | None``.
 
     - ``None`` → ``None`` (caller decides how to handle missing values)
@@ -366,13 +378,13 @@ def _to_str(value, context=None):
     return str(value)
 
 
-def _resolve_substitution(sub, context):
+def _resolve_substitution(sub: object, context: Any) -> str | None:
     """Resolve a substitution, list-of-substitutions, or plain string to str."""
     value, _fallback = _resolve_substitution_ex(sub, context)
     return value
 
 
-def _resolve_substitution_ex(sub, context):
+def _resolve_substitution_ex(sub: object, context: Any) -> tuple[str | None, bool]:
     """Resolve a substitution and report whether the result is a fallback.
 
     Returns ``(resolved_str_or_None, is_fallback)`` where *is_fallback* is
@@ -432,38 +444,11 @@ def _track_node(package, executable, name=None):
     package = str(package) if package else ""
     executable = str(executable) if executable else ""
     name = str(name) if name else ""
-    _tracked["nodes"].append({
-        "package": package,
-        "executable": executable,
-        "name": name,
-        "namespace_stack": [],
-        "explicit_namespace": None,
-        "parameters": {},
-        "param_files": [],
-        "remappings": [],
-        "env": {},
-        "kind": "node",
-        "plugins": [],
-        "target": None,
-    })
-    return len(_tracked["nodes"]) - 1
-
-def _warn(msg):
-    _tracked["warnings"].append(msg)
-
-def _error(msg):
-    _tracked["errors"].append(msg)
-
-# ─── Shim classes ─────────────────────────────────────────────────────────────
-
-class _TrackedNode:
-    def __init__(self, *, package=None, executable=None, name=None, **kwargs):
-        _track_package(package)
-        self._idx = len(_tracked["nodes"])
-        _tracked["nodes"].append({
-            "package": str(package) if package else "",
-            "executable": str(executable) if executable else "",
-            "name": str(name) if name else "",
+    _tracked["nodes"].append(
+        {
+            "package": package,
+            "executable": executable,
+            "name": name,
             "namespace_stack": [],
             "explicit_namespace": None,
             "parameters": {},
@@ -473,7 +458,42 @@ class _TrackedNode:
             "kind": "node",
             "plugins": [],
             "target": None,
-        })
+        }
+    )
+    return len(_tracked["nodes"]) - 1
+
+
+def _warn(msg: str) -> None:
+    _tracked["warnings"].append(msg)
+
+
+def _error(msg: str) -> None:
+    _tracked["errors"].append(msg)
+
+
+# ─── Shim classes ─────────────────────────────────────────────────────────────
+
+
+class _TrackedNode:
+    def __init__(self, *, package=None, executable=None, name=None, **kwargs):
+        _track_package(package)
+        self._idx = len(_tracked["nodes"])
+        _tracked["nodes"].append(
+            {
+                "package": str(package) if package else "",
+                "executable": str(executable) if executable else "",
+                "name": str(name) if name else "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "node",
+                "plugins": [],
+                "target": None,
+            }
+        )
         # Save raw kwargs for deferred resolution in _walk_action
         self._raw_package = package
         self._raw_executable = executable
@@ -491,6 +511,7 @@ class _TrackedNode:
     def __repr__(self):
         return f"TrackedNode(package={_tracked['nodes'][self._idx]['package']!r})"
 
+
 class _TrackedLifecycleNode(_TrackedNode):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -499,6 +520,7 @@ class _TrackedLifecycleNode(_TrackedNode):
 
 class _TrackedEmitEvent:
     """Tracked emit_event — records the event type and optional target node."""
+
     def __init__(self, event=None, **kwargs):
         self._event = event
         self._target_node = None
@@ -528,6 +550,7 @@ class _TrackedChangeState:
     Real API: ``ChangeState(lifecycle_node_matcher=matches_action(node), transition_id=...)``
     where ``matches_action(node)`` returns a ``_TrackedMatchesAction`` that carries ``_node_name``.
     """
+
     def __init__(self, lifecycle_node_matcher=None, transition_id=None, **kwargs):
         self._event_name = _transition_name(transition_id)
         self._target_node = None
@@ -545,6 +568,7 @@ class _TrackedShutdown:
     When used directly as an action (rather than wrapped in EmitEvent),
     serializes as an emit_event with event="shutdown".
     """
+
     _event_name = "shutdown"
 
     def __init__(self, **kwargs):
@@ -570,6 +594,7 @@ class _TrackedMatchesAction:
     Our version also records the node name and namespace so ``_TrackedChangeState``
     can extract them.
     """
+
     def __init__(self, action):
         self._node_name = _action_name(action)
         self._namespace_stack, self._explicit_namespace = _action_namespace_info(action)
@@ -582,13 +607,13 @@ def _transition_name(transition_id):
     """Convert a lifecycle Transition constant to a human-readable name."""
     # Transition IDs are integers in the lifecycle_msgs
     _TRANSITION_MAP = {
-        1: "configure",    # TRANSITION_CONFIGURE
-        2: "cleanup",      # TRANSITION_CLEANUP
-        3: "activate",     # TRANSITION_ACTIVATE
-        4: "deactivate",   # TRANSITION_DEACTIVATE
-        5: "shutdown",     # TRANSITION_UNCONFIGURED_SHUTDOWN
-        6: "shutdown",     # TRANSITION_INACTIVE_SHUTDOWN
-        7: "shutdown",     # TRANSITION_ACTIVE_SHUTDOWN
+        1: "configure",  # TRANSITION_CONFIGURE
+        2: "cleanup",  # TRANSITION_CLEANUP
+        3: "activate",  # TRANSITION_ACTIVATE
+        4: "deactivate",  # TRANSITION_DEACTIVATE
+        5: "shutdown",  # TRANSITION_UNCONFIGURED_SHUTDOWN
+        6: "shutdown",  # TRANSITION_INACTIVE_SHUTDOWN
+        7: "shutdown",  # TRANSITION_ACTIVE_SHUTDOWN
     }
     if isinstance(transition_id, int):
         return _TRANSITION_MAP.get(transition_id, f"transition_{transition_id}")
@@ -597,6 +622,7 @@ def _transition_name(transition_id):
 
 class _TrackedOnProcessStart:
     """Tracked OnProcessStart event handler."""
+
     def __init__(self, target_action=None, on_start=None, **kwargs):
         self._target_name = _action_name(target_action)
         self._namespace_stack, self._explicit_namespace = _action_namespace_info(target_action)
@@ -617,6 +643,7 @@ class _TrackedOnProcessStart:
 
 class _TrackedOnProcessExit:
     """Tracked OnProcessExit event handler."""
+
     def __init__(self, target_action=None, on_exit=None, **kwargs):
         self._target_name = _action_name(target_action)
         self._namespace_stack, self._explicit_namespace = _action_namespace_info(target_action)
@@ -641,10 +668,14 @@ class _TrackedOnStateTransition:
     Real API: ``OnStateTransition(target_lifecycle_node=node,
     start_state='configuring', goal_state='inactive', entities=[...])``
     """
-    def __init__(self, target_lifecycle_node=None, start_state=None, goal_state=None,
-                 entities=None, **kwargs):
+
+    def __init__(
+        self, target_lifecycle_node=None, start_state=None, goal_state=None, entities=None, **kwargs
+    ):
         self._target_node = _action_name(target_lifecycle_node)
-        self._namespace_stack, self._explicit_namespace = _action_namespace_info(target_lifecycle_node)
+        self._namespace_stack, self._explicit_namespace = _action_namespace_info(
+            target_lifecycle_node
+        )
         self._start_state = str(start_state) if start_state else None
         self._goal_state = str(goal_state) if goal_state else None
         self._actions = entities or []
@@ -668,6 +699,7 @@ class _TrackedOnShutdown:
     OnShutdown fires when the launch system is shutting down.  It has no
     target process — it applies system-wide.  Rendered as ``<on_shutdown>``.
     """
+
     def __init__(self, on_shutdown=None, **kwargs):
         self._actions = on_shutdown or []
 
@@ -686,6 +718,7 @@ class _TrackedOnShutdown:
 
 class _TrackedRegisterEventHandler:
     """Tracked RegisterEventHandler — records the event handler to _tracked."""
+
     def __init__(self, event_handler=None, **kwargs):
         if event_handler is not None and hasattr(event_handler, "to_event_handler"):
             _tracked["event_handlers"].append(event_handler.to_event_handler())
@@ -718,6 +751,7 @@ class _TrackedComposableNode:
     Does NOT add to the flat ``_tracked["nodes"]`` list — it is attached to the
     container's ``plugins`` list when the container is resolved in ``_walk_action``.
     """
+
     def __init__(self, *, package=None, plugin=None, name=None, **kwargs):
         _track_package(package)
         self._raw_package = package
@@ -736,30 +770,41 @@ class _TrackedComposableNode:
     def __repr__(self):
         return f"TrackedComposableNode(package={self._package!r}, plugin={self._plugin!r})"
 
+
 class _TrackedComposableNodeContainer:
     """A composable node container process.
 
     Emits a ``kind='container'`` entry whose ``plugins`` list is populated during
     deferred resolution in ``_walk_action`` from the *composable_node_descriptions*.
     """
-    def __init__(self, *, package=None, executable=None, name=None,
-                 composable_node_descriptions=None, **kwargs):
+
+    def __init__(
+        self,
+        *,
+        package=None,
+        executable=None,
+        name=None,
+        composable_node_descriptions=None,
+        **kwargs,
+    ):
         _track_package(package)
         self._idx = len(_tracked["nodes"])
-        _tracked["nodes"].append({
-            "package": str(package) if package else "",
-            "executable": str(executable) if executable else "",
-            "name": str(name) if name else "",
-            "namespace_stack": [],
-            "explicit_namespace": None,
-            "parameters": {},
-            "param_files": [],
-            "remappings": [],
-            "env": {},
-            "kind": "container",
-            "plugins": [],
-            "target": None,
-        })
+        _tracked["nodes"].append(
+            {
+                "package": str(package) if package else "",
+                "executable": str(executable) if executable else "",
+                "name": str(name) if name else "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "container",
+                "plugins": [],
+                "target": None,
+            }
+        )
         self._raw_package = package
         self._raw_executable = executable
         self._raw_name = name
@@ -776,12 +821,14 @@ class _TrackedComposableNodeContainer:
             if raw_pkg:
                 _track_package(raw_pkg)
 
+
 class _TrackedLoadComposableNodes:
     """Loads composable nodes into an existing container.
 
     Emits a ``kind='load_composable'`` entry with ``target`` set to the container
     name and ``plugins`` populated during deferred resolution in ``_walk_action``.
     """
+
     def __init__(self, *, composable_node_descriptions=None, target_container=None, **kwargs):
         # Eagerly resolve target_container when it's a plain string
         if target_container is None:
@@ -801,20 +848,22 @@ class _TrackedLoadComposableNodes:
             target_str = str(target_container)
         self._idx = len(_tracked["nodes"])
         self._raw_target = target_container
-        _tracked["nodes"].append({
-            "package": "",
-            "executable": "",
-            "name": "",
-            "namespace_stack": [],
-            "explicit_namespace": None,
-            "parameters": {},
-            "param_files": [],
-            "remappings": [],
-            "env": {},
-            "kind": "load_composable",
-            "plugins": [],
-            "target": target_str,
-        })
+        _tracked["nodes"].append(
+            {
+                "package": "",
+                "executable": "",
+                "name": "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "load_composable",
+                "plugins": [],
+                "target": target_str,
+            }
+        )
         self._descs = list(composable_node_descriptions or [])
         self._detailed = False
         # Eager: track packages from descriptions — pass raw object so
@@ -824,14 +873,17 @@ class _TrackedLoadComposableNodes:
             if raw_pkg:
                 _track_package(raw_pkg)
 
+
 class _TrackedPushRosNamespace:
     """Tracks PushRosNamespace so _walk_action can update _namespace_stack."""
+
     def __init__(self, namespace=None, **kwargs):
         self._namespace = namespace  # string or substitution object
 
 
 class _TrackedParameterFile:
     """Tracks ParameterFile references so they can be reported as param_file dependencies."""
+
     def __init__(self, param_file=None, *args, allow_substs=False, **kwargs):
         # param_file may be positional or keyword, and may be a string or substitution
         if param_file is None and args:
@@ -852,19 +904,25 @@ class _TrackedParameterFile:
                 self._param_file = path
                 _track_param_file(path)
 
+
 class _SetLaunchConfiguration:
     """Implements SetLaunchConfiguration: updates launch_configurations at walk time."""
+
     def __init__(self, name=None, value=None, **kwargs):
         self._name = name
         self._value = value
 
+
 class _TimerAction:
     """Stores TimerAction child actions so the walker can recurse into them."""
+
     def __init__(self, *, period=None, actions=None, **kwargs):
         self._actions = list(actions or [])
 
+
 class _TrackedFindPackageShare:
     """Tracks FindPackageShare; package may be a string or a list of substitutions."""
+
     def __init__(self, package):
         self._package_subs = package
         # Track statically when the name is a plain string
@@ -914,6 +972,7 @@ class _TrackedFindPackageShare:
             return _package_shares[pkg]
         return f"$(find-pkg-share {pkg})"
 
+
 class _TrackedPathJoinSubstitution:
     def __init__(self, substitutions):
         self._subs = substitutions
@@ -923,6 +982,7 @@ class _TrackedPathJoinSubstitution:
                 pkg, is_fallback = sub._resolve_name()
                 if not is_fallback:
                     _track_package(pkg)
+
     def perform(self, context):
         parts = []
         for sub in self._subs:
@@ -932,6 +992,7 @@ class _TrackedPathJoinSubstitution:
             else:
                 parts.append(str(sub))
         return str(Path(*parts))
+
 
 def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
     """Capture launch_arguments for an include site.
@@ -1021,11 +1082,14 @@ class _TrackedIncludeLaunchDescription:
         if launch_arguments and path:
             _resolve_include_args(path, launch_arguments, _StubLaunchContext(), self._dep_idx)
 
+
 class _LaunchConfiguration:
     """Substitution that resolves to a launch configuration value at runtime."""
+
     def __init__(self, variable_name, default=None, **kwargs):
         self._name = variable_name
         self._default = default
+
     def perform(self, context):
         if context and hasattr(context, "_launch_configurations"):
             if self._name in context._launch_configurations:
@@ -1033,17 +1097,18 @@ class _LaunchConfiguration:
             if self._default is not None:
                 return str(self._default)
         return None
+
     def __str__(self):
         return self._name
 
+
 class _DeclaredArg:
     """Stub for DeclareLaunchArgument: captures name, default_value, and condition."""
+
     def __init__(self, name=None, *positional, default_value=None, condition=None, **kwargs):
         # ROS 2 signature: DeclareLaunchArgument(name, *, default_value=None, ...)
         # `name` may be passed positionally or as keyword.
-        self.name = str(name) if name is not None else (
-            str(positional[0]) if positional else None
-        )
+        self.name = str(name) if name is not None else (str(positional[0]) if positional else None)
         self.default_value = default_value
         self.condition = condition
 
@@ -1072,8 +1137,10 @@ def _apply_declared_arg(arg: "_DeclaredArg", context) -> None:
         except _PackageNotFetchedError:
             raise
         except Exception as e:
-            _warn(f"condition on DeclareLaunchArgument '{arg.name}' failed to evaluate: {e}; "
-                  f"assuming condition is satisfied")
+            _warn(
+                f"condition on DeclareLaunchArgument '{arg.name}' failed to evaluate: {e}; "
+                f"assuming condition is satisfied"
+            )
 
     if arg.default_value is None:
         return  # Required arg with no default — nothing to apply
@@ -1114,28 +1181,36 @@ def _apply_declared_arg(arg: "_DeclaredArg", context) -> None:
 
 class _TrackedOpaqueFunction:
     """Stores an OpaqueFunction's callable so the walker can invoke it."""
+
     def __init__(self, *, function=None, **kwargs):
         self.function = function
 
+
 class _TrackedGroupAction:
     """Stores GroupAction's child actions so the walker can recurse into them."""
+
     def __init__(self, actions=None, **kwargs):
         self._actions = list(actions or [])
         self._scoped = kwargs.get("scoped", True)
         self._condition = kwargs.get("condition")
 
+
 class _TrackedSetEnvironmentVariable:
     """Tracks SetEnvironmentVariable: mutates _env in _walk_action."""
+
     def __init__(self, name=None, value=None, **kwargs):
         self._name = name
         self._value = value
         self._condition = kwargs.get("condition")
 
+
 class _TrackedUnsetEnvironmentVariable:
     """Tracks UnsetEnvironmentVariable: removes from _env in _walk_action."""
+
     def __init__(self, name=None, **kwargs):
         self._name = name
         self._condition = kwargs.get("condition")
+
 
 class _TrackedSetParameter:
     """Mirrors launch_ros SetParameter: accumulates (name, value) into context['global_params'].
@@ -1146,30 +1221,34 @@ class _TrackedSetParameter:
     cross-file global state.  We reproduce this here so the walker can populate the stub
     context and the orchestrator can persist the params across isolated py_resolver calls.
     """
+
     def __init__(self, name=None, value=None, **kwargs):
         # Keep raw for deferred resolution in _walk_action (value may be a substitution).
         self._name = name
         self._value = value
         self._idx = len(_tracked["nodes"])
-        _tracked["nodes"].append({
-            "package": "",
-            "executable": "",
-            "name": str(name) if name is not None and not hasattr(name, "perform") else "",
-            "namespace_stack": [],
-            "explicit_namespace": None,
-            "parameters": {},
-            "param_files": [],
-            "remappings": [],
-            "env": {},
-            "kind": "set_parameter",
-            "plugins": [],
-            "target": None,
-            "param_value": "",
-        })
+        _tracked["nodes"].append(
+            {
+                "package": "",
+                "executable": "",
+                "name": str(name) if name is not None and not hasattr(name, "perform") else "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "set_parameter",
+                "plugins": [],
+                "target": None,
+                "param_value": "",
+            }
+        )
 
 
 class _TrackedExecutable:
     """Tracks an ExecuteProcess so the walker can render it as <executable>."""
+
     def __init__(self, *, cmd=None, name=None, shell=False, **kwargs):
         # `cmd` may be a list of substitution-bearing strings or a plain string.
         if isinstance(cmd, list):
@@ -1181,28 +1260,32 @@ class _TrackedExecutable:
         self._name = name
         self._shell = bool(shell)
         self._idx = len(_tracked["nodes"])
-        _tracked["nodes"].append({
-            "package": "",
-            "executable": "",
-            "name": str(name) if name is not None and not hasattr(name, "perform") else "",
-            "namespace_stack": [],
-            "explicit_namespace": None,
-            "parameters": {},
-            "param_files": [],
-            "remappings": [],
-            "env": {},
-            "kind": "executable",
-            "plugins": [],
-            "target": None,
-            "cmd": "",
-            "shell": self._shell,
-        })
+        _tracked["nodes"].append(
+            {
+                "package": "",
+                "executable": "",
+                "name": str(name) if name is not None and not hasattr(name, "perform") else "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "executable",
+                "plugins": [],
+                "target": None,
+                "cmd": "",
+                "shell": self._shell,
+            }
+        )
 
 
 # ─── LaunchContext stub ────────────────────────────────────────────────────────
 
+
 class _StubLaunchContext:
     """Minimal LaunchContext: holds launch_configurations for substitution resolution."""
+
     def __init__(self):
         self._launch_configurations = {}
 
@@ -1218,6 +1301,7 @@ class _StubLaunchContext:
         if hasattr(sub, "perform"):
             return sub.perform(self)
         return str(sub)
+
 
 # ─── Param-file stubs for OpaqueFunction resilience ─────────────────────────
 #
@@ -1262,6 +1346,7 @@ class _DefaultParamDict(dict):
        iterates over a nested param block (e.g. ``fusion_config``) succeeds
        without raising ``AttributeError: 'bool' object has no attribute 'update'``.
     """
+
     def __missing__(self, key):
         return _DefaultParamDict()
 
@@ -1338,7 +1423,9 @@ def _call_opaque_with_stubs(fn, context):
                 try:
                     return _orig_open(actual, mode, *args, **kwargs)
                 except (FileNotFoundError, OSError):
-                    _error(f"param file not found: '{actual}' (resolved from '{path}') — stub defaults used")
+                    _error(
+                        f"param file not found: '{actual}' (resolved from '{path}') — stub defaults used"
+                    )
                     return _io.StringIO(_STUB_ROS_PARAM_YAML)
             _error(f"param file not found: '{path}' — stub defaults used")
             return _io.StringIO(_STUB_ROS_PARAM_YAML)
@@ -1351,10 +1438,12 @@ def _call_opaque_with_stubs(fn, context):
             # fetch the package and retry rather than silently returning stub YAML.
             for pkg_name, pkg_dir in _package_shares.items():
                 pkg_dir_norm = pkg_dir.rstrip("/")
-                if path_str.startswith(pkg_dir_norm + "/") or path_str.startswith(pkg_dir_norm + os.sep):
+                if path_str.startswith(pkg_dir_norm + "/") or path_str.startswith(
+                    pkg_dir_norm + os.sep
+                ):
                     if not _orig_path_isfile(os.path.join(pkg_dir_norm, "package.xml")):
                         _packages_to_fetch.add(pkg_name)
-                        raise _PackageNotFetchedError(pkg_name)
+                        raise _PackageNotFetchedError(pkg_name) from None
                     break  # package is fully fetched; file genuinely missing → error
             _error(f"param file not found: '{path}' — stub defaults used")
             return _io.StringIO(_STUB_ROS_PARAM_YAML)
@@ -1404,8 +1493,9 @@ def _call_opaque_with_stubs(fn, context):
             return False
         return _orig_path_isdir(path)
 
-    def _stub_pathlib_open(path_self, mode='r', buffering=-1, encoding=None,
-                           errors=None, newline=None):
+    def _stub_pathlib_open(
+        path_self, mode="r", buffering=-1, encoding=None, errors=None, newline=None
+    ):
         """Intercept Path.open() so that Path(...).read_text() also handles portable paths.
 
         pathlib.Path.read_text() calls self.open() internally, bypassing builtins.open.
@@ -1427,7 +1517,9 @@ def _call_opaque_with_stubs(fn, context):
                         _pathlib.Path(actual), mode, buffering, encoding, errors, newline
                     )
                 except (FileNotFoundError, OSError):
-                    _error(f"param file not found: '{actual}' (resolved from '{path_str}') — stub defaults used")
+                    _error(
+                        f"param file not found: '{actual}' (resolved from '{path_str}') — stub defaults used"
+                    )
                     return _io.StringIO(_STUB_ROS_PARAM_YAML)
             _error(f"param file not found: '{path_str}' — stub defaults used")
             return _io.StringIO(_STUB_ROS_PARAM_YAML)
@@ -1438,7 +1530,7 @@ def _call_opaque_with_stubs(fn, context):
         # Wrap ros__parameters dicts in _DefaultParamDict so that missing
         # keys return False rather than raising KeyError.
         if isinstance(result, dict):
-            for ns_key, ns_val in result.items():
+            for _ns_key, ns_val in result.items():
                 if isinstance(ns_val, dict) and "ros__parameters" in ns_val:
                     rp = ns_val["ros__parameters"]
                     if isinstance(rp, dict):
@@ -1464,10 +1556,12 @@ def _call_opaque_with_stubs(fn, context):
 
 # ─── LaunchContext factory ────────────────────────────────────────────────────
 
+
 def _make_launch_context(args_dict):
     """Create a LaunchContext pre-populated with provided args."""
     try:
         from launch import LaunchContext
+
         ctx = LaunchContext()
         ctx._launch_configurations = dict(args_dict)
         return ctx
@@ -1476,7 +1570,9 @@ def _make_launch_context(args_dict):
         ctx._launch_configurations = dict(args_dict)
         return ctx
 
+
 # ─── Node detail resolution helpers ──────────────────────────────────────────
+
 
 def _env_overrides():
     """Return a copy of the current env overrides for per-node output."""
@@ -1503,7 +1599,11 @@ def _resolve_node_details(node, context):
                     _track_package(resolved)
 
     # Namespace: emit raw inputs — Rust computes effective_namespace from these
-    ns = _resolve_substitution(node._raw_namespace, context) if node._raw_namespace is not None else None
+    ns = (
+        _resolve_substitution(node._raw_namespace, context)
+        if node._raw_namespace is not None
+        else None
+    )
     entry["namespace_stack"] = list(_namespace_stack)
     entry["explicit_namespace"] = ns
 
@@ -1535,7 +1635,9 @@ def _resolve_node_details(node, context):
     raw_env = node._raw_env
     if isinstance(raw_env, dict):
         for k, v in raw_env.items():
-            env[_resolve_substitution(k, context) or str(k)] = _resolve_substitution(v, context) or ""
+            env[_resolve_substitution(k, context) or str(k)] = (
+                _resolve_substitution(v, context) or ""
+            )
     elif isinstance(raw_env, (list, tuple)):
         for item in raw_env:
             if isinstance(item, (tuple, list)) and len(item) == 2:
@@ -1554,13 +1656,15 @@ def _resolve_composable_plugins(descs, context):
             pkg = getattr(desc, "package", None) or getattr(desc, "_package", None)
             plugin = getattr(desc, "plugin", None) or getattr(desc, "_plugin", None)
             if pkg or plugin:
-                plugins.append({
-                    "package": str(pkg) if pkg else "",
-                    "plugin": str(plugin) if plugin else "",
-                    "name": None,
-                    "parameters": {},
-                    "remappings": [],
-                })
+                plugins.append(
+                    {
+                        "package": str(pkg) if pkg else "",
+                        "plugin": str(plugin) if plugin else "",
+                        "name": None,
+                        "parameters": {},
+                        "remappings": [],
+                    }
+                )
             continue
         params = {}
         for p in desc._raw_parameters:
@@ -1573,10 +1677,12 @@ def _resolve_composable_plugins(descs, context):
             if isinstance(r, (tuple, list)) and len(r) == 2:
                 src = _resolve_substitution(r[0], context)
                 dst = _resolve_substitution(r[1], context)
-                remaps.append([
-                    src if src is not None else str(r[0]),
-                    dst if dst is not None else str(r[1]),
-                ])
+                remaps.append(
+                    [
+                        src if src is not None else str(r[0]),
+                        dst if dst is not None else str(r[1]),
+                    ]
+                )
         # Resolve package/plugin/name substitutions with the live context
         pkg = desc._package
         if _is_substitution(desc._raw_package):
@@ -1595,17 +1701,20 @@ def _resolve_composable_plugins(descs, context):
             resolved_nm = _resolve_substitution(desc._raw_name, context)
             if resolved_nm is not None:
                 nm = resolved_nm
-        plugins.append({
-            "package": pkg,
-            "plugin": plg,
-            "name": nm or None,
-            "parameters": params,
-            "remappings": remaps,
-        })
+        plugins.append(
+            {
+                "package": pkg,
+                "plugin": plg,
+                "name": nm or None,
+                "parameters": params,
+                "remappings": remaps,
+            }
+        )
     return plugins
 
 
 # ─── Inline Python include resolution ─────────────────────────────────────────
+
 
 def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth):
     """Load a Python launch file and walk its actions in the parent context.
@@ -1637,9 +1746,7 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
         return  # File not on disk — orchestrator will fetch and resolve later
 
     try:
-        spec = importlib.util.spec_from_file_location(
-            f"_inline_launch_{depth}", real_path
-        )
+        spec = importlib.util.spec_from_file_location(f"_inline_launch_{depth}", real_path)
         if spec is None or spec.loader is None:
             _warn(f"cannot load included launch file: {real_path}")
             return
@@ -1747,6 +1854,7 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
 
 # ─── Action walker ────────────────────────────────────────────────────────────
 
+
 def _walk_actions(actions, context, depth=0):
     if depth > 20:
         _warn("Max include depth reached while walking Python launch description")
@@ -1762,6 +1870,7 @@ def _walk_actions(actions, context, depth=0):
             raise  # Let it propagate to the OpaqueFunction or top-level handler
         except Exception as e:
             _error(f"Error walking action {type(action).__name__}: {e}")
+
 
 def _walk_action(action, context, depth):
     cls_name = type(action).__name__
@@ -1796,7 +1905,9 @@ def _walk_action(action, context, depth):
             if action._raw_target is not None:
                 if isinstance(action._raw_target, _TrackedComposableNodeContainer):
                     # Container object: use its already-resolved name (updated by _resolve_node_details).
-                    target = _tracked["nodes"][action._raw_target._idx].get("name") or entry.get("target", "")
+                    target = _tracked["nodes"][action._raw_target._idx].get("name") or entry.get(
+                        "target", ""
+                    )
                 else:
                     target = _resolve_substitution(action._raw_target, context)
                 if target:
@@ -1939,8 +2050,8 @@ def _walk_action(action, context, depth):
 
     # OpaqueFunction: execute its function and walk the result
     if isinstance(action, _TrackedOpaqueFunction) or (
-        cls_name == "OpaqueFunction" or
-        (hasattr(action, "function") and callable(getattr(action, "function", None)))
+        cls_name == "OpaqueFunction"
+        or (hasattr(action, "function") and callable(getattr(action, "function", None)))
     ):
         fn = getattr(action, "function", None)
         if fn and context:
@@ -1992,7 +2103,7 @@ def _walk_action(action, context, depth):
             # In process env (cases 2 & 3) — can't unset baseline.
             _error(
                 f"unset_env: '{name}' exists in the process env and cannot be unset. "
-                f"Use SetEnvironmentVariable(name=\"{name}\", value=\"\") "
+                f'Use SetEnvironmentVariable(name="{name}", value="") '
                 "or a scoped group instead"
             )
         elif name in _env:
@@ -2052,19 +2163,35 @@ def _walk_action(action, context, depth):
         exe = getattr(action, "_node_executable", getattr(action, "_node_name", None))
         name = getattr(action, "_name", None)
         _track_node(pkg, exe, name)
-        descs = getattr(action, "composable_node_descriptions",
-                        getattr(action, "_composable_node_descriptions", None)) or []
+        descs = (
+            getattr(
+                action,
+                "composable_node_descriptions",
+                getattr(action, "_composable_node_descriptions", None),
+            )
+            or []
+        )
         for desc in descs:
-            _track_node(getattr(desc, "package", None),
-                        getattr(desc, "plugin", None),
-                        getattr(desc, "node_name", getattr(desc, "name", None)))
+            _track_node(
+                getattr(desc, "package", None),
+                getattr(desc, "plugin", None),
+                getattr(desc, "node_name", getattr(desc, "name", None)),
+            )
     elif cls_name == "LoadComposableNodes":
-        descs = getattr(action, "_composable_node_descriptions",
-                        getattr(action, "composable_node_descriptions", None)) or []
+        descs = (
+            getattr(
+                action,
+                "_composable_node_descriptions",
+                getattr(action, "composable_node_descriptions", None),
+            )
+            or []
+        )
         for desc in descs:
-            _track_node(getattr(desc, "package", None),
-                        getattr(desc, "plugin", None),
-                        getattr(desc, "node_name", getattr(desc, "name", None)))
+            _track_node(
+                getattr(desc, "package", None),
+                getattr(desc, "plugin", None),
+                getattr(desc, "node_name", getattr(desc, "name", None)),
+            )
 
     # IncludeLaunchDescription (real)
     if cls_name == "IncludeLaunchDescription":
@@ -2089,6 +2216,7 @@ def _walk_action(action, context, depth):
             f"declares may not appear in the resolved output"
         )
 
+
 # ─── Known action class names ─────────────────────────────────────────────────
 
 # Class names that _walk_action handles explicitly or that are safe to skip.
@@ -2097,66 +2225,70 @@ def _walk_action(action, context, depth):
 #   • Our shimmed tracking classes (prefixed with underscore or "Tracked")
 #   • Real launch_ros classes handled via cls_name duck-typing
 #   • ROS 2 lifecycle / event infrastructure that produces no nodes/includes
-_KNOWN_ACTION_CLASSES: frozenset = frozenset({
-    # Shimmed tracking classes
-    "_DeclaredArg",
-    "_TrackedNode",
-    "_TrackedLifecycleNode",
-    "_TrackedComposableNodeContainer",
-    "_TrackedLoadComposableNodes",
-    "_TrackedPushRosNamespace",
-    "_TrackedIncludeLaunchDescription",
-    "_TrackedSetParameter",
-    "_TrackedExecutable",
-    "_SetLaunchConfiguration",
-    "_TrackedOpaqueFunction",
-    "_TrackedGroupAction",
-    "_TrackedRegisterEventHandler",
-    "_TrackedEmitEvent",
-    "_TrackedOnProcessStart",
-    "_TrackedOnProcessExit",
-    "_TrackedOnStateTransition",
-    "_TrackedOnShutdown",
-    "_TimerAction",
-    # Real launch_ros classes handled via cls_name fallback in _walk_action
-    "Node",
-    "LifecycleNode",
-    "ComposableNodeContainer",
-    "LoadComposableNodes",
-    "IncludeLaunchDescription",
-    # ROS 2 infrastructure — safe to skip (no nodes/includes produced)
-    "LogInfo",
-    "RegisterEventHandler",
-    "EmitEvent",
-    "Shutdown",
-    "ExecuteProcess",
-    "DeclareLaunchArgument",
-    "SetLaunchConfiguration",
-    "SetParameter",
-    "PushRosNamespace",
-    "ResetLaunchConfigurations",
-    "AppendEnvironmentVariable",
-    "SetEnvironmentVariable",
-    "UnsetEnvironmentVariable",
-    "OpaqueCoroutine",
-    "OpaqueFunction",
-    "GroupAction",
-    "TimerAction",
-})
+_KNOWN_ACTION_CLASSES: frozenset = frozenset(
+    {
+        # Shimmed tracking classes
+        "_DeclaredArg",
+        "_TrackedNode",
+        "_TrackedLifecycleNode",
+        "_TrackedComposableNodeContainer",
+        "_TrackedLoadComposableNodes",
+        "_TrackedPushRosNamespace",
+        "_TrackedIncludeLaunchDescription",
+        "_TrackedSetParameter",
+        "_TrackedExecutable",
+        "_SetLaunchConfiguration",
+        "_TrackedOpaqueFunction",
+        "_TrackedGroupAction",
+        "_TrackedRegisterEventHandler",
+        "_TrackedEmitEvent",
+        "_TrackedOnProcessStart",
+        "_TrackedOnProcessExit",
+        "_TrackedOnStateTransition",
+        "_TrackedOnShutdown",
+        "_TimerAction",
+        # Real launch_ros classes handled via cls_name fallback in _walk_action
+        "Node",
+        "LifecycleNode",
+        "ComposableNodeContainer",
+        "LoadComposableNodes",
+        "IncludeLaunchDescription",
+        # ROS 2 infrastructure — safe to skip (no nodes/includes produced)
+        "LogInfo",
+        "RegisterEventHandler",
+        "EmitEvent",
+        "Shutdown",
+        "ExecuteProcess",
+        "DeclareLaunchArgument",
+        "SetLaunchConfiguration",
+        "SetParameter",
+        "PushRosNamespace",
+        "ResetLaunchConfigurations",
+        "AppendEnvironmentVariable",
+        "SetEnvironmentVariable",
+        "UnsetEnvironmentVariable",
+        "OpaqueCoroutine",
+        "OpaqueFunction",
+        "GroupAction",
+        "TimerAction",
+    }
+)
 
 # ─── Import system patcher ────────────────────────────────────────────────────
 
 _PATCHED_MODULES = {}
 
+
 def _build_patched_launch():
     """Stub for the top-level `launch` package (used when ROS 2 is not installed)."""
     mod = types.ModuleType("launch")
-    mod.__path__ = []      # mark as package so submodule imports work
+    mod.__path__ = []  # mark as package so submodule imports work
     mod.__package__ = "launch"
 
     class _LaunchDescription:
         def __init__(self, entities=None, **kwargs):
             self.entities = list(entities or [])
+
         def add_action(self, action):
             self.entities.append(action)
 
@@ -2164,12 +2296,14 @@ def _build_patched_launch():
     mod.LaunchContext = _StubLaunchContext
     return mod
 
+
 def _build_patched_launch_ros():
     """Stub for the top-level `launch_ros` package."""
     mod = types.ModuleType("launch_ros")
     mod.__path__ = []
     mod.__package__ = "launch_ros"
     return mod
+
 
 def _build_patched_launch_ros_actions():
     mod = types.ModuleType("launch_ros.actions")
@@ -2212,11 +2346,13 @@ def _build_patched_launch_ros_utilities():
     mod.add_node_name_count_to_name = lambda name, **kw: name
     return mod
 
+
 def _build_patched_launch_ros_descriptions():
     mod = types.ModuleType("launch_ros.descriptions")
     mod.ComposableNode = _TrackedComposableNode
     mod.ParameterFile = _TrackedParameterFile
     return mod
+
 
 def _build_patched_launch_substitutions():
     """Always-stub: avoids recursion since we also patch top-level `launch`."""
@@ -2226,11 +2362,14 @@ def _build_patched_launch_substitutions():
     mod.PathJoinSubstitution = _TrackedPathJoinSubstitution
     mod.LaunchConfiguration = _LaunchConfiguration
     _SENTINEL = object()
+
     class _DeferredEnvironmentVariable:
         """Deferred substitution: reads _env at perform() time, not construction."""
+
         def __init__(self, name, **kw):
             self._name = name
             self._default = kw.get("default_value", _SENTINEL)
+
         def perform(self, context=None):
             # Resolve name to a concrete string via _to_str.
             name = _to_str(self._name, context) or ""
@@ -2244,14 +2383,17 @@ def _build_patched_launch_substitutions():
                 return _to_str(self._default, context) or ""
             _error(f"EnvironmentVariable: '{name}' is not set and no default was provided")
             return ""
+
         def __str__(self):
             # Avoid calling perform() without context — return the raw name.
             return str(self._name) if self._name is not None else ""
+
     mod.EnvironmentVariable = _DeferredEnvironmentVariable
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None
     mod.ThisLaunchFileDir = lambda: Path(__file__).parent
     return mod
+
 
 def _build_patched_launch_substitutions_environment_variable():
     """Submodule stub for ``from launch.substitutions.environment_variable import ...``."""
@@ -2261,6 +2403,7 @@ def _build_patched_launch_substitutions_environment_variable():
     mod = types.ModuleType("launch.substitutions.environment_variable")
     mod.EnvironmentVariable = parent.EnvironmentVariable
     return mod
+
 
 def _build_patched_launch_actions():
     """Always-stub: avoids recursion since we also patch top-level `launch`."""
@@ -2285,6 +2428,7 @@ def _build_patched_launch_actions():
     mod.OnProcessStart = _TrackedOnProcessStart
     return mod
 
+
 def _build_patched_launch_event_handlers():
     """Tracked stubs for launch.event_handlers — record event handler structure."""
     mod = types.ModuleType("launch.event_handlers")
@@ -2296,18 +2440,21 @@ def _build_patched_launch_event_handlers():
     mod.OnExecutionComplete = lambda *a, **kw: None
     return mod
 
+
 def _build_patched_launch_conditions():
     mod = types.ModuleType("launch.conditions")
 
     class _IfCondition:
         """Stub for IfCondition that supports .evaluate(context)."""
+
         def __init__(self, condition=None, **kwargs):
             self._condition = condition
+
         def evaluate(self, context):
             try:
-                if hasattr(self._condition, 'perform'):
+                if hasattr(self._condition, "perform"):
                     val = str(self._condition.perform(context)).lower()
-                    return val in ('true', '1', 'yes', 'on')
+                    return val in ("true", "1", "yes", "on")
                 if self._condition is None:
                     return False
                 return bool(self._condition)
@@ -2316,6 +2463,7 @@ def _build_patched_launch_conditions():
 
     class _UnlessCondition(_IfCondition):
         """Stub for UnlessCondition: evaluate() returns the logical inverse of IfCondition."""
+
         def evaluate(self, context):
             return not super().evaluate(context)
 
@@ -2323,6 +2471,7 @@ def _build_patched_launch_conditions():
         def __init__(self, name=None, expected_value=None, **kwargs):
             self._name = name
             self._expected = expected_value
+
         def evaluate(self, context):
             try:
                 val = context._launch_configurations.get(str(self._name), "")
@@ -2340,8 +2489,10 @@ def _build_patched_launch_conditions():
     mod.LaunchConfigurationNotEquals = _LaunchConfigurationNotEquals
     return mod
 
+
 def _build_patched_launch_launch_description_sources():
     mod = types.ModuleType("launch.launch_description_sources")
+
     class _PythonLaunchDescriptionSource:
         def __init__(self, location=None, **kwargs):
             # Resolve to a string path.  Location may be:
@@ -2373,17 +2524,21 @@ def _build_patched_launch_launch_description_sources():
                 self._location = "".join(parts)
             else:
                 self._location = str(location)
+
     class _AnyLaunchDescriptionSource(_PythonLaunchDescriptionSource):
         pass
+
     mod.PythonLaunchDescriptionSource = _PythonLaunchDescriptionSource
     mod.AnyLaunchDescriptionSource = _AnyLaunchDescriptionSource
     return mod
+
 
 def _build_patched_launch_ros_substitutions():
     """launch_ros.substitutions — provides FindPackageShare (same as launch.substitutions)."""
     mod = types.ModuleType("launch_ros.substitutions")
     mod.FindPackageShare = _TrackedFindPackageShare
     return mod
+
 
 def _build_patched_launch_ros_parameter_descriptions():
     mod = types.ModuleType("launch_ros.parameter_descriptions")
@@ -2392,14 +2547,17 @@ def _build_patched_launch_ros_parameter_descriptions():
     mod.ParameterValue = lambda *a, **kw: None
     return mod
 
+
 def _build_patched_ament_index_python():
     mod = types.ModuleType("ament_index_python")
     mod.__path__ = []
     mod.__package__ = "ament_index_python"
     return mod
 
+
 def _build_patched_ament_index_python_packages():
     mod = types.ModuleType("ament_index_python.packages")
+
     def get_package_share_directory(package_name):
         _warn(
             f"get_package_share_directory('{package_name}') is non-idiomatic; "
@@ -2424,6 +2582,7 @@ def _build_patched_ament_index_python_packages():
         # _call_opaque_with_stubs the os.path.* stubs intercept any filesystem
         # access and resolve the portable path lazily.
         return f"$(find-pkg-share {package_name})"
+
     def get_package_prefix(package_name):
         # Return the parent of the share directory as a best-effort prefix.
         # For unresolved packages the share path is portable syntax like
@@ -2433,9 +2592,11 @@ def _build_patched_ament_index_python_packages():
             return _ROS_DISTRO_PREFIX
         p = Path(share)
         return str(p.parent) if p.parent != p else _ROS_DISTRO_PREFIX
+
     mod.get_package_share_directory = get_package_share_directory
     mod.get_package_prefix = get_package_prefix
     return mod
+
 
 def _build_patched_launch_ros_events():
     """Patched launch_ros.events — provides ChangeState."""
@@ -2445,11 +2606,13 @@ def _build_patched_launch_ros_events():
     mod.ChangeState = _TrackedChangeState
     return mod
 
+
 def _build_patched_launch_ros_events_lifecycle():
     """Patched launch_ros.events.lifecycle — provides ChangeState."""
     mod = types.ModuleType("launch_ros.events.lifecycle")
     mod.ChangeState = _TrackedChangeState
     return mod
+
 
 def _build_patched_launch_ros_event_handlers():
     """Patched launch_ros.event_handlers — lifecycle event matchers."""
@@ -2459,10 +2622,12 @@ def _build_patched_launch_ros_event_handlers():
     mod.OnStateTransition = _TrackedOnStateTransition
     return mod
 
+
 def _build_patched_launch_ros_event_handlers_on_state_transition():
     mod = types.ModuleType("launch_ros.event_handlers.on_state_transition")
     mod.OnStateTransition = _TrackedOnStateTransition
     return mod
+
 
 def _build_patched_lifecycle_msgs():
     """Patched lifecycle_msgs — provides Transition constants."""
@@ -2470,6 +2635,7 @@ def _build_patched_lifecycle_msgs():
     mod.__path__ = []
     mod.__package__ = "lifecycle_msgs"
     return mod
+
 
 def _build_patched_lifecycle_msgs_msg():
     """Patched lifecycle_msgs.msg — provides Transition constants."""
@@ -2487,6 +2653,7 @@ def _build_patched_lifecycle_msgs_msg():
     mod.Transition = Transition
     return mod
 
+
 def _build_patched_launch_events():
     """Patched launch.events — provides Shutdown event and matches_action."""
     mod = types.ModuleType("launch.events")
@@ -2496,9 +2663,11 @@ def _build_patched_launch_events():
     mod.matches_action = _TrackedMatchesAction
     return mod
 
+
 def _build_patched_launch_events_process():
     mod = types.ModuleType("launch.events.process")
     return mod
+
 
 def _build_patched_launch_event_handler():
     mod = types.ModuleType("launch.event_handler")
@@ -2549,7 +2718,9 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
     def exec_module(self, module):
         pass  # Already fully initialised in create_module
 
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
+
 
 def _emit(obj):
     """Write JSON to the real stdout (saved before redirect)."""
@@ -2692,6 +2863,7 @@ def main():
     if _packages_to_fetch:
         _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)
     _emit(_tracked)
+
 
 if __name__ == "__main__":
     main()

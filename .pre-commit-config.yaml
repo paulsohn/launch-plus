@@ -23,3 +23,15 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check
+        language: system
+        types: [python]
+
+      - id: ruff-format
+        name: ruff format
+        entry: ruff format --check
+        language: system
+        types: [python]

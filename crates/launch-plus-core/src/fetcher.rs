@@ -348,7 +348,13 @@ fn update_sparse_checkout(
         );
         init_sparse_checkout(repo_dir)?;
         set_sparse_checkout_paths(repo_dir, paths)?;
-        checkout_sha(repo_dir, url, sha, options)?;
+        // Use Default mode: there are no user changes to stash — the tree
+        // artifact of sparse-checkout initialization is not real dirt.
+        let bootstrap_options = FetchOptions {
+            workspace_state: WorkspaceState::Default,
+            ..*options
+        };
+        checkout_sha(repo_dir, url, sha, &bootstrap_options)?;
         return Ok(());
     }
 

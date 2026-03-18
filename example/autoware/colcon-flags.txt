@@ -1,7 +1,0 @@
-# Colcon flagfile for the Autoware example build.
-# See example/colcon-flags.example.txt for all available options.
-
---symlink-install
---cmake-args
--DBUILD_TESTING=OFF
---catkin-skip-building-tests

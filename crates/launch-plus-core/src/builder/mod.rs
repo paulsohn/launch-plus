@@ -290,10 +290,17 @@ pub fn execute_build(
 
     // 7. Report results.
     if result.is_success() {
-        eprintln!(
-            "\nBuild complete: {} packages built successfully.",
-            result.completed.len()
-        );
+        if options.dry_run {
+            eprintln!(
+                "\nDry run complete: {} packages would be built.",
+                result.completed.len()
+            );
+        } else {
+            eprintln!(
+                "\nBuild complete: {} packages built successfully.",
+                result.completed.len()
+            );
+        }
         Ok(())
     } else {
         let failed_names: Vec<&str> = result.failed.iter().map(|(n, _)| n.as_str()).collect();

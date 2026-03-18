@@ -394,11 +394,11 @@ enum Commands {
         log_base: String,
 
         /// Extra arguments passed to cmake (e.g. -DCMAKE_BUILD_TYPE=Release)
-        #[arg(long, num_args = 1..)]
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
         cmake_args: Vec<String>,
 
         /// Extra arguments passed to make
-        #[arg(long, num_args = 1..)]
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
         make_args: Vec<String>,
 
         /// Use symlink install instead of copying files
@@ -472,11 +472,11 @@ enum Commands {
         log_base: String,
 
         /// Extra arguments passed to cmake
-        #[arg(long, num_args = 1..)]
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
         cmake_args: Vec<String>,
 
         /// Extra arguments passed to make
-        #[arg(long, num_args = 1..)]
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
         make_args: Vec<String>,
 
         /// Use symlink install instead of copying files
@@ -578,11 +578,11 @@ enum Commands {
         log_base: String,
 
         /// Extra arguments passed to cmake
-        #[arg(long, num_args = 1..)]
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
         cmake_args: Vec<String>,
 
         /// Extra arguments passed to make
-        #[arg(long, num_args = 1..)]
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
         make_args: Vec<String>,
 
         /// Use symlink install instead of copying files

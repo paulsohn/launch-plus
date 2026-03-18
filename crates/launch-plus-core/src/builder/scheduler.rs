@@ -168,6 +168,7 @@ pub fn run_parallel_build(
                     pkg_src_dirs,
                     interrupted,
                     options.continue_on_error,
+                    options.dry_run,
                 );
             });
         }
@@ -189,6 +190,7 @@ fn worker_loop(
     pkg_src_dirs: &HashMap<String, std::path::PathBuf>,
     interrupted: &'static AtomicBool,
     continue_on_error: bool,
+    dry_run: bool,
 ) {
     loop {
         // === Pick next package ===
@@ -234,7 +236,7 @@ fn worker_loop(
         };
 
         // Progress: starting.
-        {
+        if !dry_run {
             let guard = state.lock().unwrap();
             eprintln!(
                 "[{}/{}] Building {} ({})",
@@ -263,13 +265,15 @@ fn worker_loop(
 
             match result {
                 Ok(()) => {
-                    eprintln!(
-                        "[{}/{}] \u{2713} {} ({:.1}s)",
-                        guard.finished_count,
-                        guard.total,
-                        pkg_name,
-                        elapsed.as_secs_f64()
-                    );
+                    if !dry_run {
+                        eprintln!(
+                            "[{}/{}] \u{2713} {} ({:.1}s)",
+                            guard.finished_count,
+                            guard.total,
+                            pkg_name,
+                            elapsed.as_secs_f64()
+                        );
+                    }
 
                     guard.completed.push(pkg_name.clone());
 

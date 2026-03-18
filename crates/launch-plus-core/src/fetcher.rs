@@ -352,7 +352,7 @@ fn update_sparse_checkout(
         // artifact of sparse-checkout initialization is not real dirt.
         let bootstrap_options = FetchOptions {
             workspace_state: WorkspaceState::Default,
-            ..*options
+            ..options.clone()
         };
         checkout_sha(repo_dir, url, sha, &bootstrap_options)?;
         return Ok(());
@@ -780,10 +780,11 @@ fn checkout_sha(
     if have_locally {
         debug!("SHA {} already available locally, skipping fetch", sha);
     } else {
-        let mut fetch_args = vec!["fetch", url, sha];
+        let mut fetch_args = vec!["fetch"];
         if options.shallow {
-            fetch_args.insert(1, "--depth=1");
+            fetch_args.push("--depth=1");
         }
+        fetch_args.extend(["--", url, sha]);
 
         let output = Command::new("git")
             .current_dir(repo_dir)

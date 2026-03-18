@@ -218,7 +218,7 @@ pub fn resolve_version_local(
     // which may point to a different URL than the manifest specifies.
     let output = Command::new("git")
         .current_dir(repo_dir)
-        .args(["fetch", url, version_ref])
+        .args(["fetch", "--", url, version_ref])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -934,7 +934,7 @@ fn discover_packages_from_existing_repo(
     debug!("Fetching {} from {} in existing repo...", sha, url);
     let fetch_result = Command::new("git")
         .current_dir(repo_dir)
-        .args(["fetch", url, sha, "--depth=1"])
+        .args(["fetch", "--depth=1", "--", url, sha])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output();
@@ -945,7 +945,7 @@ fn discover_packages_from_existing_repo(
             debug!("Specific SHA fetch failed, trying general fetch...");
             let _ = Command::new("git")
                 .current_dir(repo_dir)
-                .args(["fetch", url, "--depth=1"])
+                .args(["fetch", "--depth=1", "--", url])
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .output();
@@ -1124,7 +1124,7 @@ fn discover_packages_from_submodules(
                             let fetch_url = entry.url.as_deref().unwrap_or("origin");
                             let _ = Command::new("git")
                                 .current_dir(&submodule_dir)
-                                .args(["fetch", fetch_url, submodule_sha, "--depth=1"])
+                                .args(["fetch", "--depth=1", "--", fetch_url, submodule_sha])
                                 .stdout(Stdio::piped())
                                 .stderr(Stdio::piped())
                                 .output();

@@ -242,6 +242,12 @@ _declared_arg_names: set = set()
 # Each entry is a resolved string.  Managed by _walk_action; reset in main().
 _namespace_stack: list = []
 
+# Environment variable overrides.  Starts empty; mutated by
+# SetEnvironmentVariable / UnsetEnvironmentVariable.  EnvironmentVariable
+# substitution checks this first, then falls back to os.environ.
+# Scoped groups clone/restore this.
+_env: dict = {}
+
 def _is_substitution(value):
     """Return True if *value* is a launch substitution (not yet resolved to a string).
 
@@ -332,6 +338,32 @@ def _track_param_file(path):
         entry = {"package": dep[0], "share_path": dep[1]}
         if entry not in _tracked["param_file_deps"]:
             _tracked["param_file_deps"].append(entry)
+
+
+def _to_str(value, context=None):
+    """Coerce a str, substitution object, or None to ``str | None``.
+
+    - ``None`` → ``None`` (caller decides how to handle missing values)
+    - ``str``  → returned as-is
+    - object with ``.perform()`` → call it; ``None`` result stays ``None``,
+      non-``None`` result is coerced to ``str``; on exception → ``str(value)``
+    - anything else → ``str(value)``
+
+    Every non-``None`` return value is guaranteed to be ``str``.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if hasattr(value, "perform"):
+        try:
+            res = value.perform(context)
+            return str(res) if res is not None else None
+        except _PackageNotFetchedError:
+            raise
+        except Exception:
+            return str(value)
+    return str(value)
 
 
 def _resolve_substitution(sub, context):
@@ -1089,6 +1121,21 @@ class _TrackedGroupAction:
     """Stores GroupAction's child actions so the walker can recurse into them."""
     def __init__(self, actions=None, **kwargs):
         self._actions = list(actions or [])
+        self._scoped = kwargs.get("scoped", True)
+        self._condition = kwargs.get("condition")
+
+class _TrackedSetEnvironmentVariable:
+    """Tracks SetEnvironmentVariable: mutates _env in _walk_action."""
+    def __init__(self, name=None, value=None, **kwargs):
+        self._name = name
+        self._value = value
+        self._condition = kwargs.get("condition")
+
+class _TrackedUnsetEnvironmentVariable:
+    """Tracks UnsetEnvironmentVariable: removes from _env in _walk_action."""
+    def __init__(self, name=None, **kwargs):
+        self._name = name
+        self._condition = kwargs.get("condition")
 
 class _TrackedSetParameter:
     """Mirrors launch_ros SetParameter: accumulates (name, value) into context['global_params'].
@@ -1431,6 +1478,11 @@ def _make_launch_context(args_dict):
 
 # ─── Node detail resolution helpers ──────────────────────────────────────────
 
+def _env_overrides():
+    """Return a copy of the current env overrides for per-node output."""
+    return dict(_env)
+
+
 def _resolve_node_details(node, context):
     """Fill in deferred details (package, executable, name, namespace, params, remaps, env).
 
@@ -1478,8 +1530,8 @@ def _resolve_node_details(node, context):
             remaps.append([src or str(r[0]), dst or str(r[1])])
     entry["remappings"] = remaps
 
-    # Env vars: accept list-of-tuples or dict
-    env = {}
+    # Env vars: start with inherited env diff, then node-local overrides
+    env = _env_overrides()
     raw_env = node._raw_env
     if isinstance(raw_env, dict):
         for k, v in raw_env.items():
@@ -1619,6 +1671,7 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
     saved_declared_arg_names = set(_declared_arg_names)
     saved_event_handlers_len = len(_tracked["event_handlers"])
     saved_namespace_depth = len(_namespace_stack)
+    saved_env = dict(_env)
 
     # Snapshot parent context BEFORE generate_launch_description() so we can
     # fully restore it after the inline walk.  Only deliberate side-effects
@@ -1677,6 +1730,8 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
         _declared_arg_names.update(saved_declared_arg_names)
         del _tracked["event_handlers"][saved_event_handlers_len:]
         del _namespace_stack[saved_namespace_depth:]
+        _env.clear()
+        _env.update(saved_env)
 
     # Restore child-only args that were not SetLaunchConfiguration'd —
     # child DeclareLaunchArgument defaults should NOT leak into the parent
@@ -1899,12 +1954,73 @@ def _walk_action(action, context, depth):
                 _error(f"OpaqueFunction failed: {e}")
         return
 
-    # GroupAction: walk child actions; restore namespace stack depth afterwards
-    # (any PushRosNamespace pushed inside the group must not leak to siblings)
+    # SetEnvironmentVariable: mutate the env map (respects condition)
+    if isinstance(action, _TrackedSetEnvironmentVariable):
+        if action._condition is not None and context is not None:
+            try:
+                if not action._condition.evaluate(context):
+                    return
+            except _PackageNotFetchedError:
+                raise
+            except Exception as e:
+                _warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
+                return
+        name = _to_str(action._name, context)
+        if not name:
+            _error("SetEnvironmentVariable: resolved name is empty or None — skipping")
+            return
+        value = _to_str(action._value, context) or ""
+        _env[name] = value
+        return
+
+    # UnsetEnvironmentVariable: remove from env map (respects condition)
+    if isinstance(action, _TrackedUnsetEnvironmentVariable):
+        if action._condition is not None and context is not None:
+            try:
+                if not action._condition.evaluate(context):
+                    return
+            except _PackageNotFetchedError:
+                raise
+            except Exception as e:
+                _warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
+                return
+        name = _to_str(action._name, context)
+        if not name:
+            _error("UnsetEnvironmentVariable: resolved name is empty or None — skipping")
+            return
+        if name in os.environ:
+            # In process env (cases 2 & 3) — can't unset baseline.
+            _error(
+                f"unset_env: '{name}' exists in the process env and cannot be unset. "
+                f"Use SetEnvironmentVariable(name=\"{name}\", value=\"\") "
+                "or a scoped group instead"
+            )
+        elif name in _env:
+            # Case 1: override-only, no baseline to expose — safe to remove.
+            del _env[name]
+        else:
+            # Case 4: not set anywhere.
+            _error(f"unset_env: environment variable '{name}' is not set")
+        return
+
+    # GroupAction: walk child actions; scoped groups save/restore env + namespace
     if isinstance(action, _TrackedGroupAction):
+        if action._condition is not None and context is not None:
+            try:
+                if not action._condition.evaluate(context):
+                    return
+            except _PackageNotFetchedError:
+                raise
+            except Exception as e:
+                _warn(f"GroupAction condition evaluation failed: {e}")
+                return
         depth_before = len(_namespace_stack)
+        saved_env = dict(_env) if action._scoped else None
         _walk_actions(action._actions, context, depth + 1)
         del _namespace_stack[depth_before:]
+        if saved_env is not None:
+            _env.clear()
+            _env.update(saved_env)
         return
 
     if isinstance(action, _TimerAction):
@@ -2105,13 +2221,45 @@ def _build_patched_launch_ros_descriptions():
 def _build_patched_launch_substitutions():
     """Always-stub: avoids recursion since we also patch top-level `launch`."""
     mod = types.ModuleType("launch.substitutions")
+    mod.__path__ = []  # mark as package so submodule imports work
     mod.FindPackageShare = _TrackedFindPackageShare
     mod.PathJoinSubstitution = _TrackedPathJoinSubstitution
     mod.LaunchConfiguration = _LaunchConfiguration
-    mod.EnvironmentVariable = lambda name, **kw: os.environ.get(name, "")
+    _SENTINEL = object()
+    class _DeferredEnvironmentVariable:
+        """Deferred substitution: reads _env at perform() time, not construction."""
+        def __init__(self, name, **kw):
+            self._name = name
+            self._default = kw.get("default_value", _SENTINEL)
+        def perform(self, context=None):
+            # Resolve name to a concrete string via _to_str.
+            name = _to_str(self._name, context) or ""
+            # Look up in override env, then process env.
+            if name in _env:
+                return _env[name]
+            if name in os.environ:
+                return os.environ[name]
+            # No match — use default if provided, otherwise error.
+            if self._default is not _SENTINEL:
+                return _to_str(self._default, context) or ""
+            _error(f"EnvironmentVariable: '{name}' is not set and no default was provided")
+            return ""
+        def __str__(self):
+            # Avoid calling perform() without context — return the raw name.
+            return str(self._name) if self._name is not None else ""
+    mod.EnvironmentVariable = _DeferredEnvironmentVariable
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None
     mod.ThisLaunchFileDir = lambda: Path(__file__).parent
+    return mod
+
+def _build_patched_launch_substitutions_environment_variable():
+    """Submodule stub for ``from launch.substitutions.environment_variable import ...``."""
+    parent = sys.modules.get("launch.substitutions")
+    if parent is None:
+        parent = _build_patched_launch_substitutions()
+    mod = types.ModuleType("launch.substitutions.environment_variable")
+    mod.EnvironmentVariable = parent.EnvironmentVariable
     return mod
 
 def _build_patched_launch_actions():
@@ -2129,7 +2277,8 @@ def _build_patched_launch_actions():
     mod.Shutdown = _TrackedShutdown
     mod.PushLaunchConfigurations = lambda *a, **kw: None
     mod.PopLaunchConfigurations = lambda *a, **kw: None
-    mod.SetEnvironmentVariable = lambda *a, **kw: None
+    mod.SetEnvironmentVariable = _TrackedSetEnvironmentVariable
+    mod.UnsetEnvironmentVariable = _TrackedUnsetEnvironmentVariable
     mod.ExecuteProcess = _TrackedExecutable
     mod.ExecuteLocal = lambda *a, **kw: None
     mod.OnProcessExit = _TrackedOnProcessExit
@@ -2369,6 +2518,7 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
         "launch_ros.parameter_descriptions": _build_patched_launch_ros_parameter_descriptions,
         "launch_ros.utilities": _build_patched_launch_ros_utilities,
         "launch.substitutions": _build_patched_launch_substitutions,
+        "launch.substitutions.environment_variable": _build_patched_launch_substitutions_environment_variable,
         "launch.actions": _build_patched_launch_actions,
         "launch.event_handlers": _build_patched_launch_event_handlers,
         "launch.conditions": _build_patched_launch_conditions,
@@ -2426,6 +2576,7 @@ def main():
     # before falling back to AMENT_PREFIX_PATH or hardcoded paths.
     global _package_shares, _namespace_stack, _apply_opaque_file_access
     _namespace_stack = []
+    _env.clear()
     if len(sys.argv) > 3:
         try:
             _package_shares = json.loads(sys.argv[3])
@@ -2533,6 +2684,10 @@ def main():
         _walk_actions(entities, ctx)
     except _PackageNotFetchedError:
         pass  # Absorbed; package already in _packages_to_fetch
+
+    # Net-zero check: any remaining overrides are leaked env mutations.
+    for k, v in _env.items():
+        _error(f"env var '{k}' was set to '{v}' but not restored (leaked from file scope)")
 
     if _packages_to_fetch:
         _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)

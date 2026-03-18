@@ -482,3 +482,136 @@ class TestInlinePythonInclude:
 
             # No new include deps
             assert len(R._tracked["include_deps"]) == deps_before
+
+
+# ─── Environment Variable Stack ──────────────────────────────────────────────
+
+class TestEnvStack:
+    """Tests for SetEnvironmentVariable / UnsetEnvironmentVariable tracking,
+    env inheritance to nodes, and group scoping."""
+
+    def test_set_env_inherits_to_node(self):
+        """SetEnvironmentVariable then Node → node's env includes the var."""
+        ctx = _make_context()
+        set_env = R._TrackedSetEnvironmentVariable(name="FOO", value="bar")
+        node = R._TrackedNode(package="p", executable="e", name="n")
+        R._walk_action(set_env, ctx, 0)
+        R._walk_action(node, ctx, 0)
+        entry = R._tracked["nodes"][node._idx]
+        assert entry["env"]["FOO"] == "bar"
+
+    def test_unset_env_nonexistent_errors(self):
+        """UnsetEnvironmentVariable on a var that doesn't exist → 'not set' error."""
+        import uuid
+        name = f"NONEXISTENT_VAR_{uuid.uuid4().hex[:8]}"
+        assert name not in os.environ, f"precondition: {name} must not be in process env"
+        ctx = _make_context()
+        R._walk_action(R._TrackedUnsetEnvironmentVariable(name=name), ctx, 0)
+        errors = R._tracked.get("errors", [])
+        assert any(name in e and "not set" in e for e in errors)
+
+    def test_unset_env_override_only_accepted(self):
+        """UnsetEnv on an override-only var (not in process env) → accepted."""
+        import uuid
+        name = f"OVERRIDE_ONLY_{uuid.uuid4().hex[:8]}"
+        assert name not in os.environ, f"precondition: {name} must not be in process env"
+        ctx = _make_context()
+        R._walk_action(R._TrackedSetEnvironmentVariable(name=name, value="val"), ctx, 0)
+        assert name in R._env
+        R._walk_action(R._TrackedUnsetEnvironmentVariable(name=name), ctx, 0)
+        assert name not in R._env
+        errors = R._tracked.get("errors", [])
+        assert not any(name in e for e in errors)
+
+    def test_group_scoped_env_does_not_leak(self):
+        """GroupAction(scoped=True) → env mutations don't leak to siblings."""
+        ctx = _make_context()
+        group = R._TrackedGroupAction(
+            actions=[R._TrackedSetEnvironmentVariable(name="SCOPED_VAR", value="val")],
+            scoped=True,
+        )
+        R._walk_action(group, ctx, 0)
+        node = R._TrackedNode(package="p", executable="e", name="n")
+        R._walk_action(node, ctx, 0)
+        entry = R._tracked["nodes"][node._idx]
+        assert "SCOPED_VAR" not in entry["env"]
+
+    def test_group_unscoped_env_leaks(self):
+        """GroupAction(scoped=False) → env mutations leak to siblings."""
+        ctx = _make_context()
+        group = R._TrackedGroupAction(
+            actions=[R._TrackedSetEnvironmentVariable(name="LEAKED_VAR", value="val")],
+            scoped=False,
+        )
+        R._walk_action(group, ctx, 0)
+        node = R._TrackedNode(package="p", executable="e", name="n")
+        R._walk_action(node, ctx, 0)
+        entry = R._tracked["nodes"][node._idx]
+        assert entry["env"]["LEAKED_VAR"] == "val"
+
+    def test_node_local_env_overrides_inherited(self):
+        """Node-local env overrides inherited env for the same key."""
+        ctx = _make_context()
+        R._walk_action(R._TrackedSetEnvironmentVariable(name="FOO", value="inherited"), ctx, 0)
+        node = R._TrackedNode(
+            package="p", executable="e", name="n",
+            env=[("FOO", "local")],
+        )
+        R._walk_action(node, ctx, 0)
+        entry = R._tracked["nodes"][node._idx]
+        assert entry["env"]["FOO"] == "local"
+
+    def test_inline_include_env_rollback(self):
+        """Env set by inline-included child does NOT leak to parent."""
+        import tempfile, textwrap
+        with tempfile.TemporaryDirectory() as d:
+            child_path = os.path.join(d, "child.launch.py")
+            with open(child_path, "w") as f:
+                f.write(textwrap.dedent("""\
+                    from launch import LaunchDescription
+                    from launch.actions import SetEnvironmentVariable
+                    def generate_launch_description():
+                        return LaunchDescription([
+                            SetEnvironmentVariable(name="CHILD_VAR", value="child_val"),
+                        ])
+                """))
+            ctx = _make_context()
+            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+            assert "CHILD_VAR" not in R._env
+
+    def test_env_overrides_returns_only_overrides(self):
+        """_env_overrides() returns only explicitly set vars, not process env."""
+        R._env["NEW_VAR"] = "new_val"
+        overrides = R._env_overrides()
+        assert overrides["NEW_VAR"] == "new_val"
+        # Process env vars must NOT appear in overrides.
+        import os
+        assert "PATH" in os.environ, "PATH should exist in process env for this test"
+        assert "PATH" not in overrides
+
+    def test_env_overrides_empty_when_no_overrides(self):
+        """Empty overrides when nothing has been set."""
+        assert R._env_overrides() == {}
+
+    def test_net_zero_error_includes_value(self):
+        """Net-zero leak error includes the override value (safe, user-set)."""
+        R._env["MY_KEY"] = "my_value"
+        # Simulate the net-zero check inline (same logic as main())
+        errors = []
+        for k, v in R._env.items():
+            errors.append(f"env var '{k}' was set to '{v}' but not restored (leaked from file scope)")
+        err = [e for e in errors if "MY_KEY" in e]
+        assert len(err) == 1
+        assert "my_value" in err[0]
+
+    def test_process_env_never_exposed_in_node(self):
+        """Node env should only contain overrides, never process env vars."""
+        ctx = _make_context()
+        R._walk_action(R._TrackedSetEnvironmentVariable(name="MY_OVERRIDE", value="val"), ctx, 0)
+        node = R._TrackedNode(package="p", executable="e", name="n")
+        R._walk_action(node, ctx, 0)
+        entry = R._tracked["nodes"][node._idx]
+        # Only the explicit override should appear.
+        assert entry["env"] == {"MY_OVERRIDE": "val"}
+        # Process env vars like PATH must never leak.
+        assert "PATH" not in entry["env"]

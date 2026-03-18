@@ -112,6 +112,7 @@ pub enum LaunchElement {
         namespace: Option<String>,
         condition: Option<Condition>,
         composable_nodes: Vec<ComposableNode>,
+        envs: Vec<Env>,
     },
     /// Load composable nodes into a running container: `<load_composable_node target="...">`
     ///
@@ -461,6 +462,7 @@ fn raw_to_launch(raw: RawElement) -> crate::Result<Option<LaunchElement>> {
             let namespace = raw.get("namespace");
             let condition = raw.condition()?;
             let composable_nodes = extract_composable_nodes(&raw.children)?;
+            let (_, _, envs) = extract_node_children(&raw.children)?;
             Ok(Some(LaunchElement::NodeContainer {
                 pkg,
                 exec,
@@ -468,6 +470,7 @@ fn raw_to_launch(raw: RawElement) -> crate::Result<Option<LaunchElement>> {
                 namespace,
                 condition,
                 composable_nodes,
+                envs,
             }))
         }
         "load_composable_node" => {

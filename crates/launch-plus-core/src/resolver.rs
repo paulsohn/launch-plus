@@ -80,11 +80,6 @@ pub enum NodeKind {
     /// in the include chain are opened persistently so that sibling real nodes share the
     /// correct group context.  Excluded from semantic comparison.
     IncludeMarker,
-    /// A `<set_env name="..." value="..."/>` statement.  Affects the OS environment of
-    /// all subsequently-launched processes.  Excluded from semantic comparison.
-    SetEnv { name: String, value: String },
-    /// A `<unset_env name="..."/>` statement.  Excluded from semantic comparison.
-    UnsetEnv { name: String },
     /// A `<log message="..."/>` action.  Excluded from semantic comparison.
     Log { message: String },
     /// A `<set_parameter name="..." value="..."/>` statement.  Sets a ROS parameter
@@ -172,6 +167,13 @@ pub struct SubstitutionContext {
     /// When `true`, missing packages are not treated as errors because `--rosdep`
     /// may install them later.  The portable form is kept silently.
     pub rosdep_fallback: bool,
+    /// Environment variable overrides.  Starts empty; mutated by
+    /// `<set_env>`/`<unset_env>` actions.  `$(env X)` checks this map first,
+    /// then falls back to the real process environment.  Scoped groups
+    /// clone/restore it.  Per-node `<env>` output is exactly this map
+    /// (no baseline diff needed).  Uses `BTreeMap` for stable key order
+    /// in rendered output and error messages.
+    pub env: BTreeMap<String, String>,
 }
 
 impl Default for SubstitutionContext {
@@ -187,7 +189,19 @@ impl Default for SubstitutionContext {
             preview_mode: false,
             lockfile_packages: Arc::new(HashSet::new()),
             rosdep_fallback: false,
+            env: BTreeMap::new(),
         }
+    }
+}
+
+impl SubstitutionContext {
+    /// Return the current env overrides.
+    ///
+    /// Since `env` is a `BTreeMap` and only contains explicit overrides
+    /// (set via `<set_env>` / `<unset_env>`), this is exactly the per-node
+    /// `<env>` output — no diff or re-sorting needed.
+    pub fn env_overrides(&self) -> BTreeMap<String, String> {
+        self.env.clone()
     }
 }
 
@@ -572,9 +586,16 @@ fn resolve_substitutions_inner(
                 result.push_str(&value);
             }
             Substitution::Env { name, default } => {
-                let value = std::env::var(&name).ok().or(default).ok_or_else(|| {
-                    crate::Error::LaunchParse(format!("environment variable not set: {}", name))
-                })?;
+                // Check overrides first, then real process env, then default.
+                let value = ctx
+                    .env
+                    .get(&name)
+                    .cloned()
+                    .or_else(|| std::env::var_os(&name).and_then(|v| v.into_string().ok()))
+                    .or(default)
+                    .ok_or_else(|| {
+                        crate::Error::LaunchParse(format!("environment variable not set: {}", name))
+                    })?;
                 result.push_str(&value);
             }
             Substitution::FindPkgShare(pkg) => {
@@ -1076,8 +1097,6 @@ pub fn semantic_eq(a: &[ResolvedNode], b: &[ResolvedNode]) -> bool {
         !matches!(
             n.kind,
             NodeKind::IncludeMarker
-                | NodeKind::SetEnv { .. }
-                | NodeKind::UnsetEnv { .. }
                 | NodeKind::SetParameter { .. }
                 | NodeKind::SetRemap { .. }
                 | NodeKind::Log { .. }
@@ -1235,6 +1254,16 @@ pub fn resolve_launch(
             .entry(k.clone())
             .or_insert_with(|| v.clone());
     }
+
+    // Net-zero check: any remaining overrides at file scope are leaked env mutations.
+    for (k, v) in &ctx.env {
+        result.errors.push(format!(
+            "env var '{}' was set to '{}' but not restored (leaked from file scope)",
+            k, v
+        ));
+    }
+    // Clear leaked overrides so callers don't inherit stale env state.
+    ctx.env.clear();
 
     Ok(result)
 }
@@ -1491,6 +1520,7 @@ fn resolve_element(
                         preview_mode: ctx.preview_mode,
                         lockfile_packages: ctx.lockfile_packages.clone(),
                         rosdep_fallback: ctx.rosdep_fallback,
+                        env: ctx.env.clone(),
                     };
                     resolve_elements(children, &mut scoped_ctx, result, options, include_stack)?;
                     // Propagate newly declared args (with defaults) from the scoped context
@@ -1790,6 +1820,7 @@ fn resolve_element(
                         preview_mode: ctx.preview_mode,
                         lockfile_packages: ctx.lockfile_packages.clone(),
                         rosdep_fallback: ctx.rosdep_fallback,
+                        env: ctx.env.clone(),
                     };
 
                     let nodes_before_xml = result.nodes.len();
@@ -1802,6 +1833,26 @@ fn resolve_element(
                         include_stack,
                     )?;
                     include_stack.pop();
+                    // Net-zero check for included file: env overrides that differ
+                    // from the parent snapshot are leaked by the included file.
+                    for (k, v) in &include_ctx.env {
+                        if ctx.env.get(k) != Some(v) {
+                            result.errors.push(format!(
+                                "env var '{}' was set to '{}' but not restored \
+                                 (leaked from included file)",
+                                k, v
+                            ));
+                        }
+                    }
+                    for k in ctx.env.keys() {
+                        if !include_ctx.env.contains_key(k) {
+                            result.errors.push(format!(
+                                "env var '{}' was unset but not restored \
+                                 (leaked from included file)",
+                                k
+                            ));
+                        }
+                    }
                     // Inject a marker if the included XML added no nodes at all.
                     if result.nodes.len() == nodes_before_xml {
                         if let Some(file_dep) =
@@ -1878,12 +1929,12 @@ fn resolve_element(
                     resolve_params(params, ctx, result, options)?;
                 let resolved_remaps = resolve_remaps(remaps, ctx, result)?;
 
-                // Resolve envs
-                let mut resolved_envs = BTreeMap::new();
+                // Resolve envs: start with inherited env diff, then node-local overrides
+                let mut merged_envs = ctx.env_overrides();
                 for env in envs {
                     let name_val = resolve_substitutions(&env.name, ctx)?.propagate_into(result);
                     let env_val = resolve_substitutions(&env.value, ctx)?.propagate_into(result);
-                    resolved_envs.insert(name_val, env_val);
+                    merged_envs.insert(name_val, env_val);
                 }
 
                 // Resolve output / args / respawn / respawn_delay
@@ -1917,7 +1968,7 @@ fn resolve_element(
                     namespace_stack: ctx.namespace_stack.clone(),
                     parameters: resolved_params,
                     remappings: resolved_remaps,
-                    env: resolved_envs,
+                    env: merged_envs,
                     source: None,          // stamped by the orchestrator
                     include_chain: vec![], // stamped by the orchestrator
                     kind: NodeKind::Node,
@@ -1980,11 +2031,11 @@ fn resolve_element(
                 let (resolved_params, resolved_param_files) =
                     resolve_params(params, ctx, result, options)?;
                 let resolved_remaps = resolve_remaps(remaps, ctx, result)?;
-                let mut resolved_envs = BTreeMap::new();
+                let mut merged_envs = ctx.env_overrides();
                 for env in envs {
                     let name_val = resolve_substitutions(&env.name, ctx)?.propagate_into(result);
                     let env_val = resolve_substitutions(&env.value, ctx)?.propagate_into(result);
-                    resolved_envs.insert(name_val, env_val);
+                    merged_envs.insert(name_val, env_val);
                 }
                 let resolved_output = if let Some(o) = output {
                     Some(resolve_substitutions(o, ctx)?.propagate_into(result))
@@ -2016,7 +2067,7 @@ fn resolve_element(
                     namespace_stack: ctx.namespace_stack.clone(),
                     parameters: resolved_params,
                     remappings: resolved_remaps,
-                    env: resolved_envs,
+                    env: merged_envs,
                     source: None,
                     include_chain: vec![],
                     kind: NodeKind::LifecycleNode,
@@ -2156,13 +2207,7 @@ fn resolve_element(
             if should_set {
                 let name_val = resolve_substitutions(name, ctx)?.propagate_into(result);
                 let env_val = resolve_substitutions(value, ctx)?.propagate_into(result);
-                result.nodes.push(ResolvedNode {
-                    kind: NodeKind::SetEnv {
-                        name: name_val,
-                        value: env_val,
-                    },
-                    ..Default::default()
-                });
+                ctx.env.insert(name_val, env_val);
             }
         }
 
@@ -2176,10 +2221,23 @@ fn resolve_element(
             };
             if should_unset {
                 let name_val = resolve_substitutions(name, ctx)?.propagate_into(result);
-                result.nodes.push(ResolvedNode {
-                    kind: NodeKind::UnsetEnv { name: name_val },
-                    ..Default::default()
-                });
+                if std::env::var_os(&name_val).is_some() {
+                    // In process env (cases 2 & 3) — can't unset baseline.
+                    result.errors.push(format!(
+                        "unset_env: '{}' exists in the process env and cannot be unset. \
+                         Use <set_env name=\"{}\" value=\"\"/> or a scoped group instead",
+                        name_val, name_val
+                    ));
+                } else if ctx.env.contains_key(&name_val) {
+                    // Case 1: override-only, no baseline to expose — safe to remove.
+                    ctx.env.remove(&name_val);
+                } else {
+                    // Case 4: not set anywhere.
+                    result.errors.push(format!(
+                        "unset_env: environment variable '{}' is not set",
+                        name_val
+                    ));
+                }
             }
         }
 
@@ -2190,6 +2248,7 @@ fn resolve_element(
             namespace,
             condition,
             composable_nodes,
+            envs,
         } => {
             let should_include = if let Some(cond) = condition {
                 let (include, cond_sub) = evaluate_condition(cond, ctx)?;
@@ -2227,6 +2286,16 @@ fn resolve_element(
                     }
                 }
 
+                // Compute inherited env + node-local <env> children.
+                let mut container_env = ctx.env_overrides();
+                for env_entry in envs {
+                    let env_name =
+                        resolve_substitutions(&env_entry.name, ctx)?.propagate_into(result);
+                    let env_value =
+                        resolve_substitutions(&env_entry.value, ctx)?.propagate_into(result);
+                    container_env.insert(env_name, env_value);
+                }
+
                 // Emit the container process as a node with its plugins.
                 result.nodes.push(ResolvedNode {
                     package: pkg_val,
@@ -2237,7 +2306,7 @@ fn resolve_element(
                     namespace_stack: ctx.namespace_stack.clone(),
                     parameters: BTreeMap::new(),
                     remappings: vec![],
-                    env: BTreeMap::new(),
+                    env: container_env,
                     source: None,
                     include_chain: vec![],
                     kind: NodeKind::Container { plugins },
@@ -2296,7 +2365,16 @@ fn resolve_element(
                     ctx.namespace_stack.pop();
                 }
 
-                // A LoadComposableNode is not itself a process; package/executable are empty.
+                // A LoadComposableNode is not itself a process — it runs inside
+                // the container's process, so it has no env of its own.
+                if !ctx.env.is_empty() {
+                    result.warnings.push(format!(
+                        "load_composable_node: env overrides ({}) are active but \
+                         will not apply — composable nodes run inside the container's \
+                         process. Consider setting env on the container instead",
+                        ctx.env.keys().cloned().collect::<Vec<_>>().join(", ")
+                    ));
+                }
                 result.nodes.push(ResolvedNode {
                     package: String::new(),
                     executable: String::new(),
@@ -2863,21 +2941,6 @@ pub fn render_resolved_xml(
                 render_load_composable_node(target, plugins, &node_ind, &child_ind, &mut out);
             }
             NodeKind::IncludeMarker => unreachable!("markers handled above"),
-            NodeKind::SetEnv { name, value } => {
-                out.push_str(&format!(
-                    "{}<set_env name=\"{}\" value=\"{}\"/>\n",
-                    node_ind,
-                    xml_escape(name),
-                    xml_escape(value)
-                ));
-            }
-            NodeKind::UnsetEnv { name } => {
-                out.push_str(&format!(
-                    "{}<unset_env name=\"{}\"/>\n",
-                    node_ind,
-                    xml_escape(name)
-                ));
-            }
             NodeKind::Log { message } => {
                 out.push_str(&format!(
                     "{}<log message=\"{}\"/>\n",
@@ -3284,12 +3347,21 @@ fn render_container_node(
             tag.push_str(&format!(" namespace=\"{}\"", xml_escape(ns)));
         }
     }
-    if plugins.is_empty() {
+    let has_children = !plugins.is_empty() || !node.env.is_empty();
+    if !has_children {
         tag.push_str("/>\n");
         out.push_str(&tag);
     } else {
         tag.push_str(">\n");
         out.push_str(&tag);
+        for (name, value) in &node.env {
+            out.push_str(&format!(
+                "{}<env name=\"{}\" value=\"{}\"/>\n",
+                child_ind,
+                xml_escape(name),
+                xml_escape(value)
+            ));
+        }
         for plugin in plugins {
             render_composable_plugin(plugin, child_ind, out);
         }
@@ -3562,6 +3634,7 @@ fn collect_arg_var_refs_in_elem(elem: &LaunchElement, refs: &mut HashSet<String>
             namespace,
             condition,
             composable_nodes,
+            envs,
         } => {
             scan_str_for_arg_var_refs(pkg, refs);
             scan_str_for_arg_var_refs(exec, refs);
@@ -3583,6 +3656,10 @@ fn collect_arg_var_refs_in_elem(elem: &LaunchElement, refs: &mut HashSet<String>
                 if let Some(c) = &cn.condition {
                     scan_str_for_arg_var_refs(&c.expr, refs);
                 }
+            }
+            for env_entry in envs {
+                scan_str_for_arg_var_refs(&env_entry.name, refs);
+                scan_str_for_arg_var_refs(&env_entry.value, refs);
             }
         }
         LaunchElement::LoadComposableNode {
@@ -3887,6 +3964,7 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
             namespace,
             condition,
             composable_nodes,
+            envs,
         } => {
             scan_str_for_env_no_fallback(pkg, names);
             scan_str_for_env_no_fallback(exec, names);
@@ -3908,6 +3986,10 @@ fn collect_env_no_fallback_in_elem(elem: &LaunchElement, names: &mut Vec<String>
                 if let Some(c) = &cn.condition {
                     scan_str_for_env_no_fallback(&c.expr, names);
                 }
+            }
+            for env_entry in envs {
+                scan_str_for_env_no_fallback(&env_entry.name, names);
+                scan_str_for_env_no_fallback(&env_entry.value, names);
             }
         }
         LaunchElement::LoadComposableNode {
@@ -4919,21 +5001,13 @@ mod tests {
     }
 
     #[test]
-    #[allow(unsafe_code)]
     fn test_resolve_env() {
-        // Set a test env var
-        // SAFETY: This test runs in a single thread and the var is unique to this test
-        unsafe {
-            std::env::set_var("TEST_LAUNCH_VAR", "test_value");
-        }
-        let ctx = SubstitutionContext::default();
+        let mut ctx = SubstitutionContext::default();
+        ctx.env
+            .insert("TEST_LAUNCH_VAR".to_string(), "test_value".to_string());
 
         let result = resolve_substitutions("$(env TEST_LAUNCH_VAR)", &ctx).unwrap();
         assert_eq!(result.value, "test_value");
-
-        unsafe {
-            std::env::remove_var("TEST_LAUNCH_VAR");
-        }
     }
 
     #[test]
@@ -4943,6 +5017,18 @@ mod tests {
         // Unset var should use default
         let result = resolve_substitutions("$(env NONEXISTENT_VAR fallback)", &ctx).unwrap();
         assert_eq!(result.value, "fallback");
+    }
+
+    #[test]
+    fn test_resolve_env_unset_without_default_errors() {
+        let var = "LAUNCH_PLUS_TEST_UNSET_8f3a2b";
+        assert!(
+            std::env::var_os(var).is_none(),
+            "precondition: {var} must not be set in the process environment"
+        );
+        let ctx = SubstitutionContext::default();
+        let result = resolve_substitutions(&format!("$(env {var})"), &ctx);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -5065,16 +5151,14 @@ mod tests {
     }
 
     #[test]
-    #[allow(unsafe_code)]
-    fn test_resolve_error_undefined_env() {
+    fn test_resolve_undefined_env_errors() {
+        let var = "DEFINITELY_NOT_A_REAL_VAR_12345";
+        assert!(
+            std::env::var_os(var).is_none(),
+            "precondition: {var} must not be set in the process environment"
+        );
         let ctx = SubstitutionContext::default();
-
-        // Make sure this var doesn't exist
-        // SAFETY: This test runs in a single thread and the var is unique to this test
-        unsafe {
-            std::env::remove_var("DEFINITELY_NOT_A_REAL_VAR_12345");
-        }
-        let result = resolve_substitutions("$(env DEFINITELY_NOT_A_REAL_VAR_12345)", &ctx);
+        let result = resolve_substitutions(&format!("$(env {var})"), &ctx);
         assert!(result.is_err());
     }
 
@@ -7669,5 +7753,266 @@ launch:
         assert!(rendered.contains("<on_process_exit target=\"can_rx\">"));
         assert!(rendered.contains("<emit_event event=\"shutdown\"/>"));
         assert!(rendered.contains("</on_process_exit>"));
+    }
+
+    // ─── Environment Variable Stack Tests ────────────────────────────────
+
+    #[test]
+    fn test_set_env_inherits_to_node() {
+        let xml = r#"
+            <launch>
+                <set_env name="FOO" value="bar"/>
+                <node pkg="p" exec="e"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        let node = result
+            .nodes
+            .iter()
+            .find(|n| matches!(n.kind, NodeKind::Node))
+            .unwrap();
+        assert_eq!(node.env.get("FOO"), Some(&"bar".to_string()));
+        // set_env leaks → net-zero error expected
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.contains("FOO") && e.contains("leaked"))
+        );
+    }
+
+    #[test]
+    fn test_scoped_group_env_isolation() {
+        let xml = r#"
+            <launch>
+                <group scoped="true">
+                    <set_env name="SCOPED_VAR" value="inner"/>
+                    <node pkg="inner_pkg" exec="inner_exec"/>
+                </group>
+                <node pkg="outer_pkg" exec="outer_exec"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        let nodes: Vec<_> = result
+            .nodes
+            .iter()
+            .filter(|n| matches!(n.kind, NodeKind::Node))
+            .collect();
+        assert_eq!(nodes.len(), 2);
+        // Inner node should have SCOPED_VAR
+        assert_eq!(nodes[0].env.get("SCOPED_VAR"), Some(&"inner".to_string()));
+        // Outer node should NOT have SCOPED_VAR (scoped group restored env)
+        assert_eq!(nodes[1].env.get("SCOPED_VAR"), None);
+    }
+
+    #[test]
+    fn test_env_substitution_reads_from_ctx_env() {
+        let xml = r#"
+            <launch>
+                <set_env name="MY_VAR" value="hello"/>
+                <node pkg="p" exec="e">
+                    <param name="p" value="$(env MY_VAR)"/>
+                </node>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        let node = result
+            .nodes
+            .iter()
+            .find(|n| matches!(n.kind, NodeKind::Node))
+            .unwrap();
+        assert_eq!(node.parameters.get("p"), Some(&"hello".to_string()));
+    }
+
+    #[test]
+    fn test_unset_env_nonexistent_errors() {
+        // <unset_env> on a var that doesn't exist anywhere → "not set" error.
+        let xml = r#"
+            <launch>
+                <unset_env name="LAUNCH_PLUS_TEST_UNSET_9c4d7e"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.contains("LAUNCH_PLUS_TEST_UNSET_9c4d7e") && e.contains("not set"))
+        );
+    }
+
+    #[test]
+    fn test_net_zero_error_on_leaked_env() {
+        let xml = r#"
+            <launch>
+                <set_env name="LEAKED" value="val"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.contains("LEAKED") && e.contains("leaked"))
+        );
+    }
+
+    #[test]
+    fn test_net_zero_no_error_when_scoped() {
+        let xml = r#"
+            <launch>
+                <group scoped="true">
+                    <set_env name="SCOPED" value="val"/>
+                </group>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        assert!(!result.errors.iter().any(|e| e.contains("SCOPED")));
+    }
+
+    #[test]
+    fn test_env_overrides_returns_set_vars() {
+        let mut ctx = SubstitutionContext::default();
+        ctx.env.insert("NEW".into(), "val".into());
+        let overrides = ctx.env_overrides();
+        assert_eq!(overrides.get("NEW"), Some(&"val".to_string()));
+    }
+
+    #[test]
+    fn test_env_overrides_empty_when_no_overrides() {
+        let ctx = SubstitutionContext::default();
+        assert!(ctx.env_overrides().is_empty());
+    }
+
+    #[test]
+    fn test_unset_env_override_only_accepted() {
+        // <set_env> then <unset_env> on a var NOT in process env → case 1: accepted.
+        // The override is removed, so the node sees no env overrides.
+        let xml = r#"
+            <launch>
+                <set_env name="OVERRIDE_ONLY_VAR_12345" value="hello"/>
+                <unset_env name="OVERRIDE_ONLY_VAR_12345"/>
+                <node pkg="p" exec="e"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        let node = result
+            .nodes
+            .iter()
+            .find(|n| matches!(n.kind, NodeKind::Node))
+            .unwrap();
+        assert_eq!(node.env.get("OVERRIDE_ONLY_VAR_12345"), None);
+        assert!(
+            !result
+                .errors
+                .iter()
+                .any(|e| e.contains("OVERRIDE_ONLY_VAR_12345"))
+        );
+    }
+
+    #[test]
+    fn test_load_composable_node_env_is_empty() {
+        let xml = r#"
+            <launch>
+                <set_env name="FOO" value="bar"/>
+                <load_composable_node target="my_container">
+                    <composable_node pkg="p" plugin="p::N"/>
+                </load_composable_node>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        let lcn = result
+            .nodes
+            .iter()
+            .find(|n| matches!(n.kind, NodeKind::LoadComposable { .. }))
+            .unwrap();
+        assert!(
+            lcn.env.is_empty(),
+            "LoadComposableNode should have empty env"
+        );
+        // Should warn that env overrides won't apply to composable nodes.
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.contains("load_composable_node") && w.contains("FOO")),
+            "should warn about active env overrides on load_composable_node"
+        );
+    }
+
+    #[test]
+    fn test_net_zero_error_includes_value() {
+        // Override-only values are user-set, not process secrets — safe to show.
+        let xml = r#"
+            <launch>
+                <set_env name="MY_KEY" value="my_value"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        let err = result
+            .errors
+            .iter()
+            .find(|e| e.contains("MY_KEY") && e.contains("leaked"))
+            .expect("should have leaked error for MY_KEY");
+        assert!(
+            err.contains("my_value"),
+            "error message should contain the override value"
+        );
+    }
+
+    #[test]
+    fn test_process_env_never_exposed_in_node() {
+        // Nodes should only contain explicit overrides, never process env vars.
+        // PATH is virtually always set in the process environment.
+        let xml = r#"
+            <launch>
+                <set_env name="MY_OVERRIDE" value="val"/>
+                <node pkg="p" exec="e"/>
+            </launch>
+        "#;
+        let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
+        let mut ctx = SubstitutionContext::default();
+        let options = ResolveOptions::default();
+        let result = resolve_launch(&launch, HashMap::new(), &mut ctx, &options).unwrap();
+        let node = result
+            .nodes
+            .iter()
+            .find(|n| matches!(n.kind, NodeKind::Node))
+            .unwrap();
+        // Only the explicit override should appear.
+        assert_eq!(node.env.len(), 1);
+        assert_eq!(node.env.get("MY_OVERRIDE"), Some(&"val".to_string()));
+        // Process env vars like PATH must never leak into node env.
+        assert!(
+            !node.env.contains_key("PATH"),
+            "process env var PATH must not appear in node env"
+        );
     }
 }

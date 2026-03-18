@@ -1959,6 +1959,9 @@ def _walk_action(action, context, depth):
                 _warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
                 return
         name = _resolve_substitution(action._name, context) or str(action._name)
+        if not name or name == "None":
+            _error("UnsetEnvironmentVariable: resolved name is empty or None — skipping")
+            return
         if name in os.environ:
             # In process env (cases 2 & 3) — can't unset baseline.
             _error(
@@ -2201,9 +2204,18 @@ def _build_patched_launch_substitutions():
             self._name = name
             self._default = kw.get("default_value", "")
         def perform(self, context=None):
-            return _env.get(self._name, os.environ.get(self._name, self._default))
+            # Resolve name to string (may be a substitution object).
+            name = self._name
+            if hasattr(name, "perform"):
+                try:
+                    name = name.perform(context) or str(self._name)
+                except Exception:
+                    name = str(self._name)
+            name = str(name) if name is not None else ""
+            return _env.get(name, os.environ.get(name, self._default))
         def __str__(self):
-            return self.perform()
+            # Avoid calling perform() without context — return the raw name.
+            return str(self._name) if self._name is not None else ""
     mod.EnvironmentVariable = _DeferredEnvironmentVariable
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None

@@ -29,9 +29,9 @@ repositories:
     - autoware_lint_common
   core/autoware_core:
     type: git
-    url: https://github.com/autowarefoundation/autoware_core.git
-    version: 9fe7ac2cfc28dae8d7529dd3eb17dd737f1f3b27
-    ref: main
+    url: https://github.com/paulsohn/autoware_core.git
+    version: 2b61e43a2ce0817f9c056e4b9f8aafe8347e3e41
+    ref: fix/agnocast-wrapper-jazzy-compat
     packages:
     - autoware_adapi_adaptors
     - autoware_adapi_specs
@@ -173,7 +173,7 @@ repositories:
   launcher/autoware_launch:
     type: git
     url: https://github.com/autowarefoundation/autoware_launch.git
-    version: 8a4b2ec1140fdc88f3b61fdf7697acd20654095c
+    version: 8f4557847c51efcf3c8dffea4ab1b4d300926b9a
     ref: main
     packages:
     - autoware_launch
@@ -192,7 +192,6 @@ repositories:
     - sample_vehicle_description
     - sample_vehicle_launch
     - single_lidar_common_launch
-    - single_lidar_sensor_kit_description
     - single_lidar_sensor_kit_launch
     - tier4_autoware_api_launch
     - tier4_control_launch
@@ -379,7 +378,7 @@ repositories:
   universe/autoware_universe:
     type: git
     url: https://github.com/autowarefoundation/autoware_universe.git
-    version: d702d678392837529fad335c4fce38cfff95f64b
+    version: d4c23fd69f148b8624b58e339a556cbe6747b5d2
     ref: main
     packages:
     - autoware_accel_brake_map_calibrator
@@ -2173,9 +2172,6 @@ packages:
   single_lidar_common_launch:
     repo: launcher/autoware_launch
     path: sensor_kit/single_lidar_sensor_kit_launch/single_lidar_common_launch
-  single_lidar_sensor_kit_description:
-    repo: launcher/autoware_launch
-    path: sensor_kit/single_lidar_sensor_kit_launch/single_lidar_sensor_kit_description
   single_lidar_sensor_kit_launch:
     repo: launcher/autoware_launch
     path: sensor_kit/single_lidar_sensor_kit_launch/single_lidar_sensor_kit_launch

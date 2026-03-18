@@ -171,8 +171,9 @@ pub struct SubstitutionContext {
     /// `<set_env>`/`<unset_env>` actions.  `$(env X)` checks this map first,
     /// then falls back to the real process environment.  Scoped groups
     /// clone/restore it.  Per-node `<env>` output is exactly this map
-    /// (no baseline diff needed).
-    pub env: HashMap<String, String>,
+    /// (no baseline diff needed).  Uses `BTreeMap` for stable key order
+    /// in rendered output and error messages.
+    pub env: BTreeMap<String, String>,
 }
 
 impl Default for SubstitutionContext {
@@ -188,22 +189,19 @@ impl Default for SubstitutionContext {
             preview_mode: false,
             lockfile_packages: Arc::new(HashSet::new()),
             rosdep_fallback: false,
-            env: HashMap::new(),
+            env: BTreeMap::new(),
         }
     }
 }
 
 impl SubstitutionContext {
-    /// Return the current env overrides as a sorted `BTreeMap`.
+    /// Return the current env overrides.
     ///
-    /// Since `env` only contains explicit overrides (set via `<set_env>` /
-    /// `<unset_env>`), this is exactly the per-node `<env>` output — no
-    /// baseline diff is needed.
+    /// Since `env` is a `BTreeMap` and only contains explicit overrides
+    /// (set via `<set_env>` / `<unset_env>`), this is exactly the per-node
+    /// `<env>` output — no diff or re-sorting needed.
     pub fn env_overrides(&self) -> BTreeMap<String, String> {
-        self.env
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect()
+        self.env.clone()
     }
 }
 

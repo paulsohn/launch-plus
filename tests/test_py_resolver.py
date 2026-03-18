@@ -502,20 +502,26 @@ class TestEnvStack:
 
     def test_unset_env_nonexistent_errors(self):
         """UnsetEnvironmentVariable on a var that doesn't exist → 'not set' error."""
+        import uuid
+        name = f"NONEXISTENT_VAR_{uuid.uuid4().hex[:8]}"
+        assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
-        R._walk_action(R._TrackedUnsetEnvironmentVariable(name="NONEXISTENT_VAR_12345"), ctx, 0)
+        R._walk_action(R._TrackedUnsetEnvironmentVariable(name=name), ctx, 0)
         errors = R._tracked.get("errors", [])
-        assert any("NONEXISTENT_VAR_12345" in e and "not set" in e for e in errors)
+        assert any(name in e and "not set" in e for e in errors)
 
     def test_unset_env_override_only_accepted(self):
         """UnsetEnv on an override-only var (not in process env) → accepted."""
+        import uuid
+        name = f"OVERRIDE_ONLY_{uuid.uuid4().hex[:8]}"
+        assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
-        R._walk_action(R._TrackedSetEnvironmentVariable(name="OVERRIDE_ONLY_12345", value="val"), ctx, 0)
-        assert "OVERRIDE_ONLY_12345" in R._env
-        R._walk_action(R._TrackedUnsetEnvironmentVariable(name="OVERRIDE_ONLY_12345"), ctx, 0)
-        assert "OVERRIDE_ONLY_12345" not in R._env
+        R._walk_action(R._TrackedSetEnvironmentVariable(name=name, value="val"), ctx, 0)
+        assert name in R._env
+        R._walk_action(R._TrackedUnsetEnvironmentVariable(name=name), ctx, 0)
+        assert name not in R._env
         errors = R._tracked.get("errors", [])
-        assert not any("OVERRIDE_ONLY_12345" in e for e in errors)
+        assert not any(name in e for e in errors)
 
     def test_group_scoped_env_does_not_leak(self):
         """GroupAction(scoped=True) → env mutations don't leak to siblings."""

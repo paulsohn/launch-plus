@@ -2221,6 +2221,7 @@ def _build_patched_launch_ros_descriptions():
 def _build_patched_launch_substitutions():
     """Always-stub: avoids recursion since we also patch top-level `launch`."""
     mod = types.ModuleType("launch.substitutions")
+    mod.__path__ = []  # mark as package so submodule imports work
     mod.FindPackageShare = _TrackedFindPackageShare
     mod.PathJoinSubstitution = _TrackedPathJoinSubstitution
     mod.LaunchConfiguration = _LaunchConfiguration
@@ -2250,6 +2251,15 @@ def _build_patched_launch_substitutions():
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None
     mod.ThisLaunchFileDir = lambda: Path(__file__).parent
+    return mod
+
+def _build_patched_launch_substitutions_environment_variable():
+    """Submodule stub for ``from launch.substitutions.environment_variable import ...``."""
+    parent = sys.modules.get("launch.substitutions")
+    if parent is None:
+        parent = _build_patched_launch_substitutions()
+    mod = types.ModuleType("launch.substitutions.environment_variable")
+    mod.EnvironmentVariable = parent.EnvironmentVariable
     return mod
 
 def _build_patched_launch_actions():
@@ -2508,6 +2518,7 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
         "launch_ros.parameter_descriptions": _build_patched_launch_ros_parameter_descriptions,
         "launch_ros.utilities": _build_patched_launch_ros_utilities,
         "launch.substitutions": _build_patched_launch_substitutions,
+        "launch.substitutions.environment_variable": _build_patched_launch_substitutions_environment_variable,
         "launch.actions": _build_patched_launch_actions,
         "launch.event_handlers": _build_patched_launch_event_handlers,
         "launch.conditions": _build_patched_launch_conditions,

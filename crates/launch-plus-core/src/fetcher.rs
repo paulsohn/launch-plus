@@ -338,6 +338,20 @@ fn update_sparse_checkout(
         paths
     );
 
+    // The indexer leaves a blobless --no-checkout clone: .git exists but no
+    // index file.  Detect this and bootstrap sparse-checkout before anything
+    // else, regardless of workspace_state.
+    if !repo_dir.join(".git").join("index").exists() {
+        info!(
+            "Initializing sparse-checkout for no-checkout clone at {}",
+            repo_dir.display()
+        );
+        init_sparse_checkout(repo_dir)?;
+        set_sparse_checkout_paths(repo_dir, paths)?;
+        checkout_sha(repo_dir, url, sha, options)?;
+        return Ok(());
+    }
+
     let sparse_enabled = is_sparse_checkout_enabled(repo_dir);
 
     if !sparse_enabled {

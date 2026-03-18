@@ -64,10 +64,13 @@ XML and Python launch files.  Manages the fetch-on-demand retry loop for
 expansion into a flat `ParsedLaunchFile` intermediate representation.
 
 ### Builder
-Selective colcon build driven by resolved launch dependencies.
+Native build backend driven by resolved launch dependencies.
 `plan_build_from_packages` computes the transitive dependency closure from
 on-disk `package.xml` files, fetches any missing packages, and
-`execute_build` drives `colcon build --packages-select <exact list>`.
+`execute_build` runs a greedy parallel scheduler that invokes cmake/make
+(ament_cmake) or setup.py/pip (ament_python) directly — no colcon required.
+`BUILD_TESTING` is automatically set to `OFF` (for `build`) or `ON` (for `test`);
+manual `-DBUILD_TESTING=...` via `--cmake-args` is rejected with an error.
 
 ### CLI
 Full command set: `index`, `update`, `fetch`, `clean`, `resolve`, `check`,
@@ -78,10 +81,6 @@ Full command set: `index`, `update`, `fetch`, `clean`, `resolve`, `check`,
 ### Executor
 Process spawning, lifecycle management, and signal handling for running
 resolved launch graphs directly.
-
-### Direct CMake Builds
-Replace colcon with direct CMake/ament_cmake invocations for finer control
-over the build process.
 
 ### CI Integration
 GitHub Actions workflow for automated testing and release.

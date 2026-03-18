@@ -127,25 +127,26 @@ source /opt/ros/humble/setup.bash
 launch-plus build -c my_bringup robot.launch.xml \
   robot_name:=my_robot \
   --rosdep \
-  --colcon-flagfile colcon-flags.txt
+  --symlink-install
 ```
 
 This resolves the launch file, computes the transitive build-dependency closure,
-fetches any missing packages, installs system dependencies via rosdep, and runs
-`colcon build` with only the needed packages.
+fetches any missing packages, installs system dependencies via rosdep, and builds
+using the native cmake/setuptools backend.
 
-### Colcon flagfile
+### Build options
 
-Extra colcon arguments are passed via a **flagfile** — one shell token per line:
+| Flag | Description |
+|------|-------------|
+| `--symlink-install` | Use symlinks instead of copying files to install tree |
+| `--parallel-workers N` | Max parallel build jobs (default: CPU count) |
+| `--cmake-args ARGS...` | Extra cmake arguments (e.g. `-DCMAKE_BUILD_TYPE=Release`) |
+| `--make-args ARGS...` | Extra make arguments |
+| `--continue-on-error` | Keep building independent packages after a failure |
+| `--dry-run` | Print build commands without executing them |
 
-```txt
-# colcon-flags.txt
---symlink-install
---cmake-args
--DCMAKE_BUILD_TYPE=Release
---parallel-workers
-4
-```
+**`BUILD_TESTING` is managed automatically**: `OFF` for `build`, `ON` for `test`.
+Passing `-DBUILD_TESTING=...` via `--cmake-args` is an error.
 
 ## Step 5: Verify (optional)
 
@@ -179,14 +180,13 @@ After running launch-plus, your workspace will look like:
 my_workspace/
 ├── my_project.repos          # your manifest
 ├── manifest.lock.repos       # generated lockfile (commit this)
-├── colcon-flags.txt          # colcon arguments
 ├── src/                      # sparse-checked out packages
 │   ├── core/my_msgs/
 │   ├── drivers/my_driver/
 │   └── launch/my_bringup/
-├── build/                    # colcon build output
-├── install/                  # colcon install output
-└── log/                      # colcon log output
+├── build/                    # per-package build artifacts
+├── install/                  # isolated install tree (colcon-compatible)
+└── log/                      # per-package build logs
 ```
 
 ## Next steps

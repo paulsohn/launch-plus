@@ -159,7 +159,7 @@ standard ROS 2 conventions:
 - `.repos` files (vcstool format)
 - `package.xml` (REP-149 / REP-127)
 - XML and Python launch files (ROS 2 launch API)
-- `colcon` for building
+- `ament_cmake` / `ament_python` build types
 - `rosdep` for system dependency resolution
 
 If your project follows these conventions, launch-plus can help.

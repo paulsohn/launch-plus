@@ -61,7 +61,7 @@ cargo fmt --all -- --check
 ### Integration test (Autoware)
 
 The Autoware example includes a self-contained integration test. Requires a
-sourced ROS 2 environment and `colcon`.
+sourced ROS 2 environment, `cmake`, and `make`.
 
 ```bash
 cd example/autoware

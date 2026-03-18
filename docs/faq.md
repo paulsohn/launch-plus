@@ -23,7 +23,7 @@ sandbox and content-addressable cache, launch-plus through its SHA-pinned lockfi
 
 But launch-plus is **not** a general-purpose build system.  It is a
 ROS 2-specific tool that understands launch files, `package.xml`, and the
-`colcon`/`ament` ecosystem natively.
+`ament` ecosystem natively.
 
 Bazel rules for ROS 2 do exist (e.g. the ones provided by Apex.AI), and they
 work well for teams that can commit to a full Bazel migration.  However, adopting
@@ -31,15 +31,15 @@ Bazel in an existing ROS 2 project is a significant undertaking:
 
 - Every package needs a `BUILD` file — `package.xml` and `CMakeLists.txt` are not
   enough
-- The entire build toolchain changes: `colcon`, `ament_cmake`, and `rosdep` are
-  replaced by Bazel equivalents
+- The entire build toolchain changes: `ament_cmake`, `rosdep`, and the standard
+  build tools are replaced by Bazel equivalents
 - Third-party ROS packages (from the buildfarm or other `.repos` sources) must be
   wrapped with Bazel build rules
 - Teams must learn and maintain a parallel build system
 
 launch-plus takes the opposite approach: **zero migration**.  It works with the
 ROS 2 conventions your project already uses — `.repos` manifests, `package.xml`,
-`colcon build`, `rosdep` — and layers the dependency-tracing and sparse-checkout
+`ament_cmake`, `rosdep` — and layers the dependency-tracing and sparse-checkout
 capabilities on top.  You can adopt it incrementally without changing any existing
 build files.
 
@@ -50,7 +50,7 @@ ROS 2-specific concerns that a general-purpose build system has no reason to
 address.
 
 In short: if your team has already invested in Bazel for ROS 2, you may not need
-launch-plus for the build subset.  But if you use the standard `colcon`/`ament`
+launch-plus for the build subset.  But if you use the standard `ament`
 toolchain — as most ROS 2 projects do — launch-plus gives you Bazel-like
 targeted builds and reproducibility without requiring a build system migration.
 
@@ -128,42 +128,31 @@ executing your launch file, so `print()` still works — it just goes to stderr.
 
 ## Building
 
-### Why does launch-plus still build `exec_depend` packages?
+### Does launch-plus build `exec_depend` packages?
 
-It shouldn't have to — `exec_depend` declares packages needed at *runtime*, not
-at build time.  However, launch-plus currently delegates to `colcon build`, which
-validates that **all** `package.xml` dependencies (including `exec_depend`) have
-install artifacts before running cmake.  There is no colcon flag to disable this
-check, so launch-plus must include `exec_depend` in the build set today.
+No.  launch-plus uses a native build backend (direct cmake/setuptools
+invocations) that does **not** validate `exec_depend` at build time.  The build
+closure uses only true build-time dependencies: `build_depend`,
+`buildtool_depend`, `build_export_depend`, `buildtool_export_depend`, and
+`<depend>`.  Runtime dependencies are tracked through the launch graph itself.
 
-This is a well-known pain point.  The Autoware project maintains
-[`remove-exec-depend`](https://github.com/autowarefoundation/autoware-github-actions/tree/main/remove-exec-depend),
-a CI action that strips `<exec_depend>` from every `package.xml` before
-building, just to work around colcon's behavior.
+This eliminates the need for workarounds like Autoware's `remove-exec-depend`
+CI action.  See [Dependency closure](concepts.md#dependency-closure) for details.
 
-Once colcon is replaced with direct ament invocations
-([#18](https://github.com/paulsohn/launch-plus/issues/18)), the build closure
-will use only `build_depend`, `buildtool_depend`, `build_export_depend`, and
-`buildtool_export_depend`.  Runtime dependencies will
-be expected to be satisfied by installed system packages — exactly the role
-`exec_depend` was designed to express.  See
-[Dependency closure](concepts.md#dependency-closure) for details.
+### How do I pass extra cmake arguments?
 
-### How does `--colcon-flagfile` work?
+Use `--cmake-args` on the command line:
 
-The flagfile contains extra arguments for `colcon build`, one shell token per
-line.  Comments (`#`) are supported:
-
-```txt
---symlink-install
---cmake-args
--DCMAKE_BUILD_TYPE=Release
---parallel-workers
-4
+```bash
+launch-plus build my_pkg my_launch.xml --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```
 
-Flags that conflict with launch-plus-managed arguments (`--packages-select`,
-`--base-paths`, `--build-base`, `--install-base`) are rejected.
+Other build options: `--make-args`, `--symlink-install`, `--parallel-workers N`,
+`--continue-on-error`, `--dry-run`.
+
+**Note:** `BUILD_TESTING` is managed automatically — `OFF` for `build`, `ON` for
+`test`.  Manually passing `-DBUILD_TESTING=...` via `--cmake-args` is rejected
+with an error to prevent conflicts.
 
 ### Can I build for a different ROS distro?
 
@@ -174,8 +163,8 @@ setup file before running launch-plus.
 ### What about cross-compilation?
 
 launch-plus itself is a native tool.  Cross-compilation of ROS 2 packages
-depends on your colcon/CMake cross-compilation setup.  You can pass
-cross-compilation flags via the colcon flagfile.
+depends on your CMake cross-compilation setup.  You can pass
+cross-compilation flags via `--cmake-args`.
 
 ## Lockfile
 

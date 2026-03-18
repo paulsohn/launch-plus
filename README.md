@@ -121,7 +121,7 @@ The pre-generated output files are included for reference:
 - [`example/autoware/resolved.launch.xml`](example/autoware/resolved.launch.xml)
 - [`example/autoware/resolver.log`](example/autoware/resolver.log)
 
-To build the resolved packages (requires a sourced ROS 2 environment and `colcon`):
+To build the resolved packages (requires a sourced ROS 2 environment, `cmake`, and `make`):
 
 ```bash
 cargo run --bin launch-plus -- build -d autoware_launch autoware.launch.xml \
@@ -133,7 +133,7 @@ cargo run --bin launch-plus -- build -d autoware_launch autoware.launch.xml \
   --apply-opaque-file-access \
   --allow-including-unportable-path \
   --rosdep \
-  --colcon-flagfile colcon-flags.txt
+  --symlink-install
 ```
 
 ### Use your own project
@@ -154,7 +154,7 @@ See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
 | `update` | Re-resolve refs and update lockfile SHAs |
 | `resolve` | Resolve and flatten a launch file to XML (no build) |
 | `check` | Like `resolve` but exits non-zero on warnings/errors |
-| `build` | Resolve, fetch dependencies, and run `colcon build` |
+| `build` | Resolve, fetch dependencies, and build with native cmake/setuptools backend |
 | `build-pkg` | Build package(s) by name with transitive dependency fetching |
 | `test` | Like `build` but includes `test_depend` packages |
 | `fetch` | Sparse-checkout specific packages from the lockfile |

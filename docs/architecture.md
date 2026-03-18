@@ -22,7 +22,7 @@ a thin `clap`-based wrapper.
 │  │   ├── substitution engine ($(var), $(eval), etc.)  │
 │  │   └── Python resolver (embedded py_resolver.py)    │
 │  ├── orchestrator — coordinates resolve + fetch loop  │
-│  ├── builder    — colcon build orchestration          │
+│  ├── builder    — native cmake/setuptools build        │
 │  └── rosdep     — system dependency resolution        │
 └───────────────────────────────────────────────────────┘
 ```
@@ -109,8 +109,11 @@ launch-plus build <pkg> <launcher>
     └── pip install
     │
     ▼
-[builder]
-    └── colcon build --packages-select <minimal set>
+[builder] — native build backend
+    ├── topological sort (Kahn's algorithm)
+    ├── greedy parallel scheduler (N worker threads)
+    ├── ament_cmake: cmake configure → make → make install
+    └── ament_python: setup.py install / pip3 install
 ```
 
 ## Key components
@@ -167,11 +170,25 @@ package that hasn't been fetched yet, it signals via `_PackageNotFetchedError`.
 The orchestrator catches this, fetches the missing package, and retries (up to
 3 times).
 
-### Builder (`builder.rs`)
+### Builder (`builder/`)
 
-Computes the transitive build-dependency closure and invokes `colcon build`.
-Reads extra arguments from a flagfile.  Validates that flagfile tokens don't
-conflict with launch-plus-managed arguments.
+Computes the transitive build-dependency closure and builds packages using a
+native backend — direct `cmake`/`make` invocations for `ament_cmake` packages
+and `setup.py`/`pip3` for `ament_python` packages.  No external build tool
+(e.g. colcon) is required.
+
+The builder automatically configures `BUILD_TESTING`:
+- **OFF** by default (normal `build` command)
+- **ON** when the `test` command is used
+- Manually passing `-DBUILD_TESTING=...` via `--cmake-args` is rejected with
+  an error to prevent conflicts with the automatic configuration.
+
+Key submodules:
+- `scheduler.rs` — greedy parallel scheduler with `std::thread::scope` + `Mutex`/`Condvar`
+- `ament_cmake.rs` — cmake configure → make → make install for one package
+- `ament_python.rs` — setuptools/pip build for one package
+- `environment.rs` — computes `CMAKE_PREFIX_PATH`, `AMENT_PREFIX_PATH`, `LD_LIBRARY_PATH`, etc.
+- `install.rs` — generates colcon-compatible install layout (DSV files, setup scripts, ament_index markers)
 
 ### Rosdep (`rosdep.rs`)
 

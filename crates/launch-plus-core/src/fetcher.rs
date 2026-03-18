@@ -236,7 +236,7 @@ fn fetch_repo_sparse(
                     );
                     init_sparse_checkout(repo_dir)?;
                     set_sparse_checkout_paths(repo_dir, paths)?;
-                    checkout_sha(repo_dir, sha, options)?;
+                    checkout_sha(repo_dir, url, sha, options)?;
                 } else {
                     // Default mode: verify SHA + clean working tree, error if mismatch.
                     verify_repo_state(repo_dir, sha)?;
@@ -247,7 +247,7 @@ fn fetch_repo_sparse(
             }
             WorkspaceState::Clean => {
                 // Clean mode: reset to pinned SHA (with auto-stash).
-                update_sparse_checkout(repo_dir, sha, paths, options)?;
+                update_sparse_checkout(repo_dir, url, sha, paths, options)?;
             }
         }
     } else {
@@ -319,7 +319,7 @@ fn sparse_clone(
     set_sparse_checkout_paths(repo_dir, paths)?;
 
     // Fetch and checkout the specific SHA
-    checkout_sha(repo_dir, sha, options)?;
+    checkout_sha(repo_dir, url, sha, options)?;
 
     Ok(())
 }
@@ -327,6 +327,7 @@ fn sparse_clone(
 /// Update sparse-checkout for an existing repository
 fn update_sparse_checkout(
     repo_dir: &Path,
+    url: &str,
     sha: &str,
     paths: &[&str],
     options: &FetchOptions,
@@ -361,7 +362,7 @@ fn update_sparse_checkout(
                     &current_sha[..current_sha.len().min(8)],
                     &sha[..sha.len().min(8)],
                 );
-                checkout_sha(repo_dir, sha, options)?;
+                checkout_sha(repo_dir, url, sha, options)?;
             } else {
                 debug!(
                     "Already at SHA {} (non-sparse repo), skipping checkout",
@@ -374,7 +375,7 @@ fn update_sparse_checkout(
         info!("Initializing sparse-checkout with paths: {:?}", paths);
         init_sparse_checkout(repo_dir)?;
         set_sparse_checkout_paths(repo_dir, paths)?;
-        checkout_sha(repo_dir, sha, options)?;
+        checkout_sha(repo_dir, url, sha, options)?;
         return Ok(());
     }
 
@@ -403,7 +404,7 @@ fn update_sparse_checkout(
         || (options.workspace_state == WorkspaceState::Clean && is_working_tree_dirty(repo_dir)?);
 
     if need_checkout {
-        checkout_sha(repo_dir, sha, options)?;
+        checkout_sha(repo_dir, url, sha, options)?;
     } else {
         debug!(
             "Already at SHA {} with correct paths, skipping checkout",
@@ -731,7 +732,16 @@ fn stash_if_dirty(repo_dir: &Path, expected_sha: &str) -> crate::Result<bool> {
 }
 
 /// Checkout a specific SHA
-fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Result<()> {
+///
+/// Fetches directly from `url` instead of the named "origin" remote, so the
+/// fetch works even when the lockfile URL differs from what origin points to
+/// (e.g. after switching to a fork).
+fn checkout_sha(
+    repo_dir: &Path,
+    url: &str,
+    sha: &str,
+    options: &FetchOptions,
+) -> crate::Result<()> {
     // In clean mode, stash dirty changes first — before any other git operations.
     if options.workspace_state == WorkspaceState::Clean {
         stash_if_dirty(repo_dir, sha)?;
@@ -750,7 +760,7 @@ fn checkout_sha(repo_dir: &Path, sha: &str, options: &FetchOptions) -> crate::Re
     if have_locally {
         debug!("SHA {} already available locally, skipping fetch", sha);
     } else {
-        let mut fetch_args = vec!["fetch", "origin", sha];
+        let mut fetch_args = vec!["fetch", url, sha];
         if options.shallow {
             fetch_args.insert(1, "--depth=1");
         }
@@ -1025,7 +1035,8 @@ mod tests {
             workspace_state: WorkspaceState::Dirty,
             ..Default::default()
         };
-        checkout_sha(dir.path(), &sha1, &options).unwrap();
+        // URL is unused here because the SHA is available locally (no fetch needed).
+        checkout_sha(dir.path(), "unused://url", &sha1, &options).unwrap();
         assert_eq!(get_current_sha(dir.path()).unwrap(), sha1);
     }
 
@@ -1043,7 +1054,7 @@ mod tests {
             workspace_state: WorkspaceState::Clean,
             ..Default::default()
         };
-        checkout_sha(dir.path(), &sha1, &options).unwrap();
+        checkout_sha(dir.path(), "unused://url", &sha1, &options).unwrap();
         assert_eq!(get_current_sha(dir.path()).unwrap(), sha1);
         assert!(!is_working_tree_dirty(dir.path()).unwrap());
     }

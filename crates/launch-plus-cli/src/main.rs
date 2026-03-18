@@ -1287,9 +1287,9 @@ fn cmd_update(
                 workspace_path
             );
             blobless_clone(&repo.url, &repo_dir)
-                .and_then(|()| resolve_version_local(&repo_dir, version_ref))
+                .and_then(|()| resolve_version_local(&repo_dir, &repo.url, version_ref))
         } else {
-            resolve_version_local(&repo_dir, version_ref)
+            resolve_version_local(&repo_dir, &repo.url, version_ref)
         };
 
         match resolve_result {

@@ -204,15 +204,21 @@ pub fn serialize_lockfile(lockfile: &Lockfile) -> crate::Result<String> {
 ///
 /// # Arguments
 /// * `repo_dir` - Path to local git clone
+/// * `url` - Git remote URL to fetch from (used directly, not via a named remote)
 /// * `version_ref` - Branch or tag name to resolve
 ///
 /// # Returns
 /// The full 40-character SHA of the fetched ref (via `FETCH_HEAD`)
-pub fn resolve_version_local(repo_dir: &Path, version_ref: &str) -> crate::Result<String> {
-    // Fetch the specific ref from origin
+pub fn resolve_version_local(
+    repo_dir: &Path,
+    url: &str,
+    version_ref: &str,
+) -> crate::Result<String> {
+    // Fetch directly from the URL so we never depend on the named "origin" remote,
+    // which may point to a different URL than the manifest specifies.
     let output = Command::new("git")
         .current_dir(repo_dir)
-        .args(["fetch", "origin", version_ref])
+        .args(["fetch", url, version_ref])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -221,7 +227,7 @@ pub fn resolve_version_local(repo_dir: &Path, version_ref: &str) -> crate::Resul
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(crate::Error::Git(format!(
-            "git fetch origin {version_ref} failed: {stderr}"
+            "git fetch {url} {version_ref} failed: {stderr}"
         )));
     }
 
@@ -831,7 +837,7 @@ pub fn discover_packages(
     if let Some(dir) = repo_dir {
         if dir.exists() && dir.join(".git").exists() {
             debug!("Using existing repo at {}", dir.display());
-            return discover_packages_from_existing_repo(dir, sha, recurse_submodules);
+            return discover_packages_from_existing_repo(dir, url, sha, recurse_submodules);
         }
     }
 
@@ -862,7 +868,7 @@ pub fn discover_packages(
     })?;
 
     blobless_clone(url, dir)?;
-    discover_packages_from_existing_repo(dir, sha, recurse_submodules)
+    discover_packages_from_existing_repo(dir, url, sha, recurse_submodules)
 }
 
 /// Discover packages from a tar archive (git archive output)
@@ -919,14 +925,16 @@ fn discover_packages_from_tar(tar_data: &[u8]) -> crate::Result<Vec<PackageInfo>
 /// modifying the working directory. This is safe for sparse-checkout repos.
 fn discover_packages_from_existing_repo(
     repo_dir: &Path,
+    url: &str,
     sha: &str,
     recurse_submodules: bool,
 ) -> crate::Result<Vec<PackageInfo>> {
-    // Fetch the SHA (in case it's not available locally)
-    debug!("Fetching {} in existing repo...", sha);
+    // Fetch the SHA directly from the URL (not via named remote "origin",
+    // which may point elsewhere if the user changed it).
+    debug!("Fetching {} from {} in existing repo...", sha, url);
     let fetch_result = Command::new("git")
         .current_dir(repo_dir)
-        .args(["fetch", "origin", sha, "--depth=1"])
+        .args(["fetch", url, sha, "--depth=1"])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output();
@@ -937,7 +945,7 @@ fn discover_packages_from_existing_repo(
             debug!("Specific SHA fetch failed, trying general fetch...");
             let _ = Command::new("git")
                 .current_dir(repo_dir)
-                .args(["fetch", "origin", "--depth=1"])
+                .args(["fetch", url, "--depth=1"])
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .output();
@@ -1028,6 +1036,11 @@ fn discover_packages_from_submodules(
     repo_dir: &Path,
     sha: &str,
 ) -> crate::Result<Vec<PackageInfo>> {
+    struct SubmoduleEntry {
+        path: String,
+        url: Option<String>,
+    }
+
     // Parse .gitmodules to find submodule paths
     let gitmodules_ref = format!("{}:.gitmodules", sha);
     let output = Command::new("git")
@@ -1049,68 +1062,86 @@ fn discover_packages_from_submodules(
     let gitmodules = String::from_utf8_lossy(&output.stdout);
     let mut packages = Vec::new();
 
-    // Parse submodule paths from .gitmodules
+    // Parse submodule entries from .gitmodules
     // Format: [submodule "name"]\n\tpath = <path>\n\turl = <url>
+    let mut entries: Vec<SubmoduleEntry> = Vec::new();
     let mut current_path: Option<String> = None;
+    let mut current_url: Option<String> = None;
     for line in gitmodules.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("path = ") {
+        if trimmed.starts_with("[submodule") {
+            // Flush previous entry
+            if let Some(path) = current_path.take() {
+                entries.push(SubmoduleEntry {
+                    path,
+                    url: current_url.take(),
+                });
+            }
+            current_url = None;
+        } else if trimmed.starts_with("path = ") {
             current_path = Some(trimmed.strip_prefix("path = ").unwrap().to_string());
-        } else if trimmed.starts_with("[submodule") {
-            current_path = None;
+        } else if trimmed.starts_with("url = ") {
+            current_url = Some(trimmed.strip_prefix("url = ").unwrap().to_string());
         }
+    }
+    // Flush last entry
+    if let Some(path) = current_path.take() {
+        entries.push(SubmoduleEntry {
+            path,
+            url: current_url.take(),
+        });
+    }
 
-        if let Some(ref path) = current_path {
-            // Get the submodule commit SHA from the tree
-            let output = Command::new("git")
-                .current_dir(repo_dir)
-                .args(["ls-tree", sha, path])
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .output();
+    for entry in &entries {
+        // Get the submodule commit SHA from the tree
+        let output = Command::new("git")
+            .current_dir(repo_dir)
+            .args(["ls-tree", sha, &entry.path])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output();
 
-            if let Ok(output) = output {
-                if output.status.success() {
-                    let stdout = String::from_utf8_lossy(&output.stdout);
-                    // Format: "160000 commit <sha>\t<path>"
-                    if let Some(line) = stdout.lines().next() {
-                        let parts: Vec<&str> = line.split_whitespace().collect();
-                        if parts.len() >= 3 && parts[1] == "commit" {
-                            let submodule_sha = parts[2];
-                            let submodule_dir = repo_dir.join(path);
+        if let Ok(output) = output {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                // Format: "160000 commit <sha>\t<path>"
+                if let Some(line) = stdout.lines().next() {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if parts.len() >= 3 && parts[1] == "commit" {
+                        let submodule_sha = parts[2];
+                        let submodule_dir = repo_dir.join(&entry.path);
 
-                            // If submodule is initialized, inspect its objects
-                            if submodule_dir.join(".git").exists() {
-                                debug!(
-                                    "Inspecting submodule at {} (SHA: {})",
-                                    path,
-                                    &submodule_sha[..8.min(submodule_sha.len())]
-                                );
+                        // If submodule is initialized, inspect its objects
+                        if submodule_dir.join(".git").exists() {
+                            debug!(
+                                "Inspecting submodule at {} (SHA: {})",
+                                entry.path,
+                                &submodule_sha[..8.min(submodule_sha.len())]
+                            );
 
-                                // Fetch the submodule SHA
-                                let _ = Command::new("git")
-                                    .current_dir(&submodule_dir)
-                                    .args(["fetch", "origin", submodule_sha, "--depth=1"])
-                                    .stdout(Stdio::piped())
-                                    .stderr(Stdio::piped())
-                                    .output();
+                            // Fetch the submodule SHA directly from its URL
+                            // (not via "origin" which may point elsewhere).
+                            let fetch_url = entry.url.as_deref().unwrap_or("origin");
+                            let _ = Command::new("git")
+                                .current_dir(&submodule_dir)
+                                .args(["fetch", fetch_url, submodule_sha, "--depth=1"])
+                                .stdout(Stdio::piped())
+                                .stderr(Stdio::piped())
+                                .output();
 
-                                if let Ok(mut sub_packages) = discover_packages_from_git_objects(
-                                    &submodule_dir,
-                                    submodule_sha,
-                                ) {
-                                    // Prefix paths with submodule path
-                                    for pkg in &mut sub_packages {
-                                        pkg.path = format!("{}/{}", path, pkg.path);
-                                    }
-                                    packages.extend(sub_packages);
+                            if let Ok(mut sub_packages) =
+                                discover_packages_from_git_objects(&submodule_dir, submodule_sha)
+                            {
+                                // Prefix paths with submodule path
+                                for pkg in &mut sub_packages {
+                                    pkg.path = format!("{}/{}", entry.path, pkg.path);
                                 }
+                                packages.extend(sub_packages);
                             }
                         }
                     }
                 }
             }
-            current_path = None;
         }
     }
 
@@ -1191,7 +1222,7 @@ fn resolve_version_from_repo(
         blobless_clone(url, dir)?;
     }
 
-    resolve_version_local(dir, version)
+    resolve_version_local(dir, url, version)
 }
 
 /// Generate a lockfile from a .repos file

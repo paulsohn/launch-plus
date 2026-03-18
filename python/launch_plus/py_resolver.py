@@ -1096,6 +1096,7 @@ class _TrackedGroupAction:
     def __init__(self, actions=None, **kwargs):
         self._actions = list(actions or [])
         self._scoped = kwargs.get("scoped", True)
+        self._condition = kwargs.get("condition")
 
 class _TrackedSetEnvironmentVariable:
     """Tracks SetEnvironmentVariable: mutates _env in _walk_action."""
@@ -1933,7 +1934,10 @@ def _walk_action(action, context, depth):
             try:
                 if not action._condition.evaluate(context):
                     return
-            except Exception:
+            except _PackageNotFetchedError:
+                raise
+            except Exception as e:
+                _warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
                 return
         name = _resolve_substitution(action._name, context) or str(action._name)
         value = _resolve_substitution(action._value, context) or ""
@@ -1946,7 +1950,10 @@ def _walk_action(action, context, depth):
             try:
                 if not action._condition.evaluate(context):
                     return
-            except Exception:
+            except _PackageNotFetchedError:
+                raise
+            except Exception as e:
+                _warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
                 return
         name = _resolve_substitution(action._name, context) or str(action._name)
         if name in os.environ:
@@ -1966,6 +1973,15 @@ def _walk_action(action, context, depth):
 
     # GroupAction: walk child actions; scoped groups save/restore env + namespace
     if isinstance(action, _TrackedGroupAction):
+        if action._condition is not None and context is not None:
+            try:
+                if not action._condition.evaluate(context):
+                    return
+            except _PackageNotFetchedError:
+                raise
+            except Exception as e:
+                _warn(f"GroupAction condition evaluation failed: {e}")
+                return
         depth_before = len(_namespace_stack)
         saved_env = dict(_env) if action._scoped else None
         _walk_actions(action._actions, context, depth + 1)

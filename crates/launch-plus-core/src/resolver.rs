@@ -591,7 +591,7 @@ fn resolve_substitutions_inner(
                     .env
                     .get(&name)
                     .cloned()
-                    .or_else(|| std::env::var(&name).ok())
+                    .or_else(|| std::env::var_os(&name).and_then(|v| v.into_string().ok()))
                     .or(default)
                     .ok_or_else(|| {
                         crate::Error::LaunchParse(format!("environment variable not set: {}", name))
@@ -2219,7 +2219,7 @@ fn resolve_element(
             };
             if should_unset {
                 let name_val = resolve_substitutions(name, ctx)?.propagate_into(result);
-                if std::env::var(&name_val).is_ok() {
+                if std::env::var_os(&name_val).is_some() {
                     // In process env (cases 2 & 3) — can't unset baseline.
                     result.errors.push(format!(
                         "unset_env: '{}' exists in the process env and cannot be unset. \
@@ -5002,7 +5002,7 @@ mod tests {
     #[test]
     fn test_resolve_env_unset_without_default_errors() {
         let ctx = SubstitutionContext::default();
-        let result = resolve_substitutions("$(env NONEXISTENT_VAR)", &ctx);
+        let result = resolve_substitutions("$(env LAUNCH_PLUS_TEST_UNSET_8f3a2b)", &ctx);
         assert!(result.is_err());
     }
 
@@ -7808,7 +7808,7 @@ launch:
         // <unset_env> on a var that doesn't exist anywhere → "not set" error.
         let xml = r#"
             <launch>
-                <unset_env name="NONEXISTENT"/>
+                <unset_env name="LAUNCH_PLUS_TEST_UNSET_9c4d7e"/>
             </launch>
         "#;
         let launch = parse_launch_xml(xml, Path::new("/test.launch.xml")).unwrap();
@@ -7819,7 +7819,7 @@ launch:
             result
                 .errors
                 .iter()
-                .any(|e| e.contains("NONEXISTENT") && e.contains("not set"))
+                .any(|e| e.contains("LAUNCH_PLUS_TEST_UNSET_9c4d7e") && e.contains("not set"))
         );
     }
 

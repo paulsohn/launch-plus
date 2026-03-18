@@ -1145,9 +1145,11 @@ a.launch.xml → b.launch.xml → c.launch.xml → d.launch.xml → e.launch.xml
 ```xml
 <arg name="path" default="$(env CUSTOM_PATH)"/>
 ```
-**Error** at resolve time if the variable is not in `ctx.env` and no default is provided
-(matching ROS 2 behavior). The parse-time lint (`collect_env_without_fallback`) separately
-flags `$(env VAR)` expressions that lack a default — that's informational, not an error.
+**Error** at resolve time if the variable is not in env overrides (`ctx.env`), not in the
+process environment, and no default is provided (matching ROS 2 behavior). The resolution
+chain is: overrides → process env → default → error. The parse-time lint
+(`collect_env_without_fallback`) separately flags `$(env VAR)` expressions that lack a
+default — that's informational, not an error.
 
 Safe pattern with fallback:
 ```xml

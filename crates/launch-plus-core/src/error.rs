@@ -55,4 +55,20 @@ pub enum Error {
     /// Process execution failed
     #[error("process execution failed: {0}")]
     ProcessExecution(String),
+
+    /// Build failed for a specific package
+    #[error("build failed for package '{package}': {detail}")]
+    BuildFailed { package: String, detail: String },
+
+    /// Unsupported build type in package.xml
+    #[error("unsupported build type '{build_type}' for package '{package}'")]
+    UnsupportedBuildType { package: String, build_type: String },
+
+    /// Build interrupted by signal (e.g. Ctrl+C)
+    #[error("build interrupted by Ctrl+C")]
+    BuildInterrupted,
+
+    /// Invalid build flag (e.g. user manually specifying BUILD_TESTING)
+    #[error("invalid build flag: {detail}")]
+    InvalidBuildFlag { detail: String },
 }

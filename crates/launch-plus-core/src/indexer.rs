@@ -254,6 +254,9 @@ pub struct PackageInfo {
     pub path: String,
     /// Dependencies extracted from package.xml
     pub dependencies: Dependencies,
+    /// Build type from `<export><build_type>` (e.g. "ament_cmake", "ament_python").
+    /// `None` if not specified (defaults to ament_cmake by convention).
+    pub build_type: Option<String>,
 }
 
 /// Evaluate a REP-149 `condition` attribute on a dependency element.
@@ -697,14 +700,19 @@ pub fn parse_package_xml(content: &str, path: &str) -> crate::Result<PackageInfo
 
     let mut name = String::new();
     let mut dependencies = Dependencies::default();
+    let mut build_type: Option<String> = None;
     let mut current_tag = String::new();
     let mut skip_current = false;
+    let mut inside_export = false;
     let mut buf = Vec::new();
 
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
                 current_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                if current_tag == "export" {
+                    inside_export = true;
+                }
                 // REP-149 §3: evaluate condition="$VAR == value" attributes.
                 // Dependencies whose condition evaluates to false are skipped.
                 skip_current = !evaluate_condition(&e);
@@ -717,61 +725,68 @@ pub fn parse_package_xml(content: &str, path: &str) -> crate::Result<PackageInfo
                     crate::Error::XmlParse(format!("failed to unescape text: {err}"))
                 })?;
 
-                let dep = text.trim().to_string();
-                if dep.is_empty() {
+                let val = text.trim().to_string();
+                if val.is_empty() {
                     // skip empty text nodes
+                } else if inside_export && current_tag == "build_type" {
+                    build_type = Some(val);
                 } else {
                     match current_tag.as_str() {
                         "name" if name.is_empty() => {
-                            name = dep;
+                            name = val;
                         }
                         "build_depend" => {
-                            if !dependencies.build.contains(&dep) {
-                                dependencies.build.push(dep);
+                            if !dependencies.build.contains(&val) {
+                                dependencies.build.push(val);
                             }
                         }
                         "build_export_depend" => {
-                            if !dependencies.build_export.contains(&dep) {
-                                dependencies.build_export.push(dep);
+                            if !dependencies.build_export.contains(&val) {
+                                dependencies.build_export.push(val);
                             }
                         }
                         "buildtool_depend" => {
-                            if !dependencies.buildtool.contains(&dep) {
-                                dependencies.buildtool.push(dep);
+                            if !dependencies.buildtool.contains(&val) {
+                                dependencies.buildtool.push(val);
                             }
                         }
                         "buildtool_export_depend" => {
-                            if !dependencies.buildtool_export.contains(&dep) {
-                                dependencies.buildtool_export.push(dep);
+                            if !dependencies.buildtool_export.contains(&val) {
+                                dependencies.buildtool_export.push(val);
                             }
                         }
                         "exec_depend" => {
-                            if !dependencies.exec.contains(&dep) {
-                                dependencies.exec.push(dep);
+                            if !dependencies.exec.contains(&val) {
+                                dependencies.exec.push(val);
                             }
                         }
                         "test_depend" => {
-                            if !dependencies.test.contains(&dep) {
-                                dependencies.test.push(dep);
+                            if !dependencies.test.contains(&val) {
+                                dependencies.test.push(val);
                             }
                         }
                         // REP-149: <depend> = build_depend + build_export_depend + exec_depend
                         "depend" => {
-                            if !dependencies.build.contains(&dep) {
-                                dependencies.build.push(dep.clone());
+                            if !dependencies.build.contains(&val) {
+                                dependencies.build.push(val.clone());
                             }
-                            if !dependencies.build_export.contains(&dep) {
-                                dependencies.build_export.push(dep.clone());
+                            if !dependencies.build_export.contains(&val) {
+                                dependencies.build_export.push(val.clone());
                             }
-                            if !dependencies.exec.contains(&dep) {
-                                dependencies.exec.push(dep);
+                            if !dependencies.exec.contains(&val) {
+                                dependencies.exec.push(val);
                             }
                         }
                         _ => {}
                     }
                 }
             }
-            Ok(Event::End(_)) => {
+            Ok(Event::End(e)) => {
+                let name = e.name();
+                let tag = String::from_utf8_lossy(name.as_ref());
+                if tag == "export" {
+                    inside_export = false;
+                }
                 current_tag.clear();
             }
             Ok(Event::Eof) => break,
@@ -803,6 +818,7 @@ pub fn parse_package_xml(content: &str, path: &str) -> crate::Result<PackageInfo
         name,
         path: path.to_string(),
         dependencies,
+        build_type,
     })
 }
 
@@ -1283,14 +1299,15 @@ pub fn generate_lockfile(
 /// Dependency resolution mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DependencyMode {
-    /// Build dependencies only (for colcon build)
+    /// Build dependencies only: `build_depend`, `build_export_depend`,
+    /// `buildtool_depend`, `buildtool_export_depend`.
     Build,
-    /// Execution dependencies only (for runtime)
+    /// Execution dependencies only (for runtime).
     Exec,
-    /// Both build and exec dependencies
+    /// Both build and exec dependencies (legacy: needed when colcon was the backend).
     BuildAndExec,
-    /// All dependencies including test
-    All,
+    /// Build + test dependencies: same as `Build` plus `test_depend`.
+    BuildAndTest,
 }
 
 /// Result of transitive dependency resolution
@@ -1328,6 +1345,25 @@ fn read_package_deps(
     let content = std::fs::read_to_string(&xml_path).ok()?;
     let parsed = parse_package_xml(&content, &xml_path.to_string_lossy()).ok()?;
     Some(parsed.dependencies)
+}
+
+/// Read on-disk `package.xml` build type for a package.
+///
+/// Returns `None` if the package is not in the lockfile, its `package.xml` is
+/// not on disk, or no `<export><build_type>` is specified.
+pub fn read_package_build_type(
+    lockfile: &Lockfile,
+    src_dir: &std::path::Path,
+    pkg_name: &str,
+) -> Option<String> {
+    let pkg_lock = lockfile.packages.get(pkg_name)?;
+    let xml_path = src_dir
+        .join(&pkg_lock.repo)
+        .join(&pkg_lock.path)
+        .join("package.xml");
+    let content = std::fs::read_to_string(&xml_path).ok()?;
+    let parsed = parse_package_xml(&content, &xml_path.to_string_lossy()).ok()?;
+    parsed.build_type
 }
 
 /// Compute transitive dependencies for a set of root packages.
@@ -1389,12 +1425,11 @@ pub fn resolve_dependencies(
                 queue.extend(deps.buildtool_export.iter().cloned());
                 queue.extend(deps.exec.iter().cloned());
             }
-            DependencyMode::All => {
+            DependencyMode::BuildAndTest => {
                 queue.extend(deps.build.iter().cloned());
                 queue.extend(deps.build_export.iter().cloned());
                 queue.extend(deps.buildtool.iter().cloned());
                 queue.extend(deps.buildtool_export.iter().cloned());
-                queue.extend(deps.exec.iter().cloned());
                 queue.extend(deps.test.iter().cloned());
             }
         }

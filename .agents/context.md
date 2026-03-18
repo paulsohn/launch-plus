@@ -521,7 +521,7 @@ launch-plus build autoware_launch autoware.launch.xml \
 
 ### Mode: test
 
-Same pipeline as `build`, but `DependencyMode::All` is used so `test_depend` packages are
+Same pipeline as `build`, but `DependencyMode::BuildAndTest` is used so `test_depend` packages are
 included in the build set.  These packages are never visited during launch-graph traversal
 and are fetched on demand by `fetch_plan_packages`.
 

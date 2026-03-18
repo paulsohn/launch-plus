@@ -9,7 +9,7 @@
 //! - `indexer`: Parse .repos files and generate lockfiles
 //! - `resolver`: Parse launch files and resolve dependencies
 //! - `fetcher`: Partial git clone via sparse-checkout
-//! - `builder`: Selective colcon build orchestration
+//! - `builder`: Selective build orchestration (native cmake/setuptools backend)
 //! - `executor`: Process spawning and lifecycle management
 
 pub mod builder;
@@ -40,7 +40,7 @@ pub use locator::{PackageLocator, locator_from_lockfile, locator_from_workspace}
 // Re-export indexer types for lockfile access
 pub use indexer::{
     Dependencies, DependencyGraph, DependencyMode, Lockfile, PackageLock, RepoLock,
-    compute_build_order, resolve_dependencies,
+    compute_build_order, read_package_build_type, resolve_dependencies,
 };
 
 // Re-export fetcher types

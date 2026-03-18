@@ -1,4 +1,4 @@
-//! Builder: compute a selective colcon build plan from a resolved launch target.
+//! Builder: compute a selective build plan and execute it for a resolved launch target.
 //!
 //! # Model
 //!
@@ -12,14 +12,21 @@
 //!    `exec_depend` is intentionally excluded: launch-plus tracks runtime deps through the
 //!    launch graph itself, making `exec_depend` redundant for this workflow.
 //! 3. [`compute_build_order`] — Kahn's topological sort so dependencies are built first.
-//! 4. `colcon build --packages-select <ordered list>` — exact list, not `--packages-up-to`,
-//!    so colcon's native dep resolver is bypassed entirely.
+//! 4. Direct `cmake`/`make` (ament_cmake) or `setuptools` (ament_python) invocations per
+//!    package, scheduled in parallel via a greedy worker pool.
 //!
 //! Transitive build dependencies that are not yet on disk are fetched iteratively:
 //! each round expands the dep graph, fetches missing packages, and repeats until
 //! no new packages appear.
 //!
-//! For `test` mode, [`DependencyMode::All`] adds `test_depend` packages to the build set.
+//! For `test` mode, [`DependencyMode::BuildAndTest`] adds `test_depend` packages
+//! to the build set.
+
+pub mod ament_cmake;
+pub mod ament_python;
+pub mod environment;
+pub mod install;
+pub mod scheduler;
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -32,7 +39,7 @@ static INTERRUPTED: AtomicBool = AtomicBool::new(false);
 use crate::fetcher::{FetchOptions, fetch_packages};
 use crate::indexer::{DependencyMode, Lockfile, compute_build_order, resolve_dependencies};
 
-/// Everything colcon needs to build the launch target.
+/// Everything needed to build the launch target.
 #[derive(Debug, Clone)]
 pub struct BuildPlan {
     /// Lockfile packages to build, in topological order (dependencies first).
@@ -43,27 +50,49 @@ pub struct BuildPlan {
     /// but are not part of the lockfile.  They must be installed via `rosdep` or
     /// `apt` before building.
     pub external_deps: HashSet<String>,
-    /// Source directory passed to `colcon build --base-paths`.
+    /// Source directory containing fetched repositories.
     pub src_dir: PathBuf,
-    /// Colcon build output directory (`--build-base`).
+    /// Build output directory (per-package build artifacts).
     pub build_base: PathBuf,
-    /// Colcon install prefix (`--install-base`).
+    /// Install prefix (per-package install trees).
     pub install_base: PathBuf,
-    /// Colcon log directory (`--log-base`).
+    /// Log directory.
     pub log_base: PathBuf,
 }
 
 /// Options controlling how the build is executed.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct BuildOptions {
-    /// Print the colcon command without running it.
+    /// Print the build commands without running them.
     pub dry_run: bool,
-    /// Extra arguments inserted into `colcon build` before `--packages-select`.
-    ///
-    /// Typically loaded from a flagfile (one token per line).  Any colcon flag is
-    /// accepted: `--symlink-install`, `--parallel-workers 8`, `--cmake-args
-    /// -DCMAKE_BUILD_TYPE=Release`, `--allow-overriding pkg`, etc.
-    pub extra_colcon_args: Vec<String>,
+    /// Maximum number of parallel build workers.
+    pub parallel_workers: usize,
+    /// Extra arguments passed to cmake (e.g. `-DCMAKE_BUILD_TYPE=Release`).
+    pub cmake_args: Vec<String>,
+    /// Extra arguments passed to make.
+    pub make_args: Vec<String>,
+    /// Use symlink install instead of copying files.
+    pub symlink_install: bool,
+    /// Continue building independent packages after a failure.
+    pub continue_on_error: bool,
+    /// Test mode: sets `BUILD_TESTING=ON` and uses `BuildAndTest` dep mode.
+    pub test_mode: bool,
+}
+
+impl Default for BuildOptions {
+    fn default() -> Self {
+        Self {
+            dry_run: false,
+            parallel_workers: std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(4),
+            cmake_args: Vec::new(),
+            make_args: Vec::new(),
+            symlink_install: false,
+            continue_on_error: false,
+            test_mode: false,
+        }
+    }
 }
 
 /// Compute a build plan from explicit seed packages, fetching transitive deps as needed.
@@ -71,16 +100,6 @@ pub struct BuildOptions {
 /// Expands transitively by reading on-disk `package.xml`.  Packages whose
 /// `package.xml` is not yet on disk are fetched, and the expansion is retried
 /// until the graph stabilises (up to 10 rounds).
-///
-/// # Why `BuildAndExec` instead of `Build`
-///
-/// Ideally only `Build` deps would be needed here, since `exec_depend` packages
-/// are not required for compilation.  However, colcon's ament_cmake task validates
-/// that **all** `package.xml` dependencies (including `exec_depend`) have install
-/// artifacts before running cmake.  There is no flag to disable this check.
-///
-/// TODO(milestone): replace colcon with direct cmake invocations so that only
-/// true build dependencies need to be compiled.
 pub fn plan_build_from_packages(
     seed_packages: &std::collections::HashSet<String>,
     lockfile: &Lockfile,
@@ -91,12 +110,10 @@ pub fn plan_build_from_packages(
     fetch_options: &FetchOptions,
     test_mode: bool,
 ) -> crate::Result<BuildPlan> {
-    // TODO: switch to DependencyMode::Build once we replace colcon with direct
-    // cmake invocations (colcon forces exec_depend validation at install time).
     let mode = if test_mode {
-        DependencyMode::All
+        DependencyMode::BuildAndTest
     } else {
-        DependencyMode::BuildAndExec
+        DependencyMode::Build
     };
 
     // Iterative expand+fetch: each round may discover new packages whose
@@ -134,7 +151,12 @@ pub fn plan_build_from_packages(
     })
 }
 
-/// Execute `colcon build --packages-select <packages>`.
+/// Execute the build plan using colcon as a subprocess.
+///
+/// This is the legacy colcon-based executor, retained as a fallback during
+/// the transition to the native builder backend. Once the native backend
+/// (ament_cmake, ament_python, scheduler) is complete, this function will
+/// be replaced.
 ///
 /// When `options.dry_run` is true, prints the command to stdout without running it.
 #[allow(unsafe_code)]
@@ -160,7 +182,17 @@ pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<
     args.push("--install-base".to_string());
     args.push(plan.install_base.to_string_lossy().into_owned());
 
-    args.extend(options.extra_colcon_args.iter().cloned());
+    // Map new BuildOptions fields to colcon args for the legacy path.
+    if options.symlink_install {
+        args.push("--symlink-install".to_string());
+    }
+    if options.continue_on_error {
+        args.push("--continue-on-error".to_string());
+    }
+    if !options.cmake_args.is_empty() {
+        args.push("--cmake-args".to_string());
+        args.extend(options.cmake_args.iter().cloned());
+    }
 
     args.push("--packages-select".to_string());
     args.extend(plan.packages.iter().cloned());
@@ -205,9 +237,7 @@ pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<
 
     if INTERRUPTED.load(Ordering::SeqCst) {
         // Child was killed by our forwarded signal; propagate as an error.
-        return Err(crate::Error::ProcessExecution(
-            "build interrupted by Ctrl+C".to_string(),
-        ));
+        return Err(crate::Error::BuildInterrupted);
     }
 
     if !status.success() {

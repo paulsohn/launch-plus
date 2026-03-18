@@ -341,16 +341,15 @@ def _track_param_file(path):
 
 
 def _to_str(value, context=None):
-    """Coerce a str, substitution object, or None to str.
+    """Coerce a str, substitution object, or None to ``str | None``.
 
     - ``None`` → ``None`` (caller decides how to handle missing values)
     - ``str``  → returned as-is
-    - object with ``.perform()`` → call it; fall back to ``str(value)`` on
-      failure or ``None`` result
+    - object with ``.perform()`` → call it; ``None`` result stays ``None``,
+      non-``None`` result is coerced to ``str``; on exception → ``str(value)``
     - anything else → ``str(value)``
 
-    This is the single choke-point for "expecting a string but might receive a
-    ROS 2 substitution object" conversions.
+    Every non-``None`` return value is guaranteed to be ``str``.
     """
     if value is None:
         return None
@@ -359,7 +358,7 @@ def _to_str(value, context=None):
     if hasattr(value, "perform"):
         try:
             res = value.perform(context)
-            return res if res is not None else str(value)
+            return str(res) if res is not None else None
         except Exception:
             return str(value)
     return str(value)
@@ -2229,10 +2228,10 @@ def _build_patched_launch_substitutions():
             self._name = name
             self._default = kw.get("default_value", "")
         def perform(self, context=None):
-            # Resolve name to string (may be a substitution object).
+            # Resolve name and default to concrete strings.
             name = _to_str(self._name, context) or ""
-            default = _to_str(self._default, context) if hasattr(self._default, "perform") else self._default
-            return _env.get(name, os.environ.get(name, default if default is not None else ""))
+            default = _to_str(self._default, context) or ""
+            return _env.get(name, os.environ.get(name, default))
         def __str__(self):
             # Avoid calling perform() without context — return the raw name.
             return str(self._name) if self._name is not None else ""

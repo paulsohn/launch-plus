@@ -914,3 +914,299 @@ class TestParseYamlLaunch:
         yaml_content = "foo: bar"
         elems = R.parse_yaml_launch(yaml_content, "test.yaml")
         assert elems == []
+
+
+# ─── Substitution Engine ─────────────────────────────────────────────────────
+
+
+def _fresh_subst_ctx(**kwargs):
+    """Create a _SubstitutionContext and reset module-level state for clean tests."""
+    # Reset tracked state so _error/_warn/_track_package don't leak between tests
+    for key in R._tracked:
+        if isinstance(R._tracked[key], list):
+            R._tracked[key] = []
+        elif isinstance(R._tracked[key], dict):
+            R._tracked[key] = {}
+    ctx = R._SubstitutionContext()
+    for k, v in kwargs.items():
+        setattr(ctx, k, v)
+    return ctx
+
+
+class TestParseSubstitutions:
+    """Tests for parse_substitutions() tokenizer."""
+
+    def test_parse_arg(self):
+        parts = R.parse_substitutions("$(arg vehicle)")
+        assert len(parts) == 1
+        assert parts[0] == ("arg", "vehicle")
+
+    def test_parse_var(self):
+        parts = R.parse_substitutions("$(var config)")
+        assert len(parts) == 1
+        assert parts[0] == ("var", "config")
+
+    def test_parse_env(self):
+        parts = R.parse_substitutions("$(env HOME)")
+        assert len(parts) == 1
+        assert parts[0] == ("env", "HOME", None)
+
+    def test_parse_env_with_default(self):
+        parts = R.parse_substitutions("$(env MY_VAR default_value)")
+        assert len(parts) == 1
+        assert parts[0] == ("env", "MY_VAR", "default_value")
+
+    def test_parse_find_pkg_share(self):
+        parts = R.parse_substitutions("$(find-pkg-share my_pkg)")
+        assert len(parts) == 1
+        assert parts[0] == ("find-pkg-share", "my_pkg")
+
+    def test_parse_find_pkg_prefix(self):
+        parts = R.parse_substitutions("$(find-pkg-prefix my_pkg)")
+        assert len(parts) == 1
+        assert parts[0] == ("find-pkg-prefix", "my_pkg")
+
+    def test_parse_dirname(self):
+        parts = R.parse_substitutions("$(dirname)")
+        assert len(parts) == 1
+        assert parts[0] == ("dirname",)
+
+    def test_parse_eval(self):
+        parts = R.parse_substitutions("$(eval '1' == '1')")
+        assert len(parts) == 1
+        assert parts[0][0] == "eval"
+
+    def test_parse_literal_only(self):
+        parts = R.parse_substitutions("/path/to/file.yaml")
+        assert len(parts) == 1
+        assert parts[0] == "/path/to/file.yaml"
+
+    def test_parse_mixed(self):
+        parts = R.parse_substitutions("$(find-pkg-share my_pkg)/config/$(arg vehicle).yaml")
+        assert len(parts) == 4
+        assert parts[0] == ("find-pkg-share", "my_pkg")
+        assert parts[1] == "/config/"
+        assert parts[2] == ("arg", "vehicle")
+        assert parts[3] == ".yaml"
+
+    def test_parse_nested(self):
+        parts = R.parse_substitutions("$(find-pkg-share $(var pkg_name))")
+        assert len(parts) == 1
+        # The nested $(var pkg_name) is kept as the argument string
+        assert parts[0][0] == "find-pkg-share"
+        assert "$(var pkg_name)" in parts[0][1]
+
+    def test_parse_unknown_warns(self):
+        _fresh_subst_ctx()  # reset warnings
+        parts = R.parse_substitutions("$(unknown_cmd value)")
+        assert len(parts) == 1
+        assert parts[0] == ("unknown", "unknown_cmd value")
+        assert any("unknown substitution" in w for w in R._tracked["warnings"])
+
+    def test_parse_empty_string(self):
+        parts = R.parse_substitutions("")
+        assert parts == []
+
+    def test_parse_dollar_not_followed_by_paren(self):
+        parts = R.parse_substitutions("$100 price")
+        assert len(parts) == 1
+        assert parts[0] == "$100 price"
+
+
+class TestNormalizeEvalExpr:
+    """Tests for _normalize_eval_expr() quote stripping."""
+
+    def test_single_quote_wrapper(self):
+        result = R._normalize_eval_expr("'1 == 1'")
+        assert result == "1 == 1"
+
+    def test_double_quote_wrapper(self):
+        result = R._normalize_eval_expr('"1 == 1"')
+        assert result == "1 == 1"
+
+    def test_escaped_inner_quotes(self):
+        # $(eval '\'cuda\' == \'cuda\'')
+        result = R._normalize_eval_expr(r"'\'cuda\' == \'cuda\''")
+        assert result == "'cuda' == 'cuda'"
+
+    def test_inner_unescaped_double_quotes_preserved(self):
+        # $(eval '"foo"=="bar"') — inner " are unescaped, so outer ' stripped but inner " kept
+        result = R._normalize_eval_expr('\'"foo"=="bar"\'')
+        assert result == '"foo"=="bar"'
+
+    def test_bare_expression(self):
+        result = R._normalize_eval_expr("1 + 2")
+        assert result == "1 + 2"
+
+
+class TestResolveSubstitutions:
+    """Tests for resolve_substitutions() — full resolution with context."""
+
+    def test_resolve_arg(self):
+        ctx = _fresh_subst_ctx(args={"vehicle": "sample_vehicle"})
+        result = R.resolve_substitutions("$(arg vehicle)", ctx)
+        assert result == "sample_vehicle"
+
+    def test_resolve_var(self):
+        ctx = _fresh_subst_ctx(vars={"config": "/path/to/config"})
+        result = R.resolve_substitutions("$(var config)", ctx)
+        assert result == "/path/to/config"
+
+    def test_resolve_var_falls_back_to_args(self):
+        ctx = _fresh_subst_ctx(args={"fallback": "from_args"})
+        result = R.resolve_substitutions("$(var fallback)", ctx)
+        assert result == "from_args"
+
+    def test_resolve_env_from_context(self):
+        ctx = _fresh_subst_ctx(env={"TEST_LAUNCH_VAR": "test_value"})
+        result = R.resolve_substitutions("$(env TEST_LAUNCH_VAR)", ctx)
+        assert result == "test_value"
+
+    def test_resolve_env_with_default_unset(self):
+        var = "LAUNCH_PLUS_TEST_UNSET_a1b2c3"
+        assert var not in os.environ, f"precondition: {var} must not be set"
+        ctx = _fresh_subst_ctx()
+        result = R.resolve_substitutions(f"$(env {var} fallback)", ctx)
+        assert result == "fallback"
+
+    def test_resolve_env_unset_without_default_errors(self):
+        var = "LAUNCH_PLUS_TEST_UNSET_d4e5f6"
+        assert var not in os.environ, f"precondition: {var} must not be set"
+        ctx = _fresh_subst_ctx()
+        R.resolve_substitutions(f"$(env {var})", ctx)
+        assert any("not set" in e for e in R._tracked["errors"])
+
+    def test_resolve_dirname(self):
+        ctx = _fresh_subst_ctx(launch_file_dir="/path/to/launch")
+        result = R.resolve_substitutions("$(dirname)/config.yaml", ctx)
+        assert result == "/path/to/launch/config.yaml"
+
+    def test_resolve_dirname_unset(self):
+        ctx = _fresh_subst_ctx()
+        result = R.resolve_substitutions("$(dirname)/config.yaml", ctx)
+        assert result == "$(dirname)/config.yaml"
+
+    def test_resolve_find_pkg_share_preview(self):
+        ctx = _fresh_subst_ctx(preview_mode=True)
+        result = R.resolve_substitutions("$(find-pkg-share my_pkg)/config", ctx)
+        assert result == "$(find-pkg-share my_pkg)/config"
+        assert "my_pkg" in R._tracked["packages"]
+
+    def test_resolve_find_pkg_prefix(self):
+        ctx = _fresh_subst_ctx()
+        result = R.resolve_substitutions("$(find-pkg-prefix my_pkg)/lib", ctx)
+        assert result == "$(find-pkg-prefix my_pkg)/lib"
+        assert "my_pkg" in R._tracked["packages"]
+
+    def test_resolve_nested_substitution(self):
+        ctx = _fresh_subst_ctx(
+            vars={"pkg_name": "vehicle_description"},
+            preview_mode=True,
+        )
+        result = R.resolve_substitutions("$(find-pkg-share $(var pkg_name))/config", ctx)
+        assert result == "$(find-pkg-share vehicle_description)/config"
+
+    def test_resolve_chained_vars(self):
+        ctx = _fresh_subst_ctx(
+            args={"vehicle": "sample"},
+            vars={
+                "config_path": "$(find-pkg-share $(arg vehicle)_description)/config",
+            },
+            preview_mode=True,
+        )
+        result = R.resolve_substitutions("$(var config_path)/params.yaml", ctx)
+        assert result == "$(find-pkg-share sample_description)/config/params.yaml"
+
+    def test_resolve_error_undefined_arg(self):
+        ctx = _fresh_subst_ctx()
+        result = R.resolve_substitutions("$(arg undefined)", ctx)
+        assert "$(arg undefined)" in result
+        assert any("undefined argument" in e for e in R._tracked["errors"])
+
+    def test_resolve_error_undefined_var(self):
+        ctx = _fresh_subst_ctx()
+        result = R.resolve_substitutions("$(var undefined)", ctx)
+        assert "$(var undefined)" in result
+        assert any("undefined variable" in e for e in R._tracked["errors"])
+
+    def test_resolve_eval_string_equality(self):
+        ctx = _fresh_subst_ctx(vars={"gnss_receiver": "ublox"})
+        result = R.resolve_substitutions("$(eval '$(var gnss_receiver)'=='ublox')", ctx)
+        assert result == "True"
+
+    def test_resolve_eval_false_comparison(self):
+        ctx = _fresh_subst_ctx(vars={"x": "foo"})
+        result = R.resolve_substitutions("$(eval '$(var x)'=='bar')", ctx)
+        assert result == "False"
+
+    def test_resolve_eval_outer_single_quote_wrapper(self):
+        ctx = _fresh_subst_ctx()
+        result = R.resolve_substitutions(
+            r"$(eval '\'cuda\' == \'cuda\' or \'cuda\' == \'cuda-all-in-one\'')",
+            ctx,
+        )
+        assert result == "True"
+
+    def test_resolve_eval_outer_double_quote_wrapper(self):
+        ctx = _fresh_subst_ctx()
+        result = R.resolve_substitutions(
+            r"""$(eval '"camera_lidar_radar_fusion"=="camera_lidar_radar_fusion"')""",
+            ctx,
+        )
+        assert result == "True"
+
+    def test_resolve_eval_outer_double_quote_false(self):
+        ctx = _fresh_subst_ctx()
+        result = R.resolve_substitutions(
+            r"""$(eval '"camera_lidar_radar_fusion"=="lidar"')""",
+            ctx,
+        )
+        assert result == "False"
+
+    def test_resolve_eval_var_with_quotes_no_corruption(self):
+        # Regression: outer " wrapper must be stripped before $(var) substitution
+        ctx = _fresh_subst_ctx(
+            vars={
+                "modules": "[Foo, ",
+                "list_end": '""]',
+            },
+        )
+        result = R.resolve_substitutions(
+            """$(eval "'$(var modules)' + '$(var list_end)'")""",
+            ctx,
+        )
+        assert result == '[Foo, ""]'
+
+    def test_resolve_eval_backslash_escaped_quotes_in_var(self):
+        ctx = _fresh_subst_ctx(
+            vars={
+                "func": r"list(set('ndt'.split('_')).intersection(['ndt','yabloc']))",
+            },
+        )
+        result = R.resolve_substitutions(r"$(eval $(var func))", ctx)
+        assert result == "['ndt']"
+
+    def test_resolve_eval_with_backslash_unescape(self):
+        ctx = _fresh_subst_ctx(
+            vars={
+                "func2": r"list(set('ndt'.split('_')).intersection([\'ndt\',\'yabloc\']))",
+            },
+        )
+        result = R.resolve_substitutions(r"$(eval $(var func2))", ctx)
+        assert result == "['ndt']"
+
+    def test_resolve_command_preserved(self):
+        ctx = _fresh_subst_ctx()
+        result = R.resolve_substitutions("$(command echo hello)", ctx)
+        assert result == "$(command echo hello)"
+
+    def test_resolve_literal_passthrough(self):
+        ctx = _fresh_subst_ctx()
+        result = R.resolve_substitutions("/path/to/file.yaml", ctx)
+        assert result == "/path/to/file.yaml"
+
+    def test_resolve_multiple_packages_tracked(self):
+        ctx = _fresh_subst_ctx(preview_mode=True)
+        R.resolve_substitutions("$(find-pkg-share pkg1)/$(find-pkg-share pkg2)", ctx)
+        assert "pkg1" in R._tracked["packages"]
+        assert "pkg2" in R._tracked["packages"]

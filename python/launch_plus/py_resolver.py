@@ -889,6 +889,271 @@ def parse_yaml_launch(content: str, file_path: str) -> list[dict[str, Any]]:
     return elements
 
 
+# ─── Substitution Engine (for XML/YAML resolution) ───────────────────────────
+#
+# Parses and resolves ROS 2 substitution syntax: $(arg x), $(env Y default),
+# $(find-pkg-share pkg), $(var x), $(dirname), $(eval expr), $(command ...).
+# Used by the XML/YAML AST walker (Phase 3) — Python launch files use the
+# existing .perform() mechanism instead.
+
+
+class _SubstitutionContext:
+    """Context for resolving substitutions in XML/YAML launch files."""
+
+    __slots__ = (
+        "args",
+        "vars",
+        "env",
+        "launch_file_dir",
+        "preview_mode",
+    )
+
+    def __init__(self) -> None:
+        self.args: dict[str, str] = {}
+        self.vars: dict[str, str] = {}
+        self.env: dict[str, str] = {}
+        self.launch_file_dir: str | None = None
+        self.preview_mode: bool = False
+
+
+def parse_substitutions(text: str) -> list[tuple[str, ...] | str]:
+    """Tokenize a string containing ``$(...)`` substitutions.
+
+    Returns a list of tokens:
+    - ``str`` for literal text
+    - ``tuple`` for substitutions: ``("arg", "name")``, ``("env", "NAME", "default")``, etc.
+
+    Supports nested substitutions via depth counting.
+    """
+    parts: list[tuple[str, ...] | str] = []
+    i = 0
+    literal: list[str] = []
+
+    while i < len(text):
+        if text[i] == "$" and i + 1 < len(text) and text[i + 1] == "(":
+            # Flush literal
+            if literal:
+                parts.append("".join(literal))
+                literal = []
+            i += 2  # skip $(
+            # Read until matching )
+            depth = 1
+            expr_chars = []
+            while i < len(text):
+                c = text[i]
+                if c == "(":
+                    depth += 1
+                    expr_chars.append(c)
+                elif c == ")":
+                    depth -= 1
+                    if depth == 0:
+                        i += 1
+                        break
+                    expr_chars.append(c)
+                else:
+                    expr_chars.append(c)
+                i += 1
+            expr = "".join(expr_chars).strip()
+            parts.append(_parse_substitution_expr(expr))
+        else:
+            literal.append(text[i])
+            i += 1
+
+    if literal:
+        parts.append("".join(literal))
+
+    return parts
+
+
+def _parse_substitution_expr(expr: str) -> tuple[str, ...]:
+    """Parse the inside of ``$(...)`` into a typed tuple."""
+    if expr == "dirname":
+        return ("dirname",)
+
+    # Split into command and argument(s)
+    parts = expr.split(None, 1)
+    cmd = parts[0] if parts else ""
+    arg = parts[1].strip() if len(parts) > 1 else None
+
+    if cmd == "arg":
+        return ("arg", arg or "")
+    if cmd == "var":
+        return ("var", arg or "")
+    if cmd == "env":
+        if arg is None:
+            return ("env", "", None)  # type: ignore[return-value]
+        env_parts = arg.split(None, 1)
+        name = env_parts[0]
+        default = env_parts[1].strip() if len(env_parts) > 1 else None
+        return ("env", name, default)  # type: ignore[return-value]
+    if cmd == "find-pkg-share":
+        return ("find-pkg-share", arg or "")
+    if cmd == "find-pkg-prefix":
+        return ("find-pkg-prefix", arg or "")
+    if cmd == "eval":
+        return ("eval", _normalize_eval_expr(arg or ""))
+    if cmd == "command":
+        return ("command", arg or "")
+
+    _warn(f"unknown substitution: $({expr})")
+    return ("unknown", expr)
+
+
+def _normalize_eval_expr(expr: str) -> str:
+    """Strip outer quote wrappers from $(eval ...) expressions.
+
+    Handles three quoting styles from XML:
+    - Style B: ``'expr'`` with escaped inner quotes
+    - Style A: ``"expr"`` (from XML ``&quot;`` entities)
+    - Bare expression (no change)
+    """
+
+    def _has_unescaped(s: str, ch: str) -> bool:
+        i = 0
+        while i < len(s):
+            if s[i] == "\\" and i + 1 < len(s):
+                i += 2
+            elif s[i] == ch:
+                return True
+            else:
+                i += 1
+        return False
+
+    # Style B: outer ' wrapper
+    if (
+        len(expr) >= 2
+        and expr[0] == "'"
+        and expr[-1] == "'"
+        and not _has_unescaped(expr[1:-1], "'")
+    ):
+        expr = expr[1:-1]
+
+    # Unescape \' and \"
+    expr = expr.replace("\\'", "'").replace('\\"', '"')
+
+    # Style A: outer " wrapper
+    if (
+        len(expr) >= 2
+        and expr[0] == '"'
+        and expr[-1] == '"'
+        and not _has_unescaped(expr[1:-1], '"')
+    ):
+        expr = expr[1:-1]
+
+    return expr
+
+
+def resolve_substitutions(
+    text: str,
+    ctx: _SubstitutionContext,
+) -> str:
+    """Resolve all substitutions in a string using the given context.
+
+    Recursively resolves nested substitutions (e.g., ``$(find-pkg-share $(arg pkg))``).
+    """
+    tokens = parse_substitutions(text)
+    parts: list[str] = []
+
+    for token in tokens:
+        if isinstance(token, str):
+            parts.append(token)
+            continue
+
+        kind = token[0]
+
+        if kind == "arg":
+            name = token[1]
+            # Resolve the name itself (may contain nested substitutions)
+            name = resolve_substitutions(name, ctx)
+            value = ctx.args.get(name)
+            if value is None:
+                _error(f"undefined argument: {name}")
+                parts.append(f"$(arg {name})")
+            else:
+                # Recursively resolve (arg value may contain substitutions)
+                parts.append(resolve_substitutions(value, ctx))
+
+        elif kind == "var":
+            name = token[1]
+            name = resolve_substitutions(name, ctx)
+            value = ctx.vars.get(name) or ctx.args.get(name)
+            if value is None:
+                _error(f"undefined variable: {name}")
+                parts.append(f"$(var {name})")
+            else:
+                parts.append(resolve_substitutions(value, ctx))
+
+        elif kind == "env":
+            name = token[1]
+            default = token[2] if len(token) > 2 else None
+            # Check overrides → process env → default
+            value = ctx.env.get(name)
+            if value is None:
+                value = os.environ.get(name)
+            if value is None:
+                value = default  # type: ignore[assignment]
+            if value is None:
+                _error(f"environment variable not set: {name}")
+                parts.append(f"$(env {name})")
+            else:
+                parts.append(str(value))
+
+        elif kind == "find-pkg-share":
+            pkg = token[1]
+            pkg = resolve_substitutions(pkg, ctx)
+            _track_package(pkg)
+            if ctx.preview_mode:
+                parts.append(f"$(find-pkg-share {pkg})")
+            else:
+                try:
+                    path = _resolve_pkg_share(pkg)
+                    parts.append(path)
+                except _PackageNotFetchedError:
+                    raise
+                except Exception:
+                    parts.append(f"$(find-pkg-share {pkg})")
+
+        elif kind == "find-pkg-prefix":
+            pkg = token[1]
+            pkg = resolve_substitutions(pkg, ctx)
+            _track_package(pkg)
+            # Always keep portable for now — prefix resolution not implemented
+            parts.append(f"$(find-pkg-prefix {pkg})")
+
+        elif kind == "dirname":
+            if ctx.launch_file_dir:
+                parts.append(ctx.launch_file_dir)
+            else:
+                parts.append("$(dirname)")
+
+        elif kind == "eval":
+            expr = token[1]
+            # Resolve nested substitutions in the expression
+            expr = resolve_substitutions(expr, ctx)
+            # Unescape \' and \" that may come from variable values (e.g. <let value="[\'a\']"/>)
+            expr = expr.replace("\\'", "'").replace('\\"', '"')
+            try:
+                # Python-native eval — no subprocess needed
+                result = eval(expr)  # noqa: S307
+                parts.append(str(result))
+            except Exception as e:
+                _error(f"$(eval {expr}) failed: {e}")
+                if ctx.preview_mode:
+                    parts.append(f"$(eval {expr})")
+
+        elif kind == "command":
+            body = token[1]
+            body = resolve_substitutions(body, ctx)
+            # Cannot evaluate at analysis time — preserve as-is
+            parts.append(f"$(command {body})")
+
+        else:
+            # Unknown substitution — preserve as-is
+            parts.append(f"$({' '.join(token)})")
+
+    return "".join(parts)
+
+
 # ─── Shim classes ─────────────────────────────────────────────────────────────
 
 

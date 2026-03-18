@@ -1823,4 +1823,113 @@ repositories:
         assert!(info.dependencies.build.contains(&"rclcpp".to_string()));
         assert!(info.dependencies.exec.contains(&"std_msgs".to_string()));
     }
+
+    // ── ensure_remote_url ───────────────────────────────────────────────
+
+    /// Helper: create a git repo and run commands in it.
+    fn git(dir: &std::path::Path, args: &[&str]) {
+        let output = Command::new("git")
+            .current_dir(dir)
+            .args(args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    /// Helper: read origin URL from a repo.
+    fn get_origin_url(dir: &std::path::Path) -> Option<String> {
+        Command::new("git")
+            .current_dir(dir)
+            .args(["remote", "get-url", "origin"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+    }
+
+    #[test]
+    fn test_ensure_remote_url_noop_for_full_clone() {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-b", "main"]);
+        git(
+            dir.path(),
+            &[
+                "remote",
+                "add",
+                "origin",
+                "https://old.example.com/repo.git",
+            ],
+        );
+
+        // Full clone (no partialclonefilter) — should not touch origin.
+        ensure_remote_url(dir.path(), "https://new.example.com/repo.git").unwrap();
+        assert_eq!(
+            get_origin_url(dir.path()).as_deref(),
+            Some("https://old.example.com/repo.git")
+        );
+    }
+
+    #[test]
+    fn test_ensure_remote_url_updates_partial_clone() {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-b", "main"]);
+        git(
+            dir.path(),
+            &[
+                "remote",
+                "add",
+                "origin",
+                "https://old.example.com/repo.git",
+            ],
+        );
+        // Simulate partial clone config.
+        git(
+            dir.path(),
+            &["config", "remote.origin.partialclonefilter", "blob:none"],
+        );
+
+        ensure_remote_url(dir.path(), "https://new.example.com/repo.git").unwrap();
+        assert_eq!(
+            get_origin_url(dir.path()).as_deref(),
+            Some("https://new.example.com/repo.git")
+        );
+    }
+
+    #[test]
+    fn test_ensure_remote_url_noop_when_url_matches() {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-b", "main"]);
+        git(
+            dir.path(),
+            &["remote", "add", "origin", "https://example.com/repo.git"],
+        );
+        git(
+            dir.path(),
+            &["config", "remote.origin.partialclonefilter", "blob:none"],
+        );
+
+        // URL already matches — no-op.
+        ensure_remote_url(dir.path(), "https://example.com/repo.git").unwrap();
+        assert_eq!(
+            get_origin_url(dir.path()).as_deref(),
+            Some("https://example.com/repo.git")
+        );
+    }
+
+    #[test]
+    fn test_ensure_remote_url_noop_without_origin() {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-b", "main"]);
+        // No origin remote at all — should not error.
+        ensure_remote_url(dir.path(), "https://example.com/repo.git").unwrap();
+    }
 }

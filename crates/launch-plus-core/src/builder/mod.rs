@@ -213,7 +213,16 @@ pub fn execute_build(
         pkg_deps.insert(pkg.clone(), deps);
     }
 
-    // 3. Create timestamped log directory with `latest` symlink.
+    // 3. Resolve per-package source directories from lockfile.
+    let mut pkg_src_dirs: HashMap<String, PathBuf> = HashMap::new();
+    for pkg in &plan.packages {
+        if let Some(pkg_lock) = lockfile.packages.get(pkg) {
+            let src = plan.src_dir.join(&pkg_lock.repo).join(&pkg_lock.path);
+            pkg_src_dirs.insert(pkg.clone(), src);
+        }
+    }
+
+    // 4. Create timestamped log directory with `latest` symlink.
     let timestamp = chrono_timestamp();
     let log_dir = plan.log_base.join(&timestamp);
     std::fs::create_dir_all(&log_dir)?;
@@ -246,8 +255,14 @@ pub fn execute_build(
         )
     };
 
-    let result =
-        scheduler::run_parallel_build(&plan, options, &build_types, &pkg_deps, &INTERRUPTED)?;
+    let result = scheduler::run_parallel_build(
+        &plan,
+        options,
+        &build_types,
+        &pkg_deps,
+        &pkg_src_dirs,
+        &INTERRUPTED,
+    )?;
 
     #[cfg(unix)]
     unsafe {

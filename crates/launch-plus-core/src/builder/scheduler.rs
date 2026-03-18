@@ -77,12 +77,14 @@ impl BuildResult {
 /// * `options` - Build options
 /// * `build_types` - Map of package name → build type
 /// * `pkg_deps` - Map of package name → set of in-set build dependencies
+/// * `pkg_src_dirs` - Map of package name → source directory path
 /// * `interrupted` - Global SIGINT flag
 pub fn run_parallel_build(
     plan: &BuildPlan,
     options: &BuildOptions,
     build_types: &HashMap<String, BuildType>,
     pkg_deps: &HashMap<String, HashSet<String>>,
+    pkg_src_dirs: &HashMap<String, std::path::PathBuf>,
     interrupted: &'static AtomicBool,
 ) -> crate::Result<BuildResult> {
     if plan.packages.is_empty() {
@@ -163,6 +165,7 @@ pub fn run_parallel_build(
                     cvar,
                     opts_ref,
                     plan,
+                    pkg_src_dirs,
                     interrupted,
                     options.continue_on_error,
                 );
@@ -183,6 +186,7 @@ fn worker_loop(
     cvar: &Condvar,
     opts_ref: &BuildOptionsRef,
     plan: &BuildPlan,
+    pkg_src_dirs: &HashMap<String, std::path::PathBuf>,
     interrupted: &'static AtomicBool,
     continue_on_error: bool,
 ) {
@@ -217,7 +221,10 @@ fn worker_loop(
 
         let ctx = PackageBuildContext {
             pkg_name: pkg_name.clone(),
-            src_dir: find_package_dir(&plan.src_dir, &pkg_name),
+            src_dir: pkg_src_dirs
+                .get(&pkg_name)
+                .cloned()
+                .unwrap_or_else(|| find_package_dir(&plan.src_dir, &pkg_name)),
             build_dir: plan.build_base.join(&pkg_name),
             install_dir: plan.install_base.join(&pkg_name),
             log_dir: plan.log_base.join(&pkg_name),
@@ -376,6 +383,7 @@ mod tests {
         let result = run_parallel_build(
             &plan,
             &options,
+            &HashMap::new(),
             &HashMap::new(),
             &HashMap::new(),
             &INTERRUPTED,

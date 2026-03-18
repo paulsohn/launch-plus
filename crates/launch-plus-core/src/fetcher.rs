@@ -206,6 +206,11 @@ fn fetch_repo_sparse(
     options: &FetchOptions,
 ) -> crate::Result<()> {
     if repo_dir.exists() && repo_dir.join(".git").exists() {
+        // Blobless/partial clones use origin as the promisor remote for lazy
+        // blob fetches.  Ensure it points to the lockfile URL so that both
+        // explicit fetches and lazy object requests work after a URL change.
+        crate::indexer::ensure_remote_url(repo_dir, url)?;
+
         match options.workspace_state {
             WorkspaceState::Dirty => {
                 // Dirty mode: never touch existing repos — use whatever is on disk.
@@ -797,8 +802,9 @@ fn checkout_sha(
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(crate::Error::Git(format!(
-                "git fetch of {} failed and commit is not available locally: {}",
+                "git fetch of {} from {} failed and commit is not available locally: {}",
                 sha,
+                url,
                 stderr.trim()
             )));
         }

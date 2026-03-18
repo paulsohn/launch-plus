@@ -1169,6 +1169,52 @@ pub fn blobless_clone(url: &str, repo_dir: &Path) -> crate::Result<()> {
     Ok(())
 }
 
+/// Ensure the origin remote URL matches `expected_url`.
+///
+/// Blobless clones use origin as the promisor remote for lazy blob fetches
+/// (e.g. `git show`, `git checkout`).  If the manifest URL changed, origin
+/// must be updated so that both explicit fetches and lazy object requests
+/// go to the correct server.
+///
+/// This is a no-op when the URL already matches.
+pub fn ensure_remote_url(repo_dir: &Path, expected_url: &str) -> crate::Result<()> {
+    let current_url = Command::new("git")
+        .current_dir(repo_dir)
+        .args(["remote", "get-url", "origin"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+
+    if current_url.as_deref() == Some(expected_url) {
+        return Ok(());
+    }
+
+    debug!(
+        "Updating origin URL for {} to {}",
+        repo_dir.display(),
+        expected_url
+    );
+    let output = Command::new("git")
+        .current_dir(repo_dir)
+        .args(["remote", "set-url", "origin", expected_url])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| crate::Error::Git(format!("failed to run git remote set-url: {e}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(crate::Error::Git(format!(
+            "git remote set-url origin failed: {stderr}"
+        )));
+    }
+
+    Ok(())
+}
+
 /// Resolve a version (tag, branch, or SHA) to a concrete SHA.
 ///
 /// Resolution strategy:
@@ -1201,6 +1247,12 @@ fn resolve_version_from_repo(
     // Ensure a local clone exists to resolve from.
     if !dir.join(".git").exists() {
         blobless_clone(url, dir)?;
+    } else {
+        // Blobless clones use origin as the promisor remote for lazy blob
+        // fetches.  If the manifest URL changed (e.g. switched to a fork),
+        // update origin so that both explicit fetches and lazy blob requests
+        // go to the right place.
+        ensure_remote_url(dir, url)?;
     }
 
     resolve_version_local(dir, url, version)

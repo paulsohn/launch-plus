@@ -154,7 +154,7 @@ fn install(ctx: &PackageBuildContext) -> crate::Result<()> {
 /// * `step_name` is used for log file naming and error messages (e.g. "configure", "build").
 /// * stdout and stderr are tee'd to `<log_dir>/<step_name>_stdout.log` / `_stderr.log`.
 /// * If `ctx.options.dry_run`, prints the command and returns without executing.
-fn run_command(
+pub fn run_command(
     ctx: &PackageBuildContext,
     program: &str,
     args: &[String],

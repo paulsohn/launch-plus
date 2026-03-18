@@ -1555,8 +1555,6 @@ fn resolve_file_recursive(
     let is_preview = workflow_options.preview;
     let lockfile_pkg_names: Arc<HashSet<String>> =
         Arc::new(lockfile.packages.keys().cloned().collect());
-    let process_env: HashMap<String, String> = std::env::vars().collect();
-    let baseline_env = Arc::new(process_env.clone());
     let mut ctx = SubstitutionContext {
         launch_file_dir: Some(file_path.parent().unwrap_or(Path::new("/")).to_path_buf()),
         launch_file_path: Some(file_path.clone()),
@@ -1570,8 +1568,6 @@ fn resolve_file_recursive(
         preview_mode: workflow_options.preview,
         lockfile_packages: lockfile_pkg_names,
         rosdep_fallback: workflow_options.rosdep_fallback,
-        env: process_env,
-        baseline_env,
         ..Default::default()
     };
     // Build a callback that runs py_resolver inline on Python includes so that

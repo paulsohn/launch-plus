@@ -43,7 +43,6 @@ def _reset_py_resolver_state():
     R._apply_opaque_file_access = False
     R._preview_mode = True
     R._env.clear()
-    R._env_baseline.clear()
 
     yield
 

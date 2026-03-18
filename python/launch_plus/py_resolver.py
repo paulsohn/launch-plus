@@ -242,12 +242,11 @@ _declared_arg_names: set = set()
 # Each entry is a resolved string.  Managed by _walk_action; reset in main().
 _namespace_stack: list = []
 
-# Full environment variable map, initialized from os.environ in main().
-# Mutated by SetEnvironmentVariable / UnsetEnvironmentVariable.
+# Environment variable overrides.  Starts empty; mutated by
+# SetEnvironmentVariable / UnsetEnvironmentVariable.  EnvironmentVariable
+# substitution checks this first, then falls back to os.environ.
 # Scoped groups clone/restore this.
 _env: dict = {}
-# Frozen baseline snapshot for computing per-node env diffs.
-_env_baseline: dict = {}
 
 def _is_substitution(value):
     """Return True if *value* is a launch substitution (not yet resolved to a string).
@@ -1452,9 +1451,9 @@ def _make_launch_context(args_dict):
 
 # ─── Node detail resolution helpers ──────────────────────────────────────────
 
-def _compute_env_diff():
-    """Return env vars that differ from the process baseline."""
-    return {k: v for k, v in _env.items() if _env_baseline.get(k) != v}
+def _env_overrides():
+    """Return a copy of the current env overrides for per-node output."""
+    return dict(_env)
 
 
 def _resolve_node_details(node, context):
@@ -1505,7 +1504,7 @@ def _resolve_node_details(node, context):
     entry["remappings"] = remaps
 
     # Env vars: start with inherited env diff, then node-local overrides
-    env = _compute_env_diff()
+    env = _env_overrides()
     raw_env = node._raw_env
     if isinstance(raw_env, dict):
         for k, v in raw_env.items():
@@ -1950,10 +1949,19 @@ def _walk_action(action, context, depth):
             except Exception:
                 return
         name = _resolve_substitution(action._name, context) or str(action._name)
-        if name not in _env:
-            _error(f"unset_env: environment variable '{name}' is not set")
-        else:
+        if name in os.environ:
+            # In process env (cases 2 & 3) — can't unset baseline.
+            _error(
+                f"unset_env: '{name}' exists in the process env and cannot be unset. "
+                f"Use SetEnvironmentVariable(name=\"{name}\", value=\"\") "
+                "or a scoped group instead"
+            )
+        elif name in _env:
+            # Case 1: override-only, no baseline to expose — safe to remove.
             del _env[name]
+        else:
+            # Case 4: not set anywhere.
+            _error(f"unset_env: environment variable '{name}' is not set")
         return
 
     # GroupAction: walk child actions; scoped groups save/restore env + namespace
@@ -2168,7 +2176,7 @@ def _build_patched_launch_substitutions():
     mod.FindPackageShare = _TrackedFindPackageShare
     mod.PathJoinSubstitution = _TrackedPathJoinSubstitution
     mod.LaunchConfiguration = _LaunchConfiguration
-    mod.EnvironmentVariable = lambda name, **kw: _env.get(name, kw.get("default_value", ""))
+    mod.EnvironmentVariable = lambda name, **kw: _env.get(name, os.environ.get(name, kw.get("default_value", "")))
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None
     mod.ThisLaunchFileDir = lambda: Path(__file__).parent
@@ -2488,9 +2496,6 @@ def main():
     global _package_shares, _namespace_stack, _apply_opaque_file_access
     _namespace_stack = []
     _env.clear()
-    _env.update(os.environ)
-    _env_baseline.clear()
-    _env_baseline.update(os.environ)
     if len(sys.argv) > 3:
         try:
             _package_shares = json.loads(sys.argv[3])
@@ -2599,13 +2604,9 @@ def main():
     except _PackageNotFetchedError:
         pass  # Absorbed; package already in _packages_to_fetch
 
-    # Net-zero check: error on env vars that leaked from file scope.
+    # Net-zero check: any remaining overrides are leaked env mutations.
     for k, v in _env.items():
-        if _env_baseline.get(k) != v:
-            _error(f"env var '{k}' was set to '{v}' but not restored (leaked from file scope)")
-    for k in _env_baseline:
-        if k not in _env:
-            _error(f"env var '{k}' was unset but not restored (leaked from file scope)")
+        _error(f"env var '{k}' was set to '{v}' but not restored (leaked from file scope)")
 
     if _packages_to_fetch:
         _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)

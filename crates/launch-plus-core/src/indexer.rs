@@ -1036,11 +1036,6 @@ fn discover_packages_from_submodules(
     repo_dir: &Path,
     sha: &str,
 ) -> crate::Result<Vec<PackageInfo>> {
-    struct SubmoduleEntry {
-        path: String,
-        url: Option<String>,
-    }
-
     // Parse .gitmodules to find submodule paths
     let gitmodules_ref = format!("{}:.gitmodules", sha);
     let output = Command::new("git")
@@ -1062,86 +1057,72 @@ fn discover_packages_from_submodules(
     let gitmodules = String::from_utf8_lossy(&output.stdout);
     let mut packages = Vec::new();
 
-    // Parse submodule entries from .gitmodules
+    // Parse submodule paths from .gitmodules
     // Format: [submodule "name"]\n\tpath = <path>\n\turl = <url>
-    let mut entries: Vec<SubmoduleEntry> = Vec::new();
     let mut current_path: Option<String> = None;
-    let mut current_url: Option<String> = None;
     for line in gitmodules.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("[submodule") {
-            // Flush previous entry
-            if let Some(path) = current_path.take() {
-                entries.push(SubmoduleEntry {
-                    path,
-                    url: current_url.take(),
-                });
-            }
-            current_url = None;
-        } else if trimmed.starts_with("path = ") {
+        if trimmed.starts_with("path = ") {
             current_path = Some(trimmed.strip_prefix("path = ").unwrap().to_string());
-        } else if trimmed.starts_with("url = ") {
-            current_url = Some(trimmed.strip_prefix("url = ").unwrap().to_string());
+        } else if trimmed.starts_with("[submodule") {
+            current_path = None;
         }
-    }
-    // Flush last entry
-    if let Some(path) = current_path.take() {
-        entries.push(SubmoduleEntry {
-            path,
-            url: current_url.take(),
-        });
-    }
 
-    for entry in &entries {
-        // Get the submodule commit SHA from the tree
-        let output = Command::new("git")
-            .current_dir(repo_dir)
-            .args(["ls-tree", sha, &entry.path])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output();
+        if let Some(ref path) = current_path {
+            // Get the submodule commit SHA from the tree
+            let output = Command::new("git")
+                .current_dir(repo_dir)
+                .args(["ls-tree", sha, path])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output();
 
-        if let Ok(output) = output {
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                // Format: "160000 commit <sha>\t<path>"
-                if let Some(line) = stdout.lines().next() {
-                    let parts: Vec<&str> = line.split_whitespace().collect();
-                    if parts.len() >= 3 && parts[1] == "commit" {
-                        let submodule_sha = parts[2];
-                        let submodule_dir = repo_dir.join(&entry.path);
+            if let Ok(output) = output {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    // Format: "160000 commit <sha>\t<path>"
+                    if let Some(line) = stdout.lines().next() {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() >= 3 && parts[1] == "commit" {
+                            let submodule_sha = parts[2];
+                            let submodule_dir = repo_dir.join(path);
 
-                        // If submodule is initialized, inspect its objects
-                        if submodule_dir.join(".git").exists() {
-                            debug!(
-                                "Inspecting submodule at {} (SHA: {})",
-                                entry.path,
-                                &submodule_sha[..8.min(submodule_sha.len())]
-                            );
+                            // If submodule is initialized, inspect its objects
+                            if submodule_dir.join(".git").exists() {
+                                debug!(
+                                    "Inspecting submodule at {} (SHA: {})",
+                                    path,
+                                    &submodule_sha[..8.min(submodule_sha.len())]
+                                );
 
-                            // Fetch the submodule SHA directly from its URL
-                            // (not via "origin" which may point elsewhere).
-                            let fetch_url = entry.url.as_deref().unwrap_or("origin");
-                            let _ = Command::new("git")
-                                .current_dir(&submodule_dir)
-                                .args(["fetch", "--depth=1", "--", fetch_url, submodule_sha])
-                                .stdout(Stdio::piped())
-                                .stderr(Stdio::piped())
-                                .output();
+                                // Use "origin" here: submodules are initialized by
+                                // `git submodule init` which resolves .gitmodules URLs
+                                // (often relative) against the superproject remote and
+                                // sets origin accordingly.  Unlike the superproject,
+                                // submodule origin is managed by git, not the user.
+                                let _ = Command::new("git")
+                                    .current_dir(&submodule_dir)
+                                    .args(["fetch", "--depth=1", "origin", submodule_sha])
+                                    .stdout(Stdio::piped())
+                                    .stderr(Stdio::piped())
+                                    .output();
 
-                            if let Ok(mut sub_packages) =
-                                discover_packages_from_git_objects(&submodule_dir, submodule_sha)
-                            {
-                                // Prefix paths with submodule path
-                                for pkg in &mut sub_packages {
-                                    pkg.path = format!("{}/{}", entry.path, pkg.path);
+                                if let Ok(mut sub_packages) = discover_packages_from_git_objects(
+                                    &submodule_dir,
+                                    submodule_sha,
+                                ) {
+                                    // Prefix paths with submodule path
+                                    for pkg in &mut sub_packages {
+                                        pkg.path = format!("{}/{}", path, pkg.path);
+                                    }
+                                    packages.extend(sub_packages);
                                 }
-                                packages.extend(sub_packages);
                             }
                         }
                     }
                 }
             }
+            current_path = None;
         }
     }
 

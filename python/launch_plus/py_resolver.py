@@ -340,6 +340,31 @@ def _track_param_file(path):
             _tracked["param_file_deps"].append(entry)
 
 
+def _to_str(value, context=None):
+    """Coerce a str, substitution object, or None to str.
+
+    - ``None`` → ``None`` (caller decides how to handle missing values)
+    - ``str``  → returned as-is
+    - object with ``.perform()`` → call it; fall back to ``str(value)`` on
+      failure or ``None`` result
+    - anything else → ``str(value)``
+
+    This is the single choke-point for "expecting a string but might receive a
+    ROS 2 substitution object" conversions.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if hasattr(value, "perform"):
+        try:
+            res = value.perform(context)
+            return res if res is not None else str(value)
+        except Exception:
+            return str(value)
+    return str(value)
+
+
 def _resolve_substitution(sub, context):
     """Resolve a substitution, list-of-substitutions, or plain string to str."""
     value, _fallback = _resolve_substitution_ex(sub, context)
@@ -1939,16 +1964,11 @@ def _walk_action(action, context, depth):
             except Exception as e:
                 _warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
                 return
-        if action._name is None:
-            _error("SetEnvironmentVariable: name is None — skipping")
-            return
-        resolved = _resolve_substitution(action._name, context)
-        name = resolved if resolved is not None else str(action._name)
+        name = _to_str(action._name, context)
         if not name:
-            _error("SetEnvironmentVariable: resolved name is empty — skipping")
+            _error("SetEnvironmentVariable: resolved name is empty or None — skipping")
             return
-        resolved_val = _resolve_substitution(action._value, context)
-        value = resolved_val if resolved_val is not None else ""
+        value = _to_str(action._value, context) or ""
         _env[name] = value
         return
 
@@ -1963,13 +1983,9 @@ def _walk_action(action, context, depth):
             except Exception as e:
                 _warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
                 return
-        if action._name is None:
-            _error("UnsetEnvironmentVariable: name is None — skipping")
-            return
-        resolved = _resolve_substitution(action._name, context)
-        name = resolved if resolved is not None else str(action._name)
+        name = _to_str(action._name, context)
         if not name:
-            _error("UnsetEnvironmentVariable: resolved name is empty — skipping")
+            _error("UnsetEnvironmentVariable: resolved name is empty or None — skipping")
             return
         if name in os.environ:
             # In process env (cases 2 & 3) — can't unset baseline.
@@ -2214,15 +2230,9 @@ def _build_patched_launch_substitutions():
             self._default = kw.get("default_value", "")
         def perform(self, context=None):
             # Resolve name to string (may be a substitution object).
-            name = self._name
-            if hasattr(name, "perform"):
-                try:
-                    res = name.perform(context)
-                    name = res if res is not None else str(self._name)
-                except Exception:
-                    name = str(self._name)
-            name = str(name) if name is not None else ""
-            return _env.get(name, os.environ.get(name, self._default))
+            name = _to_str(self._name, context) or ""
+            default = _to_str(self._default, context) if hasattr(self._default, "perform") else self._default
+            return _env.get(name, os.environ.get(name, default if default is not None else ""))
         def __str__(self):
             # Avoid calling perform() without context — return the raw name.
             return str(self._name) if self._name is not None else ""

@@ -5021,8 +5021,13 @@ mod tests {
 
     #[test]
     fn test_resolve_env_unset_without_default_errors() {
+        let var = "LAUNCH_PLUS_TEST_UNSET_8f3a2b";
+        assert!(
+            std::env::var_os(var).is_none(),
+            "precondition: {var} must not be set in the process environment"
+        );
         let ctx = SubstitutionContext::default();
-        let result = resolve_substitutions("$(env LAUNCH_PLUS_TEST_UNSET_8f3a2b)", &ctx);
+        let result = resolve_substitutions(&format!("$(env {var})"), &ctx);
         assert!(result.is_err());
     }
 
@@ -5147,8 +5152,13 @@ mod tests {
 
     #[test]
     fn test_resolve_undefined_env_errors() {
+        let var = "DEFINITELY_NOT_A_REAL_VAR_12345";
+        assert!(
+            std::env::var_os(var).is_none(),
+            "precondition: {var} must not be set in the process environment"
+        );
         let ctx = SubstitutionContext::default();
-        let result = resolve_substitutions("$(env DEFINITELY_NOT_A_REAL_VAR_12345)", &ctx);
+        let result = resolve_substitutions(&format!("$(env {var})"), &ctx);
         assert!(result.is_err());
     }
 

@@ -175,6 +175,25 @@ pub fn execute_build(
         return Ok(());
     }
 
+    // 0. Absolutize all plan paths — build tools run in per-package build dirs,
+    //    so relative paths would resolve incorrectly.
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let abs = |p: &Path| -> PathBuf {
+        if p.is_absolute() {
+            p.to_path_buf()
+        } else {
+            cwd.join(p)
+        }
+    };
+    let plan = &BuildPlan {
+        packages: plan.packages.clone(),
+        external_deps: plan.external_deps.clone(),
+        src_dir: abs(&plan.src_dir),
+        build_base: abs(&plan.build_base),
+        install_base: abs(&plan.install_base),
+        log_base: abs(&plan.log_base),
+    };
+
     // 1. Determine build type for each package.
     let mut build_types: HashMap<String, scheduler::BuildType> = HashMap::new();
     for pkg in &plan.packages {

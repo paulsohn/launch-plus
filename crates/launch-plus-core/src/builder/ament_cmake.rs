@@ -221,12 +221,9 @@ pub fn run_command(
         // Stdout reader thread.
         let stdout_handle = stdout_pipe.map(|pipe| s.spawn(move || tee_to_file(pipe, &stdout_log)));
 
-        // Stderr reader thread.
-        let stderr_handle = stderr_pipe.map(|pipe| {
-            let pkg = pkg_name.clone();
-            let step = step.clone();
-            s.spawn(move || tee_to_file_with_prefix(pipe, &stderr_log, &pkg, &step))
-        });
+        // Stderr reader thread — tee to both log file and terminal.
+        let stderr_handle =
+            stderr_pipe.map(|pipe| s.spawn(move || tee_to_file_and_stderr(pipe, &stderr_log)));
 
         let status = child.wait().map_err(|e| crate::Error::BuildFailed {
             package: pkg_name.clone(),
@@ -289,15 +286,9 @@ fn tee_to_file(reader: impl std::io::Read, log_path: &Path) {
     }
 }
 
-/// Read from `reader` line-by-line, writing to `log_path` and emitting
-/// non-empty lines as tracing warnings (stderr from build tools often
-/// contains warnings that are useful to surface).
-fn tee_to_file_with_prefix(
-    reader: impl std::io::Read,
-    log_path: &Path,
-    _pkg_name: &str,
-    _step_name: &str,
-) {
+/// Read from `reader` line-by-line, writing to `log_path` and forwarding
+/// every line to stderr so build errors/warnings are immediately visible.
+fn tee_to_file_and_stderr(reader: impl std::io::Read, log_path: &Path) {
     let file = match fs::File::create(log_path) {
         Ok(f) => f,
         Err(e) => {
@@ -312,11 +303,7 @@ fn tee_to_file_with_prefix(
             Ok(line) => {
                 use std::io::Write;
                 let _ = writeln!(writer, "{line}");
-                // Don't spam terminal with every stderr line — the log file has everything.
-                // Only surface via tracing at trace level.
-                if !line.is_empty() {
-                    tracing::trace!("{line}");
-                }
+                eprintln!("{line}");
             }
             Err(_) => break,
         }

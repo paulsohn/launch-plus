@@ -1332,7 +1332,7 @@ impl DependencyGraph {
 /// Read on-disk `package.xml` dependencies for a package.
 ///
 /// Returns `None` if the package is not in the lockfile or its `package.xml` is not on disk.
-fn read_package_deps(
+pub fn read_package_deps(
     lockfile: &Lockfile,
     src_dir: &std::path::Path,
     pkg_name: &str,

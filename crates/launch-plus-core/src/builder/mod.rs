@@ -28,16 +28,18 @@ pub mod environment;
 pub mod install;
 pub mod scheduler;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Flag set by the SIGINT handler so the builder knows the child was interrupted.
 static INTERRUPTED: AtomicBool = AtomicBool::new(false);
 
 use crate::fetcher::{FetchOptions, fetch_packages};
-use crate::indexer::{DependencyMode, Lockfile, compute_build_order, resolve_dependencies};
+use crate::indexer::{
+    DependencyMode, Lockfile, compute_build_order, read_package_build_type, read_package_deps,
+    resolve_dependencies,
+};
 
 /// Everything needed to build the launch target.
 #[derive(Debug, Clone)]
@@ -151,72 +153,91 @@ pub fn plan_build_from_packages(
     })
 }
 
-/// Execute the build plan using colcon as a subprocess.
+/// Execute the build plan using the native builder backend.
 ///
-/// This is the legacy colcon-based executor, retained as a fallback during
-/// the transition to the native builder backend. Once the native backend
-/// (ament_cmake, ament_python, scheduler) is complete, this function will
-/// be replaced.
+/// Steps:
+/// 1. Determine build type for each package (ament_cmake or ament_python)
+/// 2. Validate: reject unsupported build types
+/// 3. Create timestamped log directory with `latest` symlink
+/// 4. Create root install layout (setup.bash, setup.sh, setup.zsh, etc.)
+/// 5. Run the parallel scheduler
+/// 6. Create per-package install metadata for successfully built packages
 ///
-/// When `options.dry_run` is true, prints the command to stdout without running it.
+/// When `options.dry_run` is true, prints the build commands without executing.
 #[allow(unsafe_code)]
-pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<()> {
+pub fn execute_build(
+    plan: &BuildPlan,
+    options: &BuildOptions,
+    lockfile: &Lockfile,
+) -> crate::Result<()> {
     if plan.packages.is_empty() {
         tracing::info!("No packages to build.");
         return Ok(());
     }
 
-    // --log-base is a colcon global argument (before the verb).
-    let mut args: Vec<String> = vec![
-        "--log-base".to_string(),
-        plan.log_base.to_string_lossy().into_owned(),
-        "build".to_string(),
-    ];
-
-    args.push("--base-paths".to_string());
-    args.push(plan.src_dir.to_string_lossy().into_owned());
-
-    args.push("--build-base".to_string());
-    args.push(plan.build_base.to_string_lossy().into_owned());
-
-    args.push("--install-base".to_string());
-    args.push(plan.install_base.to_string_lossy().into_owned());
-
-    // Map new BuildOptions fields to colcon args for the legacy path.
-    if options.symlink_install {
-        args.push("--symlink-install".to_string());
-    }
-    if options.continue_on_error {
-        args.push("--continue-on-error".to_string());
-    }
-    if !options.cmake_args.is_empty() {
-        args.push("--cmake-args".to_string());
-        args.extend(options.cmake_args.iter().cloned());
+    // 1. Determine build type for each package.
+    let mut build_types: HashMap<String, scheduler::BuildType> = HashMap::new();
+    for pkg in &plan.packages {
+        let bt = match read_package_build_type(lockfile, &plan.src_dir, pkg) {
+            Some(ref s) if s == "ament_python" => scheduler::BuildType::AmentPython,
+            Some(ref s) if s == "ament_cmake" => scheduler::BuildType::AmentCmake,
+            None => scheduler::BuildType::AmentCmake, // default
+            Some(other) => {
+                return Err(crate::Error::UnsupportedBuildType {
+                    package: pkg.clone(),
+                    build_type: other,
+                });
+            }
+        };
+        build_types.insert(pkg.clone(), bt);
     }
 
-    args.push("--packages-select".to_string());
-    args.extend(plan.packages.iter().cloned());
-
-    let cmd_str = format!("colcon {}", args.join(" "));
-
-    if options.dry_run {
-        println!("{cmd_str}");
-        return Ok(());
+    // 2. Build per-package dependency sets (in-set build deps only).
+    let mut pkg_deps: HashMap<String, HashSet<String>> = HashMap::new();
+    let pkg_set: HashSet<&String> = plan.packages.iter().collect();
+    for pkg in &plan.packages {
+        let mut deps = HashSet::new();
+        if let Some(d) = read_package_deps(lockfile, &plan.src_dir, pkg) {
+            for dep_name in d
+                .build
+                .iter()
+                .chain(d.build_export.iter())
+                .chain(d.buildtool.iter())
+                .chain(d.buildtool_export.iter())
+            {
+                if pkg_set.contains(dep_name) {
+                    deps.insert(dep_name.clone());
+                }
+            }
+        }
+        pkg_deps.insert(pkg.clone(), deps);
     }
 
-    tracing::info!("{cmd_str}");
+    // 3. Create timestamped log directory with `latest` symlink.
+    let timestamp = chrono_timestamp();
+    let log_dir = plan.log_base.join(&timestamp);
+    std::fs::create_dir_all(&log_dir)?;
+    let latest_link = plan.log_base.join("latest");
+    // Remove existing symlink and create new one.
+    #[cfg(unix)]
+    {
+        let _ = std::fs::remove_file(&latest_link);
+        let _ = std::os::unix::fs::symlink(&timestamp, &latest_link);
+    }
 
-    // Spawn colcon as a child process and forward SIGINT so a single Ctrl+C
-    // terminates both colcon and the builder.
-    let mut child = Command::new("colcon")
-        .args(&args)
-        .spawn()
-        .map_err(|e| crate::Error::ProcessExecution(format!("failed to run colcon: {e}")))?;
+    // Use the timestamped log dir for this build.
+    let mut plan = plan.clone();
+    plan.log_base = log_dir;
 
+    // 4. Create root install layout.
+    let parent_prefix = std::env::var("COLCON_PREFIX_PATH")
+        .or_else(|_| std::env::var("AMENT_PREFIX_PATH"))
+        .ok();
+    install::create_root_layout(&plan.install_base, parent_prefix.as_deref())?;
+
+    // 5. Install SIGINT handler and run scheduler.
     INTERRUPTED.store(false, Ordering::SeqCst);
 
-    // Install a SIGINT handler that sets the flag instead of killing our process.
-    // The default SIGINT behaviour is restored after the child exits.
     #[cfg(unix)]
     let prev_handler = unsafe {
         libc::signal(
@@ -225,37 +246,109 @@ pub fn execute_build(plan: &BuildPlan, options: &BuildOptions) -> crate::Result<
         )
     };
 
-    let status = child
-        .wait()
-        .map_err(|e| crate::Error::ProcessExecution(format!("failed to wait for colcon: {e}")))?;
+    let result =
+        scheduler::run_parallel_build(&plan, options, &build_types, &pkg_deps, &INTERRUPTED)?;
 
-    // Restore previous signal handler.
     #[cfg(unix)]
     unsafe {
         libc::signal(libc::SIGINT, prev_handler);
     }
 
-    if INTERRUPTED.load(Ordering::SeqCst) {
-        // Child was killed by our forwarded signal; propagate as an error.
-        return Err(crate::Error::BuildInterrupted);
+    // 6. Create per-package install metadata for successfully built packages.
+    for pkg in &result.completed {
+        // Read runtime deps (exec_depend) for the colcon metadata files.
+        let runtime_deps: Vec<String> =
+            if let Some(d) = read_package_deps(lockfile, &plan.src_dir, pkg) {
+                d.exec
+            } else {
+                vec![]
+            };
+        let has_library = plan.install_base.join(pkg).join("lib").join(pkg).exists()
+            || plan.install_base.join(pkg).join("lib").is_dir();
+        install::create_package_install_metadata(
+            &plan.install_base.join(pkg),
+            pkg,
+            &runtime_deps,
+            has_library,
+        )?;
     }
 
-    if !status.success() {
-        return Err(crate::Error::ProcessExecution(format!(
-            "colcon build failed with status: {status}"
-        )));
+    // 7. Report results.
+    if result.is_success() {
+        eprintln!(
+            "\nBuild complete: {} packages built successfully.",
+            result.completed.len()
+        );
+        Ok(())
+    } else {
+        let failed_names: Vec<&str> = result.failed.iter().map(|(n, _)| n.as_str()).collect();
+        Err(crate::Error::BuildFailed {
+            package: failed_names.join(", "),
+            detail: format!(
+                "{} succeeded, {} failed",
+                result.completed.len(),
+                result.failed.len()
+            ),
+        })
     }
-    Ok(())
+}
+
+/// Generate an ISO-8601 timestamp string for log directory naming.
+fn chrono_timestamp() -> String {
+    use std::time::SystemTime;
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = now.as_secs();
+    // Simple formatting without chrono dependency.
+    // Format: YYYY-MM-DD_HH-MM-SS
+    let days = secs / 86400;
+    let time_of_day = secs % 86400;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    // Approximate date calculation (good enough for log dirs).
+    let mut year = 1970i64;
+    #[allow(clippy::cast_possible_wrap)]
+    let mut remaining_days = days as i64;
+    loop {
+        let days_in_year = if is_leap_year(year) { 366 } else { 365 };
+        if remaining_days < days_in_year {
+            break;
+        }
+        remaining_days -= days_in_year;
+        year += 1;
+    }
+    let month_days = if is_leap_year(year) {
+        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    } else {
+        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    };
+    let mut month = 1;
+    for &md in &month_days {
+        if remaining_days < md {
+            break;
+        }
+        remaining_days -= md;
+        month += 1;
+    }
+    let day = remaining_days + 1;
+
+    format!("{year:04}-{month:02}-{day:02}_{hours:02}-{minutes:02}-{seconds:02}")
+}
+
+fn is_leap_year(year: i64) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }
 
 /// Signal-safe SIGINT handler: sets the INTERRUPTED flag.
 ///
-/// The child process (colcon) is in the same process group and receives SIGINT
-/// directly from the terminal.  This handler prevents our process from being
-/// killed before we can clean up.
+/// Child processes in the same process group receive SIGINT directly from
+/// the terminal.  This handler prevents our process from being killed
+/// before we can clean up.
 #[cfg(unix)]
+#[allow(unsafe_code)]
 extern "C" fn sigint_handler(_sig: libc::c_int) {
-    use std::sync::atomic::Ordering;
-    // AtomicBool::store is signal-safe.
     INTERRUPTED.store(true, Ordering::SeqCst);
 }

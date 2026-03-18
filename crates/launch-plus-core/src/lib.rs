@@ -40,7 +40,7 @@ pub use locator::{PackageLocator, locator_from_lockfile, locator_from_workspace}
 // Re-export indexer types for lockfile access
 pub use indexer::{
     Dependencies, DependencyGraph, DependencyMode, Lockfile, PackageLock, RepoLock,
-    compute_build_order, read_package_build_type, resolve_dependencies,
+    compute_build_order, read_package_build_type, read_package_deps, resolve_dependencies,
 };
 
 // Re-export fetcher types

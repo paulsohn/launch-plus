@@ -965,7 +965,7 @@ fn main() -> Result<()> {
             if let Some(n) = parallel_workers {
                 build_options.parallel_workers = n;
             }
-            execute_build(&plan, &build_options)?;
+            execute_build(&plan, &build_options, &parsed_lockfile)?;
         }
         Commands::Test {
             package,
@@ -1597,7 +1597,7 @@ fn run_build(
         }
     }
 
-    execute_build(&plan, &build_options).with_context(|| "build failed")?;
+    execute_build(&plan, &build_options, &lockfile).with_context(|| "build failed")?;
 
     Ok(())
 }

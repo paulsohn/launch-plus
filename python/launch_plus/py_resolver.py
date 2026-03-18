@@ -1942,11 +1942,13 @@ def _walk_action(action, context, depth):
         if action._name is None:
             _error("SetEnvironmentVariable: name is None — skipping")
             return
-        name = _resolve_substitution(action._name, context) or str(action._name)
+        resolved = _resolve_substitution(action._name, context)
+        name = resolved if resolved is not None else str(action._name)
         if not name:
             _error("SetEnvironmentVariable: resolved name is empty — skipping")
             return
-        value = _resolve_substitution(action._value, context) or ""
+        resolved_val = _resolve_substitution(action._value, context)
+        value = resolved_val if resolved_val is not None else ""
         _env[name] = value
         return
 
@@ -1964,7 +1966,8 @@ def _walk_action(action, context, depth):
         if action._name is None:
             _error("UnsetEnvironmentVariable: name is None — skipping")
             return
-        name = _resolve_substitution(action._name, context) or str(action._name)
+        resolved = _resolve_substitution(action._name, context)
+        name = resolved if resolved is not None else str(action._name)
         if not name:
             _error("UnsetEnvironmentVariable: resolved name is empty — skipping")
             return
@@ -2214,7 +2217,8 @@ def _build_patched_launch_substitutions():
             name = self._name
             if hasattr(name, "perform"):
                 try:
-                    name = name.perform(context) or str(self._name)
+                    res = name.perform(context)
+                    name = res if res is not None else str(self._name)
                 except Exception:
                     name = str(self._name)
             name = str(name) if name is not None else ""

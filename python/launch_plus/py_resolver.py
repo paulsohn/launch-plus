@@ -330,15 +330,19 @@ def _try_rosdep_install(package: str) -> bool:
     _rosdep_attempted.add(package)
     ros_distro = os.environ.get("ROS_DISTRO", "")
     if not ros_distro:
+        _warn(f"rosdep: skipping '{package}' (ROS_DISTRO not set)")
         return False
     try:
-        result = subprocess.run(
-            ["rosdep", "install", "--rosdistro", ros_distro, "-y", "--from-keys", package],
-            capture_output=True,
-            text=True,
-        )
-        return result.returncode == 0
-    except Exception:
+        cmd = ["rosdep", "install", "--rosdistro", ros_distro, "-y", "--from-keys", package]
+        _warn(f"rosdep: installing '{package}' via: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            _warn(f"rosdep: '{package}' installed successfully")
+            return True
+        _warn(f"rosdep: '{package}' failed (rc={result.returncode}): {result.stderr.strip()}")
+        return False
+    except Exception as e:
+        _warn(f"rosdep: '{package}' exception: {e}")
         return False
 
 
@@ -515,8 +519,14 @@ def _resolve_pkg_share(package: str) -> str:
             return str(_real_get_package_share_directory(package))
         except _PackageNotFetchedError:
             raise
-        except Exception:
-            pass  # Fall through to rosdep or portable fallback.
+        except Exception as e:
+            _warn(
+                f"_resolve_pkg_share('{package}'): AMENT lookup failed: {e}, rosdep_fallback={_rosdep_fallback}"
+            )
+    else:
+        _warn(
+            f"_resolve_pkg_share('{package}'): no AMENT resolver available, rosdep_fallback={_rosdep_fallback}"
+        )
     # 4. Try rosdep install if enabled.
     if (
         _rosdep_fallback

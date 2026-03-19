@@ -700,6 +700,35 @@ def _track_node(node_dict: dict) -> int:
     return idx
 
 
+def _track_event_handler(eh_dict: dict) -> int:
+    """Track an event handler as a node entry so it appears in encounter order.
+
+    Wraps the event handler dict in a node-shaped dict with ``kind: "event_handler"``
+    and uses ``_track_node()`` to get proper ``include_chain`` and ordering.
+    """
+    node_dict = {
+        "package": "",
+        "executable": "",
+        "name": "",
+        "namespace_stack": eh_dict.get("namespace_stack", []),
+        "explicit_namespace": eh_dict.get("explicit_namespace"),
+        "parameters": {},
+        "param_files": [],
+        "remappings": [],
+        "env": {},
+        "kind": "event_handler",
+        "plugins": [],
+        "target": eh_dict.get("target"),
+        # Event-handler-specific fields
+        "handler_kind": eh_dict.get("handler_kind", ""),
+        "target_node": eh_dict.get("target_node"),
+        "start_state": eh_dict.get("start_state"),
+        "goal_state": eh_dict.get("goal_state"),
+        "eh_actions": eh_dict.get("actions", []),
+    }
+    return _track_node(node_dict)
+
+
 def _to_str(value: object, context: Any = None) -> str | None:
     """Coerce a str, substitution object, or None to ``str | None``.
 
@@ -1619,6 +1648,7 @@ def _yaml_value_to_str(v: object) -> str:
 
 def _read_and_expand_param_file(
     path: str,
+    ctx: "_SubstitutionContext | None" = None,
 ) -> list[tuple[str, str]] | None:
     """Read a param file and expand ros__parameters. Returns None on failure."""
     real_path = path
@@ -1647,7 +1677,17 @@ def _read_and_expand_param_file(
     try:
         with open(real_path) as f:
             content = f.read()
-        return _expand_ros_params_yaml(content)
+        pairs = _expand_ros_params_yaml(content)
+        if pairs and ctx is not None:
+            resolved_pairs: list[tuple[str, str]] = []
+            for key, val in pairs:
+                try:
+                    resolved_val = resolve_substitutions(val, ctx)
+                except Exception:
+                    resolved_val = val
+                resolved_pairs.append((key, resolved_val))
+            return resolved_pairs
+        return pairs
     except Exception as e:
         _error(f"--inline-params: failed to read '{path}': {e}")
         return None
@@ -1687,7 +1727,7 @@ def _resolve_params_xml(
                 seen_paths.add(path)
                 pf_entry: dict = {"path": path}
                 if _inline_params:
-                    expanded = _read_and_expand_param_file(path)
+                    expanded = _read_and_expand_param_file(path, ctx)
                     if expanded is not None:
                         pf_entry["params"] = expanded
                 param_files.append(pf_entry)
@@ -1722,6 +1762,13 @@ def _resolve_envs_xml(
         value = resolve_substitutions(e.get("value", ""), ctx)
         result[name] = value
     return result
+
+
+def _resolve_optional(value: str | None, ctx: _SubstitutionContext) -> str | None:
+    """Resolve substitutions in an optional XML attribute value."""
+    if value is None:
+        return None
+    return resolve_substitutions(value, ctx)
 
 
 def _resolve_composable_plugins_xml(
@@ -1987,10 +2034,10 @@ def _resolve_xml_element(
                 "kind": node_kind,
                 "plugins": [],
                 "target": None,
-                "output": data.get("output"),
-                "args": data.get("args"),
-                "respawn": data.get("respawn"),
-                "respawn_delay": data.get("respawn_delay"),
+                "output": _resolve_optional(data.get("output"), ctx),
+                "args": _resolve_optional(data.get("args"), ctx),
+                "respawn": _resolve_optional(data.get("respawn"), ctx),
+                "respawn_delay": _resolve_optional(data.get("respawn_delay"), ctx),
             }
         )
 
@@ -2203,7 +2250,7 @@ def _resolve_xml_element(
             "OnStateTransition": "on_state_transition",
             "OnShutdown": "on_shutdown",
         }
-        _tracked["event_handlers"].append(
+        _track_event_handler(
             {
                 "handler_kind": kind_map.get(handler_kind, handler_kind),
                 "target": target,
@@ -2225,7 +2272,7 @@ def _resolve_xml_element(
         ee_ns = data.get("namespace")
         if ee_ns:
             ee_ns = resolve_substitutions(ee_ns, ctx)
-        _tracked["event_handlers"].append(
+        _track_event_handler(
             {
                 "handler_kind": "emit_event",
                 "target": None,
@@ -2615,6 +2662,27 @@ def _resolve_element_to_ir(
                 actions=actions,
             )
         )
+        # Also track in nodes list for encounter-order interleaving
+        _track_event_handler(
+            {
+                "handler_kind": kind_map.get(handler_kind, handler_kind),
+                "target": target,
+                "target_node": target_node,
+                "start_state": start_state,
+                "goal_state": goal_state,
+                "namespace_stack": list(_namespace_stack),
+                "explicit_namespace": handler_ns,
+                "actions": [
+                    {
+                        "event": a.event,
+                        "target_node": a.target_node,
+                        "namespace_stack": [],
+                        "explicit_namespace": a.namespace,
+                    }
+                    for a in actions
+                ],
+            }
+        )
         return []
 
     if kind == "EmitEvent":
@@ -2640,6 +2708,26 @@ def _resolve_element_to_ir(
                     )
                 ],
             )
+        )
+        # Also track in nodes list for encounter-order interleaving
+        _track_event_handler(
+            {
+                "handler_kind": "emit_event",
+                "target": None,
+                "target_node": target_node,
+                "start_state": None,
+                "goal_state": None,
+                "namespace_stack": list(_namespace_stack),
+                "explicit_namespace": ee_ns,
+                "actions": [
+                    {
+                        "event": event,
+                        "target_node": target_node,
+                        "namespace_stack": list(_namespace_stack),
+                        "explicit_namespace": ee_ns,
+                    }
+                ],
+            }
         )
         return []
 
@@ -2945,7 +3033,7 @@ class _TrackedRegisterEventHandler:
 
     def __init__(self, event_handler=None, **kwargs):
         if event_handler is not None and hasattr(event_handler, "to_event_handler"):
-            _tracked["event_handlers"].append(event_handler.to_event_handler())
+            _track_event_handler(event_handler.to_event_handler())
 
 
 def _action_name(action):

@@ -502,6 +502,7 @@ enum PyNodeKind {
     Log,
     Executable,
     LifecycleNode,
+    EventHandler,
 }
 
 /// A deserialized event handler from the Python resolver.
@@ -625,6 +626,21 @@ struct PyResolvedNode {
     /// Resolved `respawn_delay=` attribute.
     #[serde(default)]
     respawn_delay: Option<String>,
+    /// Event handler kind (for `kind == EventHandler`).
+    #[serde(default)]
+    handler_kind: Option<String>,
+    /// Event handler target node (for `kind == EventHandler`).
+    #[serde(default)]
+    target_node: Option<String>,
+    /// Lifecycle start state (for `kind == EventHandler`).
+    #[serde(default)]
+    start_state: Option<String>,
+    /// Lifecycle goal state (for `kind == EventHandler`).
+    #[serde(default)]
+    goal_state: Option<String>,
+    /// Event handler actions (for `kind == EventHandler`).
+    #[serde(default)]
+    eh_actions: Vec<PyEventAction>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -791,6 +807,43 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                     },
                     shell: n.shell,
                 },
+                PyNodeKind::EventHandler => {
+                    let hk_str = n.handler_kind.as_deref().unwrap_or("");
+                    let handler_kind = match hk_str {
+                        "on_process_start" => EventHandlerKind::OnProcessStart,
+                        "on_process_exit" => EventHandlerKind::OnProcessExit,
+                        "on_state_transition" => EventHandlerKind::OnStateTransition,
+                        "on_shutdown" => EventHandlerKind::OnShutdown,
+                        other => {
+                            tracing::warn!(
+                                "unknown event handler kind from Python resolver: {other}"
+                            );
+                            return None;
+                        }
+                    };
+                    let handler_ns = crate::resolver::effective_namespace(
+                        &n.namespace_stack,
+                        n.explicit_namespace.as_deref(),
+                    );
+                    let actions = n
+                        .eh_actions
+                        .iter()
+                        .map(|a| ResolvedEventAction::EmitEvent {
+                            event: a.event.clone(),
+                            target_node: a.target_node.clone(),
+                            namespace: a.explicit_namespace.clone(),
+                        })
+                        .collect();
+                    NodeKind::EventHandler {
+                        handler_kind,
+                        target: n.target.clone(),
+                        target_node: n.target_node.clone(),
+                        namespace: handler_ns,
+                        start_state: n.start_state.clone(),
+                        goal_state: n.goal_state.clone(),
+                        actions,
+                    }
+                }
             };
             Some(ResolvedNode {
                 package: n.package.clone(),
@@ -832,49 +885,52 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
         })
         .collect::<Vec<_>>();
 
-    // Convert event handlers from the Python output into ResolvedNode entries.
-    for eh in &py_output.event_handlers {
-        let handler_kind = match eh.handler_kind.as_str() {
-            "on_process_start" => EventHandlerKind::OnProcessStart,
-            "on_process_exit" => EventHandlerKind::OnProcessExit,
-            "on_state_transition" => EventHandlerKind::OnStateTransition,
-            "on_shutdown" => EventHandlerKind::OnShutdown,
-            other => {
-                tracing::warn!("unknown event handler kind from Python resolver: {other}");
-                continue;
-            }
-        };
-        let handler_ns = crate::resolver::effective_namespace(
-            &eh.namespace_stack,
-            eh.explicit_namespace.as_deref(),
-        );
-        // Leave action namespaces as None unless the Python resolver recorded
-        // an explicit namespace.  apply_parent_namespace will inherit the
-        // handler's (recomputed) namespace into None actions, avoiding stale
-        // pre-prefix namespaces that would miss cross-file namespace propagation.
-        let actions = eh
-            .actions
-            .iter()
-            .map(|a| ResolvedEventAction::EmitEvent {
-                event: a.event.clone(),
-                target_node: a.target_node.clone(),
-                namespace: a.explicit_namespace.clone(),
-            })
-            .collect();
-        nodes.push(ResolvedNode {
-            namespace_stack: eh.namespace_stack.clone(),
-            explicit_namespace: eh.explicit_namespace.clone(),
-            kind: NodeKind::EventHandler {
-                handler_kind,
-                target: eh.target.clone(),
-                target_node: eh.target_node.clone(),
-                namespace: handler_ns,
-                start_state: eh.start_state.clone(),
-                goal_state: eh.goal_state.clone(),
-                actions,
-            },
-            ..ResolvedNode::default()
-        });
+    // Legacy: convert event handlers from the separate `event_handlers` field
+    // for backward compatibility. Skip if the nodes list already contains
+    // interleaved event handlers (new behavior).
+    let has_inline_eh = nodes
+        .iter()
+        .any(|n| matches!(n.kind, NodeKind::EventHandler { .. }));
+    if !has_inline_eh {
+        for eh in &py_output.event_handlers {
+            let handler_kind = match eh.handler_kind.as_str() {
+                "on_process_start" => EventHandlerKind::OnProcessStart,
+                "on_process_exit" => EventHandlerKind::OnProcessExit,
+                "on_state_transition" => EventHandlerKind::OnStateTransition,
+                "on_shutdown" => EventHandlerKind::OnShutdown,
+                other => {
+                    tracing::warn!("unknown event handler kind from Python resolver: {other}");
+                    continue;
+                }
+            };
+            let handler_ns = crate::resolver::effective_namespace(
+                &eh.namespace_stack,
+                eh.explicit_namespace.as_deref(),
+            );
+            let actions = eh
+                .actions
+                .iter()
+                .map(|a| ResolvedEventAction::EmitEvent {
+                    event: a.event.clone(),
+                    target_node: a.target_node.clone(),
+                    namespace: a.explicit_namespace.clone(),
+                })
+                .collect();
+            nodes.push(ResolvedNode {
+                namespace_stack: eh.namespace_stack.clone(),
+                explicit_namespace: eh.explicit_namespace.clone(),
+                kind: NodeKind::EventHandler {
+                    handler_kind,
+                    target: eh.target.clone(),
+                    target_node: eh.target_node.clone(),
+                    namespace: handler_ns,
+                    start_state: eh.start_state.clone(),
+                    goal_state: eh.goal_state.clone(),
+                    actions,
+                },
+                ..ResolvedNode::default()
+            });
+        }
     }
 
     let launch_includes = py_output

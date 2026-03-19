@@ -1496,6 +1496,25 @@ class TestResolveXmlElements:
         assert tracked["nodes"][0]["namespace_stack"] == ["/robot"]
         assert tracked["nodes"][0]["explicit_namespace"] == "/override"
 
+    def test_node_output_args_respawn_resolved(self):
+        """output=, args=, respawn= attributes must resolve substitutions."""
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="my_output" default="screen"/>
+              <arg name="my_args" default="-d /path/config.rviz"/>
+              <arg name="do_respawn" default="true"/>
+              <node pkg="p" exec="e" name="n"
+                    output="$(var my_output)"
+                    args="$(var my_args)"
+                    respawn="$(var do_respawn)"/>
+            </launch>
+        """)
+        _, tracked = _parse_and_walk(xml)
+        node = tracked["nodes"][0]
+        assert node["output"] == "screen"
+        assert node["args"] == "-d /path/config.rviz"
+        assert node["respawn"] == "true"
+
     # ── Node params, remaps, env ──
 
     def test_node_params_and_remaps(self):
@@ -1579,13 +1598,14 @@ class TestResolveXmlElements:
             </launch>
         """)
         _, tracked = _parse_and_walk(xml)
-        assert len(tracked["event_handlers"]) == 1
-        eh = tracked["event_handlers"][0]
+        ehs = [n for n in tracked["nodes"] if n.get("kind") == "event_handler"]
+        assert len(ehs) == 1
+        eh = ehs[0]
         assert eh["handler_kind"] == "on_process_start"
         assert eh["target"] == "my_node"
-        assert len(eh["actions"]) == 1
-        assert eh["actions"][0]["event"] == "configure"
-        assert eh["actions"][0]["target_node"] == "my_node"
+        assert len(eh["eh_actions"]) == 1
+        assert eh["eh_actions"][0]["event"] == "configure"
+        assert eh["eh_actions"][0]["target_node"] == "my_node"
 
     def test_on_shutdown(self):
         xml = textwrap.dedent("""\
@@ -1596,8 +1616,9 @@ class TestResolveXmlElements:
             </launch>
         """)
         _, tracked = _parse_and_walk(xml)
-        assert len(tracked["event_handlers"]) == 1
-        assert tracked["event_handlers"][0]["handler_kind"] == "on_shutdown"
+        ehs = [n for n in tracked["nodes"] if n.get("kind") == "event_handler"]
+        assert len(ehs) == 1
+        assert ehs[0]["handler_kind"] == "on_shutdown"
 
     # ── SetParameter, SetRemap, Log, Executable ──
 

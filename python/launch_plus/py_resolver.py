@@ -780,6 +780,7 @@ def _parse_xml_element(elem: ET.Element) -> dict[str, Any] | None:
             "Arg": {
                 "name": elem.get("name", ""),
                 "default": elem.get("default"),
+                "value": elem.get("value"),
                 "description": elem.get("description"),
             }
         }
@@ -1272,7 +1273,14 @@ def resolve_substitutions(
         elif kind == "var":
             name = token[1]
             name = resolve_substitutions(name, ctx, _depth + 1)
-            value = ctx.vars.get(name) or ctx.args.get(name)
+            # Check vars first, then args. Use 'in' instead of 'or' to handle
+            # empty string values correctly (empty string is a valid value).
+            if name in ctx.vars:
+                value = ctx.vars[name]
+            elif name in ctx.args:
+                value = ctx.args[name]
+            else:
+                value = None
             if value is None:
                 _error(f"undefined variable: {name}")
                 parts.append(f"$(var {name})")
@@ -1523,6 +1531,7 @@ def _resolve_xml_element(
     if kind == "Arg":
         name = data.get("name", "")
         default = data.get("default")
+        fixed_value = data.get("value")
         # Record declaration
         if name and name not in _declared_arg_names:
             _declared_arg_names.add(name)
@@ -1532,8 +1541,11 @@ def _resolve_xml_element(
                     "default": default or "",
                 }
             )
-        # Apply default if arg not already set (from caller)
-        if name and name not in ctx.args and default is not None:
+        if fixed_value is not None:
+            # <arg name="X" value="Y"/> — fixed, non-overridable value
+            ctx.args[name] = resolve_substitutions(fixed_value, ctx)
+        elif name and name not in ctx.args and default is not None:
+            # <arg name="X" default="Y"/> — apply default if not already set
             ctx.args[name] = resolve_substitutions(default, ctx)
 
     elif kind == "Let":
@@ -1628,30 +1640,37 @@ def _resolve_xml_element(
                 with open(real_path) as f:
                     content = f.read()
                 child_elements = parse_xml_launch(content, real_path)
-                # Build child context
+                # Build child context — in ROS 2, <include> is NOT scoped:
+                # <let> (SetLaunchConfiguration) in child modifies shared context.
                 child_ctx = _SubstitutionContext()
                 child_ctx.args = {**ctx.args, **child_ctx_args}
-                child_ctx.vars = {}  # vars don't cascade
+                child_ctx.vars = dict(ctx.vars)
                 child_ctx.env = dict(ctx.env)
                 child_ctx.launch_file_dir = os.path.dirname(real_path)
                 child_ctx.preview_mode = ctx.preview_mode
                 resolve_xml_elements(child_elements, child_ctx, include_stack=new_stack)
+                # Propagate child's vars back to parent (unscoped include semantics)
+                ctx.vars.update(child_ctx.vars)
             elif real_path.endswith((".yaml", ".yml")):
                 with open(real_path) as f:
                     content = f.read()
                 child_elements = parse_yaml_launch(content, real_path)
                 child_ctx = _SubstitutionContext()
                 child_ctx.args = {**ctx.args, **child_ctx_args}
-                child_ctx.vars = {}
+                child_ctx.vars = dict(ctx.vars)
                 child_ctx.env = dict(ctx.env)
                 child_ctx.launch_file_dir = os.path.dirname(real_path)
                 child_ctx.preview_mode = ctx.preview_mode
                 resolve_xml_elements(child_elements, child_ctx, include_stack=new_stack)
+                ctx.vars.update(child_ctx.vars)
             elif real_path.endswith((".launch.py", ".py")):
                 # Delegate to existing Python inline resolver.
                 # Create a launch context from the current substitution context
                 # so _inline_resolve_python_launch can access _launch_configurations.
                 parent_lc = _make_launch_context(ctx.args)
+                # Pass global_params so OpaqueFunction bodies can access vehicle dimensions etc.
+                if _global_params:
+                    parent_lc._launch_configurations["global_params"] = list(_global_params)
                 _inline_resolve_python_launch(
                     file_path, parent_lc, child_ctx_args, len(include_stack) + 1
                 )
@@ -1972,10 +1991,13 @@ def _resolve_element_to_ir(
     if kind == "Arg":
         name = data.get("name", "")
         default = data.get("default")
+        fixed_value = data.get("value")
         if name and name not in _declared_arg_names:
             _declared_arg_names.add(name)
             _tracked["declared_args"].append({"name": name, "default": default or ""})
-        if name and name not in ctx.args and default is not None:
+        if fixed_value is not None:
+            ctx.args[name] = resolve_substitutions(fixed_value, ctx)
+        elif name and name not in ctx.args and default is not None:
             ctx.args[name] = resolve_substitutions(default, ctx)
         return []
 
@@ -2071,15 +2093,19 @@ def _resolve_element_to_ir(
                     child_elements = parse_xml_launch(content, real_path)
                 child_ctx = _SubstitutionContext()
                 child_ctx.args = {**ctx.args, **child_ctx_args}
-                child_ctx.vars = {}
+                child_ctx.vars = dict(ctx.vars)
                 child_ctx.env = dict(ctx.env)
                 child_ctx.launch_file_dir = os.path.dirname(real_path)
                 child_ctx.preview_mode = ctx.preview_mode
                 for child in child_elements:
                     result_actions.extend(_resolve_element_to_ir(child, child_ctx, new_stack))
+                ctx.vars.update(child_ctx.vars)
             elif real_path.endswith((".launch.py", ".py")):
+                parent_lc = _make_launch_context(ctx.args)
+                if _global_params:
+                    parent_lc._launch_configurations["global_params"] = list(_global_params)
                 _inline_resolve_python_launch(
-                    file_path, None, child_ctx_args, len(include_stack) + 1
+                    file_path, parent_lc, child_ctx_args, len(include_stack) + 1
                 )
         return result_actions
 
@@ -3720,11 +3746,9 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
 
         entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
-        # Apply child launch arguments: only set keys that the parent hasn't
-        # already defined, so parent values are never overwritten.
+        # Apply child launch arguments: explicit include args override parent context.
         for k, v in child_args.items():
-            if k not in parent_context._launch_configurations:
-                parent_context._launch_configurations[k] = v
+            parent_context._launch_configurations[k] = v
 
         # Pass 1: apply DeclareLaunchArgument defaults (child-only args).
         for entity in entities:
@@ -4802,10 +4826,6 @@ def main():
         _walk_actions(entities, ctx)
     except _PackageNotFetchedError:
         pass  # Absorbed; package already in _packages_to_fetch
-
-    # Net-zero check: any remaining overrides are leaked env mutations.
-    for k, v in _env.items():
-        _error(f"env var '{k}' was set to '{v}' but not restored (leaked from file scope)")
 
     if _packages_to_fetch:
         _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)

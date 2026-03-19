@@ -1691,6 +1691,97 @@ class TestResolveXmlElements:
             _, tracked = _parse_and_walk(main_xml)
             assert tracked["include_args"][child_path] == {"x": "42"}
 
+    def test_include_unscoped_arg_leaks_to_sibling(self):
+        """ROS 2 semantics: <include> is unscoped by default, so a child's
+        <arg name="X" default="Y"/> sets X globally.  A later sibling that
+        also declares <arg name="X" default="Z"/> will NOT apply its default
+        because X is already set."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # First child sets output_topic default to "/planning/topic"
+            child_a = os.path.join(tmpdir, "a.launch.xml")
+            with open(child_a, "w") as f:
+                f.write(
+                    textwrap.dedent("""\
+                    <launch>
+                      <arg name="output_topic" default="/planning/topic"/>
+                      <node pkg="p" exec="e" name="node_a">
+                        <remap from="out" to="$(var output_topic)"/>
+                      </node>
+                    </launch>
+                """)
+                )
+            # Second child declares output_topic with a DIFFERENT default
+            child_b = os.path.join(tmpdir, "b.launch.xml")
+            with open(child_b, "w") as f:
+                f.write(
+                    textwrap.dedent("""\
+                    <launch>
+                      <arg name="output_topic" default="/control/topic"/>
+                      <node pkg="p" exec="e" name="node_b">
+                        <remap from="out" to="$(var output_topic)"/>
+                      </node>
+                    </launch>
+                """)
+                )
+            # Main includes both: a first, then b
+            main_xml = f"""\
+                <launch>
+                  <include file="{child_a}"/>
+                  <include file="{child_b}"/>
+                </launch>
+            """
+            _, tracked = _parse_and_walk(main_xml)
+            nodes = tracked["nodes"]
+            assert len(nodes) == 2
+            # node_a resolves to its own default
+            assert nodes[0]["remappings"] == [["out", "/planning/topic"]]
+            # node_b gets the LEAKED value from node_a (ROS 2 unscoped semantics)
+            assert nodes[1]["remappings"] == [["out", "/planning/topic"]]
+
+    def test_include_explicit_arg_overrides_leaked(self):
+        """When the parent explicitly passes an arg value, it overrides any
+        leaked value from a prior sibling include."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_a = os.path.join(tmpdir, "a.launch.xml")
+            with open(child_a, "w") as f:
+                f.write(
+                    textwrap.dedent("""\
+                    <launch>
+                      <arg name="output_topic" default="/planning/topic"/>
+                      <node pkg="p" exec="e" name="node_a">
+                        <remap from="out" to="$(var output_topic)"/>
+                      </node>
+                    </launch>
+                """)
+                )
+            child_b = os.path.join(tmpdir, "b.launch.xml")
+            with open(child_b, "w") as f:
+                f.write(
+                    textwrap.dedent("""\
+                    <launch>
+                      <arg name="output_topic" default="/control/topic"/>
+                      <node pkg="p" exec="e" name="node_b">
+                        <remap from="out" to="$(var output_topic)"/>
+                      </node>
+                    </launch>
+                """)
+                )
+            # Parent explicitly passes output_topic to b
+            main_xml = f"""\
+                <launch>
+                  <include file="{child_a}"/>
+                  <include file="{child_b}">
+                    <arg name="output_topic" value="/explicit/topic"/>
+                  </include>
+                </launch>
+            """
+            _, tracked = _parse_and_walk(main_xml)
+            nodes = tracked["nodes"]
+            assert len(nodes) == 2
+            assert nodes[0]["remappings"] == [["out", "/planning/topic"]]
+            # Explicit arg overrides the leaked value
+            assert nodes[1]["remappings"] == [["out", "/explicit/topic"]]
+
     def test_circular_include_detected(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             # File includes itself

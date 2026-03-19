@@ -613,6 +613,18 @@ struct PyResolvedNode {
     /// Param files referenced by this node — reference or inlined.
     #[serde(default)]
     param_files: Vec<PyParamFile>,
+    /// Resolved `output=` attribute (e.g. "screen", "log", "both").
+    #[serde(default)]
+    output: Option<String>,
+    /// Resolved `arguments=` (CLI args for the node process).
+    #[serde(default)]
+    args: Option<String>,
+    /// Resolved `respawn=` attribute.
+    #[serde(default)]
+    respawn: Option<String>,
+    /// Resolved `respawn_delay=` attribute.
+    #[serde(default)]
+    respawn_delay: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -812,10 +824,10 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                     .collect(),
                 kind,
                 param_files: n.param_files.iter().map(convert_param_file).collect(),
-                output: None,
-                args: None,
-                respawn: None, // Python launch API has no respawn support yet
-                respawn_delay: None,
+                output: n.output.clone(),
+                args: n.args.clone(),
+                respawn: n.respawn.clone(),
+                respawn_delay: n.respawn_delay.clone(),
             })
         })
         .collect::<Vec<_>>();
@@ -1025,18 +1037,29 @@ fn process_parsed_file(
             .insert(key.clone(), args.clone());
     }
 
-    // Track launch include dependencies (for fetching/building).
+    // Track launch include dependencies (for fetching/building) and populate
+    // include_args for the renderer's --show-args annotations.
     // The Python resolver already inlines all included files' nodes, so we do NOT
     // re-resolve them here — only record the dependency edges.
     for include in parsed.launch_includes {
+        let key = (include.package.clone(), include.share_path.clone());
+        // Populate include_args for --show-args rendering.
+        result
+            .include_args
+            .entry(key.clone())
+            .or_insert_with(|| IncludeArgContext {
+                explicit: include.explicit_args.clone(),
+                with_cascade: HashMap::new(),
+                namespace_stack: include.namespace_stack.clone(),
+            });
         if !result
             .launch_files
             .iter()
             .any(|f| f.package == include.package && f.share_path == include.share_path)
         {
             result.launch_files.push(FileDependency {
-                package: include.package.clone(),
-                share_path: include.share_path.clone(),
+                package: include.package,
+                share_path: include.share_path,
                 kind: DependencyKind::Launch,
             });
         }

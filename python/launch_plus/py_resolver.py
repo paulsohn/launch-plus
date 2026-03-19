@@ -2722,6 +2722,10 @@ class _TrackedNode:
         self._raw_parameters = list(kwargs.get("parameters") or [])
         self._raw_remappings = list(kwargs.get("remappings") or [])
         self._raw_env = kwargs.get("env") or []
+        self._raw_output = kwargs.get("output")
+        self._raw_arguments = kwargs.get("arguments")
+        self._raw_respawn = kwargs.get("respawn")
+        self._raw_respawn_delay = kwargs.get("respawn_delay")
         self._detailed = False
         # Eager: track any ParameterFile paths identifiable at construction time
         for p in self._raw_parameters:
@@ -3881,6 +3885,23 @@ def _resolve_node_details(node, context):
                 v_str = _resolve_substitution(item[1], context) or ""
                 env[k_str] = v_str
     entry["env"] = env
+
+    # output / arguments / respawn / respawn_delay
+    for attr, key in (
+        ("_raw_output", "output"),
+        ("_raw_arguments", "args"),
+        ("_raw_respawn", "respawn"),
+        ("_raw_respawn_delay", "respawn_delay"),
+    ):
+        raw = getattr(node, attr, None)
+        if raw is not None:
+            resolved = _resolve_substitution(raw, context)
+            if resolved is not None:
+                entry[key] = resolved
+            elif isinstance(raw, str):
+                entry[key] = raw
+            else:
+                entry[key] = str(raw)
 
 
 def _resolve_composable_plugins(descs, context):

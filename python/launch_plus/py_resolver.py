@@ -26,6 +26,7 @@ import os
 import re
 import sys
 import types
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -72,6 +73,185 @@ if TYPE_CHECKING:
         include_args: dict[str, dict[str, str]]
         param_files: list[str]
         set_launch_configurations: dict[str, str]
+
+# ─── Resolved IR ─────────────────────────────────────────────────────────────
+# Fully-resolved, flattened representation of a launch description.
+# See .agents/resolved-ir.md for the full specification.
+#
+# All substitutions resolved, conditions evaluated, groups inlined,
+# namespaces computed.  No control flow remains.
+
+
+@dataclass
+class IRGroupAction:
+    """A structural grouping of actions.
+
+    Scope effects (env, namespace, params, remaps) are fully consumed
+    during resolution and baked into child nodes.  The group exists
+    purely for annotation — rendering it back produces the same
+    launch behavior regardless of scoping.
+
+    ``source`` optionally records the include origin (e.g.
+    ``"pkg://launch/file.launch.xml"``) so the renderer can emit
+    ``<!-- source: ... -->`` / ``<!-- end: ... -->`` comment markers.
+    """
+
+    children: list["IRAction"] = field(default_factory=list)
+    source: str | None = None
+
+
+@dataclass
+class IRComposablePlugin:
+    """A composable node loaded into a container."""
+
+    package: str = ""
+    plugin: str = ""
+    name: str | None = None
+    namespace: str | None = None
+    parameters: dict[str, str] = field(default_factory=dict)
+    remappings: list[tuple[str, str]] = field(default_factory=list)
+    param_files: list[str] = field(default_factory=list)
+
+
+@dataclass
+class IRNode:
+    """A concrete ROS 2 node."""
+
+    package: str = ""
+    executable: str = ""
+    name: str | None = None
+    namespace: str | None = None
+    parameters: dict[str, str] = field(default_factory=dict)
+    param_files: list[str] = field(default_factory=list)
+    remappings: list[tuple[str, str]] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)
+    output: str | None = None
+    args: str | None = None
+    respawn: str | None = None
+    respawn_delay: str | None = None
+
+
+@dataclass
+class IRLifecycleNode(IRNode):
+    """A concrete lifecycle node."""
+
+
+@dataclass
+class IRComposableNodeContainer(IRNode):
+    """A container process hosting composable nodes."""
+
+    plugins: list[IRComposablePlugin] = field(default_factory=list)
+
+
+@dataclass
+class IRLoadComposableNode:
+    """Load plugins into an existing container."""
+
+    target: str = ""
+    namespace: str | None = None
+    plugins: list[IRComposablePlugin] = field(default_factory=list)
+
+
+@dataclass
+class IRExecutable:
+    """A generic process (not a ROS node)."""
+
+    cmd: str = ""
+    name: str | None = None
+    shell: bool = False
+    namespace: str | None = None
+    env: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class IRLog:
+    """A log message action."""
+
+    message: str = ""
+    level: str | None = None
+
+
+@dataclass
+class IROpaque:
+    """An unresolvable Python action — escape hatch for non-serializable callbacks."""
+
+    description: str = ""
+    python_object: object = None
+
+
+@dataclass
+class IRResolvedEventAction:
+    """A resolved event action (e.g. EmitEvent inside an event handler).
+
+    Events carry structured metadata beyond just a name — e.g. Shutdown has
+    ``reason``, SignalProcess has ``signal``.  The ``metadata`` dict captures
+    statically-known fields.  Events that reference runtime context
+    (ExecuteLocal, ExecuteProcess, TimerAction) cannot be fully resolved;
+    their metadata will be partial or empty.
+    """
+
+    event: str = ""
+    target_node: str | None = None
+    namespace: str | None = None
+    metadata: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class IREventHandler:
+    """A resolved event handler."""
+
+    kind: str = ""  # on_process_start, on_process_exit, on_state_transition, on_shutdown
+    target: str | None = None
+    target_node: str | None = None
+    namespace: str | None = None
+    start_state: str | None = None
+    goal_state: str | None = None
+    actions: list[IRResolvedEventAction] = field(default_factory=list)
+
+
+# Union of all IR action types.
+IRAction = (
+    IRGroupAction
+    | IRNode
+    | IRLifecycleNode
+    | IRComposableNodeContainer
+    | IRLoadComposableNode
+    | IRExecutable
+    | IRLog
+    | IROpaque
+)
+
+
+@dataclass
+class IRDeclaredArg:
+    """A top-level arg declaration."""
+
+    name: str = ""
+    default: str = ""
+    description: str | None = None
+
+
+@dataclass
+class IRResolvedInclude:
+    """Include metadata for dependency tracking."""
+
+    package: str = ""
+    share_path: str = ""
+    args: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class IRResolvedLaunch:
+    """Top-level container for a fully resolved launch description."""
+
+    actions: list[IRAction] = field(default_factory=list)
+    event_handlers: list[IREventHandler] = field(default_factory=list)
+    packages: list[str] = field(default_factory=list)
+    includes: list[IRResolvedInclude] = field(default_factory=list)
+    declared_args: list[IRDeclaredArg] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+
 
 # ─── Capture real ament_index_python BEFORE installing the import patcher ────
 # This allows FindPackageShare.perform() to return real installed paths when
@@ -256,6 +436,20 @@ _namespace_stack: list = []
 # substitution checks this first, then falls back to os.environ.
 # Scoped groups clone/restore this.
 _env: dict = {}
+
+# Scoped global parameters set by <set_parameter> at group level.
+# Accumulated during resolution; merged into each node's parameters.
+_global_params: list[tuple[str, str]] = []
+
+# Scoped global remappings set by <set_remap> at group level.
+# Accumulated during resolution; merged into each node's remappings.
+_global_remaps: list[tuple[str, str]] = []
+
+# Scoped global parameter files set by <set_parameters_from_file>.
+_global_param_files: list[str] = []
+
+# Collected event handlers — separate from the action tree.
+_ir_event_handlers: list[IREventHandler] = []
 
 
 def _is_substitution(value):
@@ -1046,11 +1240,15 @@ def _normalize_eval_expr(expr: str) -> str:
 def resolve_substitutions(
     text: str,
     ctx: _SubstitutionContext,
+    _depth: int = 0,
 ) -> str:
     """Resolve all substitutions in a string using the given context.
 
     Recursively resolves nested substitutions (e.g., ``$(find-pkg-share $(arg pkg))``).
     """
+    if _depth > 50:
+        _error(f"substitution recursion limit exceeded: {text[:100]}")
+        return text
     tokens = parse_substitutions(text)
     parts: list[str] = []
 
@@ -1063,25 +1261,23 @@ def resolve_substitutions(
 
         if kind == "arg":
             name = token[1]
-            # Resolve the name itself (may contain nested substitutions)
-            name = resolve_substitutions(name, ctx)
+            name = resolve_substitutions(name, ctx, _depth + 1)
             value = ctx.args.get(name)
             if value is None:
                 _error(f"undefined argument: {name}")
                 parts.append(f"$(arg {name})")
             else:
-                # Recursively resolve (arg value may contain substitutions)
-                parts.append(resolve_substitutions(value, ctx))
+                parts.append(resolve_substitutions(value, ctx, _depth + 1))
 
         elif kind == "var":
             name = token[1]
-            name = resolve_substitutions(name, ctx)
+            name = resolve_substitutions(name, ctx, _depth + 1)
             value = ctx.vars.get(name) or ctx.args.get(name)
             if value is None:
                 _error(f"undefined variable: {name}")
                 parts.append(f"$(var {name})")
             else:
-                parts.append(resolve_substitutions(value, ctx))
+                parts.append(resolve_substitutions(value, ctx, _depth + 1))
 
         elif kind == "env":
             name = token[1]
@@ -1100,7 +1296,7 @@ def resolve_substitutions(
 
         elif kind == "find-pkg-share":
             pkg = token[1]
-            pkg = resolve_substitutions(pkg, ctx)
+            pkg = resolve_substitutions(pkg, ctx, _depth + 1)
             _track_package(pkg)
             if ctx.preview_mode:
                 parts.append(f"$(find-pkg-share {pkg})")
@@ -1115,7 +1311,7 @@ def resolve_substitutions(
 
         elif kind == "find-pkg-prefix":
             pkg = token[1]
-            pkg = resolve_substitutions(pkg, ctx)
+            pkg = resolve_substitutions(pkg, ctx, _depth + 1)
             _track_package(pkg)
             # Always keep portable for now — prefix resolution not implemented
             parts.append(f"$(find-pkg-prefix {pkg})")
@@ -1129,7 +1325,7 @@ def resolve_substitutions(
         elif kind == "eval":
             expr = token[1]
             # Resolve nested substitutions in the expression
-            expr = resolve_substitutions(expr, ctx)
+            expr = resolve_substitutions(expr, ctx, _depth + 1)
             # Unescape \' and \" that may come from variable values (e.g. <let value="[\'a\']"/>)
             expr = expr.replace("\\'", "'").replace('\\"', '"')
             try:
@@ -1143,7 +1339,7 @@ def resolve_substitutions(
 
         elif kind == "command":
             body = token[1]
-            body = resolve_substitutions(body, ctx)
+            body = resolve_substitutions(body, ctx, _depth + 1)
             # Cannot evaluate at analysis time — preserve as-is
             parts.append(f"$(command {body})")
 
@@ -1452,9 +1648,12 @@ def _resolve_xml_element(
                 child_ctx.preview_mode = ctx.preview_mode
                 resolve_xml_elements(child_elements, child_ctx, include_stack=new_stack)
             elif real_path.endswith((".launch.py", ".py")):
-                # Delegate to existing Python inline resolver
+                # Delegate to existing Python inline resolver.
+                # Create a launch context from the current substitution context
+                # so _inline_resolve_python_launch can access _launch_configurations.
+                parent_lc = _make_launch_context(ctx.args)
                 _inline_resolve_python_launch(
-                    file_path, None, child_ctx_args, len(include_stack) + 1
+                    file_path, parent_lc, child_ctx_args, len(include_stack) + 1
                 )
 
     elif kind in ("Node", "LifecycleNode"):
@@ -1753,6 +1952,439 @@ def _resolve_xml_element(
     elif kind == "UnknownElement":
         tag_name = data.get("tag_name", "")
         _warn(f"unknown XML element: <{tag_name}>")
+
+
+def _resolve_element_to_ir(
+    elem_dict: dict[str, Any],
+    ctx: _SubstitutionContext,
+    include_stack: list[str],
+) -> list[IRAction]:
+    """Resolve a single parsed element to a list of IR actions (tree-structured).
+
+    Returns a list because some elements (e.g. Include) may expand to multiple actions,
+    while others (e.g. Arg, Let, condition-false) return an empty list.
+    """
+    if not elem_dict:
+        return []
+    kind = next(iter(elem_dict))
+    data = elem_dict[kind]
+
+    if kind == "Arg":
+        name = data.get("name", "")
+        default = data.get("default")
+        if name and name not in _declared_arg_names:
+            _declared_arg_names.add(name)
+            _tracked["declared_args"].append({"name": name, "default": default or ""})
+        if name and name not in ctx.args and default is not None:
+            ctx.args[name] = resolve_substitutions(default, ctx)
+        return []
+
+    if kind == "Let":
+        cond = data.get("condition")
+        if _evaluate_condition(cond, ctx):
+            name = data.get("name", "")
+            value = resolve_substitutions(data.get("value", ""), ctx)
+            ctx.vars[name] = value
+        return []
+
+    if kind == "Group":
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return []
+        scoped = data.get("scoped", True)
+        children = data.get("children", [])
+        # Walk children, collecting IR actions
+        if scoped:
+            saved_args = dict(ctx.args)
+            saved_vars = dict(ctx.vars)
+            saved_env = dict(_env)
+            saved_ns_depth = len(_namespace_stack)
+            saved_gp = list(_global_params)
+            saved_gr = list(_global_remaps)
+            saved_gpf = list(_global_param_files)
+        child_actions: list[IRAction] = []
+        for child in children:
+            child_actions.extend(_resolve_element_to_ir(child, ctx, include_stack))
+        if scoped:
+            new_args = {k: v for k, v in ctx.args.items() if k not in saved_args}
+            ctx.args = saved_args
+            ctx.args.update(new_args)
+            ctx.vars = saved_vars
+            globals()["_env"] = saved_env
+            del _namespace_stack[saved_ns_depth:]
+            _global_params[:] = saved_gp
+            _global_remaps[:] = saved_gr
+            _global_param_files[:] = saved_gpf
+        return [IRGroupAction(children=child_actions)]
+
+    if kind == "Include":
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return []
+        file_path = resolve_substitutions(data.get("file", ""), ctx)
+        include_args_list = data.get("args", [])
+        if file_path in include_stack:
+            _error(f"circular include detected: {file_path}")
+            return []
+        if len(include_stack) > 20:
+            _warn(f"max include depth exceeded for {file_path}")
+            return []
+        dep_idx = _track_include(file_path)
+        # Build child args sequentially
+        child_ctx_args: dict[str, str] = {}
+        for ia in include_args_list:
+            arg_name = ia.get("name", "")
+            arg_value = ia.get("value")
+            if arg_value is not None:
+                tmp_ctx = _SubstitutionContext()
+                tmp_ctx.args = {**ctx.args, **child_ctx_args}
+                tmp_ctx.vars = dict(ctx.vars)
+                tmp_ctx.env = dict(ctx.env)
+                tmp_ctx.launch_file_dir = ctx.launch_file_dir
+                tmp_ctx.preview_mode = ctx.preview_mode
+                child_ctx_args[arg_name] = resolve_substitutions(arg_value, tmp_ctx)
+        if dep_idx >= 0 and child_ctx_args:
+            _tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
+        if child_ctx_args:
+            _tracked["include_args"][file_path] = child_ctx_args
+        # Resolve inline
+        real_path = file_path
+        parsed = _parse_portable_path(file_path)
+        if parsed:
+            pkg, rest = parsed
+            try:
+                pkg_share = _resolve_pkg_share(pkg)
+                real_path = os.path.join(pkg_share, rest)
+            except _PackageNotFetchedError:
+                raise
+            except Exception:
+                return []
+        result_actions: list[IRAction] = []
+        if os.path.isfile(real_path):
+            new_stack = include_stack + [file_path]
+            if real_path.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
+                with open(real_path) as f:
+                    content = f.read()
+                if real_path.endswith((".yaml", ".yml")):
+                    child_elements = parse_yaml_launch(content, real_path)
+                else:
+                    child_elements = parse_xml_launch(content, real_path)
+                child_ctx = _SubstitutionContext()
+                child_ctx.args = {**ctx.args, **child_ctx_args}
+                child_ctx.vars = {}
+                child_ctx.env = dict(ctx.env)
+                child_ctx.launch_file_dir = os.path.dirname(real_path)
+                child_ctx.preview_mode = ctx.preview_mode
+                for child in child_elements:
+                    result_actions.extend(_resolve_element_to_ir(child, child_ctx, new_stack))
+            elif real_path.endswith((".launch.py", ".py")):
+                _inline_resolve_python_launch(
+                    file_path, None, child_ctx_args, len(include_stack) + 1
+                )
+        return result_actions
+
+    if kind in ("Node", "LifecycleNode"):
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return []
+        pkg = resolve_substitutions(data.get("pkg", ""), ctx)
+        exe = resolve_substitutions(data.get("exec", ""), ctx)
+        name = data.get("name")
+        if name:
+            name = resolve_substitutions(name, ctx)
+        ns = data.get("namespace")
+        if ns:
+            ns = resolve_substitutions(ns, ctx)
+        _track_package(pkg)
+        params, param_files = _resolve_params_xml(data.get("params", []), ctx)
+        remaps = _resolve_remaps_xml(data.get("remaps", []), ctx)
+        env = dict(_env)
+        env.update(_resolve_envs_xml(data.get("envs", []), ctx))
+        effective_ns = _effective_namespace(list(_namespace_stack), ns)
+        # Merge scoped global params/remaps/param_files (global first, node-local overrides)
+        merged_params = dict(_global_params)
+        merged_params.update(params)
+        merged_param_files = list(_global_param_files) + param_files
+        merged_remaps = list(_global_remaps) + [(s, d) for s, d in remaps]
+        node_cls = IRLifecycleNode if kind == "LifecycleNode" else IRNode
+        return [
+            node_cls(
+                package=pkg,
+                executable=exe,
+                name=name or None,
+                namespace=effective_ns,
+                parameters=merged_params,
+                param_files=merged_param_files,
+                remappings=merged_remaps,
+                env=env,
+                output=data.get("output"),
+                args=data.get("args"),
+                respawn=data.get("respawn"),
+                respawn_delay=data.get("respawn_delay"),
+            )
+        ]
+
+    if kind == "NodeContainer":
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return []
+        pkg = resolve_substitutions(data.get("pkg", ""), ctx)
+        exe = resolve_substitutions(data.get("exec", ""), ctx)
+        name = data.get("name")
+        if name:
+            name = resolve_substitutions(name, ctx)
+        ns = data.get("namespace")
+        if ns:
+            ns = resolve_substitutions(ns, ctx)
+        _track_package(pkg)
+        env = dict(_env)
+        env.update(_resolve_envs_xml(data.get("envs", []), ctx))
+        plugins = _resolve_composable_plugins_xml(data.get("composable_nodes", []), ctx)
+        effective_ns = _effective_namespace(list(_namespace_stack), ns)
+        return [
+            IRComposableNodeContainer(
+                package=pkg,
+                executable=exe,
+                name=name or None,
+                namespace=effective_ns,
+                env=env,
+                plugins=[
+                    IRComposablePlugin(
+                        package=p.get("package", ""),
+                        plugin=p.get("plugin", ""),
+                        name=p.get("name"),
+                        parameters=p.get("parameters", {}),
+                        remappings=[tuple(r) for r in p.get("remappings", [])],
+                        param_files=p.get("param_files", []),
+                    )
+                    for p in plugins
+                ],
+            )
+        ]
+
+    if kind == "LoadComposableNode":
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return []
+        target = data.get("target")
+        if target:
+            target = resolve_substitutions(target, ctx)
+        ns = data.get("namespace")
+        if ns:
+            ns = resolve_substitutions(ns, ctx)
+        plugins = _resolve_composable_plugins_xml(data.get("composable_nodes", []), ctx)
+        effective_ns = _effective_namespace(list(_namespace_stack), ns)
+        return [
+            IRLoadComposableNode(
+                target=target or "",
+                namespace=effective_ns,
+                plugins=[
+                    IRComposablePlugin(
+                        package=p.get("package", ""),
+                        plugin=p.get("plugin", ""),
+                        name=p.get("name"),
+                        parameters=p.get("parameters", {}),
+                        remappings=[tuple(r) for r in p.get("remappings", [])],
+                        param_files=p.get("param_files", []),
+                    )
+                    for p in plugins
+                ],
+            )
+        ]
+
+    if kind == "SetEnv":
+        cond = data.get("condition")
+        if _evaluate_condition(cond, ctx):
+            name = resolve_substitutions(data.get("name", ""), ctx)
+            value = resolve_substitutions(data.get("value", ""), ctx)
+            _env[name] = value
+            ctx.env[name] = value
+        return []
+        return []
+
+    if kind == "UnsetEnv":
+        cond = data.get("condition")
+        if _evaluate_condition(cond, ctx):
+            name = resolve_substitutions(data.get("name", ""), ctx)
+            _env.pop(name, None)
+            ctx.env.pop(name, None)
+        return []
+        return []
+
+    if kind == "PushRosNamespace":
+        cond = data.get("condition")
+        if _evaluate_condition(cond, ctx):
+            ns = resolve_substitutions(data.get("namespace", ""), ctx)
+            if ns:
+                _namespace_stack.append(ns)
+        return []
+
+    if kind == "SetParameter":
+        name = resolve_substitutions(data.get("name", ""), ctx)
+        value = resolve_substitutions(data.get("value", ""), ctx)
+        _tracked["global_params"].append([name, value])
+        _global_params.append((name, value))
+        return []
+
+    if kind == "SetParametersFromFile":
+        path = resolve_substitutions(data.get("filename", ""), ctx)
+        _global_param_files.append(path)
+        return []
+
+    if kind == "SetRemap":
+        src = resolve_substitutions(data.get("from", ""), ctx)
+        dst = resolve_substitutions(data.get("to", ""), ctx)
+        _global_remaps.append((src, dst))
+        return []
+
+    if kind == "Log":
+        msg = resolve_substitutions(data.get("message", ""), ctx)
+        return [IRLog(message=msg)]
+
+    if kind == "Executable":
+        cond = data.get("condition")
+        if not _evaluate_condition(cond, ctx):
+            return []
+        cmd = resolve_substitutions(data.get("cmd", ""), ctx)
+        name = data.get("name")
+        if name:
+            name = resolve_substitutions(name, ctx)
+        shell = data.get("shell", False)
+        effective_ns = _effective_namespace(list(_namespace_stack))
+        return [
+            IRExecutable(
+                cmd=cmd, name=name or None, shell=shell, namespace=effective_ns, env=dict(_env)
+            )
+        ]
+
+    if kind == "EventHandler":
+        handler_kind = data.get("kind", "")
+        target = data.get("target")
+        if target:
+            target = resolve_substitutions(target, ctx)
+        target_node = data.get("target_node")
+        if target_node:
+            target_node = resolve_substitutions(target_node, ctx)
+        handler_ns = data.get("namespace")
+        if handler_ns:
+            handler_ns = resolve_substitutions(handler_ns, ctx)
+        start_state = data.get("start_state")
+        if start_state:
+            start_state = resolve_substitutions(start_state, ctx)
+        goal_state = data.get("goal_state")
+        if goal_state:
+            goal_state = resolve_substitutions(goal_state, ctx)
+        actions: list[IRResolvedEventAction] = []
+        for child in data.get("children", []):
+            if "EmitEvent" in child:
+                ee = child["EmitEvent"]
+                event = resolve_substitutions(ee.get("event", ""), ctx)
+                ee_target = ee.get("target_node")
+                if ee_target:
+                    ee_target = resolve_substitutions(ee_target, ctx)
+                ee_ns = ee.get("namespace")
+                if ee_ns:
+                    ee_ns = resolve_substitutions(ee_ns, ctx)
+                actions.append(
+                    IRResolvedEventAction(
+                        event=event,
+                        target_node=ee_target,
+                        namespace=ee_ns,
+                    )
+                )
+        kind_map = {
+            "OnProcessStart": "on_process_start",
+            "OnProcessExit": "on_process_exit",
+            "OnStateTransition": "on_state_transition",
+            "OnShutdown": "on_shutdown",
+        }
+        effective_ns = _effective_namespace(list(_namespace_stack), handler_ns)
+        _ir_event_handlers.append(
+            IREventHandler(
+                kind=kind_map.get(handler_kind, handler_kind),
+                target=target,
+                target_node=target_node,
+                namespace=effective_ns,
+                start_state=start_state,
+                goal_state=goal_state,
+                actions=actions,
+            )
+        )
+        return []
+
+    if kind == "EmitEvent":
+        event = resolve_substitutions(data.get("event", ""), ctx)
+        target_node = data.get("target_node")
+        if target_node:
+            target_node = resolve_substitutions(target_node, ctx)
+        ee_ns = data.get("namespace")
+        if ee_ns:
+            ee_ns = resolve_substitutions(ee_ns, ctx)
+        effective_ns = _effective_namespace(list(_namespace_stack), ee_ns)
+        _ir_event_handlers.append(
+            IREventHandler(
+                kind="emit_event",
+                target=None,
+                target_node=target_node,
+                namespace=effective_ns,
+                actions=[
+                    IRResolvedEventAction(
+                        event=event,
+                        target_node=target_node,
+                        namespace=effective_ns,
+                    )
+                ],
+            )
+        )
+        return []
+
+    if kind == "UnknownElement":
+        tag_name = data.get("tag_name", "")
+        _warn(f"unknown XML element: <{tag_name}>")
+        return []
+
+    return []
+
+
+def resolve_xml_to_ir(
+    elements: list[dict[str, Any]],
+    ctx: _SubstitutionContext,
+    *,
+    include_stack: list[str] | None = None,
+) -> IRResolvedLaunch:
+    """Walk parsed XML/YAML elements and return a tree-structured ``IRResolvedLaunch``.
+
+    This is the primary public API for XML/YAML resolution.
+    Produces ``IRGroupAction`` nodes that preserve scope boundaries.
+    """
+    if include_stack is None:
+        include_stack = []
+    ir_actions: list[IRAction] = []
+    for elem in elements:
+        ir_actions.extend(_resolve_element_to_ir(elem, ctx, include_stack))
+
+    ir = IRResolvedLaunch(actions=ir_actions)
+    ir.event_handlers = list(_ir_event_handlers)
+    ir.packages = list(_tracked["packages"])
+    ir.warnings = list(_tracked["warnings"])
+    ir.errors = list(_tracked["errors"])
+    for a in _tracked["declared_args"]:
+        ir.declared_args.append(
+            IRDeclaredArg(
+                name=a["name"],
+                default=a.get("default", ""),
+                description=a.get("description"),
+            )
+        )
+    for dep in _tracked["include_deps"]:
+        ir.includes.append(
+            IRResolvedInclude(
+                package=dep.get("package", ""),
+                share_path=dep.get("share_path", ""),
+                args=dep.get("include_args", {}),
+            )
+        )
+    return ir
 
 
 # ─── Shim classes ─────────────────────────────────────────────────────────────
@@ -2873,13 +3505,13 @@ def _resolve_node_details(node, context):
 
     # Package / executable / name: resolve substitutions (e.g. LaunchConfiguration)
     # that could not be resolved at construction time.
-    for field in ("package", "executable", "name"):
-        raw = getattr(node, f"_raw_{field}", None)
+    for field_name in ("package", "executable", "name"):
+        raw = getattr(node, f"_raw_{field_name}", None)
         if _is_substitution(raw):
             resolved, is_fallback = _resolve_substitution_ex(raw, context)
             if resolved is not None:
-                entry[field] = resolved
-                if field == "package" and not is_fallback:
+                entry[field_name] = resolved
+                if field_name == "package" and not is_fallback:
                     _track_package(resolved)
 
     # Namespace: emit raw inputs — Rust computes effective_namespace from these
@@ -4032,6 +4664,10 @@ def main():
     global _package_shares, _namespace_stack, _apply_opaque_file_access
     _namespace_stack = []
     _env.clear()
+    _global_params.clear()
+    _global_remaps.clear()
+    _global_param_files.clear()
+    _ir_event_handlers.clear()
     if len(sys.argv) > 3:
         try:
             _package_shares = json.loads(sys.argv[3])
@@ -4065,7 +4701,34 @@ def main():
             _PATCHED_MODULES[mod_name] = builder()
         sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
 
-    # Load the launch file as a module
+    # ── XML / YAML files: parse and walk with the flat walker ──────────────
+    if launch_file.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
+        try:
+            with open(launch_file) as f:
+                content = f.read()
+        except Exception as e:
+            _error(f"cannot read {launch_file}: {e}")
+            _emit(_tracked)
+            return
+        if launch_file.endswith((".yaml", ".yml")):
+            elements = parse_yaml_launch(content, launch_file)
+        else:
+            elements = parse_xml_launch(content, launch_file)
+        subst_ctx = _SubstitutionContext()
+        subst_ctx.args = dict(args_dict)
+        subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file))
+        subst_ctx.preview_mode = _preview_mode
+        subst_ctx.env = dict(_env)
+        try:
+            resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file])
+        except _PackageNotFetchedError:
+            pass  # Absorbed; package already in _packages_to_fetch
+        if _packages_to_fetch:
+            _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)
+        _emit(_tracked)
+        return
+
+    # ── Python launch files: load as module ──────────────────────────────
     spec = importlib.util.spec_from_file_location("_target_launch", launch_file)
     if spec is None:
         _emit({"error": f"cannot load {launch_file}"})

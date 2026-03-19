@@ -479,6 +479,8 @@ enum PyNodeKind {
     Container,
     LoadComposable,
     SetParameter,
+    SetRemap,
+    Log,
     Executable,
     LifecycleNode,
 }
@@ -564,6 +566,15 @@ struct PyResolvedNode {
     /// For `kind == Executable`: whether to run via a shell.
     #[serde(default)]
     shell: bool,
+    /// For `kind == SetRemap`: source topic.
+    #[serde(default)]
+    remap_from: Option<String>,
+    /// For `kind == SetRemap`: destination topic.
+    #[serde(default)]
+    remap_to: Option<String>,
+    /// For `kind == Log`: the log message.
+    #[serde(default)]
+    message: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -759,6 +770,13 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                 PyNodeKind::SetParameter => NodeKind::SetParameter {
                     name: n.name.clone(),
                     value: n.param_value.clone().unwrap_or_default(),
+                },
+                PyNodeKind::SetRemap => NodeKind::SetRemap {
+                    from: n.remap_from.clone().unwrap_or_default(),
+                    to: n.remap_to.clone().unwrap_or_default(),
+                },
+                PyNodeKind::Log => NodeKind::Log {
+                    message: n.message.clone().unwrap_or_default(),
                 },
                 PyNodeKind::Executable => NodeKind::Executable {
                     cmd: n.cmd.clone().unwrap_or_default(),
@@ -1408,8 +1426,15 @@ fn resolve_file_recursive(
         share_path.display()
     );
 
-    // Route to appropriate handler based on file type
-    if is_python_launch_file(share_path) {
+    // Route ALL file types through the Python resolver.
+    // py_resolver.py detects the format by extension and handles XML/YAML/Python
+    // uniformly, including cross-format includes.
+    if is_python_launch_file(share_path)
+        || is_xml_launch_file(share_path)
+        || share_path
+            .extension()
+            .is_some_and(|e| e == "yaml" || e == "yml")
+    {
         resolve_python_file_recursive(
             lockfile,
             locator,
@@ -1428,286 +1453,290 @@ fn resolve_file_recursive(
         return;
     }
 
-    if !is_xml_launch_file(share_path) {
-        debug!(
-            "Skipping unsupported launch file type: {}:{}",
-            package,
-            share_path.display()
-        );
-        return;
-    }
+    // Unsupported file type
+    debug!(
+        "Skipping unsupported launch file type: {}:{}",
+        package,
+        share_path.display()
+    );
+    return;
 
-    // Resolve the file path based on mode:
-    //   preview: fetch from source workspace (lockfile) with AMENT_PREFIX_PATH fallback
-    //   non-preview: look up from AMENT_PREFIX_PATH (must be installed after colcon build)
-    let file_path = if workflow_options.preview {
-        if lockfile.packages.contains_key(package) {
-            // Package is in lockfile: fetch workspace source and resolve from there.
-            if !ensure_package_fetched(
-                lockfile,
-                package,
-                fetch_dir,
-                options,
-                result,
-                fetched_packages,
-                failed_repos,
-            ) {
-                return;
+    // ── Dead code below: old Rust XML resolver path. ──────────────────────
+    // Kept temporarily for reference; will be removed in Phase 5.
+    #[allow(unreachable_code)]
+    {
+        // Resolve the file path based on mode:
+        //   preview: fetch from source workspace (lockfile) with AMENT_PREFIX_PATH fallback
+        //   non-preview: look up from AMENT_PREFIX_PATH (must be installed after colcon build)
+        let file_path = if workflow_options.preview {
+            if lockfile.packages.contains_key(package) {
+                // Package is in lockfile: fetch workspace source and resolve from there.
+                if !ensure_package_fetched(
+                    lockfile,
+                    package,
+                    fetch_dir,
+                    options,
+                    result,
+                    fetched_packages,
+                    failed_repos,
+                ) {
+                    return;
+                }
+                match locator.resolve_share_file(package, share_path) {
+                    Some(p) => p,
+                    None => {
+                        result.add_error(format!(
+                        "package '{}' is in lockfile but the file {}://{} was not found in the workspace source",
+                        package, package, share_path.display()
+                    ));
+                        return;
+                    }
+                }
+            } else {
+                // Package is NOT in lockfile (e.g. a ROS buildfarm package like rosbridge_server).
+                // Fall back to AMENT_PREFIX_PATH (requires the package to be installed via apt/rosdep).
+                match locator.resolve_install_file(package, share_path) {
+                    Some(p) => p,
+                    None => {
+                        if workflow_options.rosdep_fallback {
+                            // Try to install via rosdep, then retry the lookup.
+                            if try_rosdep_install(package, result) {
+                                match locator.resolve_install_file(package, share_path) {
+                                    Some(p) => p,
+                                    None => {
+                                        result.add_error(format!(
+                                            "package '{}' not found even after rosdep install; \
+                                         it may need to be added to the lockfile",
+                                            package
+                                        ));
+                                        return;
+                                    }
+                                }
+                            } else {
+                                return; // error already added by try_rosdep_install
+                            }
+                        } else {
+                            result.add_error(format!(
+                                "package '{}' not found in lockfile or AMENT_PREFIX_PATH; \
+                             if it is a ROS buildfarm package, install it with \
+                             `rosdep install -y --from-keys {}` or use --rosdep to \
+                             install missing packages automatically",
+                                package, package
+                            ));
+                            return;
+                        }
+                    }
+                }
             }
-            match locator.resolve_share_file(package, share_path) {
+        } else {
+            match locator.resolve_install_file(package, share_path) {
                 Some(p) => p,
                 None => {
                     result.add_error(format!(
-                        "package '{}' is in lockfile but the file {}://{} was not found in the workspace source",
-                        package, package, share_path.display()
+                        "{}://{} not found in AMENT_PREFIX_PATH; \
+                     run 'colcon build' first, or use --preview to resolve from source workspace",
+                        package,
+                        share_path.display()
                     ));
                     return;
                 }
             }
-        } else {
-            // Package is NOT in lockfile (e.g. a ROS buildfarm package like rosbridge_server).
-            // Fall back to AMENT_PREFIX_PATH (requires the package to be installed via apt/rosdep).
-            match locator.resolve_install_file(package, share_path) {
-                Some(p) => p,
-                None => {
-                    if workflow_options.rosdep_fallback {
-                        // Try to install via rosdep, then retry the lookup.
-                        if try_rosdep_install(package, result) {
-                            match locator.resolve_install_file(package, share_path) {
-                                Some(p) => p,
-                                None => {
-                                    result.add_error(format!(
-                                        "package '{}' not found even after rosdep install; \
-                                         it may need to be added to the lockfile",
-                                        package
-                                    ));
-                                    return;
-                                }
-                            }
-                        } else {
-                            return; // error already added by try_rosdep_install
-                        }
-                    } else {
-                        result.add_error(format!(
-                            "package '{}' not found in lockfile or AMENT_PREFIX_PATH; \
-                             if it is a ROS buildfarm package, install it with \
-                             `rosdep install -y --from-keys {}` or use --rosdep to \
-                             install missing packages automatically",
-                            package, package
-                        ));
-                        return;
-                    }
-                }
-            }
-        }
-    } else {
-        match locator.resolve_install_file(package, share_path) {
-            Some(p) => p,
-            None => {
-                result.add_error(format!(
-                    "{}://{} not found in AMENT_PREFIX_PATH; \
-                     run 'colcon build' first, or use --preview to resolve from source workspace",
-                    package,
-                    share_path.display()
-                ));
+        };
+
+        // Parse the launch file
+        let content = match std::fs::read_to_string(&file_path) {
+            Ok(c) => c,
+            Err(e) => {
+                result.add_error(format!("failed to read {}: {}", file_path.display(), e));
                 return;
             }
-        }
-    };
+        };
 
-    // Parse the launch file
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
-        Err(e) => {
-            result.add_error(format!("failed to read {}: {}", file_path.display(), e));
-            return;
-        }
-    };
-
-    let ast = match parse_launch_xml(&content, &file_path) {
-        Ok(a) => a,
-        Err(e) => {
-            result.add_error(format!("failed to parse {}: {}", file_path.display(), e));
-            return;
-        }
-    };
-
-    // Static AST scan for declared/referenced arg names (must happen before initial_args is moved).
-    let declared_arg_names = collect_declared_args(&ast.elements);
-    let referenced_arg_names = collect_arg_and_var_refs(&ast.elements);
-
-    // Anti-pattern static scans.
-    let scoped_false_includes = collect_scoped_false_includes(&ast.elements);
-    let env_no_fallback = collect_env_without_fallback(&ast.elements);
-
-    // Resolve (without following includes - we handle that here).
-    // Provide a pkg_share_resolver so that $(find-pkg-share X) substitutions are
-    // expanded to real paths — necessary for inline-resolved includes (e.g. YAML files)
-    // whose content is loaded from the resolved path at resolution time.
-    let locator_for_ctx = locator.clone();
-    let locator_for_cb = locator.clone();
-    let package_shares_for_cb = if workflow_options.preview {
-        locator.all_package_shares()
-    } else {
-        locator.all_install_shares()
-    };
-    let workflow_options_for_cb = workflow_options.clone();
-    let is_preview = workflow_options.preview;
-    let lockfile_pkg_names: Arc<HashSet<String>> =
-        Arc::new(lockfile.packages.keys().cloned().collect());
-    let mut ctx = SubstitutionContext {
-        launch_file_dir: Some(file_path.parent().unwrap_or(Path::new("/")).to_path_buf()),
-        launch_file_path: Some(file_path.clone()),
-        pkg_share_resolver: Some(Arc::new(move |pkg: &str| {
-            if is_preview {
-                locator_for_ctx.locate_package_share(pkg)
-            } else {
-                locator_for_ctx.locate_install_share(pkg)
-            }
-        })),
-        preview_mode: workflow_options.preview,
-        lockfile_packages: lockfile_pkg_names,
-        rosdep_fallback: workflow_options.rosdep_fallback,
-        ..Default::default()
-    };
-    // Build a callback that runs py_resolver inline on Python includes so that
-    // SetLaunchConfiguration side-effects (e.g. current_ros_namespace) become visible
-    // to subsequent $(var ...) substitutions in the same parent XML file.
-    // Note: inline calls receive empty global_params (not the accumulated SetParameter
-    // state) because the inline callback only extracts SetLaunchConfiguration side-effects,
-    // not full resolution output.  Full resolution (with global_params) happens later in
-    // resolve_python_file_recursive when the orchestrator processes the include.
-    let lockfile_pkg_list_for_cb: Vec<String> = lockfile.packages.keys().cloned().collect();
-    let python_cfg_callback: Arc<
-        dyn Fn(&Path, &HashMap<String, String>) -> HashMap<String, String> + Send + Sync,
-    > = Arc::new(move |py_path: &Path, args: &HashMap<String, String>| {
-        // Augment args with the package shares from AMENT_PREFIX_PATH so that
-        // Python files that call get_package_share_directory() resolve correctly.
-        let _ = &locator_for_cb; // keep alive
-        match run_py_resolver(
-            py_path,
-            args,
-            &package_shares_for_cb,
-            &lockfile_pkg_list_for_cb,
-            &[],
-            &workflow_options_for_cb,
-        ) {
-            Ok(output) => output.set_launch_configurations,
+        let ast = match parse_launch_xml(&content, &file_path) {
+            Ok(a) => a,
             Err(e) => {
-                tracing::warn!(
-                    "inline py_resolver for '{}' failed: {e} — \
-                     SetLaunchConfiguration side-effects from this file will be missing",
-                    py_path.display()
-                );
-                HashMap::new()
+                result.add_error(format!("failed to parse {}: {}", file_path.display(), e));
+                return;
             }
-        }
-    });
-    let resolve_options = ResolveOptions {
-        apply_arg_defaults: workflow_options.apply_arg_defaults,
-        allow_unportable_paths: workflow_options.allow_unportable_paths,
-        inline_params: workflow_options.inline_params,
-        python_cfg_callback: Some(python_cfg_callback),
-        ..Default::default()
-    };
+        };
 
-    // Clone initial_args as effective_args before resolve_launch consumes it.
-    // Used by process_parsed_file to build cascade-mode child args.
-    let effective_args = initial_args.clone();
+        // Static AST scan for declared/referenced arg names (must happen before initial_args is moved).
+        let declared_arg_names = collect_declared_args(&ast.elements);
+        let referenced_arg_names = collect_arg_and_var_refs(&ast.elements);
 
-    let resolved = match resolve_launch(&ast, initial_args, &mut ctx, &resolve_options) {
-        Ok(r) => r,
-        Err(e) => {
-            result.add_error(format!("failed to resolve {}: {}", file_path.display(), e));
-            return;
-        }
-    };
+        // Anti-pattern static scans.
+        let scoped_false_includes = collect_scoped_false_includes(&ast.elements);
+        let env_no_fallback = collect_env_without_fallback(&ast.elements);
 
-    // Build include chain: parent_chain + (package, share_path).
-    let mut current_chain = parent_chain;
-    current_chain.push((package.to_string(), share_path.to_path_buf()));
+        // Resolve (without following includes - we handle that here).
+        // Provide a pkg_share_resolver so that $(find-pkg-share X) substitutions are
+        // expanded to real paths — necessary for inline-resolved includes (e.g. YAML files)
+        // whose content is loaded from the resolved path at resolution time.
+        let locator_for_ctx = locator.clone();
+        let locator_for_cb = locator.clone();
+        let package_shares_for_cb = if workflow_options.preview {
+            locator.all_package_shares()
+        } else {
+            locator.all_install_shares()
+        };
+        let workflow_options_for_cb = workflow_options.clone();
+        let is_preview = workflow_options.preview;
+        let lockfile_pkg_names: Arc<HashSet<String>> =
+            Arc::new(lockfile.packages.keys().cloned().collect());
+        let mut ctx = SubstitutionContext {
+            launch_file_dir: Some(file_path.parent().unwrap_or(Path::new("/")).to_path_buf()),
+            launch_file_path: Some(file_path.clone()),
+            pkg_share_resolver: Some(Arc::new(move |pkg: &str| {
+                if is_preview {
+                    locator_for_ctx.locate_package_share(pkg)
+                } else {
+                    locator_for_ctx.locate_install_share(pkg)
+                }
+            })),
+            preview_mode: workflow_options.preview,
+            lockfile_packages: lockfile_pkg_names,
+            rosdep_fallback: workflow_options.rosdep_fallback,
+            ..Default::default()
+        };
+        // Build a callback that runs py_resolver inline on Python includes so that
+        // SetLaunchConfiguration side-effects (e.g. current_ros_namespace) become visible
+        // to subsequent $(var ...) substitutions in the same parent XML file.
+        // Note: inline calls receive empty global_params (not the accumulated SetParameter
+        // state) because the inline callback only extracts SetLaunchConfiguration side-effects,
+        // not full resolution output.  Full resolution (with global_params) happens later in
+        // resolve_python_file_recursive when the orchestrator processes the include.
+        let lockfile_pkg_list_for_cb: Vec<String> = lockfile.packages.keys().cloned().collect();
+        let python_cfg_callback: Arc<
+            dyn Fn(&Path, &HashMap<String, String>) -> HashMap<String, String> + Send + Sync,
+        > = Arc::new(move |py_path: &Path, args: &HashMap<String, String>| {
+            // Augment args with the package shares from AMENT_PREFIX_PATH so that
+            // Python files that call get_package_share_directory() resolve correctly.
+            let _ = &locator_for_cb; // keep alive
+            match run_py_resolver(
+                py_path,
+                args,
+                &package_shares_for_cb,
+                &lockfile_pkg_list_for_cb,
+                &[],
+                &workflow_options_for_cb,
+            ) {
+                Ok(output) => output.set_launch_configurations,
+                Err(e) => {
+                    tracing::warn!(
+                        "inline py_resolver for '{}' failed: {e} — \
+                     SetLaunchConfiguration side-effects from this file will be missing",
+                        py_path.display()
+                    );
+                    HashMap::new()
+                }
+            }
+        });
+        let resolve_options = ResolveOptions {
+            apply_arg_defaults: workflow_options.apply_arg_defaults,
+            allow_unportable_paths: workflow_options.allow_unportable_paths,
+            inline_params: workflow_options.inline_params,
+            python_cfg_callback: Some(python_cfg_callback),
+            ..Default::default()
+        };
 
-    // --- XML-specific anti-pattern checks ---
+        // Clone initial_args as effective_args before resolve_launch consumes it.
+        // Used by process_parsed_file to build cascade-mode child args.
+        let effective_args = initial_args.clone();
 
-    // Unused arg: warn about args declared in this file but never referenced via $(arg)
-    // or $(var).  Skipped in global-cascade mode where args flow implicitly.
-    if !workflow_options.global_arg_cascade {
-        let mut unused: Vec<String> = declared_arg_names
-            .iter()
-            .filter(|name| !referenced_arg_names.contains(*name))
-            .cloned()
-            .collect();
-        unused.sort();
-        for name in unused {
-            result.add_warning(format!(
+        let resolved = match resolve_launch(&ast, initial_args, &mut ctx, &resolve_options) {
+            Ok(r) => r,
+            Err(e) => {
+                result.add_error(format!("failed to resolve {}: {}", file_path.display(), e));
+                return;
+            }
+        };
+
+        // Build include chain: parent_chain + (package, share_path).
+        let mut current_chain = parent_chain;
+        current_chain.push((package.to_string(), share_path.to_path_buf()));
+
+        // --- XML-specific anti-pattern checks ---
+
+        // Unused arg: warn about args declared in this file but never referenced via $(arg)
+        // or $(var).  Skipped in global-cascade mode where args flow implicitly.
+        if !workflow_options.global_arg_cascade {
+            let mut unused: Vec<String> = declared_arg_names
+                .iter()
+                .filter(|name| !referenced_arg_names.contains(*name))
+                .cloned()
+                .collect();
+            unused.sort();
+            for name in unused {
+                result.add_warning(format!(
                 "{}://{}: unused arg '{}' — declared but never referenced via $(arg) or $(var) in this file",
                 package,
                 share_path.display(),
                 name
             ));
+            }
         }
-    }
 
-    // <include> inside <group scoped="false"> leaks included-file variables into parent scope.
-    for file_expr in &scoped_false_includes {
-        let snippet = if file_expr.len() > 60 {
-            format!("{}...", &file_expr[..60])
-        } else {
-            file_expr.clone()
-        };
-        result.add_warning(format!(
+        // <include> inside <group scoped="false"> leaks included-file variables into parent scope.
+        for file_expr in &scoped_false_includes {
+            let snippet = if file_expr.len() > 60 {
+                format!("{}...", &file_expr[..60])
+            } else {
+                file_expr.clone()
+            };
+            result.add_warning(format!(
             "{}://{}: <include> inside <group scoped=\"false\"> — '{}' leaks its internal variables into the parent scope; move the <include> out of the group",
             package, share_path.display(), snippet
         ));
-    }
+        }
 
-    // $(env X) without a fallback crashes at launch time if the variable is unset.
-    // Suppressed by default (info) because common env vars like HOME are always set.
-    {
-        let mut seen = std::collections::HashSet::new();
-        for name in &env_no_fallback {
-            if seen.insert(name.clone()) {
-                result.add_info(format!(
+        // $(env X) without a fallback crashes at launch time if the variable is unset.
+        // Suppressed by default (info) because common env vars like HOME are always set.
+        {
+            let mut seen = std::collections::HashSet::new();
+            for name in &env_no_fallback {
+                if seen.insert(name.clone()) {
+                    result.add_info(format!(
                     "{}://{}: $(env {}) has no fallback — will fail if the environment variable is unset; use $(env {} <default>)",
                     package, share_path.display(), name, name
                 ));
+                }
             }
         }
-    }
 
-    // Preserve result.include_args for API consumers (e.g. external tooling that reads
-    // per-include arg contexts) and the renderer (which emits <!-- arg ... --> annotations).
-    // process_parsed_file uses LaunchInclude.explicit_args directly and does not need
-    // result.include_args, but we keep it populated.
-    result.include_args.extend(
-        resolved
-            .include_args
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone())),
-    );
-    // Convert to unified IR and delegate all common post-processing (accumulation,
-    // node chain/source assignment, declared-arg tracking, include recursion,
-    // IncludeMarker injection, and excessive-include-arg checks).
-    // Note: required_abs_files that couldn't be parsed by extract_file_dependency
-    // are reported as errors inside resolved_launch_to_parsed.
-    let parsed = resolved_launch_to_parsed(resolved);
-    process_parsed_file(
-        parsed,
-        package,
-        share_path,
-        &file_path,
-        &current_chain,
-        &effective_args,
-        persisted_arg_context,
-        result,
-        lockfile,
-        locator,
-        fetch_dir,
-        fetched_packages,
-        failed_repos,
-        workflow_options,
-        options,
-    );
+        // Preserve result.include_args for API consumers (e.g. external tooling that reads
+        // per-include arg contexts) and the renderer (which emits <!-- arg ... --> annotations).
+        // process_parsed_file uses LaunchInclude.explicit_args directly and does not need
+        // result.include_args, but we keep it populated.
+        result.include_args.extend(
+            resolved
+                .include_args
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone())),
+        );
+        // Convert to unified IR and delegate all common post-processing (accumulation,
+        // node chain/source assignment, declared-arg tracking, include recursion,
+        // IncludeMarker injection, and excessive-include-arg checks).
+        // Note: required_abs_files that couldn't be parsed by extract_file_dependency
+        // are reported as errors inside resolved_launch_to_parsed.
+        let parsed = resolved_launch_to_parsed(resolved);
+        process_parsed_file(
+            parsed,
+            package,
+            share_path,
+            &file_path,
+            &current_chain,
+            &effective_args,
+            persisted_arg_context,
+            result,
+            lockfile,
+            locator,
+            fetch_dir,
+            fetched_packages,
+            failed_repos,
+            workflow_options,
+            options,
+        );
+    } // end #[allow(unreachable_code)] block
 }
 
 #[cfg(test)]

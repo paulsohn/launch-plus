@@ -1759,3 +1759,275 @@ class TestResolveXmlElements:
         R.resolve_xml_elements(elements, ctx)
         assert len(R._tracked["nodes"]) == 1
         assert R._tracked["nodes"][0]["package"] == "default_model_pkg"
+
+
+# ─── Resolved IR (resolve_xml_to_ir) ─────────────────────────────────────────
+
+
+def _parse_to_ir(xml_str, **ctx_kwargs):
+    """Parse XML string, walk it, and return IRResolvedLaunch."""
+    ctx = _fresh_walker_ctx(**ctx_kwargs)
+    elements = R.parse_xml_launch(xml_str, "test.launch.xml")
+    return R.resolve_xml_to_ir(elements, ctx)
+
+
+class TestResolvedIR:
+    """Tests for resolve_xml_to_ir() — typed IR output."""
+
+    def test_ir_node(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <push-ros-namespace namespace="/robot"/>
+              <node pkg="p" exec="e" name="n" namespace="local"/>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        assert len(ir.actions) == 1
+        node = ir.actions[0]
+        assert isinstance(node, R.IRNode)
+        assert node.package == "p"
+        assert node.executable == "e"
+        assert node.name == "n"
+        # Effective namespace: /robot + local = /robot/local
+        assert node.namespace == "/robot/local"
+
+    def test_ir_lifecycle_node(self):
+        xml = '<launch><lifecycle_node pkg="p" exec="e" name="n"/></launch>'
+        ir = _parse_to_ir(xml)
+        assert isinstance(ir.actions[0], R.IRLifecycleNode)
+
+    def test_ir_container_with_plugins(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <node_container pkg="rclcpp" exec="container" name="c">
+                <composable_node pkg="a" plugin="a::N" name="n1"/>
+              </node_container>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        assert len(ir.actions) == 1
+        container = ir.actions[0]
+        assert isinstance(container, R.IRComposableNodeContainer)
+        assert len(container.plugins) == 1
+        assert container.plugins[0].plugin == "a::N"
+
+    def test_ir_load_composable(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <load_composable_node target="/c">
+                <composable_node pkg="b" plugin="b::N" name="n2"/>
+              </load_composable_node>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        lcn = ir.actions[0]
+        assert isinstance(lcn, R.IRLoadComposableNode)
+        assert lcn.target == "/c"
+        assert len(lcn.plugins) == 1
+
+    def test_ir_executable(self):
+        xml = '<launch><executable cmd="echo hi" name="e" shell="true"/></launch>'
+        ir = _parse_to_ir(xml)
+        exe = ir.actions[0]
+        assert isinstance(exe, R.IRExecutable)
+        assert exe.cmd == "echo hi"
+        assert exe.shell is True
+
+    def test_ir_set_parameter_merged_into_node(self):
+        """SetParameter is consumed and merged into child nodes' parameters."""
+        xml = textwrap.dedent("""\
+            <launch>
+              <set_parameter name="use_sim_time" value="true"/>
+              <node pkg="p" exec="e" name="n">
+                <param name="local" value="yes"/>
+              </node>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        assert len(ir.actions) == 1
+        node = ir.actions[0]
+        assert isinstance(node, R.IRNode)
+        assert node.parameters["use_sim_time"] == "true"
+        assert node.parameters["local"] == "yes"
+
+    def test_ir_set_parameter_scoped(self):
+        """SetParameter inside scoped group does not leak to outer nodes."""
+        xml = textwrap.dedent("""\
+            <launch>
+              <group scoped="true">
+                <set_parameter name="inner" value="1"/>
+                <node pkg="p" exec="e" name="inner_node"/>
+              </group>
+              <node pkg="p" exec="e" name="outer_node"/>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        group = ir.actions[0]
+        assert isinstance(group, R.IRGroupAction)
+        inner = [a for a in group.children if isinstance(a, R.IRNode)][0]
+        assert inner.parameters.get("inner") == "1"
+        outer = [a for a in ir.actions if isinstance(a, R.IRNode)][0]
+        assert "inner" not in outer.parameters
+
+    def test_ir_set_remap_merged_into_node(self):
+        """SetRemap is consumed and merged into child nodes' remappings."""
+        xml = textwrap.dedent("""\
+            <launch>
+              <set_remap from="/in" to="/out"/>
+              <node pkg="p" exec="e" name="n"/>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        assert len(ir.actions) == 1
+        node = ir.actions[0]
+        assert isinstance(node, R.IRNode)
+        assert ("/in", "/out") in node.remappings
+
+    def test_ir_log(self):
+        xml = '<launch><log message="hello"/></launch>'
+        ir = _parse_to_ir(xml)
+        log = ir.actions[0]
+        assert isinstance(log, R.IRLog)
+        assert log.message == "hello"
+
+    def test_ir_event_handler_in_metadata(self):
+        """Event handlers go to metadata, not the action tree."""
+        xml = textwrap.dedent("""\
+            <launch>
+              <on_process_exit target="my_node">
+                <emit_event event="shutdown" target_node="my_node"/>
+              </on_process_exit>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        assert len(ir.actions) == 0
+        assert len(ir.event_handlers) == 1
+        eh = ir.event_handlers[0]
+        assert isinstance(eh, R.IREventHandler)
+        assert eh.kind == "on_process_exit"
+        assert eh.target == "my_node"
+        assert len(eh.actions) == 1
+        assert eh.actions[0].event == "shutdown"
+
+    def test_ir_declared_args(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="x" default="1"/>
+              <arg name="y" default="2"/>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        assert len(ir.declared_args) == 2
+        assert ir.declared_args[0].name == "x"
+        assert ir.declared_args[1].default == "2"
+
+    def test_ir_packages_tracked(self):
+        xml = '<launch><node pkg="my_pkg" exec="e" name="n"/></launch>'
+        ir = _parse_to_ir(xml)
+        assert "my_pkg" in ir.packages
+
+    def test_ir_includes_tracked(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_path = os.path.join(tmpdir, "child.launch.xml")
+            with open(child_path, "w") as f:
+                f.write('<launch><node pkg="p" exec="e" name="n"/></launch>')
+
+            xml = f"""\
+                <launch>
+                  <include file="{child_path}">
+                    <arg name="x" value="42"/>
+                  </include>
+                </launch>
+            """
+            ir = _parse_to_ir(xml)
+            # Node from child is inlined
+            assert any(isinstance(a, R.IRNode) and a.package == "p" for a in ir.actions)
+
+    def test_ir_errors_and_warnings(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <node pkg="$(arg undefined)" exec="e" name="n"/>
+              <foobar/>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        assert any("undefined" in e for e in ir.errors)
+        assert any("unknown" in w for w in ir.warnings)
+
+    def test_ir_env_effective(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <set_env name="A" value="1"/>
+              <node pkg="p" exec="e" name="n">
+                <env name="B" value="2"/>
+              </node>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        node = ir.actions[0]
+        assert isinstance(node, R.IRNode)
+        assert node.env == {"A": "1", "B": "2"}
+
+    def test_ir_namespace_effective_only(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <push-ros-namespace namespace="/a"/>
+              <push-ros-namespace namespace="b"/>
+              <node pkg="p" exec="e" name="n" namespace="c"/>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        node = ir.actions[0]
+        assert isinstance(node, R.IRNode)
+        # /a + b = /a/b, then + c = /a/b/c
+        assert node.namespace == "/a/b/c"
+        # No namespace_stack attribute — only effective
+        assert not hasattr(node, "namespace_stack")
+
+    def test_ir_absolute_namespace_resets(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <push-ros-namespace namespace="/old"/>
+              <node pkg="p" exec="e" name="n" namespace="/override"/>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        node = ir.actions[0]
+        assert isinstance(node, R.IRNode)
+        assert node.namespace == "/override"
+
+    def test_ir_condition_filters(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <arg name="flag" default="false"/>
+              <node pkg="yes" exec="e" name="y" unless="$(arg flag)"/>
+              <node pkg="no" exec="e" name="n" if="$(arg flag)"/>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        # Only the unless=false (i.e. included) node survives
+        assert len(ir.actions) == 1
+        assert isinstance(ir.actions[0], R.IRNode)
+        assert ir.actions[0].package == "yes"
+
+    def test_ir_scoped_group_env_not_leaked(self):
+        xml = textwrap.dedent("""\
+            <launch>
+              <group scoped="true">
+                <set_env name="X" value="leaked"/>
+                <node pkg="inner" exec="e" name="i"/>
+              </group>
+              <node pkg="outer" exec="e" name="o"/>
+            </launch>
+        """)
+        ir = _parse_to_ir(xml)
+        # Inner node is inside IRGroupAction
+        assert isinstance(ir.actions[0], R.IRGroupAction)
+        group = ir.actions[0]
+        inner_nodes = [a for a in group.children if isinstance(a, R.IRNode)]
+        assert len(inner_nodes) == 1
+        assert inner_nodes[0].env.get("X") == "leaked"
+        # Outer node is at top level, env scoped — X not visible
+        outer_nodes = [a for a in ir.actions if isinstance(a, R.IRNode)]
+        assert len(outer_nodes) == 1
+        assert outer_nodes[0].env.get("X") is None

@@ -1659,21 +1659,22 @@ fn cmd_resolve(
             &result.initial_args,
             &result.declared_args_by_file,
         );
-        if preview && expand_paths {
-            // Expand $(find-pkg-share <pkg>) tokens to absolute AMENT install paths
-            // so the output is directly comparable with a non-preview (post-build)
-            // resolution.  Requires AMENT_PREFIX_PATH from the build's install tree.
-            use launch_plus_core::locator::PackageLocator;
-            let mut locator = PackageLocator::new();
-            locator.add_ament_from_env();
-            xml = expand_portable_paths(&xml, &locator);
-        } else if preview {
+        if preview && !expand_paths {
             // Prepend a preview marker so consumers can distinguish source-path output
             // from post-build install-path output.
             xml.insert_str(
                 0,
                 "<!-- PREVIEW: resolved from source workspace, not install paths -->\n",
             );
+        } else {
+            // Expand $(find-pkg-share <pkg>) tokens to absolute AMENT install paths.
+            // For preview + expand-paths: makes output comparable with post-build.
+            // For non-preview (post-build): Python always outputs portable paths,
+            // so we expand them to the actual install paths here.
+            use launch_plus_core::locator::PackageLocator;
+            let mut locator = PackageLocator::new();
+            locator.add_ament_from_env();
+            xml = expand_portable_paths(&xml, &locator);
         }
         println!("{xml}");
     }

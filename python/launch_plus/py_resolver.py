@@ -1657,23 +1657,25 @@ def _read_and_expand_param_file(
         pkg, rest = parsed
         pkg_share = _package_shares.get(pkg)
         if not pkg_share:
-            try:
-                pkg_share = _resolve_pkg_share(pkg)
-            except Exception:
-                if _preview_mode:
-                    _warn(
-                        f"--inline-params: param file not available: '{path}' (package not fetched)"
-                    )
-                else:
+            # Try fetching the package if it's in the lockfile.
+            if _ensure_fetched(pkg):
+                pkg_share = _package_shares.get(pkg)
+            if not pkg_share:
+                try:
+                    pkg_share = _resolve_pkg_share(pkg)
+                except Exception:
                     _error(f"param file not found: '{path}' (package not available)")
-                return None
+                    return None
         real_path = os.path.join(pkg_share, rest)
     if not os.path.isfile(real_path):
-        if _preview_mode:
-            _warn(f"--inline-params: param file not found: '{real_path}' (resolved from '{path}')")
-        else:
+        # Package share was known but file missing — try full fetch.
+        if parsed and _ensure_fetched(parsed[0]):
+            pkg_share = _package_shares.get(parsed[0])
+            if pkg_share:
+                real_path = os.path.join(pkg_share, parsed[1])
+        if not os.path.isfile(real_path):
             _error(f"param file not found: '{real_path}' (resolved from '{path}')")
-        return None
+            return None
     try:
         with open(real_path) as f:
             content = f.read()

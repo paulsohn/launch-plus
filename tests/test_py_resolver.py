@@ -2141,3 +2141,48 @@ class TestResolvedIR:
         outer_nodes = [a for a in ir.actions if isinstance(a, R.IRNode)]
         assert len(outer_nodes) == 1
         assert outer_nodes[0].env.get("X") is None
+
+
+# ─── rosdep resolve parser tests ─────────────────────────────────────────────
+# Mirror the Rust-side tests in rosdep.rs.
+
+
+class TestParseRosdepResolve:
+    def test_single_key_apt(self):
+        stdout = "#apt\nros-jazzy-rclcpp\n"
+        assert R._parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]
+
+    def test_multi_key(self):
+        stdout = "#ROSDEP[rclcpp]\n#apt\nros-jazzy-rclcpp\n#ROSDEP[eigen]\n#apt\nlibeigen3-dev\n"
+        assert R._parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp", "libeigen3-dev"]
+
+    def test_multi_packages_per_key(self):
+        stdout = "#ROSDEP[libnl-3-dev]\n#apt\nlibnl-3-dev libnl-genl-3-dev libnl-route-3-dev\n"
+        assert R._parse_rosdep_resolve(stdout) == [
+            "libnl-3-dev",
+            "libnl-genl-3-dev",
+            "libnl-route-3-dev",
+        ]
+
+    def test_empty_output(self):
+        assert R._parse_rosdep_resolve("") == []
+
+    def test_unsupported_installer_ignored(self):
+        stdout = "#brew\nhomebrew-pkg\n"
+        assert R._parse_rosdep_resolve(stdout) == []
+
+    def test_mixed_installers_only_apt(self):
+        stdout = (
+            "#ROSDEP[rclcpp]\n#apt\nros-jazzy-rclcpp\n#ROSDEP[brew_only]\n#brew\nhomebrew-pkg\n"
+        )
+        assert R._parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]
+
+    def test_pip_ignored(self):
+        stdout = "#pip\nsome-pip-package\n"
+        assert R._parse_rosdep_resolve(stdout) == []
+
+    def test_unresolved_key_no_installer_line(self):
+        """A key with a #ROSDEP header but no #installer line is unresolved."""
+        stdout = "#ROSDEP[rclcpp]\n#apt\nros-jazzy-rclcpp\n#ROSDEP[nonexistent_xyz]\n"
+        # Only the resolved key's package is returned.
+        assert R._parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]

@@ -323,26 +323,65 @@ _fetched_packages: set = set()
 _rosdep_attempted: set = set()
 
 
+def _parse_rosdep_resolve(stdout: str) -> list[str]:
+    """Parse ``rosdep resolve`` stdout into a list of apt package names.
+
+    Output format::
+
+        #apt
+        ros-humble-ublox-gps
+
+    or with multiple packages on one line::
+
+        #apt
+        libnl-3-dev libnl-genl-3-dev
+
+    Only ``#apt`` packages are returned; other installers (``#pip``, ``#brew``)
+    are ignored.
+    """
+    apt_pkgs: list[str] = []
+    installer = ""
+    for line in stdout.strip().splitlines():
+        if line.startswith("#"):
+            installer = line.lstrip("#").strip()
+        elif installer == "apt" and line.strip():
+            apt_pkgs.extend(line.strip().split())
+    return apt_pkgs
+
+
 def _try_rosdep_install(package: str) -> bool:
-    """Attempt to install a package via rosdep.  Returns True on success."""
+    """Resolve a rosdep key to system packages and install them.
+
+    Uses ``rosdep resolve`` + ``apt-get install`` (matching the Rust-side
+    approach in rosdep.rs) instead of ``rosdep install`` which treats
+    arguments as ROS package names and fails on plain keys.
+    """
     if package in _rosdep_attempted:
         return False
     _rosdep_attempted.add(package)
     ros_distro = os.environ.get("ROS_DISTRO", "")
     if not ros_distro:
-        _warn(f"rosdep: skipping '{package}' (ROS_DISTRO not set)")
         return False
     try:
-        cmd = ["rosdep", "install", "--rosdistro", ros_distro, "-y", "--from-keys", package]
-        _warn(f"rosdep: installing '{package}' via: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode == 0:
-            _warn(f"rosdep: '{package}' installed successfully")
-            return True
-        _warn(f"rosdep: '{package}' failed (rc={result.returncode}): {result.stderr.strip()}")
-        return False
-    except Exception as e:
-        _warn(f"rosdep: '{package}' exception: {e}")
+        # Step 1: rosdep resolve → find apt package name.
+        resolve = subprocess.run(
+            ["rosdep", "resolve", "--rosdistro", ros_distro, package],
+            capture_output=True,
+            text=True,
+        )
+        if resolve.returncode != 0:
+            return False
+        apt_pkgs = _parse_rosdep_resolve(resolve.stdout)
+        if not apt_pkgs:
+            return False
+        # Step 2: apt-get install.
+        install = subprocess.run(
+            ["sudo", "-n", "apt-get", "install", "-y", "--no-install-recommends", *apt_pkgs],
+            capture_output=True,
+            text=True,
+        )
+        return install.returncode == 0
+    except Exception:
         return False
 
 
@@ -519,14 +558,8 @@ def _resolve_pkg_share(package: str) -> str:
             return str(_real_get_package_share_directory(package))
         except _PackageNotFetchedError:
             raise
-        except Exception as e:
-            _warn(
-                f"_resolve_pkg_share('{package}'): AMENT lookup failed: {e}, rosdep_fallback={_rosdep_fallback}"
-            )
-    else:
-        _warn(
-            f"_resolve_pkg_share('{package}'): no AMENT resolver available, rosdep_fallback={_rosdep_fallback}"
-        )
+        except Exception:
+            pass  # Fall through to rosdep or portable fallback.
     # 4. Try rosdep install if enabled.
     if (
         _rosdep_fallback

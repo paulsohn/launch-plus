@@ -398,7 +398,7 @@ def _ensure_fetched(package: str) -> bool:
             # Repo exists — add to sparse-checkout.
             sparse_path = "/**" if pkg_path_in_repo in (".", "") else pkg_path_in_repo
             subprocess.run(
-                ["git", "sparse-checkout", "add", "--no-cone", sparse_path],
+                ["git", "sparse-checkout", "add", sparse_path],
                 cwd=repo_dir,
                 check=True,
                 capture_output=True,

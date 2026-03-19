@@ -342,15 +342,8 @@ fn run_py_resolver(
         args_with_globals.insert("__global_params__".to_string(), gp_json);
     }
 
-    let args_json = serde_json::to_string(&args_with_globals)
-        .map_err(|e| crate::Error::Git(format!("failed to serialize launch args: {e}")))?;
-    let shares_json = serde_json::to_string(package_shares)
-        .map_err(|e| crate::Error::Git(format!("failed to serialize package_shares: {e}")))?;
-
-    // Pass workflow options as a JSON flags object (sys.argv[4] in py_resolver).
-    //
-    // lockfile_packages: package name → {repo, path, url, version} so Python can
-    // fetch missing packages inline via git sparse-checkout (no round-trip to Rust).
+    // Build lockfile data for Python: package name → {repo, path, url, version}
+    // so py_resolver can fetch missing packages inline via git sparse-checkout.
     let lockfile_data: HashMap<String, serde_json::Value> = lockfile
         .packages
         .iter()
@@ -368,17 +361,6 @@ fn run_py_resolver(
         })
         .collect();
 
-    let flags = serde_json::json!({
-        "apply_opaque_file_access": workflow_options.apply_opaque_file_access,
-        "preview": workflow_options.preview,
-        "inline_params": workflow_options.inline_params,
-        // Full lockfile data so py_resolver can fetch packages inline.
-        "lockfile_packages": lockfile_data,
-        // Fetch directory (workspace src/) for constructing repo paths.
-        "fetch_dir": fetch_dir.to_string_lossy(),
-    });
-    let flags_json = flags.to_string();
-
     let script_str = script_path.to_str().ok_or_else(|| {
         crate::Error::Git("py_resolver script path is not valid UTF-8".to_string())
     })?;
@@ -388,12 +370,42 @@ fn run_py_resolver(
             file_path.display()
         ))
     })?;
-    let output = Command::new("python3")
-        .args([script_str, file_str, &args_json, &shares_json, &flags_json])
+    // Pass JSON data via stdin to avoid hitting the OS ARG_MAX limit.
+    // Large lockfiles + package_shares can easily exceed the ~2MB argument limit.
+    let stdin_payload = serde_json::json!({
+        "launch_file": file_str,
+        "args": &args_with_globals,
+        "package_shares": package_shares,
+        "flags": {
+            "apply_opaque_file_access": workflow_options.apply_opaque_file_access,
+            "preview": workflow_options.preview,
+            "inline_params": workflow_options.inline_params,
+            "rosdep_fallback": workflow_options.rosdep_fallback,
+            "lockfile_packages": &lockfile_data,
+            "fetch_dir": fetch_dir.to_string_lossy(),
+        },
+    });
+    let stdin_json = stdin_payload.to_string();
+
+    let mut child = Command::new("python3")
+        .args([script_str])
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .output()
+        .spawn()
         .map_err(|e| crate::Error::Git(format!("failed to run python3: {e}")))?;
+
+    // Write JSON payload to stdin, then close the pipe so Python sees EOF.
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin
+            .write_all(stdin_json.as_bytes())
+            .map_err(|e| crate::Error::Git(format!("failed to write to python3 stdin: {e}")))?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| crate::Error::Git(format!("failed to wait for python3: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

@@ -274,13 +274,13 @@ _ROS_DISTRO = os.environ.get("ROS_DISTRO", "")
 _ROS_DISTRO_PREFIX = f"/opt/ros/{_ROS_DISTRO}" if _ROS_DISTRO else ""
 
 # ─── Workspace package share map ─────────────────────────────────────────────
-# Filled in main() from sys.argv[3] (passed by orchestrator).
+# Filled in main() from stdin JSON (passed by orchestrator).
 # Maps package_name → absolute path to the package root in the workspace src dir.
 # Used to resolve $(find-pkg-share X) against source packages (not just installed ones).
 _package_shares: dict = {}
 
 # ─── Workflow flags ────────────────────────────────────────────────────────────
-# Set from sys.argv[4] (JSON flags object) in main().
+# Set from stdin JSON flags in main().
 #
 # When False (default), _stub_open and os.path stubs record an error and return
 # stub data for portable-path access inside OpaqueFunction bodies.  When True,
@@ -297,13 +297,18 @@ _apply_opaque_file_access: bool = False
 _preview_mode: bool = True
 
 # ─── Lockfile data ────────────────────────────────────────────────────────────
-# Filled in main() from the "lockfile_packages" key in the flags JSON (sys.argv[4]).
+# Filled in main() from the "lockfile_packages" key in the flags JSON (stdin).
 # Maps package_name → {"repo": str, "path": str, "url": str, "version": str}.
 # When non-empty, _resolve_pkg_share() treats any package in this dict as a
 # source-only package: it never falls through to AMENT_PREFIX_PATH.  If the
 # source directory is not fully fetched (no package.xml), _ensure_fetched()
 # is called to fetch it inline via git sparse-checkout.
 _lockfile_data: dict = {}
+
+# ─── Rosdep fallback ──────────────────────────────────────────────────────────
+# When True, _resolve_pkg_share() runs `rosdep install` for packages not found
+# in the lockfile or AMENT_PREFIX_PATH before giving up.  Exposed as --rosdep.
+_rosdep_fallback: bool = False
 
 # ─── Fetch directory ──────────────────────────────────────────────────────────
 # Workspace src/ directory where repositories are cloned.  Set from flags JSON.
@@ -313,6 +318,28 @@ _fetch_dir: str = ""
 # Session cache: packages whose full directory (with package.xml) has been
 # confirmed or fetched during this run.  Avoids redundant git calls.
 _fetched_packages: set = set()
+
+# Packages already attempted via rosdep (success or failure).
+_rosdep_attempted: set = set()
+
+
+def _try_rosdep_install(package: str) -> bool:
+    """Attempt to install a package via rosdep.  Returns True on success."""
+    if package in _rosdep_attempted:
+        return False
+    _rosdep_attempted.add(package)
+    ros_distro = os.environ.get("ROS_DISTRO", "")
+    if not ros_distro:
+        return False
+    try:
+        result = subprocess.run(
+            ["rosdep", "install", "--rosdistro", ros_distro, "-y", "--from-keys", package],
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 class _PackageNotFetchedError(RuntimeError):
@@ -488,9 +515,19 @@ def _resolve_pkg_share(package: str) -> str:
             return str(_real_get_package_share_directory(package))
         except _PackageNotFetchedError:
             raise
-        except Exception as e:
-            _warn(f"get_package_share_directory('{package}') failed: {e}")
-    # 4. Fallback: return portable substitution syntax so that any downstream
+        except Exception:
+            pass  # Fall through to rosdep or portable fallback.
+    # 4. Try rosdep install if enabled.
+    if (
+        _rosdep_fallback
+        and _try_rosdep_install(package)
+        and _real_get_package_share_directory is not None
+    ):
+        try:
+            return str(_real_get_package_share_directory(package))
+        except Exception:
+            pass
+    # 5. Fallback: return portable substitution syntax so that any downstream
     #    open() call hits the FileNotFoundError stub (which emits a warning) rather
     #    than silently using a wrong distro-specific path.
     return f"$(find-pkg-share {package})"
@@ -5114,16 +5151,12 @@ def main():
     _emit._fd = sys.stdout
     sys.stdout = sys.stderr
 
-    if len(sys.argv) < 3:
-        _emit({"error": "usage: py_resolver.py <launch_file> <args_json> [package_shares_json]"})
-        sys.exit(1)
+    # Read input from stdin (JSON object with launch_file, args, package_shares, flags).
+    # This avoids OS ARG_MAX limits that occur with large lockfiles.
+    stdin_data = json.loads(sys.stdin.read())
+    launch_file = stdin_data["launch_file"]
+    args_dict = stdin_data.get("args", {})
 
-    launch_file = sys.argv[1]
-    args_dict = json.loads(sys.argv[2])
-
-    # Load workspace package share paths (passed by orchestrator as third argument).
-    # These let us resolve $(find-pkg-share X) against workspace source packages
-    # before falling back to AMENT_PREFIX_PATH or hardcoded paths.
     global _package_shares, _namespace_stack, _apply_opaque_file_access
     global _lockfile_data, _fetch_dir, _fetched_packages, _root_source_key
     _namespace_stack = []
@@ -5136,26 +5169,19 @@ def main():
     _global_param_files.clear()
     _ir_event_handlers.clear()
     _fetched_packages.clear()
-    if len(sys.argv) > 3:
-        try:
-            _package_shares = json.loads(sys.argv[3])
-        except Exception:
-            _package_shares = {}
+    _package_shares = stdin_data.get("package_shares", {})
 
-    # Load workflow flags (passed as 5th argument, JSON object).
-    global _preview_mode, _inline_params
-    if len(sys.argv) > 4:
-        try:
-            flags = json.loads(sys.argv[4])
-            _apply_opaque_file_access = bool(flags.get("apply_opaque_file_access", False))
-            _preview_mode = bool(flags.get("preview", True))
-            _inline_params = bool(flags.get("inline_params", False))
-            # lockfile_packages: dict of pkg → {repo, path, url, version}
-            lf_data = flags.get("lockfile_packages", {})
-            _lockfile_data = lf_data if isinstance(lf_data, dict) else {}
-            _fetch_dir = flags.get("fetch_dir", "")
-        except Exception:
-            _apply_opaque_file_access = False
+    # Load workflow flags.
+    global _preview_mode, _inline_params, _rosdep_fallback
+    flags = stdin_data.get("flags", {})
+    _apply_opaque_file_access = bool(flags.get("apply_opaque_file_access", False))
+    _preview_mode = bool(flags.get("preview", True))
+    _inline_params = bool(flags.get("inline_params", False))
+    _rosdep_fallback = bool(flags.get("rosdep_fallback", False))
+    # lockfile_packages: dict of pkg → {repo, path, url, version}
+    lf_data = flags.get("lockfile_packages", {})
+    _lockfile_data = lf_data if isinstance(lf_data, dict) else {}
+    _fetch_dir = flags.get("fetch_dir", "")
 
     # Arg values may contain portable paths ($(find-pkg-share pkg)/...) when they are
     # cascaded from the XML resolver.  These are intentionally preserved as-is: the

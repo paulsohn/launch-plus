@@ -85,7 +85,6 @@ COMMON_FLAGS=(
 # Resolve-only display flags (not accepted by build)
 RESOLVE_DISPLAY=(
     --inline-params
-    --flatten-namespaces
     --show-args
 )
 

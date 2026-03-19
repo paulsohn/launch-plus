@@ -1528,7 +1528,7 @@ class TestResolveXmlElements:
         _, tracked = _parse_and_walk(xml, ctx=ctx)
         node = tracked["nodes"][0]
         assert len(node["param_files"]) == 1
-        assert "config_pkg" in node["param_files"][0]
+        assert "config_pkg" in node["param_files"][0]["path"]
         assert "config_pkg" in tracked["packages"]
 
     # ── Container and composable nodes ──

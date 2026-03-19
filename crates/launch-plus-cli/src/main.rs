@@ -231,7 +231,8 @@ enum Commands {
         ///
         /// Useful for flattening deeply nested namespace hierarchies into a more readable,
         /// single-file layout.
-        #[arg(long)]
+        // flatten_namespaces is always enabled — namespaces are resolved into node attributes.
+        #[arg(long, default_value_t = true, hide = true)]
         flatten_namespaces: bool,
 
         /// Emit `<!-- arg name="..." value="..." -->` comments at each include boundary.
@@ -1020,7 +1021,7 @@ fn main() -> Result<()> {
                 preview,
                 false, // expand_paths — not applicable for check
                 false, // flatten
-                false, // flatten_namespaces
+                true,  // flatten_namespaces
                 false, // show_args — irrelevant, XML is suppressed
                 true,  // suppress_xml — check never writes resolved XML to stdout
                 strict,

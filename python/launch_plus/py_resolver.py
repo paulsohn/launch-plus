@@ -24,11 +24,14 @@ import importlib.util
 import json
 import os
 import re
+import subprocess
 import sys
 import types
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import yaml
 
 # ─── Output schema contract ───────────────────────────────────────────────────
 # Defines the exact JSON schema emitted to stdout.  Rust's PyResolvedNode /
@@ -276,18 +279,13 @@ _ROS_DISTRO_PREFIX = f"/opt/ros/{_ROS_DISTRO}" if _ROS_DISTRO else ""
 # Used to resolve $(find-pkg-share X) against source packages (not just installed ones).
 _package_shares: dict = {}
 
-# Lockfile packages whose source directories were not found on disk during this run.
-# Populated by get_package_share_directory() when a lockfile package hasn't been cloned.
-# Emitted in the JSON output so the Rust orchestrator can fetch them and retry py_resolver.
-_packages_to_fetch: set = set()
-
 # ─── Workflow flags ────────────────────────────────────────────────────────────
 # Set from sys.argv[4] (JSON flags object) in main().
 #
 # When False (default), _stub_open and os.path stubs record an error and return
 # stub data for portable-path access inside OpaqueFunction bodies.  When True,
-# portable paths are resolved to actual filesystem paths (raising
-# _PackageNotFetchedError when the package is not yet fully fetched).
+# portable paths are resolved to actual filesystem paths (fetching the package
+# inline if needed via _ensure_fetched).
 #
 # Exposed as --apply-opaque-file-access in the CLI.
 _apply_opaque_file_access: bool = False
@@ -298,26 +296,130 @@ _apply_opaque_file_access: bool = False
 # real path from _package_shares so the output contains absolute install paths.
 _preview_mode: bool = True
 
-# ─── Lockfile package names ────────────────────────────────────────────────────
+# ─── Lockfile data ────────────────────────────────────────────────────────────
 # Filled in main() from the "lockfile_packages" key in the flags JSON (sys.argv[4]).
-# When non-empty, _resolve_pkg_share() treats any package in this set as a
+# Maps package_name → {"repo": str, "path": str, "url": str, "version": str}.
+# When non-empty, _resolve_pkg_share() treats any package in this dict as a
 # source-only package: it never falls through to AMENT_PREFIX_PATH.  If the
-# source directory is not fully fetched (no package.xml), _PackageNotFetchedError
-# is raised instead, triggering the fetch-and-retry mechanism.
-_lockfile_packages: set = set()
+# source directory is not fully fetched (no package.xml), _ensure_fetched()
+# is called to fetch it inline via git sparse-checkout.
+_lockfile_data: dict = {}
+
+# ─── Fetch directory ──────────────────────────────────────────────────────────
+# Workspace src/ directory where repositories are cloned.  Set from flags JSON.
+_fetch_dir: str = ""
+
+# ─── Already-fetched packages ────────────────────────────────────────────────
+# Session cache: packages whose full directory (with package.xml) has been
+# confirmed or fetched during this run.  Avoids redundant git calls.
+_fetched_packages: set = set()
 
 
 class _PackageNotFetchedError(RuntimeError):
-    """Raised when a lockfile package's source directory doesn't exist on disk yet.
+    """Raised when a lockfile package cannot be fetched and resolution must abort.
 
-    Propagating this out of an OpaqueFunction body means the function cannot complete,
-    but the failure is recoverable: Rust reads `packages_to_fetch` from the JSON output,
-    clones the missing repos, and re-invokes py_resolver.
+    This is now a last-resort exception: _ensure_fetched() handles inline fetching
+    for most cases.  This exception is only raised when fetching actually fails
+    (e.g. git error, package not in lockfile but expected).
     """
 
     def __init__(self, pkg_name: str):
-        super().__init__(f"package '{pkg_name}' source not on disk; needs fetch")
+        super().__init__(f"package '{pkg_name}' source not on disk; fetch failed")
         self.pkg_name = pkg_name
+
+
+def _ensure_fetched(package: str) -> bool:
+    """Ensure a lockfile package is fully fetched (has package.xml on disk).
+
+    Performs inline git sparse-checkout to fetch the package directory if needed.
+    Updates _package_shares with the on-disk path after fetching.
+
+    Returns True if the package is available after this call.
+    Returns False if the package is not in the lockfile or fetching failed.
+    """
+    if package in _fetched_packages:
+        return True
+
+    pkg_info = _lockfile_data.get(package)
+    if not pkg_info or not _fetch_dir:
+        return False
+
+    repo_workspace_path = pkg_info["repo"]
+    pkg_path_in_repo = pkg_info["path"]
+    repo_url = pkg_info["url"]
+    repo_sha = pkg_info["version"]
+
+    repo_dir = os.path.join(_fetch_dir, repo_workspace_path)
+    pkg_dir = os.path.join(repo_dir, pkg_path_in_repo)
+
+    # Check if already fully fetched (package.xml present).
+    if os.path.isfile(os.path.join(pkg_dir, "package.xml")):
+        _fetched_packages.add(package)
+        _package_shares[package] = pkg_dir
+        return True
+
+    # Need to fetch via git sparse-checkout.
+    try:
+        if not os.path.isdir(os.path.join(repo_dir, ".git")):
+            # Repo not cloned yet — sparse clone.
+            os.makedirs(repo_dir, exist_ok=True)
+            # Normalize sparse path: "." means repo root → use "/**"
+            sparse_path = "/**" if pkg_path_in_repo in (".", "") else pkg_path_in_repo
+            subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "--filter=blob:none",
+                    "--sparse",
+                    "--single-branch",
+                    "--depth=1",
+                    repo_url,
+                    repo_dir,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "sparse-checkout", "set", "--no-cone", sparse_path],
+                cwd=repo_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "checkout", repo_sha],
+                cwd=repo_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        else:
+            # Repo exists — add to sparse-checkout.
+            sparse_path = "/**" if pkg_path_in_repo in (".", "") else pkg_path_in_repo
+            subprocess.run(
+                ["git", "sparse-checkout", "add", "--no-cone", sparse_path],
+                cwd=repo_dir,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        # Verify fetch succeeded.
+        if os.path.isfile(os.path.join(pkg_dir, "package.xml")):
+            _fetched_packages.add(package)
+            _package_shares[package] = pkg_dir
+            return True
+        else:
+            _warn(f"fetched package '{package}' but package.xml not found at {pkg_dir}")
+            return False
+
+    except subprocess.CalledProcessError as e:
+        _warn(f"git fetch failed for package '{package}': {e.stderr or e}")
+        return False
+    except Exception as e:
+        _warn(f"failed to fetch package '{package}': {e}")
+        return False
 
 
 # ─── Portable path support ────────────────────────────────────────────────────
@@ -354,10 +456,9 @@ def _parse_portable_path(path_str: str):
 def _resolve_pkg_share(package: str) -> str:
     """Resolve a package share path.
 
-    Lockfile packages (when _lockfile_packages is set) always resolve from the
-    workspace source tree and NEVER fall through to AMENT_PREFIX_PATH.  If the
-    source directory is not yet fully fetched (no package.xml), _PackageNotFetchedError
-    is raised to trigger the fetch-and-retry mechanism in the Rust orchestrator.
+    Lockfile packages always resolve from the workspace source tree and NEVER fall
+    through to AMENT_PREFIX_PATH.  If the source directory is not yet fully fetched
+    (no package.xml), _ensure_fetched() is called to fetch it inline.
 
     Non-lockfile packages (system / rosdep packages) are resolved via AMENT_PREFIX_PATH.
     """
@@ -366,20 +467,20 @@ def _resolve_pkg_share(package: str) -> str:
         pkg_path: str = _package_shares[package]
         # For lockfile packages, enforce full fetch: if package.xml is absent the
         # package has been sparse-checked at the file level but not fully cloned.
-        # Raise _PackageNotFetchedError rather than returning a dangling path.
+        # Fetch inline instead of returning a dangling path.
         if (
-            _lockfile_packages
-            and package in _lockfile_packages
+            _lockfile_data
+            and package in _lockfile_data
             and not os.path.isfile(os.path.join(pkg_path, "package.xml"))
         ):
-            _packages_to_fetch.add(package)
+            if _ensure_fetched(package):
+                return _package_shares[package]
             raise _PackageNotFetchedError(package)
         return pkg_path
-    # 2. Lockfile package not found in _package_shares — shouldn't happen when the
-    #    lockfile is configured, but guard against it: trigger fetch instead of
-    #    silently falling through to AMENT_PREFIX_PATH with a potentially stale version.
-    if _lockfile_packages and package in _lockfile_packages:
-        _packages_to_fetch.add(package)
+    # 2. Lockfile package not found in _package_shares — fetch it.
+    if _lockfile_data and package in _lockfile_data:
+        if _ensure_fetched(package):
+            return _package_shares[package]
         raise _PackageNotFetchedError(package)
     # 3. Non-lockfile packages (system / rosdep): use AMENT_PREFIX_PATH.
     if _real_get_package_share_directory is not None:
@@ -415,6 +516,7 @@ _tracked: dict[str, Any] = {
     "warnings": [],
     "errors": [],
     "declared_args": [],  # [{name, default}] — for Rust to forward based on apply_arg_defaults
+    "declared_args_by_file": {},  # {"pkg://share_path": [{name, default}]} — per-file declared args for --show-args
     "global_params": [],  # [[name, value], ...] — SetParameter accumulations (real ROS 2 behavior)
     "include_args": {},  # {path: {arg: value}} — launch_arguments captured from IncludeLaunchDescription
     "param_files": [],  # [path_string, ...] — ParameterFile paths referenced by nodes
@@ -431,11 +533,19 @@ _declared_arg_names: set = set()
 # Each entry is a resolved string.  Managed by _walk_action; reset in main().
 _namespace_stack: list = []
 
+# Include chain: stack of [package, share_path] pairs from root to current file.
+# Pushed on entering an include, popped on exit.  Attached to each tracked node
+# so the renderer can draw <group> boundaries at file transitions.
+_include_chain: list = []
+
 # Environment variable overrides.  Starts empty; mutated by
 # SetEnvironmentVariable / UnsetEnvironmentVariable.  EnvironmentVariable
 # substitution checks this first, then falls back to os.environ.
 # Scoped groups clone/restore this.
 _env: dict = {}
+
+# Whether to inline param files (read YAML and expand into parameters dict).
+_inline_params: bool = False
 
 # Scoped global parameters set by <set_parameter> at group level.
 # Accumulated during resolution; merged into each node's parameters.
@@ -546,6 +656,50 @@ def _track_param_file(path):
             _tracked["param_file_deps"].append(entry)
 
 
+# Source key for the root file — set in main().
+_root_source_key: str = ""
+
+
+def _current_source_key() -> str:
+    """Return the source key for the current file being resolved.
+
+    Uses the last entry of _include_chain, or _root_source_key for root-level.
+    Format: "pkg://share_path" (matching Rust convention).
+    """
+    if _include_chain:
+        pkg, path = _include_chain[-1]
+        return f"{pkg}://{path}" if pkg else path
+    return _root_source_key
+
+
+def _record_declared_arg(name: str, default: str, *, flat: bool = True) -> None:
+    """Record a declared arg in the per-file dict, and optionally the flat list.
+
+    The flat list is used by Rust for apply_arg_defaults (first-declaration wins).
+    The per-file dict is used by --show-args to render arg comments per included file.
+    """
+    if flat:
+        _tracked["declared_args"].append({"name": name, "default": default})
+    key = _current_source_key()
+    if key:
+        by_file = _tracked["declared_args_by_file"]
+        if key not in by_file:
+            by_file[key] = []
+        by_file[key].append({"name": name, "default": default})
+
+
+def _track_node(node_dict: dict) -> int:
+    """Append a node dict to _tracked["nodes"] with source info from _include_chain.
+
+    Returns the index of the appended node.
+    """
+    if _include_chain:
+        node_dict["include_chain"] = list(_include_chain)
+    idx = len(_tracked["nodes"])
+    _tracked["nodes"].append(node_dict)
+    return idx
+
+
 def _to_str(value: object, context: Any = None) -> str | None:
     """Coerce a str, substitution object, or None to ``str | None``.
 
@@ -631,14 +785,15 @@ def _resolve_substitution_ex(sub: object, context: Any) -> tuple[str | None, boo
     return str(sub), True
 
 
-def _track_node(package, executable, name=None):
+def _track_node_from_action(package, executable, name=None):
+    """Track a node from an unpatched ROS 2 action (e.g. from OpaqueFunction return)."""
     # Pass raw package to _track_package BEFORE stringifying — _track_package
     # has an _is_substitution guard that filters out substitution objects.
     _track_package(package)
     package = str(package) if package else ""
     executable = str(executable) if executable else ""
     name = str(name) if name else ""
-    _tracked["nodes"].append(
+    return _track_node(
         {
             "package": package,
             "executable": executable,
@@ -654,7 +809,6 @@ def _track_node(package, executable, name=None):
             "target": None,
         }
     )
-    return len(_tracked["nodes"]) - 1
 
 
 def _warn(msg: str) -> None:
@@ -1413,25 +1567,130 @@ def _effective_namespace(
     return current
 
 
+def _expand_ros_params_yaml(content: str) -> list[tuple[str, str]]:
+    """Parse ROS 2 parameter YAML and flatten into (key, value) pairs.
+
+    Supports all standard ROS 2 layouts:
+      - bare ``ros__parameters: ...``
+      - ``/**:\\n  ros__parameters: ...`` (Autoware wildcard convention)
+      - ``/ns:\\n  node_name:\\n    ros__parameters: ...`` (general ROS 2)
+    """
+    data = yaml.safe_load(content)
+    if not isinstance(data, dict):
+        return []
+    out: list[tuple[str, str]] = []
+    _collect_ros_params(data, 0, out)
+    return out
+
+
+def _collect_ros_params(value: object, depth: int, out: list[tuple[str, str]]) -> None:
+    if depth > 3 or not isinstance(value, dict):
+        return
+    if "ros__parameters" in value:
+        _flatten_yaml_value(value["ros__parameters"], "", out)
+    else:
+        for child in value.values():
+            if isinstance(child, dict):
+                _collect_ros_params(child, depth + 1, out)
+
+
+def _flatten_yaml_value(value: object, prefix: str, out: list[tuple[str, str]]) -> None:
+    if isinstance(value, dict):
+        for k, v in value.items():
+            full_key = f"{prefix}.{k}" if prefix else str(k)
+            _flatten_yaml_value(v, full_key, out)
+    elif isinstance(value, list):
+        items = ", ".join(_yaml_value_to_str(v) for v in value)
+        out.append((prefix, f"[{items}]"))
+    else:
+        out.append((prefix, _yaml_value_to_str(value)))
+
+
+def _yaml_value_to_str(v: object) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return str(v).lower()
+    if isinstance(v, list):
+        items = ", ".join(_yaml_value_to_str(x) for x in v)
+        return f"[{items}]"
+    return str(v)
+
+
+def _read_and_expand_param_file(
+    path: str,
+) -> list[tuple[str, str]] | None:
+    """Read a param file and expand ros__parameters. Returns None on failure."""
+    real_path = path
+    parsed = _parse_portable_path(path)
+    if parsed:
+        pkg, rest = parsed
+        pkg_share = _package_shares.get(pkg)
+        if not pkg_share:
+            try:
+                pkg_share = _resolve_pkg_share(pkg)
+            except Exception:
+                if _preview_mode:
+                    _warn(
+                        f"--inline-params: param file not available: '{path}' (package not fetched)"
+                    )
+                else:
+                    _error(f"param file not found: '{path}' (package not available)")
+                return None
+        real_path = os.path.join(pkg_share, rest)
+    if not os.path.isfile(real_path):
+        if _preview_mode:
+            _warn(f"--inline-params: param file not found: '{real_path}' (resolved from '{path}')")
+        else:
+            _error(f"param file not found: '{real_path}' (resolved from '{path}')")
+        return None
+    try:
+        with open(real_path) as f:
+            content = f.read()
+        return _expand_ros_params_yaml(content)
+    except Exception as e:
+        _error(f"--inline-params: failed to read '{path}': {e}")
+        return None
+
+
+def _make_param_file_entry(path: str) -> dict:
+    """Create a param_file dict entry, with optional inline expansion."""
+    pf_entry: dict = {"path": path}
+    if _inline_params:
+        expanded = _read_and_expand_param_file(path)
+        if expanded is not None:
+            pf_entry["params"] = expanded
+    return pf_entry
+
+
 def _resolve_params_xml(
     params: list[dict[str, str]],
     ctx: _SubstitutionContext,
-) -> tuple[dict[str, str], list[str]]:
+) -> tuple[dict[str, str], list[dict]]:
     """Resolve parameter children from parsed XML.
 
-    Returns (resolved_params_dict, param_file_paths).
+    Returns (resolved_params_dict, param_files_list).
+    Each param_file entry is ``{"path": str}`` (reference) or
+    ``{"path": str, "params": [[key, val], ...]}`` (inlined).
     """
     resolved: dict[str, str] = {}
-    param_files: list[str] = []
+    param_files: list[dict] = []
+    seen_paths: set[str] = set()
     for p in params:
         name = p.get("name")
         value = p.get("value")
         from_file = p.get("from")
         if from_file:
             path = resolve_substitutions(from_file, ctx)
-            if path not in param_files:
-                param_files.append(path)
             _track_param_file(path)
+            if path not in seen_paths:
+                seen_paths.add(path)
+                pf_entry: dict = {"path": path}
+                if _inline_params:
+                    expanded = _read_and_expand_param_file(path)
+                    if expanded is not None:
+                        pf_entry["params"] = expanded
+                param_files.append(pf_entry)
         elif name:
             resolved_name = resolve_substitutions(name, ctx)
             resolved_value = resolve_substitutions(value or "", ctx)
@@ -1532,15 +1791,12 @@ def _resolve_xml_element(
         name = data.get("name", "")
         default = data.get("default")
         fixed_value = data.get("value")
-        # Record declaration
-        if name and name not in _declared_arg_names:
-            _declared_arg_names.add(name)
-            _tracked["declared_args"].append(
-                {
-                    "name": name,
-                    "default": default or "",
-                }
-            )
+        # Record declaration: always per-file (for --show-args), flat only on first encounter
+        if name:
+            already_seen = name in _declared_arg_names
+            if not already_seen:
+                _declared_arg_names.add(name)
+            _record_declared_arg(name, default or "", flat=not already_seen)
         if fixed_value is not None:
             # <arg name="X" value="Y"/> — fixed, non-overridable value
             ctx.args[name] = resolve_substitutions(fixed_value, ctx)
@@ -1635,45 +1891,66 @@ def _resolve_xml_element(
                 return  # Package not available — orchestrator handles
 
         if os.path.isfile(real_path):
+            # Push include chain entry for source tracking.
+            inc_dep = _extract_pkg_and_share_path(file_path)
+            if inc_dep:
+                _include_chain.append(list(inc_dep))
+            else:
+                _include_chain.append(["", file_path])
+
             new_stack = include_stack + [file_path]
-            if real_path.endswith((".launch.xml", ".xml")):
-                with open(real_path) as f:
-                    content = f.read()
-                child_elements = parse_xml_launch(content, real_path)
-                # Build child context — in ROS 2, <include> is NOT scoped:
-                # <let> (SetLaunchConfiguration) in child modifies shared context.
-                child_ctx = _SubstitutionContext()
-                child_ctx.args = {**ctx.args, **child_ctx_args}
-                child_ctx.vars = dict(ctx.vars)
-                child_ctx.env = dict(ctx.env)
-                child_ctx.launch_file_dir = os.path.dirname(real_path)
-                child_ctx.preview_mode = ctx.preview_mode
-                resolve_xml_elements(child_elements, child_ctx, include_stack=new_stack)
-                # Propagate child's vars back to parent (unscoped include semantics)
-                ctx.vars.update(child_ctx.vars)
-            elif real_path.endswith((".yaml", ".yml")):
-                with open(real_path) as f:
-                    content = f.read()
-                child_elements = parse_yaml_launch(content, real_path)
-                child_ctx = _SubstitutionContext()
-                child_ctx.args = {**ctx.args, **child_ctx_args}
-                child_ctx.vars = dict(ctx.vars)
-                child_ctx.env = dict(ctx.env)
-                child_ctx.launch_file_dir = os.path.dirname(real_path)
-                child_ctx.preview_mode = ctx.preview_mode
-                resolve_xml_elements(child_elements, child_ctx, include_stack=new_stack)
-                ctx.vars.update(child_ctx.vars)
-            elif real_path.endswith((".launch.py", ".py")):
-                # Delegate to existing Python inline resolver.
-                # Create a launch context from the current substitution context
-                # so _inline_resolve_python_launch can access _launch_configurations.
-                parent_lc = _make_launch_context(ctx.args)
-                # Pass global_params so OpaqueFunction bodies can access vehicle dimensions etc.
-                if _global_params:
-                    parent_lc._launch_configurations["global_params"] = list(_global_params)
-                _inline_resolve_python_launch(
-                    file_path, parent_lc, child_ctx_args, len(include_stack) + 1
-                )
+            try:
+                if real_path.endswith((".launch.xml", ".xml")):
+                    with open(real_path) as f:
+                        content = f.read()
+                    child_elements = parse_xml_launch(content, real_path)
+                    # Build child context — in ROS 2, <include> is NOT scoped:
+                    # <let> (SetLaunchConfiguration) in child modifies shared context.
+                    child_ctx = _SubstitutionContext()
+                    child_ctx.args = {**ctx.args, **child_ctx_args}
+                    child_ctx.vars = dict(ctx.vars)
+                    child_ctx.env = dict(ctx.env)
+                    child_ctx.launch_file_dir = os.path.dirname(real_path)
+                    child_ctx.preview_mode = ctx.preview_mode
+                    resolve_xml_elements(child_elements, child_ctx, include_stack=new_stack)
+                    # Propagate child's args and vars back to parent (unscoped include semantics).
+                    # In ROS 2, <arg> declarations in included files set LaunchConfiguration
+                    # which is visible to the caller via both $(arg) and $(var).
+                    ctx.args.update(child_ctx.args)
+                    ctx.vars.update(child_ctx.vars)
+                elif real_path.endswith((".yaml", ".yml")):
+                    with open(real_path) as f:
+                        content = f.read()
+                    child_elements = parse_yaml_launch(content, real_path)
+                    child_ctx = _SubstitutionContext()
+                    child_ctx.args = {**ctx.args, **child_ctx_args}
+                    child_ctx.vars = dict(ctx.vars)
+                    child_ctx.env = dict(ctx.env)
+                    child_ctx.launch_file_dir = os.path.dirname(real_path)
+                    child_ctx.preview_mode = ctx.preview_mode
+                    resolve_xml_elements(child_elements, child_ctx, include_stack=new_stack)
+                    ctx.args.update(child_ctx.args)
+                    ctx.vars.update(child_ctx.vars)
+                elif real_path.endswith((".launch.py", ".py")):
+                    # Delegate to existing Python inline resolver.
+                    # Create a launch context from the current substitution context
+                    # so _inline_resolve_python_launch can access _launch_configurations.
+                    parent_lc = _make_launch_context({**ctx.args, **ctx.vars})
+                    # Pass global_params so OpaqueFunction bodies can access vehicle dimensions etc.
+                    if _global_params:
+                        parent_lc._launch_configurations["global_params"] = list(_global_params)
+                    _inline_resolve_python_launch(
+                        file_path, parent_lc, child_ctx_args, len(include_stack) + 1
+                    )
+                    # Propagate SetLaunchConfiguration side-effects back to the
+                    # XML substitution context so subsequent $(var ...) references
+                    # see variables set by the child Python file.
+                    set_configs = _tracked["set_launch_configurations"]
+                    for k, v in parent_lc._launch_configurations.items():
+                        if (k in set_configs or k in child_ctx_args) and k != "global_params":
+                            ctx.vars[k] = str(v) if not isinstance(v, str) else v
+            finally:
+                _include_chain.pop()
 
     elif kind in ("Node", "LifecycleNode"):
         cond = data.get("condition")
@@ -1696,7 +1973,7 @@ def _resolve_xml_element(
         env.update(_resolve_envs_xml(data.get("envs", []), ctx))
 
         node_kind = "node" if kind == "Node" else "lifecycle_node"
-        _tracked["nodes"].append(
+        _track_node(
             {
                 "package": pkg,
                 "executable": exe,
@@ -1735,7 +2012,7 @@ def _resolve_xml_element(
         env.update(_resolve_envs_xml(data.get("envs", []), ctx))
         plugins = _resolve_composable_plugins_xml(data.get("composable_nodes", []), ctx)
 
-        _tracked["nodes"].append(
+        _track_node(
             {
                 "package": pkg,
                 "executable": exe,
@@ -1765,7 +2042,7 @@ def _resolve_xml_element(
 
         plugins = _resolve_composable_plugins_xml(data.get("composable_nodes", []), ctx)
 
-        _tracked["nodes"].append(
+        _track_node(
             {
                 "package": "",
                 "executable": "",
@@ -1812,7 +2089,7 @@ def _resolve_xml_element(
     elif kind == "SetRemap":
         src = resolve_substitutions(data.get("from", ""), ctx)
         dst = resolve_substitutions(data.get("to", ""), ctx)
-        _tracked["nodes"].append(
+        _track_node(
             {
                 "package": "",
                 "executable": "",
@@ -1834,7 +2111,7 @@ def _resolve_xml_element(
 
     elif kind == "Log":
         msg = resolve_substitutions(data.get("message", ""), ctx)
-        _tracked["nodes"].append(
+        _track_node(
             {
                 "package": "",
                 "executable": "",
@@ -1861,7 +2138,7 @@ def _resolve_xml_element(
         if name:
             name = resolve_substitutions(name, ctx)
         shell = data.get("shell", False)
-        _tracked["nodes"].append(
+        _track_node(
             {
                 "package": "",
                 "executable": "",
@@ -1992,9 +2269,11 @@ def _resolve_element_to_ir(
         name = data.get("name", "")
         default = data.get("default")
         fixed_value = data.get("value")
-        if name and name not in _declared_arg_names:
-            _declared_arg_names.add(name)
-            _tracked["declared_args"].append({"name": name, "default": default or ""})
+        if name:
+            already_seen = name in _declared_arg_names
+            if not already_seen:
+                _declared_arg_names.add(name)
+            _record_declared_arg(name, default or "", flat=not already_seen)
         if fixed_value is not None:
             ctx.args[name] = resolve_substitutions(fixed_value, ctx)
         elif name and name not in ctx.args and default is not None:
@@ -2130,7 +2409,7 @@ def _resolve_element_to_ir(
         # Merge scoped global params/remaps/param_files (global first, node-local overrides)
         merged_params = dict(_global_params)
         merged_params.update(params)
-        merged_param_files = list(_global_param_files) + param_files
+        merged_param_files = [_make_param_file_entry(p) for p in _global_param_files] + param_files
         merged_remaps = list(_global_remaps) + [(s, d) for s, d in remaps]
         node_cls = IRLifecycleNode if kind == "LifecycleNode" else IRNode
         return [
@@ -2419,8 +2698,7 @@ def resolve_xml_to_ir(
 class _TrackedNode:
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
         _track_package(package)
-        self._idx = len(_tracked["nodes"])
-        _tracked["nodes"].append(
+        self._idx = _track_node(
             {
                 "package": str(package) if package else "",
                 "executable": str(executable) if executable else "",
@@ -2730,8 +3008,7 @@ class _TrackedComposableNodeContainer:
         **kwargs,
     ):
         _track_package(package)
-        self._idx = len(_tracked["nodes"])
-        _tracked["nodes"].append(
+        self._idx = _track_node(
             {
                 "package": str(package) if package else "",
                 "executable": str(executable) if executable else "",
@@ -2788,9 +3065,8 @@ class _TrackedLoadComposableNodes:
                 target_str = str(target_container)
         else:
             target_str = str(target_container)
-        self._idx = len(_tracked["nodes"])
         self._raw_target = target_container
-        _tracked["nodes"].append(
+        self._idx = _track_node(
             {
                 "package": "",
                 "executable": "",
@@ -2831,15 +3107,17 @@ class _TrackedParameterFile:
         if param_file is None and args:
             param_file = args[0]
         self._param_file = None
+        self._raw_param_file = param_file  # Keep raw for deferred resolution
         if param_file is not None:
             if isinstance(param_file, str):
                 path = param_file  # Keep portable; Rust handles $(find-pkg-share ...) format
             elif hasattr(param_file, "perform"):
                 try:
                     result = param_file.perform(_StubLaunchContext())
-                    path = str(result) if result is not None else str(param_file)
+                    # Only use eagerly-resolved path if it's meaningful (not None)
+                    path = str(result) if result is not None else None
                 except Exception:
-                    path = str(param_file)
+                    path = None  # Defer to _resolve_node_details
             else:
                 path = str(param_file) if param_file is not None else None
             if path:
@@ -3109,11 +3387,11 @@ def _apply_declared_arg(arg: "_DeclaredArg", context) -> None:
         _warn(f"DeclareLaunchArgument('{arg.name}') default resolution failed: {e}")
         return
 
-    # Record for the Rust orchestrator (first declaration wins; prevents duplicate entries
-    # when the same arg is declared in multiple conditional branches).
-    if arg.name not in _declared_arg_names:
+    # Record for the Rust orchestrator (first declaration wins in flat list; per-file always).
+    already_seen = arg.name in _declared_arg_names
+    if not already_seen:
         _declared_arg_names.add(arg.name)
-        _tracked["declared_args"].append({"name": arg.name, "default": resolved})
+    _record_declared_arg(arg.name, resolved, flat=not already_seen)
 
     # Apply to the launch context only if the arg was not already set by the
     # CLI/parent chain — those values always take precedence.
@@ -3166,26 +3444,10 @@ class _TrackedSetParameter:
 
     def __init__(self, name=None, value=None, **kwargs):
         # Keep raw for deferred resolution in _walk_action (value may be a substitution).
+        # No node entry — SetParameter is a side-effect action that populates _global_params,
+        # which are then absorbed into each leaf node's parameters.
         self._name = name
         self._value = value
-        self._idx = len(_tracked["nodes"])
-        _tracked["nodes"].append(
-            {
-                "package": "",
-                "executable": "",
-                "name": str(name) if name is not None and not hasattr(name, "perform") else "",
-                "namespace_stack": [],
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": "set_parameter",
-                "plugins": [],
-                "target": None,
-                "param_value": "",
-            }
-        )
 
 
 class _TrackedExecutable:
@@ -3201,8 +3463,7 @@ class _TrackedExecutable:
             self._cmd = []
         self._name = name
         self._shell = bool(shell)
-        self._idx = len(_tracked["nodes"])
-        _tracked["nodes"].append(
+        self._idx = _track_node(
             {
                 "package": "",
                 "executable": "",
@@ -3325,8 +3586,8 @@ def _call_opaque_with_stubs(fn, context):
         """Resolve a portable path to an actual filesystem path.
 
         Returns the resolved path string, or ``None`` if the input is not a
-        portable path.  Raises ``_PackageNotFetchedError`` when the package is
-        in the lockfile but not fully fetched (missing ``package.xml``).
+        portable path.  Fetches the package inline if needed via _ensure_fetched().
+        Raises ``_PackageNotFetchedError`` only if fetching fails.
         """
         parsed = _parse_portable_path(path_str)
         if parsed is None:
@@ -3335,8 +3596,14 @@ def _call_opaque_with_stubs(fn, context):
         if pkg in _package_shares:
             pkg_dir = _package_shares[pkg]
             if not _orig_path_isfile(os.path.join(pkg_dir, "package.xml")):
-                _packages_to_fetch.add(pkg)
-                raise _PackageNotFetchedError(pkg)
+                if _ensure_fetched(pkg):
+                    pkg_dir = _package_shares[pkg]
+                else:
+                    raise _PackageNotFetchedError(pkg)
+            return os.path.join(pkg_dir, rest) if rest else pkg_dir
+        # Try fetching if it's a lockfile package.
+        if pkg in _lockfile_data and _ensure_fetched(pkg):
+            pkg_dir = _package_shares[pkg]
             return os.path.join(pkg_dir, rest) if rest else pkg_dir
         # Try AMENT_PREFIX_PATH for packages not in the lockfile.
         if _real_get_package_share_directory is not None:
@@ -3376,16 +3643,21 @@ def _call_opaque_with_stubs(fn, context):
             return _orig_open(path, mode, *args, **kwargs)
         except (FileNotFoundError, OSError):
             # If the missing file is inside a lockfile package that hasn't been fully
-            # fetched yet (no package.xml), raise _PackageNotFetchedError so Rust can
-            # fetch the package and retry rather than silently returning stub YAML.
-            for pkg_name, pkg_dir in _package_shares.items():
+            # fetched yet (no package.xml), try to fetch it inline.
+            for pkg_name, pkg_dir in list(_package_shares.items()):
                 pkg_dir_norm = pkg_dir.rstrip("/")
                 if path_str.startswith(pkg_dir_norm + "/") or path_str.startswith(
                     pkg_dir_norm + os.sep
                 ):
                     if not _orig_path_isfile(os.path.join(pkg_dir_norm, "package.xml")):
-                        _packages_to_fetch.add(pkg_name)
-                        raise _PackageNotFetchedError(pkg_name) from None
+                        if _ensure_fetched(pkg_name):
+                            # Retry open after fetching.
+                            try:
+                                return _orig_open(path, mode, *args, **kwargs)
+                            except (FileNotFoundError, OSError):
+                                pass  # File still missing after fetch → fall through to error
+                        else:
+                            raise _PackageNotFetchedError(pkg_name) from None
                     break  # package is fully fetched; file genuinely missing → error
             _error(f"param file not found: '{path}' — stub defaults used")
             return _io.StringIO(_STUB_ROS_PARAM_YAML)
@@ -3551,11 +3823,33 @@ def _resolve_node_details(node, context):
 
     # Parameters and param files
     params = {}
-    pf_list = []
+    pf_list: list[dict] = []
+    seen_pf: set[str] = set()
     for p in node._raw_parameters:
-        if hasattr(p, "_param_file") and p._param_file:
-            if p._param_file not in pf_list:
-                pf_list.append(p._param_file)
+        if hasattr(p, "_param_file"):
+            path = p._param_file
+            # Deferred resolution: try again with live context if not resolved eagerly
+            if path is None and hasattr(p, "_raw_param_file") and p._raw_param_file is not None:
+                raw = p._raw_param_file
+                if hasattr(raw, "perform"):
+                    try:
+                        result = raw.perform(context)
+                        if result is not None:
+                            path = str(result)
+                    except Exception:
+                        pass
+                elif not isinstance(raw, str):
+                    path = str(raw)
+            if path:
+                path = str(path)
+                if path not in seen_pf:
+                    seen_pf.add(path)
+                    pf_entry: dict = {"path": path}
+                    if _inline_params:
+                        expanded = _read_and_expand_param_file(path)
+                        if expanded is not None:
+                            pf_entry["params"] = expanded
+                    pf_list.append(pf_entry)
         elif isinstance(p, dict):
             for k, v in p.items():
                 resolved_v = _resolve_substitution(v, context)
@@ -3609,8 +3903,34 @@ def _resolve_composable_plugins(descs, context):
                 )
             continue
         params = {}
+        pf_list: list[dict] = []
+        seen_pf: set[str] = set()
         for p in desc._raw_parameters:
-            if isinstance(p, dict):
+            if hasattr(p, "_param_file"):
+                path = p._param_file
+                # Deferred resolution: try again with live context if not resolved eagerly
+                if path is None and hasattr(p, "_raw_param_file") and p._raw_param_file is not None:
+                    raw = p._raw_param_file
+                    if hasattr(raw, "perform"):
+                        try:
+                            result = raw.perform(context)
+                            if result is not None:
+                                path = str(result)
+                        except Exception:
+                            pass
+                    elif not isinstance(raw, str):
+                        path = str(raw)
+                if path:
+                    path = str(path)
+                    if path not in seen_pf:
+                        seen_pf.add(path)
+                        pf_entry: dict = {"path": path}
+                        if _inline_params:
+                            expanded = _read_and_expand_param_file(path)
+                            if expanded is not None:
+                                pf_entry["params"] = expanded
+                    pf_list.append(pf_entry)
+            elif isinstance(p, dict):
                 for k, v in p.items():
                     resolved_v = _resolve_substitution(v, context)
                     params[str(k)] = resolved_v if resolved_v is not None else ""
@@ -3650,6 +3970,7 @@ def _resolve_composable_plugins(descs, context):
                 "name": nm or None,
                 "parameters": params,
                 "remappings": remaps,
+                "param_files": pf_list,
             }
         )
     return plugins
@@ -3870,7 +4191,16 @@ def _walk_action(action, context, depth):
                     resolved = _resolve_substitution(v, context)
                     v_str = resolved if resolved is not None else str(v)
                     child_args[k_str] = v_str
-            _inline_resolve_python_launch(action._path, context, child_args, depth + 1)
+            # Push include chain for source tracking.
+            inc_dep = _extract_pkg_and_share_path(action._path)
+            if inc_dep:
+                _include_chain.append(list(inc_dep))
+            else:
+                _include_chain.append(["", action._path])
+            try:
+                _inline_resolve_python_launch(action._path, context, child_args, depth + 1)
+            finally:
+                _include_chain.pop()
 
         return
 
@@ -3915,9 +4245,7 @@ def _walk_action(action, context, depth):
             gp_list = context._launch_configurations.setdefault("global_params", [])
             gp_list.append((name, value))
             _tracked["global_params"].append([name, value])
-            # Update the tracked node entry so the orchestrator can render <set_parameter>.
-            _tracked["nodes"][action._idx]["name"] = name
-            _tracked["nodes"][action._idx]["param_value"] = str(value) if value is not None else ""
+            _global_params.append((name, value))
         return
 
     # ExecuteProcess: resolve cmd parts and name, record as executable.
@@ -3977,8 +4305,8 @@ def _walk_action(action, context, depth):
                 result = _call_opaque_with_stubs(fn, context)
                 if result:
                     _walk_actions(result, context, depth + 1)
-            except _PackageNotFetchedError:
-                pass  # Package recorded in _packages_to_fetch; Rust will fetch and retry
+            except _PackageNotFetchedError as e:
+                _error(f"OpaqueFunction failed: package fetch failed: {e}")
             except Exception as e:
                 _error(f"OpaqueFunction failed: {e}")
         return
@@ -4075,12 +4403,12 @@ def _walk_action(action, context, depth):
     if cls_name in ("Node", "LifecycleNode") and hasattr(action, "_package"):
         pkg = getattr(action, "_package", None)
         exe = getattr(action, "_node_executable", getattr(action, "_node_name", None))
-        _track_node(pkg, exe)
+        _track_node_from_action(pkg, exe)
     elif cls_name == "ComposableNodeContainer" and hasattr(action, "_package"):
         pkg = getattr(action, "_package", None)
         exe = getattr(action, "_node_executable", getattr(action, "_node_name", None))
         name = getattr(action, "_name", None)
-        _track_node(pkg, exe, name)
+        _track_node_from_action(pkg, exe, name)
         descs = (
             getattr(
                 action,
@@ -4090,7 +4418,7 @@ def _walk_action(action, context, depth):
             or []
         )
         for desc in descs:
-            _track_node(
+            _track_node_from_action(
                 getattr(desc, "package", None),
                 getattr(desc, "plugin", None),
                 getattr(desc, "node_name", getattr(desc, "name", None)),
@@ -4105,7 +4433,7 @@ def _walk_action(action, context, depth):
             or []
         )
         for desc in descs:
-            _track_node(
+            _track_node_from_action(
                 getattr(desc, "package", None),
                 getattr(desc, "plugin", None),
                 getattr(desc, "node_name", getattr(desc, "name", None)),
@@ -4484,12 +4812,16 @@ def _build_patched_ament_index_python_packages():
         _track_package(package_name)
         # Early fetch check using the actual package dir (before returning a portable path).
         # This ensures that if the package is in the lockfile but hasn't been fully fetched
-        # yet (no package.xml), _PackageNotFetchedError is raised here — which is important
-        # for module-level callers where os.path stubs may not be active.
+        # yet (no package.xml), we fetch it inline — important for module-level callers
+        # where os.path stubs may not be active.
         if package_name in _package_shares:
             pkg_dir = _package_shares[package_name]
-            if not os.path.isfile(os.path.join(pkg_dir, "package.xml")):
-                _packages_to_fetch.add(package_name)
+            if not os.path.isfile(os.path.join(pkg_dir, "package.xml")) and not _ensure_fetched(
+                package_name
+            ):
+                raise _PackageNotFetchedError(package_name)
+        elif package_name in _lockfile_data:
+            if not _ensure_fetched(package_name):
                 raise _PackageNotFetchedError(package_name)
         # In non-preview mode, return the real install path so the output contains
         # absolute paths matching the installed layout.
@@ -4664,12 +4996,17 @@ def main():
     # These let us resolve $(find-pkg-share X) against workspace source packages
     # before falling back to AMENT_PREFIX_PATH or hardcoded paths.
     global _package_shares, _namespace_stack, _apply_opaque_file_access
+    global _lockfile_data, _fetch_dir, _fetched_packages, _root_source_key
     _namespace_stack = []
+    # Set root source key for per-file declared arg tracking
+    root_dep = _extract_pkg_and_share_path(launch_file)
+    _root_source_key = f"{root_dep[0]}://{root_dep[1]}" if root_dep else launch_file
     _env.clear()
     _global_params.clear()
     _global_remaps.clear()
     _global_param_files.clear()
     _ir_event_handlers.clear()
+    _fetched_packages.clear()
     if len(sys.argv) > 3:
         try:
             _package_shares = json.loads(sys.argv[3])
@@ -4677,13 +5014,17 @@ def main():
             _package_shares = {}
 
     # Load workflow flags (passed as 5th argument, JSON object).
-    global _preview_mode
+    global _preview_mode, _inline_params
     if len(sys.argv) > 4:
         try:
             flags = json.loads(sys.argv[4])
             _apply_opaque_file_access = bool(flags.get("apply_opaque_file_access", False))
             _preview_mode = bool(flags.get("preview", True))
-            _lockfile_packages = set(flags.get("lockfile_packages", []))
+            _inline_params = bool(flags.get("inline_params", False))
+            # lockfile_packages: dict of pkg → {repo, path, url, version}
+            lf_data = flags.get("lockfile_packages", {})
+            _lockfile_data = lf_data if isinstance(lf_data, dict) else {}
+            _fetch_dir = flags.get("fetch_dir", "")
         except Exception:
             _apply_opaque_file_access = False
 
@@ -4723,10 +5064,8 @@ def main():
         subst_ctx.env = dict(_env)
         try:
             resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file])
-        except _PackageNotFetchedError:
-            pass  # Absorbed; package already in _packages_to_fetch
-        if _packages_to_fetch:
-            _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)
+        except _PackageNotFetchedError as e:
+            _error(f"failed to fetch package: {e}")
         _emit(_tracked)
         return
 
@@ -4739,10 +5078,8 @@ def main():
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
-    except _PackageNotFetchedError:
-        # Module-level get_package_share_directory() call failed: source not on disk.
-        # Output with packages_to_fetch set so Rust fetches and retries.
-        _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)
+    except _PackageNotFetchedError as e:
+        _error(f"failed to fetch package during module load: {e}")
         _emit(_tracked)
         return
     except Exception as e:
@@ -4777,8 +5114,8 @@ def main():
 
     try:
         ld = mod.generate_launch_description()
-    except _PackageNotFetchedError:
-        _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)
+    except _PackageNotFetchedError as e:
+        _error(f"failed to fetch package during generate_launch_description: {e}")
         _emit(_tracked)
         return
     except Exception as e:
@@ -4802,11 +5139,9 @@ def main():
 
     try:
         _walk_actions(entities, ctx)
-    except _PackageNotFetchedError:
-        pass  # Absorbed; package already in _packages_to_fetch
+    except _PackageNotFetchedError as e:
+        _error(f"failed to fetch package during action walking: {e}")
 
-    if _packages_to_fetch:
-        _tracked["packages_to_fetch"] = sorted(_packages_to_fetch)
     _emit(_tracked)
 
 

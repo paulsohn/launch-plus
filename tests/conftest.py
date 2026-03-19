@@ -34,14 +34,21 @@ def _reset_py_resolver_state():
     R._tracked.update(copy.deepcopy(_TRACKED_TEMPLATE))
 
     # Scalar / set / list globals
-    R._packages_to_fetch.clear()
     R._declared_arg_names.clear()
     R._namespace_stack.clear()
     R._package_shares.clear()
-    R._lockfile_packages.clear()
+    R._lockfile_data.clear()
+    R._fetch_dir = ""
+    R._fetched_packages.clear()
     R._apply_opaque_file_access = False
     R._preview_mode = True
+    R._inline_params = False
     R._env.clear()
+    R._include_chain.clear()
+    R._global_params.clear()
+    R._global_param_files.clear()
+    R._global_remaps.clear()
+    R._ir_event_handlers.clear()
 
     yield
 

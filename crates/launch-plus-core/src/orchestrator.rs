@@ -312,7 +312,8 @@ fn run_py_resolver(
     file_path: &Path,
     initial_args: &HashMap<String, String>,
     package_shares: &HashMap<String, String>,
-    lockfile_package_names: &[String],
+    lockfile: &Lockfile,
+    fetch_dir: &Path,
     persisted_global_params: &[serde_json::Value],
     workflow_options: &ResolveWorkflowOptions,
 ) -> crate::Result<PyResolverOutput> {
@@ -347,12 +348,34 @@ fn run_py_resolver(
         .map_err(|e| crate::Error::Git(format!("failed to serialize package_shares: {e}")))?;
 
     // Pass workflow options as a JSON flags object (sys.argv[4] in py_resolver).
+    //
+    // lockfile_packages: package name → {repo, path, url, version} so Python can
+    // fetch missing packages inline via git sparse-checkout (no round-trip to Rust).
+    let lockfile_data: HashMap<String, serde_json::Value> = lockfile
+        .packages
+        .iter()
+        .filter_map(|(pkg_name, pkg_lock)| {
+            let repo_lock = lockfile.repositories.get(&pkg_lock.repo)?;
+            Some((
+                pkg_name.clone(),
+                serde_json::json!({
+                    "repo": pkg_lock.repo,
+                    "path": pkg_lock.path,
+                    "url": repo_lock.url,
+                    "version": repo_lock.version,
+                }),
+            ))
+        })
+        .collect();
+
     let flags = serde_json::json!({
         "apply_opaque_file_access": workflow_options.apply_opaque_file_access,
         "preview": workflow_options.preview,
-        // Full set of lockfile package names so py_resolver can enforce that lockfile
-        // packages always resolve from source and never fall through to AMENT_PREFIX_PATH.
-        "lockfile_packages": lockfile_package_names,
+        "inline_params": workflow_options.inline_params,
+        // Full lockfile data so py_resolver can fetch packages inline.
+        "lockfile_packages": lockfile_data,
+        // Fetch directory (workspace src/) for constructing repo paths.
+        "fetch_dir": fetch_dir.to_string_lossy(),
     });
     let flags_json = flags.to_string();
 
@@ -425,10 +448,10 @@ struct PyResolverOutput {
     /// Promoted to result.add_error() by the caller.
     #[serde(default)]
     errors: Vec<String>,
-    /// Lockfile packages whose source directories were not found on disk.
-    /// Non-empty when get_package_share_directory() was called for a lockfile package
-    /// that hasn't been cloned yet.  The caller fetches these and retries run_py_resolver.
+    /// Legacy field — Python now fetches packages inline via _ensure_fetched().
+    /// Kept for serde backward compatibility with older py_resolver output.
     #[serde(default)]
+    #[allow(dead_code)]
     packages_to_fetch: Vec<String>,
     /// SetLaunchConfiguration calls: {name: value}.
     /// Propagated into the calling XML file's substitution context so that
@@ -447,6 +470,9 @@ struct PyResolverOutput {
     /// Event handlers detected in the Python launch file.
     #[serde(default)]
     event_handlers: Vec<PyEventHandler>,
+    /// Per-file declared args for --show-args: {"pkg://share_path": [{name, default}]}
+    #[serde(default)]
+    declared_args_by_file: HashMap<String, Vec<PyDeclaredArg>>,
 }
 
 #[derive(Debug, serde::Deserialize, Clone, PartialEq)]
@@ -513,6 +539,15 @@ struct PyEventAction {
     explicit_namespace: Option<String>,
 }
 
+/// A param file entry from py_resolver: reference or inlined.
+#[derive(Debug, serde::Deserialize)]
+struct PyParamFile {
+    path: String,
+    /// Inlined params as [[key, value], ...]; absent for references.
+    #[serde(default)]
+    params: Option<Vec<(String, String)>>,
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct PyComposablePlugin {
     package: String,
@@ -523,6 +558,8 @@ struct PyComposablePlugin {
     parameters: BTreeMap<String, String>,
     #[serde(default)]
     remappings: Vec<(String, String)>,
+    #[serde(default)]
+    param_files: Vec<PyParamFile>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -550,8 +587,9 @@ struct PyResolvedNode {
     plugins: Vec<PyComposablePlugin>,
     #[serde(default)]
     target: Option<String>,
-    /// For `kind == SetParameter`: the resolved parameter value string.
+    /// Legacy: was used for `kind == SetParameter` (now filtered out).
     #[serde(default)]
+    #[allow(dead_code)]
     param_value: Option<String>,
     /// For `kind == Executable`: the resolved command string.
     #[serde(default)]
@@ -568,6 +606,13 @@ struct PyResolvedNode {
     /// For `kind == Log`: the log message.
     #[serde(default)]
     message: Option<String>,
+    /// Include chain from root to this node's source file, as `[package, share_path]` pairs.
+    /// Set by py_resolver for nodes within included files; empty for root-level nodes.
+    #[serde(default)]
+    include_chain: Vec<(String, String)>,
+    /// Param files referenced by this node — reference or inlined.
+    #[serde(default)]
+    param_files: Vec<PyParamFile>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -658,6 +703,21 @@ fn try_rosdep_install(package: &str, result: &mut ResolveResult) -> bool {
     }
 }
 
+/// Convert a [`PyParamFile`] from Python output to the renderer's [`ParamFile`].
+fn convert_param_file(pf: &PyParamFile) -> crate::resolver::ParamFile {
+    if let Some(ref params) = pf.params {
+        crate::resolver::ParamFile::Inlined {
+            display: pf.path.clone(),
+            params: params.clone(),
+        }
+    } else {
+        crate::resolver::ParamFile::Reference {
+            display: pf.path.clone(),
+            abs: pf.path.clone(), // portable path — Rust doesn't need abs
+        }
+    }
+}
+
 /// Convert a [`PyResolverOutput`] (Python shim output) into the unified [`ParsedLaunchFile`] IR.
 ///
 /// Uses structured `include_deps` / `param_file_deps` emitted by the Python resolver
@@ -668,8 +728,10 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
     let mut nodes = py_output
         .nodes
         .iter()
-        .map(|n| {
+        .filter_map(|n| {
             let kind = match n.kind {
+                // SetParameter is absorbed into leaf nodes by the Python resolver.
+                PyNodeKind::SetParameter => return None,
                 PyNodeKind::Container => NodeKind::Container {
                     plugins: n
                         .plugins
@@ -680,7 +742,7 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                             name: p.name.clone(),
                             parameters: p.parameters.clone(),
                             remappings: p.remappings.clone(),
-                            param_files: vec![],
+                            param_files: p.param_files.iter().map(convert_param_file).collect(),
                         })
                         .collect(),
                 },
@@ -695,16 +757,12 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                             name: p.name.clone(),
                             parameters: p.parameters.clone(),
                             remappings: p.remappings.clone(),
-                            param_files: vec![],
+                            param_files: p.param_files.iter().map(convert_param_file).collect(),
                         })
                         .collect(),
                 },
                 PyNodeKind::Node => NodeKind::Node,
                 PyNodeKind::LifecycleNode => NodeKind::LifecycleNode,
-                PyNodeKind::SetParameter => NodeKind::SetParameter {
-                    name: n.name.clone(),
-                    value: n.param_value.clone().unwrap_or_default(),
-                },
                 PyNodeKind::SetRemap => NodeKind::SetRemap {
                     from: n.remap_from.clone().unwrap_or_default(),
                     to: n.remap_to.clone().unwrap_or_default(),
@@ -722,7 +780,7 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                     shell: n.shell,
                 },
             };
-            ResolvedNode {
+            Some(ResolvedNode {
                 package: n.package.clone(),
                 executable: n.executable.clone(),
                 name: if n.name.is_empty() {
@@ -739,15 +797,26 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                 parameters: n.parameters.clone(),
                 remappings: n.remappings.clone(),
                 env: n.env.clone(),
-                source: None,              // set by process_parsed_file
-                include_chain: Vec::new(), // set by process_parsed_file
+                source: if n.include_chain.is_empty() {
+                    None // root-level node — source set by process_parsed_file
+                } else {
+                    // Derive source from last entry of include_chain
+                    n.include_chain
+                        .last()
+                        .map(|(pkg, path)| (pkg.clone(), PathBuf::from(path)))
+                },
+                include_chain: n
+                    .include_chain
+                    .iter()
+                    .map(|(pkg, path)| (pkg.clone(), PathBuf::from(path)))
+                    .collect(),
                 kind,
-                param_files: vec![],
+                param_files: n.param_files.iter().map(convert_param_file).collect(),
                 output: None,
                 args: None,
                 respawn: None, // Python launch API has no respawn support yet
                 respawn_delay: None,
-            }
+            })
         })
         .collect::<Vec<_>>();
 
@@ -837,6 +906,25 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
         })
         .collect();
 
+    // Convert per-file declared args from Python's "pkg://share_path" keyed format.
+    let mut declared_args_by_file = HashMap::new();
+    for (key_str, args) in &py_output.declared_args_by_file {
+        // Parse "pkg://share_path" format
+        let (pkg, share_path) = if let Some(idx) = key_str.find("://") {
+            (
+                key_str[..idx].to_string(),
+                PathBuf::from(&key_str[idx + 3..]),
+            )
+        } else {
+            (String::new(), PathBuf::from(key_str))
+        };
+        let arg_map: HashMap<String, String> = args
+            .iter()
+            .map(|a| (a.name.clone(), a.default.clone()))
+            .collect();
+        declared_args_by_file.insert((pkg, share_path), arg_map);
+    }
+
     ParsedLaunchFile {
         packages: py_output.packages,
         nodes,
@@ -844,6 +932,7 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
         param_files,
         other_files: Vec::new(),
         declared_arg_defaults,
+        declared_args_by_file,
         global_params: py_output.global_params,
         warnings: Vec::new(), // warnings emitted separately by the caller with py_resolver formatting
         errors: Vec::new(),
@@ -900,10 +989,17 @@ fn process_parsed_file(
     result.parsed_files.push(file_path.to_path_buf());
 
     // Set include_chain and source on all nodes, then accumulate.
-    // IncludeMarker nodes (from inline resolver) get a chain that includes their own source.
+    // If Python already set include_chain (non-empty), prepend current_chain.
+    // Otherwise, use current_chain as the full chain (root-level nodes).
     let source = (package.to_string(), share_path.to_path_buf());
     for mut node in parsed.nodes {
-        if matches!(node.kind, NodeKind::IncludeMarker) {
+        if !node.include_chain.is_empty() {
+            // Python set the chain — prepend current_chain (which includes the root)
+            let mut full_chain = current_chain.to_vec();
+            full_chain.extend(node.include_chain);
+            node.include_chain = full_chain;
+            // source is already set by py_output_to_parsed from the last chain entry
+        } else if matches!(node.kind, NodeKind::IncludeMarker) {
             let mut c = current_chain.to_vec();
             if let Some(ref src) = node.source {
                 c.push(src.clone());
@@ -917,10 +1013,17 @@ fn process_parsed_file(
     }
 
     // Store declared args for --show-args.
+    // The root file's args come from declared_arg_defaults.
     result.declared_args_by_file.insert(
         (package.to_string(), share_path.to_path_buf()),
         parsed.declared_arg_defaults.clone(),
     );
+    // Per-file declared args from included files come from declared_args_by_file.
+    for (key, args) in &parsed.declared_args_by_file {
+        result
+            .declared_args_by_file
+            .insert(key.clone(), args.clone());
+    }
 
     // Track launch include dependencies (for fetching/building).
     // The Python resolver already inlines all included files' nodes, so we do NOT
@@ -1038,11 +1141,6 @@ fn resolve_python_file_recursive(
         locator.all_install_shares()
     };
 
-    // Full list of lockfile package names — passed to py_resolver so it can enforce
-    // that lockfile packages always resolve from source and never fall through to
-    // AMENT_PREFIX_PATH (see _resolve_pkg_share in py_resolver.py).
-    let lockfile_pkg_list: Vec<String> = lockfile.packages.keys().cloned().collect();
-
     // Snapshot the globally accumulated SetParameter values accumulated so far.
     // This file may depend on SetParameter calls from sibling/ancestor files (e.g.
     // vehicle_info.launch.py setting front_overhang before ground_segmentation.launch.py
@@ -1050,72 +1148,25 @@ fn resolve_python_file_recursive(
     // OpaqueFunction bodies can read cross-file parameters.
     let current_global_params = result.global_params.clone();
 
-    // Run the Python resolver shim, retrying if lockfile packages are missing from disk.
-    // py_resolver signals missing packages via `packages_to_fetch` in its JSON output
-    // (raised by get_package_share_directory() when a source directory doesn't exist).
-    // We fetch the missing packages and retry; bounded to avoid infinite loops.
-    let py_output = {
-        const MAX_FETCH_RETRIES: usize = 3;
-        let mut retries_remaining = MAX_FETCH_RETRIES;
-        loop {
-            let out = match run_py_resolver(
-                &file_path,
-                initial_args,
-                &package_shares,
-                &lockfile_pkg_list,
-                &current_global_params,
-                workflow_options,
-            ) {
-                Ok(out) => out,
-                Err(e) => {
-                    result.add_error(format!(
-                        "failed to resolve Python launch file {}: {}",
-                        file_path.display(),
-                        e
-                    ));
-                    return;
-                }
-            };
-
-            if out.packages_to_fetch.is_empty() || retries_remaining == 0 {
-                break out;
-            }
-
-            // Fetch every missing package, then retry py_resolver so that
-            // get_package_share_directory() finds them on disk this time.
-            let mut any_fetched = false;
-            for pkg in &out.packages_to_fetch {
-                if ensure_package_fetched(
-                    lockfile,
-                    pkg,
-                    fetch_dir,
-                    options,
-                    result,
-                    fetched_packages,
-                    failed_repos,
-                ) {
-                    any_fetched = true;
-                }
-            }
-            if !any_fetched {
-                // Nothing could be fetched (e.g. all packages missing from lockfile).
-                // Stop retrying — output may be incomplete.
-                let missing: Vec<_> = out
-                    .packages_to_fetch
-                    .iter()
-                    .filter(|p| !fetched_packages.contains(p.as_str()))
-                    .cloned()
-                    .collect();
-                if !missing.is_empty() {
-                    result.add_warning(format!(
-                        "Python resolver requested packages not in lockfile: {}; \
-                         resolution may be incomplete",
-                        missing.join(", ")
-                    ));
-                }
-                break out;
-            }
-            retries_remaining -= 1;
+    // Run the Python resolver shim.  Python handles package fetching inline via
+    // _ensure_fetched() — no retry loop needed.
+    let py_output = match run_py_resolver(
+        &file_path,
+        initial_args,
+        &package_shares,
+        lockfile,
+        fetch_dir,
+        &current_global_params,
+        workflow_options,
+    ) {
+        Ok(out) => out,
+        Err(e) => {
+            result.add_error(format!(
+                "failed to resolve Python launch file {}: {}",
+                file_path.display(),
+                e
+            ));
+            return;
         }
     };
 

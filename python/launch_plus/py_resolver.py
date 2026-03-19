@@ -3703,22 +3703,10 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
     if not hasattr(mod, "generate_launch_description"):
         return
 
-    # Save tracking state BEFORE generate_launch_description() — constructors
-    # (e.g. _TrackedNode, _TrackedSetParameter) append to _tracked["nodes"]
-    # at construction time.  The Rust orchestrator will resolve this same
-    # child file separately and produce its own tracked entries, so we must
-    # discard everything created by the inline execution.
-    saved_nodes_len = len(_tracked["nodes"])
-    saved_gp_len = len(_tracked["global_params"])
-    saved_deps_len = len(_tracked["include_deps"])
-    saved_pkgs = list(_tracked["packages"])
-    saved_includes_len = len(_tracked["includes"])
-    saved_include_args_keys = set(_tracked["include_args"])
-    saved_param_files_len = len(_tracked["param_files"])
-    saved_param_file_deps_len = len(_tracked["param_file_deps"])
-    saved_declared_args_len = len(_tracked["declared_args"])
+    # Save scoping state that must be restored after inline execution.
+    # Nodes, includes, packages, params, etc. are KEPT — the Python resolver
+    # now handles all includes inline and the orchestrator does NOT re-resolve them.
     saved_declared_arg_names = set(_declared_arg_names)
-    saved_event_handlers_len = len(_tracked["event_handlers"])
     saved_namespace_depth = len(_namespace_stack)
     saved_env = dict(_env)
 
@@ -3762,20 +3750,10 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
     except _PackageNotFetchedError:
         raise
     finally:
-        del _tracked["nodes"][saved_nodes_len:]
-        del _tracked["global_params"][saved_gp_len:]
-        del _tracked["include_deps"][saved_deps_len:]
-        del _tracked["includes"][saved_includes_len:]
-        for k in list(_tracked["include_args"]):
-            if k not in saved_include_args_keys:
-                del _tracked["include_args"][k]
-        del _tracked["param_files"][saved_param_files_len:]
-        del _tracked["param_file_deps"][saved_param_file_deps_len:]
-        _tracked["packages"][:] = saved_pkgs
-        del _tracked["declared_args"][saved_declared_args_len:]
+        # Restore scoping state only — nodes, includes, packages, params, etc.
+        # are intentionally kept since the orchestrator no longer re-resolves them.
         _declared_arg_names.clear()
         _declared_arg_names.update(saved_declared_arg_names)
-        del _tracked["event_handlers"][saved_event_handlers_len:]
         del _namespace_stack[saved_namespace_depth:]
         _env.clear()
         _env.update(saved_env)

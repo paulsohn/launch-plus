@@ -274,7 +274,6 @@ pub fn resolve_launch_recursive(
         options,
         initial_args,
         workflow_options,
-        &HashMap::new(), // persisted_arg_context: empty at root
         &mut result,
         &mut fetched_packages,
         &mut failed_repos,
@@ -855,69 +854,16 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
 /// Common post-processing for any parsed launch file (XML, YAML, or Python).
 ///
 /// Apply a parent file's `<push-ros-namespace>` context to a child node.
-///
-/// Cross-file namespace propagation: when file A includes file B inside a
-/// `<push-ros-namespace>` group, nodes from B need the parent namespace prepended.
-/// This is a post-hoc adjustment — the child resolver runs namespace-agnostically,
-/// and the caller (orchestrator) applies the enclosing scope's namespace afterward.
-fn apply_parent_namespace(parent_stack: &[String], node: &mut ResolvedNode) {
-    use crate::resolver::effective_namespace;
-
-    // Prepend parent stack to the node's own namespace_stack.
-    let mut new_stack = parent_stack.to_vec();
-    new_stack.extend(node.namespace_stack.iter().cloned());
-    node.namespace_stack = new_stack;
-
-    // Recompute effective namespace from the combined stack + explicit namespace.
-    // This avoids the double-effective-join bug where joining two absolute namespaces
-    // causes the parent to be lost (e.g. "/can0" + "/inner" → "/inner" instead of "/can0/inner").
-    node.namespace = effective_namespace(&node.namespace_stack, node.explicit_namespace.as_deref());
-
-    // For event handlers, also recompute handler and action namespaces.
-    if let NodeKind::EventHandler {
-        ref mut namespace,
-        ref mut actions,
-        ..
-    } = node.kind
-    {
-        // Recompute event handler namespace from combined stack + explicit namespace.
-        *namespace = effective_namespace(&node.namespace_stack, node.explicit_namespace.as_deref());
-        let handler_ns = namespace.clone();
-        for action in actions {
-            match action {
-                ResolvedEventAction::EmitEvent { namespace, .. } => {
-                    // Only inherit handler namespace if the action didn't have an
-                    // explicitly set namespace (e.g. <emit_event namespace="...">).
-                    if namespace.is_none() {
-                        *namespace = handler_ns.clone();
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Accumulates packages/files/nodes into `result`, updates declared-arg tracking,
-/// and recurses into each launch include.  Both `resolve_file_recursive` (XML/YAML)
-/// and `resolve_python_file_recursive` (Python) call this after producing a
-/// [`ParsedLaunchFile`].
-#[allow(clippy::too_many_arguments)]
+/// Accumulates packages/files/nodes into `result` and updates declared-arg tracking.
+/// The Python resolver handles all includes inline, so this function only records
+/// dependency edges without recursing.
 fn process_parsed_file(
     parsed: ParsedLaunchFile,
     package: &str,
     share_path: &Path,
     file_path: &Path,
     current_chain: &[(String, PathBuf)],
-    effective_args: &HashMap<String, String>,
-    persisted_arg_context: &HashMap<String, String>,
     result: &mut ResolveResult,
-    lockfile: &Lockfile,
-    locator: &PackageLocator,
-    fetch_dir: &Path,
-    fetched_packages: &mut HashSet<String>,
-    failed_repos: &mut HashSet<String>,
-    workflow_options: &ResolveWorkflowOptions,
-    options: &FetchOptions,
 ) {
     // Accumulate direct packages
     result
@@ -970,22 +916,16 @@ fn process_parsed_file(
         result.nodes.push(node);
     }
 
-    // Store declared args so the excessive-include-arg check and --show-args can use them.
+    // Store declared args for --show-args.
     result.declared_args_by_file.insert(
         (package.to_string(), share_path.to_path_buf()),
         parsed.declared_arg_defaults.clone(),
     );
 
-    // Build next_persisted: current persisted context + this file's declared defaults.
-    let next_persisted: HashMap<String, String> = persisted_arg_context
-        .iter()
-        .chain(parsed.declared_arg_defaults.iter())
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
-
-    // Recurse into launch includes
+    // Track launch include dependencies (for fetching/building).
+    // The Python resolver already inlines all included files' nodes, so we do NOT
+    // re-resolve them here — only record the dependency edges.
     for include in parsed.launch_includes {
-        // Add to launch files (dedup)
         if !result
             .launch_files
             .iter()
@@ -996,90 +936,6 @@ fn process_parsed_file(
                 share_path: include.share_path.clone(),
                 kind: DependencyKind::Launch,
             });
-        }
-
-        // Build child args:
-        // - cascade mode: parent effective_args as base, explicit args override
-        // - strict mode: only explicit args
-        // Persisted declared defaults from ancestors fill in remaining gaps at lowest priority.
-        let mut child_args = if workflow_options.global_arg_cascade {
-            let mut m = effective_args.clone();
-            for (k, v) in &include.explicit_args {
-                m.insert(k.clone(), v.clone()); // explicit overrides cascade
-            }
-            m
-        } else {
-            include.explicit_args.clone()
-        };
-        for (k, v) in &next_persisted {
-            child_args.entry(k.clone()).or_insert_with(|| v.clone());
-        }
-
-        let nodes_before = result.nodes.len();
-        resolve_file_recursive(
-            lockfile,
-            locator,
-            &include.package,
-            &include.share_path,
-            fetch_dir,
-            options,
-            child_args,
-            workflow_options,
-            &next_persisted,
-            result,
-            fetched_packages,
-            failed_repos,
-            current_chain.to_vec(),
-        );
-
-        // Apply parent namespace to all nodes produced by the child file.
-        // This implements cross-file <push-ros-namespace> propagation: the caller's
-        // namespace context is an enclosing scope concern that the child doesn't know
-        // about, so we apply it post-hoc.
-        if !include.namespace_stack.is_empty() {
-            for node in &mut result.nodes[nodes_before..] {
-                apply_parent_namespace(&include.namespace_stack, node);
-            }
-        }
-
-        // Inject IncludeMarker if the child file (and all descendants) produced no nodes.
-        if result.nodes.len() == nodes_before {
-            let mut chain = current_chain.to_vec();
-            chain.push((include.package.clone(), include.share_path.clone()));
-            result.nodes.push(ResolvedNode {
-                source: Some((include.package.clone(), include.share_path.clone())),
-                include_chain: chain,
-                kind: NodeKind::IncludeMarker,
-                ..Default::default()
-            });
-        }
-
-        // Excessive include arg check: warn about args forwarded to a child that the child
-        // never declares.  Skip in global-cascade mode where children may use args via
-        // LaunchConfiguration without declaring them.
-        if !workflow_options.global_arg_cascade && !include.explicit_args.is_empty() {
-            let child_declared: HashSet<String> = result
-                .declared_args_by_file
-                .get(&(include.package.clone(), include.share_path.clone()))
-                .map(|m| m.keys().cloned().collect())
-                .unwrap_or_default();
-            let explicit_names: HashSet<String> = include.explicit_args.keys().cloned().collect();
-            let mut excessive: Vec<String> = explicit_names
-                .difference(&child_declared)
-                .cloned()
-                .collect();
-            excessive.sort();
-            for arg_name in excessive {
-                result.add_warning(format!(
-                    "{}://{}: excessive include arg '{}' — {}://{} does not declare <arg name=\"{}\"/>",
-                    package,
-                    share_path.display(),
-                    arg_name,
-                    include.package,
-                    include.share_path.display(),
-                    arg_name
-                ));
-            }
         }
     }
 }
@@ -1097,7 +953,6 @@ fn resolve_python_file_recursive(
     options: &FetchOptions,
     initial_args: &HashMap<String, String>,
     workflow_options: &ResolveWorkflowOptions,
-    persisted_arg_context: &HashMap<String, String>,
     result: &mut ResolveResult,
     fetched_packages: &mut HashSet<String>,
     failed_repos: &mut HashSet<String>,
@@ -1268,17 +1123,6 @@ fn resolve_python_file_recursive(
     let mut current_chain = parent_chain;
     current_chain.push((package.to_string(), share_path.to_path_buf()));
 
-    // Build effective args before consuming py_output: merge initial_args with declared
-    // defaults (initial_args wins).  Passed to process_parsed_file for cascade-mode children.
-    let mut effective_args = initial_args.clone();
-    if workflow_options.apply_arg_defaults {
-        for declared in &py_output.declared_args {
-            effective_args
-                .entry(declared.name.clone())
-                .or_insert_with(|| declared.default.clone());
-        }
-    }
-
     // Promote shim warnings with py_resolver-specific formatting (package://path: prefix).
     // Done before consuming py_output; py_output_to_parsed intentionally omits warnings.
     for warning in &py_output.warnings {
@@ -1304,16 +1148,7 @@ fn resolve_python_file_recursive(
         share_path,
         &file_path,
         &current_chain,
-        &effective_args,
-        persisted_arg_context,
         result,
-        lockfile,
-        locator,
-        fetch_dir,
-        fetched_packages,
-        failed_repos,
-        workflow_options,
-        options,
     );
 }
 
@@ -1330,7 +1165,6 @@ fn resolve_file_recursive(
     options: &FetchOptions,
     initial_args: HashMap<String, String>,
     workflow_options: &ResolveWorkflowOptions,
-    persisted_arg_context: &HashMap<String, String>,
     result: &mut ResolveResult,
     fetched_packages: &mut HashSet<String>,
     failed_repos: &mut HashSet<String>,
@@ -1379,7 +1213,6 @@ fn resolve_file_recursive(
             options,
             &initial_args,
             workflow_options,
-            persisted_arg_context,
             result,
             fetched_packages,
             failed_repos,
@@ -1461,91 +1294,6 @@ mod tests {
                 *expected,
                 "stack={stack:?} explicit={explicit:?}"
             );
-        }
-    }
-
-    /// Cross-file namespace propagation: parent push-ros-namespace is applied post-hoc.
-    #[test]
-    fn test_apply_parent_namespace() {
-        // Node with no namespace, parent has namespace "can0"
-        let parent_stack = vec!["can0".to_string()];
-        let mut node = ResolvedNode {
-            namespace: None,
-            namespace_stack: vec![],
-            kind: NodeKind::LifecycleNode,
-            ..Default::default()
-        };
-        apply_parent_namespace(&parent_stack, &mut node);
-        assert_eq!(node.namespace.as_deref(), Some("/can0"));
-        assert_eq!(node.namespace_stack, vec!["can0"]);
-
-        // Node with explicit namespace="", parent has namespace "can0"
-        // Empty string explicit → effective_namespace returns None → parent applies
-        let mut node2 = ResolvedNode {
-            namespace: None, // effective_namespace([], Some("")) = None
-            explicit_namespace: Some(String::new()),
-            namespace_stack: vec![],
-            kind: NodeKind::Node,
-            ..Default::default()
-        };
-        apply_parent_namespace(&parent_stack, &mut node2);
-        assert_eq!(node2.namespace.as_deref(), Some("/can0"));
-
-        // Node with explicit absolute namespace="/override", parent "can0"
-        // Absolute namespace should override (ros2 semantics)
-        let mut node3 = ResolvedNode {
-            namespace: Some("/override".to_string()),
-            explicit_namespace: Some("/override".to_string()),
-            namespace_stack: vec![],
-            kind: NodeKind::Node,
-            ..Default::default()
-        };
-        apply_parent_namespace(&parent_stack, &mut node3);
-        // Absolute explicit namespace overrides parent via ros2_namespace_join
-        assert_eq!(node3.namespace.as_deref(), Some("/override"));
-
-        // Node with relative child push-ros-namespace, parent "can0"
-        // Previously this was broken: effective("/inner") joined with "/can0" → "/inner"
-        let mut node4 = ResolvedNode {
-            namespace: Some("/inner".to_string()),
-            namespace_stack: vec!["inner".to_string()],
-            kind: NodeKind::Node,
-            ..Default::default()
-        };
-        apply_parent_namespace(&parent_stack, &mut node4);
-        // Combined stack ["can0", "inner"] → effective "/can0/inner"
-        assert_eq!(node4.namespace.as_deref(), Some("/can0/inner"));
-        assert_eq!(node4.namespace_stack, vec!["can0", "inner"]);
-
-        // Event handler: parent namespace should apply to handler and actions
-        let mut node5 = ResolvedNode {
-            namespace: None,
-            namespace_stack: vec![],
-            kind: NodeKind::EventHandler {
-                handler_kind: EventHandlerKind::OnProcessStart,
-                target: Some("my_node".to_string()),
-                target_node: None,
-                namespace: None,
-                start_state: None,
-                goal_state: None,
-                actions: vec![ResolvedEventAction::EmitEvent {
-                    event: "configure".to_string(),
-                    target_node: Some("my_node".to_string()),
-                    namespace: None,
-                }],
-            },
-            ..Default::default()
-        };
-        apply_parent_namespace(&parent_stack, &mut node5);
-        if let NodeKind::EventHandler {
-            namespace, actions, ..
-        } = &node5.kind
-        {
-            assert_eq!(namespace.as_deref(), Some("/can0"));
-            let ResolvedEventAction::EmitEvent { namespace, .. } = &actions[0];
-            assert_eq!(namespace.as_deref(), Some("/can0"));
-        } else {
-            panic!("expected EventHandler");
         }
     }
 

@@ -421,10 +421,9 @@ class TestInlinePythonInclude:
         R._inline_resolve_python_launch("/nonexistent/path.py", ctx, {}, depth=1)
         # No error, no crash
 
-    def test_inline_include_does_not_duplicate_tracked_nodes(self):
-        """Inline include must NOT create tracked node entries — the Rust
-        orchestrator resolves the child file separately, so any entries
-        created by the inline walk would be duplicates."""
+    def test_inline_include_keeps_tracked_nodes(self):
+        """Inline include MUST keep tracked node entries — the Python resolver
+        handles all includes inline and the orchestrator does not re-resolve."""
         with tempfile.TemporaryDirectory() as tmpdir:
             child_path = _write_launch_py(
                 tmpdir,
@@ -441,17 +440,16 @@ class TestInlinePythonInclude:
             )
 
             nodes_before = len(R._tracked["nodes"])
-            pkgs_before = list(R._tracked["packages"])
             ctx = _make_context({})
             R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
 
-            # No new tracked nodes or packages from the inline walk
-            assert len(R._tracked["nodes"]) == nodes_before
-            assert R._tracked["packages"] == pkgs_before
+            # Inline include adds nodes to tracked state
+            assert len(R._tracked["nodes"]) > nodes_before
 
-    def test_inline_include_does_not_duplicate_global_params(self):
-        """SetParameter inside an inline-included child must NOT create
-        tracked global_params entries — only context mutations survive."""
+    def test_inline_include_keeps_global_params(self):
+        """SetParameter inside an inline-included child MUST create
+        tracked global_params entries — the Python resolver handles all
+        includes inline."""
         with tempfile.TemporaryDirectory() as tmpdir:
             child_path = _write_launch_py(
                 tmpdir,
@@ -471,9 +469,9 @@ class TestInlinePythonInclude:
             ctx = _make_context({})
             R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
 
-            # No new tracked global_params
-            assert len(R._tracked["global_params"]) == gp_before
-            # But context should have the global_params for downstream use
+            # Global params from inline include are kept
+            assert len(R._tracked["global_params"]) > gp_before
+            # Context should also have them
             gp_list = ctx._launch_configurations.get("global_params", [])
             assert any(name == "wheel_radius" for name, _ in gp_list)
 

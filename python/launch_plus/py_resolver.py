@@ -1840,18 +1840,22 @@ def _resolve_xml_element(
         name = data.get("name", "")
         default = data.get("default")
         fixed_value = data.get("value")
+        if fixed_value is not None:
+            # <arg name="X" value="Y"/> — fixed, non-overridable value
+            resolved = resolve_substitutions(fixed_value, ctx)
+            ctx.args[name] = resolved
+        elif name and name not in ctx.args and default is not None:
+            # <arg name="X" default="Y"/> — apply default if not already set
+            resolved = resolve_substitutions(default, ctx)
+            ctx.args[name] = resolved
+        else:
+            resolved = ctx.args.get(name, default or "")
         # Record declaration: always per-file (for --show-args), flat only on first encounter
         if name:
             already_seen = name in _declared_arg_names
             if not already_seen:
                 _declared_arg_names.add(name)
-            _record_declared_arg(name, default or "", flat=not already_seen)
-        if fixed_value is not None:
-            # <arg name="X" value="Y"/> — fixed, non-overridable value
-            ctx.args[name] = resolve_substitutions(fixed_value, ctx)
-        elif name and name not in ctx.args and default is not None:
-            # <arg name="X" default="Y"/> — apply default if not already set
-            ctx.args[name] = resolve_substitutions(default, ctx)
+            _record_declared_arg(name, resolved, flat=not already_seen)
 
     elif kind == "Let":
         cond = data.get("condition")
@@ -2318,15 +2322,19 @@ def _resolve_element_to_ir(
         name = data.get("name", "")
         default = data.get("default")
         fixed_value = data.get("value")
+        if fixed_value is not None:
+            resolved = resolve_substitutions(fixed_value, ctx)
+            ctx.args[name] = resolved
+        elif name and name not in ctx.args and default is not None:
+            resolved = resolve_substitutions(default, ctx)
+            ctx.args[name] = resolved
+        else:
+            resolved = ctx.args.get(name, default or "")
         if name:
             already_seen = name in _declared_arg_names
             if not already_seen:
                 _declared_arg_names.add(name)
-            _record_declared_arg(name, default or "", flat=not already_seen)
-        if fixed_value is not None:
-            ctx.args[name] = resolve_substitutions(fixed_value, ctx)
-        elif name and name not in ctx.args and default is not None:
-            ctx.args[name] = resolve_substitutions(default, ctx)
+            _record_declared_arg(name, resolved, flat=not already_seen)
         return []
 
     if kind == "Let":

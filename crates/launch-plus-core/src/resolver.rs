@@ -162,8 +162,8 @@ pub struct FileDependency {
 
 /// Context for args passed to an included launch file.
 ///
-/// Stored in [`ResolvedLaunch::include_args`] so the orchestrator can choose
-/// which scoping model to apply when recursing into the child.
+/// Stored in [`ResolveResult::include_args`](crate::orchestrator::ResolveResult::include_args)
+/// so the orchestrator can choose which scoping model to apply when recursing into the child.
 #[derive(Debug, Clone, Default)]
 pub struct IncludeArgContext {
     /// Only the args explicitly forwarded via `<arg name="..." value="..."/>` in the

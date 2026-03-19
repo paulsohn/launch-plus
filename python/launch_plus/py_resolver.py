@@ -1959,9 +1959,13 @@ def _resolve_xml_element(
                     child_elements = parse_xml_launch(content, real_path)
                     # Build child context — in ROS 2, <include> is NOT scoped:
                     # <let> (SetLaunchConfiguration) in child modifies shared context.
+                    # Include args override both args AND vars because in ROS 2
+                    # $(arg) and $(var) read from the same LaunchConfiguration
+                    # namespace.  Without this, a grandparent's <let> value can
+                    # shadow the include arg when $(var) checks vars first.
                     child_ctx = _SubstitutionContext()
                     child_ctx.args = {**ctx.args, **child_ctx_args}
-                    child_ctx.vars = dict(ctx.vars)
+                    child_ctx.vars = {**ctx.vars, **child_ctx_args}
                     child_ctx.env = dict(ctx.env)
                     child_ctx.launch_file_dir = os.path.dirname(real_path)
                     child_ctx.preview_mode = ctx.preview_mode
@@ -1977,7 +1981,7 @@ def _resolve_xml_element(
                     child_elements = parse_yaml_launch(content, real_path)
                     child_ctx = _SubstitutionContext()
                     child_ctx.args = {**ctx.args, **child_ctx_args}
-                    child_ctx.vars = dict(ctx.vars)
+                    child_ctx.vars = {**ctx.vars, **child_ctx_args}
                     child_ctx.env = dict(ctx.env)
                     child_ctx.launch_file_dir = os.path.dirname(real_path)
                     child_ctx.preview_mode = ctx.preview_mode
@@ -2429,7 +2433,7 @@ def _resolve_element_to_ir(
                     child_elements = parse_xml_launch(content, real_path)
                 child_ctx = _SubstitutionContext()
                 child_ctx.args = {**ctx.args, **child_ctx_args}
-                child_ctx.vars = dict(ctx.vars)
+                child_ctx.vars = {**ctx.vars, **child_ctx_args}
                 child_ctx.env = dict(ctx.env)
                 child_ctx.launch_file_dir = os.path.dirname(real_path)
                 child_ctx.preview_mode = ctx.preview_mode
@@ -3284,14 +3288,20 @@ class _TrackedFindPackageShare:
         pkg, is_fallback = self._resolve_name(context)
         if not is_fallback:
             _track_package(pkg)
-        if not _preview_mode and pkg in _package_shares:
-            return _package_shares[pkg]
+        if not _preview_mode:
+            try:
+                return _resolve_pkg_share(pkg)
+            except Exception:
+                pass
         return f"$(find-pkg-share {pkg})"
 
     def __str__(self):
         pkg, is_fallback = self._resolve_name(None)
-        if not _preview_mode and pkg in _package_shares:
-            return _package_shares[pkg]
+        if not _preview_mode:
+            try:
+                return _resolve_pkg_share(pkg)
+            except Exception:
+                pass
         return f"$(find-pkg-share {pkg})"
 
 

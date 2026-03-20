@@ -770,6 +770,21 @@ def _current_source_key() -> str:
     return _root_source_key
 
 
+def _portable_display(sub) -> str:
+    """Get the portable display string for a substitution without triggering resolution.
+
+    Unlike ``str(sub)`` which may call ``_resolve_pkg_share()`` in non-preview
+    mode, this always returns the portable form (e.g. ``$(find-pkg-share pkg)``).
+    Used for recording unresolved declared arg defaults in --show-args metadata.
+    """
+    if isinstance(sub, _TrackedFindPackageShare):
+        pkg, _ = sub._resolve_name(None)
+        return f"$(find-pkg-share {pkg})"
+    if isinstance(sub, _TrackedPathJoinSubstitution):
+        return "".join(_portable_display(s) for s in sub._subs)
+    return str(sub)
+
+
 def _record_declared_arg(name: str, default: str, *, flat: bool = True) -> None:
     """Record a declared arg in the per-file dict, and optionally the flat list.
 
@@ -3588,7 +3603,30 @@ def _apply_declared_arg(arg: "_DeclaredArg", context) -> None:
             )
 
     if arg.default_value is None:
-        return  # Required arg with no default — nothing to apply
+        # Required arg with no default — record declaration but nothing to resolve.
+        already_seen = arg.name in _declared_arg_names
+        if not already_seen:
+            _declared_arg_names.add(arg.name)
+        _record_declared_arg(arg.name, "", flat=not already_seen)
+        return
+
+    # Lazy evaluation: if the arg is already set by the caller, skip resolving the
+    # default (which may trigger side effects like FindPackageShare for packages that
+    # aren't installed).  Record the unresolved default string for --show-args.
+    already_set = context is not None and arg.name in context._launch_configurations
+    if already_set:
+        # Record unresolved default for --show-args metadata.
+        # Use _portable_display() to avoid triggering resolution side effects.
+        dv = arg.default_value
+        if isinstance(dv, list):
+            raw = "".join(_portable_display(s) for s in dv)
+        else:
+            raw = _portable_display(dv)
+        already_seen = arg.name in _declared_arg_names
+        if not already_seen:
+            _declared_arg_names.add(arg.name)
+        _record_declared_arg(arg.name, raw, flat=not already_seen)
+        return
 
     # Resolve the default_value, which may be a plain string, a substitution object,
     # or a list of substitution objects to be concatenated.
@@ -3618,9 +3656,8 @@ def _apply_declared_arg(arg: "_DeclaredArg", context) -> None:
         _declared_arg_names.add(arg.name)
     _record_declared_arg(arg.name, resolved, flat=not already_seen)
 
-    # Apply to the launch context only if the arg was not already set by the
-    # CLI/parent chain — those values always take precedence.
-    if context is not None and arg.name not in context._launch_configurations:
+    # Apply to the launch context — arg was not already set, so use the resolved default.
+    if context is not None:
         context._launch_configurations[arg.name] = resolved
 
 

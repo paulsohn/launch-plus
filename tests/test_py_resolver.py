@@ -2147,6 +2147,60 @@ class TestResolvedIR:
 # Mirror the Rust-side tests in rosdep.rs.
 
 
+# ─── _apply_declared_arg (lazy default evaluation) ───────────────────────────
+
+
+class TestApplyDeclaredArgLazy:
+    """Default is NOT resolved when the arg is already set by the caller."""
+
+    def test_default_not_resolved_when_arg_already_set(self):
+        """FindPackageShare in default must not be perform()'d if arg is set."""
+        R._preview_mode = False
+        # No package in AMENT — perform() would error if called.
+        ctx = _make_context({"my_arg": "already_set_value"})
+        arg = R._DeclaredArg(
+            "my_arg",
+            default_value=[
+                R._TrackedFindPackageShare("nonexistent_pkg"),
+                "/config/file.yaml",
+            ],
+        )
+        R._apply_declared_arg(arg, ctx)
+        # Arg value unchanged (caller's value preserved).
+        assert ctx._launch_configurations["my_arg"] == "already_set_value"
+        # No error — default was not resolved.
+        assert not any("nonexistent_pkg" in e for e in R._tracked["errors"])
+
+    def test_default_resolved_when_arg_not_set(self):
+        """Default IS resolved when the arg has no caller-provided value."""
+        R._preview_mode = True
+        ctx = _make_context({})
+        arg = R._DeclaredArg(
+            "my_arg",
+            default_value="simple_default",
+        )
+        R._apply_declared_arg(arg, ctx)
+        assert ctx._launch_configurations["my_arg"] == "simple_default"
+
+    def test_unresolved_default_recorded_for_show_args(self):
+        """When arg is already set, the raw default string is recorded for --show-args."""
+        R._preview_mode = False
+        ctx = _make_context({"my_arg": "caller_value"})
+        arg = R._DeclaredArg(
+            "my_arg",
+            default_value=[
+                R._TrackedFindPackageShare("some_pkg"),
+                "/config/file.yaml",
+            ],
+        )
+        R._apply_declared_arg(arg, ctx)
+        # declared_args records the unresolved default (str() form).
+        recorded = R._tracked["declared_args"]
+        assert len(recorded) == 1
+        assert "$(find-pkg-share some_pkg)" in recorded[0]["default"]
+        assert "/config/file.yaml" in recorded[0]["default"]
+
+
 # ─── _resolve_pkg_share and _TrackedFindPackageShare ─────────────────────────
 
 

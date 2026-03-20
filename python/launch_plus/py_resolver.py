@@ -296,13 +296,6 @@ _apply_opaque_file_access: bool = False
 # real path from _package_shares so the output contains absolute install paths.
 _preview_mode: bool = True
 
-# ─── Expand paths ────────────────────────────────────────────────────────────
-# When True (preview + --expand-paths), portable $(find-pkg-share ...) tokens
-# in the output are expanded to AMENT install paths.  Resolution still uses
-# source paths internally (for fetching, includes, etc.), but output values
-# use AMENT install paths so the result is comparable with post-build output.
-_expand_paths: bool = False
-
 # ─── Lockfile data ────────────────────────────────────────────────────────────
 # Filled in main() from the "lockfile_packages" key in the flags JSON (stdin).
 # Maps package_name → {"repo": str, "path": str, "url": str, "version": str}.
@@ -3399,16 +3392,6 @@ class _TrackedFindPackageShare:
 
     def _try_ament_resolve(self, pkg: str) -> str:
         """Resolve to a real path, return portable form on failure."""
-        if _preview_mode and _expand_paths:
-            # Preview + expand_paths: resolve via AMENT for display output,
-            # not via _resolve_pkg_share which returns source paths.
-            if _real_get_package_share_directory is not None:
-                try:
-                    return str(_real_get_package_share_directory(pkg))
-                except Exception:
-                    pass
-            # Package not installed — keep portable (not an error in preview).
-            return f"$(find-pkg-share {pkg})"
         try:
             return _resolve_pkg_share(pkg)
         except _PackageNotFetchedError:
@@ -3422,13 +3405,13 @@ class _TrackedFindPackageShare:
         pkg, is_fallback = self._resolve_name(context)
         if not is_fallback:
             _track_package(pkg)
-        if not _preview_mode or _expand_paths:
+        if not _preview_mode:
             return self._try_ament_resolve(pkg)
         return f"$(find-pkg-share {pkg})"
 
     def __str__(self):
         pkg, is_fallback = self._resolve_name(None)
-        if not _preview_mode or _expand_paths:
+        if not _preview_mode:
             return self._try_ament_resolve(pkg)
         return f"$(find-pkg-share {pkg})"
 
@@ -5313,11 +5296,10 @@ def main():
     _package_shares = stdin_data.get("package_shares", {})
 
     # Load workflow flags.
-    global _preview_mode, _inline_params, _rosdep_fallback, _expand_paths
+    global _preview_mode, _inline_params, _rosdep_fallback
     flags = stdin_data.get("flags", {})
     _apply_opaque_file_access = bool(flags.get("apply_opaque_file_access", False))
     _preview_mode = bool(flags.get("preview", True))
-    _expand_paths = bool(flags.get("expand_paths", False))
     _inline_params = bool(flags.get("inline_params", False))
     _rosdep_fallback = bool(flags.get("rosdep_fallback", False))
     # lockfile_packages: dict of pkg → {repo, path, url, version}

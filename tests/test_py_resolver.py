@@ -2274,7 +2274,6 @@ class TestTrackedFindPackageShare:
 
     def test_preview_returns_portable(self):
         R._preview_mode = True
-        R._expand_paths = False
         fps = R._TrackedFindPackageShare("my_pkg")
         assert fps.perform(None) == "$(find-pkg-share my_pkg)"
         assert str(fps) == "$(find-pkg-share my_pkg)"
@@ -2293,27 +2292,6 @@ class TestTrackedFindPackageShare:
         # Returns portable fallback but records an error
         assert result == "$(find-pkg-share missing_pkg)"
         assert any("missing_pkg" in e for e in R._tracked["errors"])
-
-    def test_expand_paths_uses_ament_not_source(self):
-        """preview + expand_paths should try AMENT, not return source paths."""
-        R._preview_mode = True
-        R._expand_paths = True
-        # Source path in _package_shares (used for internal resolution)
-        R._package_shares["my_pkg"] = "/ws/src/my_pkg"
-        fps = R._TrackedFindPackageShare("my_pkg")
-        result = fps.perform(None)
-        # Without AMENT available, falls back to portable (not source path)
-        assert result == "$(find-pkg-share my_pkg)"
-
-    def test_expand_paths_no_error_for_unresolvable(self):
-        """preview + expand_paths: unresolvable is not an error (just stays portable)."""
-        R._preview_mode = True
-        R._expand_paths = True
-        fps = R._TrackedFindPackageShare("missing_pkg")
-        result = fps.perform(None)
-        assert result == "$(find-pkg-share missing_pkg)"
-        # No error recorded in preview mode
-        assert not any("missing_pkg" in e for e in R._tracked["errors"])
 
 
 class TestParseRosdepResolve:

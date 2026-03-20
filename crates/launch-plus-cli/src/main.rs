@@ -177,19 +177,6 @@ enum Commands {
         #[arg(long)]
         preview: bool,
 
-        /// Expand `$(find-pkg-share ...)` tokens in the output to absolute AMENT install
-        /// paths.
-        ///
-        /// Preview mode normally emits portable `$(find-pkg-share pkg)/...` paths.  With
-        /// this flag every such token is expanded using the current AMENT_PREFIX_PATH, so
-        /// the output is directly comparable (`diff`) with a non-preview (post-build)
-        /// resolution.
-        ///
-        /// Requires `--preview`.  Source the build's `install/setup.bash` before running
-        /// so that AMENT_PREFIX_PATH points to the installed packages.
-        #[arg(long, requires = "preview")]
-        expand_paths: bool,
-
         /// Allow raw filesystem paths in `<include file=...>` and `<param from=...>` in preview
         /// mode instead of requiring $(find-pkg-share ...) substitutions.
         ///
@@ -742,7 +729,6 @@ fn main() -> Result<()> {
             allow_global_arg_cascade,
             apply_launch_arg_defaults,
             preview,
-            expand_paths,
             allow_including_unportable_path,
             apply_opaque_file_access,
             inline_params,
@@ -765,7 +751,6 @@ fn main() -> Result<()> {
                 apply_opaque_file_access,
                 rosdep_fallback: rosdep,
                 inline_params,
-                expand_paths,
             };
             cmd_resolve(
                 &package,
@@ -1010,7 +995,6 @@ fn main() -> Result<()> {
                 apply_opaque_file_access,
                 rosdep_fallback: rosdep,
                 inline_params: false, // check suppresses XML anyway
-                expand_paths: false,  // not applicable for check
             };
             cmd_resolve(
                 &package,
@@ -1658,7 +1642,7 @@ fn cmd_resolve(
             &result.initial_args,
             &result.declared_args_by_file,
         );
-        if preview && !workflow_options.expand_paths {
+        if preview {
             // Prepend a preview marker so consumers can distinguish source-path output
             // from post-build install-path output.
             xml.insert_str(

@@ -42,7 +42,6 @@ def _reset_py_resolver_state():
     R._fetched_packages.clear()
     R._apply_opaque_file_access = False
     R._preview_mode = True
-    R._expand_paths = False
     R._inline_params = False
     R._rosdep_fallback = False
     R._rosdep_attempted.clear()

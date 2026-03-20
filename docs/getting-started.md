@@ -161,14 +161,12 @@ launch-plus resolve -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > postbuild.launch.xml
 
-# Preview resolve with path expansion (for comparison)
-launch-plus resolve -d my_bringup robot.launch.xml \
-  robot_name:=my_robot \
-  --preview --expand-paths \
-  > preview.launch.xml
-
-# Compare — should be identical
-diff preview.launch.xml postbuild.launch.xml
+# Compare preview vs postbuild (normalize paths first)
+INSTALL_DIR="$(pwd)/install"
+sed -E "s|${INSTALL_DIR}/[^/]+/share/([^/]+)|\$(find-pkg-share \1)|g" \
+  postbuild.launch.xml > postbuild_normalized.xml
+grep -v '^<!-- PREVIEW:' preview.launch.xml > preview_clean.xml
+diff preview_clean.xml postbuild_normalized.xml
 ```
 
 ## Directory layout

@@ -124,28 +124,37 @@ set -u
 echo "    OK (AMENT_PREFIX_PATH set)"
 echo
 
-# ── Step 4: Preview resolve + expand paths ───────────────────────────────────
+# ── Step 4: Post-build resolve (real paths) ──────────────────────────────────
 
-echo "==> Step 4: Preview resolve (expand paths)"
-$LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" "${RESOLVE_DISPLAY[@]}" --preview --expand-paths > preview.xml
-echo "    OK (preview.xml)"
-echo
-
-# ── Step 5: Post-build resolve (real paths) ──────────────────────────────────
-
-echo "==> Step 5: Post-build resolve"
+echo "==> Step 4: Post-build resolve"
 $LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" "${RESOLVE_DISPLAY[@]}" > postbuild.xml
 echo "    OK (postbuild.xml)"
 echo
 
-# ── Step 6: Compare ─────────────────────────────────────────────────────────
+# ── Step 5: Normalize and compare ────────────────────────────────────────────
+# Replace real install paths with portable $(find-pkg-share ...) tokens so we
+# can diff preview (portable) vs postbuild (real paths).
 
-echo "==> Step 6: Diff preview.xml vs postbuild.xml"
-if diff preview.xml postbuild.xml > /dev/null 2>&1; then
-    echo "    OK (identical)"
+echo "==> Step 5: Normalize postbuild paths and diff against preview"
+
+INSTALL_DIR="$(pwd)/install"
+ROS_SHARE="/opt/ros/${ROS_DISTRO:-}/share"
+
+# Normalize colcon install paths:  <install>/<pkg>/share/<pkg> → $(find-pkg-share <pkg>)
+# Normalize ROS system paths:      /opt/ros/<distro>/share/<pkg> → $(find-pkg-share <pkg>)
+# Also strip the preview marker line from preview_raw.xml.
+sed -E \
+    -e "s|${INSTALL_DIR}/[^/]+/share/([^/]+)|\$(find-pkg-share \1)|g" \
+    -e "s|${ROS_SHARE}/([^/]+)|\$(find-pkg-share \1)|g" \
+    postbuild.xml > postbuild_normalized.xml
+
+grep -v '^<!-- PREVIEW:' preview_raw.xml > preview.xml
+
+if diff preview.xml postbuild_normalized.xml > /dev/null 2>&1; then
+    echo "    OK (identical after normalization)"
 else
-    echo "    FAIL: preview.xml and postbuild.xml differ!"
-    diff preview.xml postbuild.xml | head -40
+    echo "    FAIL: preview.xml and postbuild_normalized.xml differ!"
+    diff preview.xml postbuild_normalized.xml | head -60
     exit 1
 fi
 

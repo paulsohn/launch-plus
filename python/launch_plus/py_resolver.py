@@ -296,6 +296,13 @@ _apply_opaque_file_access: bool = False
 # real path from _package_shares so the output contains absolute install paths.
 _preview_mode: bool = True
 
+# ─── Expand paths ────────────────────────────────────────────────────────────
+# When True (preview + --expand-paths), portable $(find-pkg-share ...) tokens
+# in the output are expanded to AMENT install paths.  Resolution still uses
+# source paths internally (for fetching, includes, etc.), but output values
+# use AMENT install paths so the result is comparable with post-build output.
+_expand_paths: bool = False
+
 # ─── Lockfile data ────────────────────────────────────────────────────────────
 # Filled in main() from the "lockfile_packages" key in the flags JSON (stdin).
 # Maps package_name → {"repo": str, "path": str, "url": str, "version": str}.
@@ -526,20 +533,28 @@ def _parse_portable_path(path_str: str):
 def _resolve_pkg_share(package: str) -> str:
     """Resolve a package share path.
 
-    Lockfile packages always resolve from the workspace source tree and NEVER fall
-    through to AMENT_PREFIX_PATH.  If the source directory is not yet fully fetched
-    (no package.xml), _ensure_fetched() is called to fetch it inline.
+    Preview mode (lockfile workflow):
+      Lockfile packages resolve from the workspace source tree.  If the source
+      directory is not yet fully fetched (no package.xml), _ensure_fetched() is
+      called to fetch it inline.
 
-    Non-lockfile packages (system / rosdep packages) are resolved via AMENT_PREFIX_PATH.
+    Non-preview mode (postbuild):
+      Only AMENT_PREFIX_PATH (installed artifacts) is used.  Source paths are
+      never returned — if a package is not installed, the portable fallback is
+      returned.
+
+    Non-lockfile packages (system / rosdep) are resolved via AMENT_PREFIX_PATH
+    in both modes.
     """
-    # 1. Workspace source packages (from orchestrator lockfile).
+    # 1. _package_shares lookup.
+    #    Preview: contains workspace source paths.
+    #    Postbuild: contains install paths from AMENT (populated by orchestrator).
     if package in _package_shares:
         pkg_path: str = _package_shares[package]
-        # For lockfile packages, enforce full fetch: if package.xml is absent the
-        # package has been sparse-checked at the file level but not fully cloned.
-        # Fetch inline instead of returning a dangling path.
+        # In preview mode, lockfile packages may need full fetch.
         if (
-            _lockfile_data
+            _preview_mode
+            and _lockfile_data
             and package in _lockfile_data
             and not os.path.isfile(os.path.join(pkg_path, "package.xml"))
         ):
@@ -547,8 +562,8 @@ def _resolve_pkg_share(package: str) -> str:
                 return _package_shares[package]
             raise _PackageNotFetchedError(package)
         return pkg_path
-    # 2. Lockfile package not found in _package_shares — fetch it.
-    if _lockfile_data and package in _lockfile_data:
+    # 2. Lockfile package not yet in _package_shares — fetch (preview only).
+    if _preview_mode and _lockfile_data and package in _lockfile_data:
         if _ensure_fetched(package):
             return _package_shares[package]
         raise _PackageNotFetchedError(package)
@@ -570,10 +585,13 @@ def _resolve_pkg_share(package: str) -> str:
             return str(_real_get_package_share_directory(package))
         except Exception:
             pass
-    # 5. Fallback: return portable substitution syntax so that any downstream
-    #    open() call hits the FileNotFoundError stub (which emits a warning) rather
-    #    than silently using a wrong distro-specific path.
-    return f"$(find-pkg-share {package})"
+    # 5. Fallback.
+    if _preview_mode:
+        # Preview: return portable syntax — downstream open() will hit the
+        # FileNotFoundError stub which emits a warning.
+        return f"$(find-pkg-share {package})"
+    # Postbuild: package not installed — this is an error.
+    raise LookupError(f"package '{package}' not found in AMENT_PREFIX_PATH")
 
 
 def _resolve_ros_substitutions(value: str) -> str:
@@ -3364,24 +3382,39 @@ class _TrackedFindPackageShare:
             return str(subs), True
         return str(subs), False
 
+    def _try_ament_resolve(self, pkg: str) -> str:
+        """Resolve to a real path, return portable form on failure."""
+        if _preview_mode and _expand_paths:
+            # Preview + expand_paths: resolve via AMENT for display output,
+            # not via _resolve_pkg_share which returns source paths.
+            if _real_get_package_share_directory is not None:
+                try:
+                    return str(_real_get_package_share_directory(pkg))
+                except Exception:
+                    pass
+            # Package not installed — keep portable (not an error in preview).
+            return f"$(find-pkg-share {pkg})"
+        try:
+            return _resolve_pkg_share(pkg)
+        except _PackageNotFetchedError:
+            raise
+        except Exception as e:
+            if not _preview_mode:
+                _error(f"$(find-pkg-share {pkg}): {e}")
+            return f"$(find-pkg-share {pkg})"
+
     def perform(self, context):
         pkg, is_fallback = self._resolve_name(context)
         if not is_fallback:
             _track_package(pkg)
-        if not _preview_mode:
-            try:
-                return _resolve_pkg_share(pkg)
-            except Exception:
-                pass
+        if not _preview_mode or _expand_paths:
+            return self._try_ament_resolve(pkg)
         return f"$(find-pkg-share {pkg})"
 
     def __str__(self):
         pkg, is_fallback = self._resolve_name(None)
-        if not _preview_mode:
-            try:
-                return _resolve_pkg_share(pkg)
-            except Exception:
-                pass
+        if not _preview_mode or _expand_paths:
+            return self._try_ament_resolve(pkg)
         return f"$(find-pkg-share {pkg})"
 
 
@@ -5215,10 +5248,11 @@ def main():
     _package_shares = stdin_data.get("package_shares", {})
 
     # Load workflow flags.
-    global _preview_mode, _inline_params, _rosdep_fallback
+    global _preview_mode, _inline_params, _rosdep_fallback, _expand_paths
     flags = stdin_data.get("flags", {})
     _apply_opaque_file_access = bool(flags.get("apply_opaque_file_access", False))
     _preview_mode = bool(flags.get("preview", True))
+    _expand_paths = bool(flags.get("expand_paths", False))
     _inline_params = bool(flags.get("inline_params", False))
     _rosdep_fallback = bool(flags.get("rosdep_fallback", False))
     # lockfile_packages: dict of pkg → {repo, path, url, version}

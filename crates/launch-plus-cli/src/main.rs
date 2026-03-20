@@ -765,6 +765,7 @@ fn main() -> Result<()> {
                 apply_opaque_file_access,
                 rosdep_fallback: rosdep,
                 inline_params,
+                expand_paths,
             };
             cmd_resolve(
                 &package,
@@ -774,7 +775,6 @@ fn main() -> Result<()> {
                 &src,
                 report,
                 preview,
-                expand_paths,
                 flatten,
                 flatten_namespaces,
                 show_args,
@@ -1010,6 +1010,7 @@ fn main() -> Result<()> {
                 apply_opaque_file_access,
                 rosdep_fallback: rosdep,
                 inline_params: false, // check suppresses XML anyway
+                expand_paths: false,  // not applicable for check
             };
             cmd_resolve(
                 &package,
@@ -1019,7 +1020,6 @@ fn main() -> Result<()> {
                 &src,
                 false, // report
                 preview,
-                false, // expand_paths — not applicable for check
                 false, // flatten
                 true,  // flatten_namespaces
                 false, // show_args — irrelevant, XML is suppressed
@@ -1608,7 +1608,6 @@ fn cmd_resolve(
     src_dir: &str,
     report: bool,
     preview: bool,
-    expand_paths: bool,
     flatten: bool,
     flatten_namespaces: bool,
     show_args: bool,
@@ -1659,14 +1658,7 @@ fn cmd_resolve(
             &result.initial_args,
             &result.declared_args_by_file,
         );
-        if preview && expand_paths {
-            // Expand $(find-pkg-share <pkg>) tokens to absolute AMENT install paths
-            // so the preview output is comparable with post-build resolution.
-            use launch_plus_core::locator::PackageLocator;
-            let mut locator = PackageLocator::new();
-            locator.add_ament_from_env();
-            xml = expand_portable_paths(&xml, &locator);
-        } else if preview {
+        if preview && !workflow_options.expand_paths {
             // Prepend a preview marker so consumers can distinguish source-path output
             // from post-build install-path output.
             xml.insert_str(
@@ -1788,56 +1780,6 @@ fn cmd_resolve(
     }
 
     Ok(())
-}
-
-/// Expand `$(find-pkg-share <pkg>)` tokens in `text` to absolute AMENT install paths.
-///
-/// Each `$(find-pkg-share <pkg>)` occurrence is resolved via the locator's AMENT prefix
-/// entries.  Tokens whose package cannot be found are left unchanged.
-fn expand_portable_paths(
-    text: &str,
-    locator: &launch_plus_core::locator::PackageLocator,
-) -> String {
-    use std::fmt::Write;
-    let token = "$(find-pkg-share ";
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(start) = rest.find(token) {
-        out.push_str(&rest[..start]);
-        let after = &rest[start + token.len()..];
-        // Find the matching close paren (handle nesting).
-        let mut depth = 1u32;
-        let mut close = None;
-        for (i, c) in after.char_indices() {
-            match c {
-                '(' => depth += 1,
-                ')' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        close = Some(i);
-                        break;
-                    }
-                }
-                _ => {}
-            }
-        }
-        if let Some(close_idx) = close {
-            let pkg = after[..close_idx].trim();
-            if let Some(share_dir) = locator.locate_install_share(pkg) {
-                let _ = write!(out, "{}", share_dir.display());
-            } else {
-                // Package not in AMENT — keep the token as-is.
-                out.push_str(&rest[start..start + token.len() + close_idx + 1]);
-            }
-            rest = &after[close_idx + 1..];
-        } else {
-            // Unmatched paren — keep the rest as-is.
-            out.push_str(&rest[start..]);
-            rest = "";
-        }
-    }
-    out.push_str(rest);
-    out
 }
 
 /// Execute the clean command: remove fetched packages

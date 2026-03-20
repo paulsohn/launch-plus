@@ -126,6 +126,15 @@ pub struct ResolveWorkflowOptions {
     ///
     /// Exposed via `--inline-params` in the CLI.
     pub inline_params: bool,
+
+    /// Expand `$(find-pkg-share ...)` tokens in the output to absolute AMENT install paths.
+    ///
+    /// Only meaningful in preview mode.  When set, the Python resolver resolves portable
+    /// tokens via AMENT_PREFIX_PATH so the output is directly comparable with post-build
+    /// resolution.
+    ///
+    /// Exposed via `--expand-paths` in the CLI.
+    pub expand_paths: bool,
 }
 
 /// Result of recursive launch file resolution
@@ -379,6 +388,7 @@ fn run_py_resolver(
         "flags": {
             "apply_opaque_file_access": workflow_options.apply_opaque_file_access,
             "preview": workflow_options.preview,
+            "expand_paths": workflow_options.expand_paths,
             "inline_params": workflow_options.inline_params,
             "rosdep_fallback": workflow_options.rosdep_fallback,
             "lockfile_packages": &lockfile_data,

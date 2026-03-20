@@ -2147,6 +2147,99 @@ class TestResolvedIR:
 # Mirror the Rust-side tests in rosdep.rs.
 
 
+# ─── _resolve_pkg_share and _TrackedFindPackageShare ─────────────────────────
+
+
+class TestResolvePkgShare:
+    """Tests for _resolve_pkg_share mode-dependent behavior."""
+
+    def test_preview_returns_source_path_from_package_shares(self):
+        R._preview_mode = True
+        R._package_shares["my_pkg"] = "/ws/src/my_pkg"
+        assert R._resolve_pkg_share("my_pkg") == "/ws/src/my_pkg"
+
+    def test_preview_unknown_pkg_returns_portable(self):
+        R._preview_mode = True
+        result = R._resolve_pkg_share("unknown_pkg")
+        assert result == "$(find-pkg-share unknown_pkg)"
+
+    def test_postbuild_returns_install_path_from_package_shares(self):
+        R._preview_mode = False
+        R._package_shares["my_pkg"] = "/ws/install/my_pkg/share/my_pkg"
+        assert R._resolve_pkg_share("my_pkg") == "/ws/install/my_pkg/share/my_pkg"
+
+    def test_postbuild_unknown_pkg_raises(self):
+        R._preview_mode = False
+        import pytest
+
+        with pytest.raises(LookupError, match="not found in AMENT_PREFIX_PATH"):
+            R._resolve_pkg_share("unknown_pkg")
+
+    def test_postbuild_skips_lockfile_fetch(self):
+        """In postbuild mode, lockfile packages not in _package_shares are not fetched."""
+        R._preview_mode = False
+        R._lockfile_data = {
+            "lockfile_pkg": {
+                "repo": "org/repo",
+                "path": "pkg",
+                "url": "https://example.com",
+                "version": "abc123",
+            }
+        }
+        import pytest
+
+        # Should raise, not attempt to fetch
+        with pytest.raises(LookupError, match="not found in AMENT_PREFIX_PATH"):
+            R._resolve_pkg_share("lockfile_pkg")
+
+
+class TestTrackedFindPackageShare:
+    """Tests for _TrackedFindPackageShare mode-dependent perform()/str()."""
+
+    def test_preview_returns_portable(self):
+        R._preview_mode = True
+        R._expand_paths = False
+        fps = R._TrackedFindPackageShare("my_pkg")
+        assert fps.perform(None) == "$(find-pkg-share my_pkg)"
+        assert str(fps) == "$(find-pkg-share my_pkg)"
+
+    def test_postbuild_returns_install_path(self):
+        R._preview_mode = False
+        R._package_shares["my_pkg"] = "/install/share/my_pkg"
+        fps = R._TrackedFindPackageShare("my_pkg")
+        assert fps.perform(None) == "/install/share/my_pkg"
+        assert str(fps) == "/install/share/my_pkg"
+
+    def test_postbuild_unresolvable_reports_error(self):
+        R._preview_mode = False
+        fps = R._TrackedFindPackageShare("missing_pkg")
+        result = fps.perform(None)
+        # Returns portable fallback but records an error
+        assert result == "$(find-pkg-share missing_pkg)"
+        assert any("missing_pkg" in e for e in R._tracked["errors"])
+
+    def test_expand_paths_uses_ament_not_source(self):
+        """preview + expand_paths should try AMENT, not return source paths."""
+        R._preview_mode = True
+        R._expand_paths = True
+        # Source path in _package_shares (used for internal resolution)
+        R._package_shares["my_pkg"] = "/ws/src/my_pkg"
+        fps = R._TrackedFindPackageShare("my_pkg")
+        result = fps.perform(None)
+        # Without AMENT available, falls back to portable (not source path)
+        assert result == "$(find-pkg-share my_pkg)"
+
+    def test_expand_paths_no_error_for_unresolvable(self):
+        """preview + expand_paths: unresolvable is not an error (just stays portable)."""
+        R._preview_mode = True
+        R._expand_paths = True
+        fps = R._TrackedFindPackageShare("missing_pkg")
+        result = fps.perform(None)
+        assert result == "$(find-pkg-share missing_pkg)"
+        # No error recorded in preview mode
+        assert not any("missing_pkg" in e for e in R._tracked["errors"])
+
+
 class TestParseRosdepResolve:
     def test_single_key_apt(self):
         stdout = "#apt\nros-jazzy-rclcpp\n"

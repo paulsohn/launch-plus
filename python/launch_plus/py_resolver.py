@@ -3543,6 +3543,37 @@ class _TrackedIncludeLaunchDescription:
             _resolve_include_args(path, launch_arguments, _StubLaunchContext(), self._dep_idx)
 
 
+class _DeferredDefault:
+    """Wraps an unresolved DeclareLaunchArgument default_value.
+
+    Stored in ``_launch_configurations`` instead of a resolved string.
+    Resolution is deferred until the value is actually read via
+    ``_LaunchConfiguration.perform()``.  This avoids eagerly calling
+    ``FindPackageShare.perform()`` for packages that may not be installed
+    when the arg is never actually used (e.g. gated by a false condition).
+    """
+
+    def __init__(self, default_value):
+        self.default_value = default_value
+
+    def resolve(self, context):
+        """Resolve the deferred substitutions to a string."""
+        dv = self.default_value
+        if hasattr(dv, "perform"):
+            result = dv.perform(context)
+            return str(result) if result is not None else str(dv)
+        if isinstance(dv, list):
+            parts = []
+            for sub in dv:
+                if hasattr(sub, "perform"):
+                    result = sub.perform(context)
+                    parts.append(str(result) if result is not None else str(sub))
+                else:
+                    parts.append(str(sub))
+            return "".join(parts)
+        return str(dv)
+
+
 class _LaunchConfiguration:
     """Substitution that resolves to a launch configuration value at runtime."""
 
@@ -3553,7 +3584,13 @@ class _LaunchConfiguration:
     def perform(self, context):
         if context and hasattr(context, "_launch_configurations"):
             if self._name in context._launch_configurations:
-                return context._launch_configurations[self._name]
+                value = context._launch_configurations[self._name]
+                # Resolve deferred defaults on first read.
+                if isinstance(value, _DeferredDefault):
+                    resolved = value.resolve(context)
+                    context._launch_configurations[self._name] = resolved
+                    return resolved
+                return value
             if self._default is not None:
                 return str(self._default)
         return None
@@ -3628,37 +3665,28 @@ def _apply_declared_arg(arg: "_DeclaredArg", context) -> None:
         _record_declared_arg(arg.name, raw, flat=not already_seen)
         return
 
-    # Resolve the default_value, which may be a plain string, a substitution object,
-    # or a list of substitution objects to be concatenated.
-    try:
-        dv = arg.default_value
-        if hasattr(dv, "perform"):
-            result = dv.perform(context)
-            resolved = str(result) if result is not None else str(dv)
-        elif isinstance(dv, list):
-            parts = []
-            for sub in dv:
-                if hasattr(sub, "perform"):
-                    result = sub.perform(context)
-                    parts.append(str(result) if result is not None else str(sub))
-                else:
-                    parts.append(str(sub))
-            resolved = "".join(parts)
-        else:
-            resolved = str(dv)
-    except Exception as e:
-        _warn(f"DeclareLaunchArgument('{arg.name}') default resolution failed: {e}")
-        return
+    # Store the default as a _DeferredDefault — resolution is deferred until the
+    # value is actually read via LaunchConfiguration.perform().  This avoids
+    # eagerly resolving FindPackageShare for packages that may not be installed
+    # (e.g. CUDA packages) when the arg is gated by a false condition and never
+    # actually read.
+    #
+    # For --show-args metadata, record the portable display form (no side effects).
+    dv = arg.default_value
+    if isinstance(dv, list):
+        display = "".join(_portable_display(s) for s in dv)
+    else:
+        display = _portable_display(dv)
 
     # Record for the Rust orchestrator (first declaration wins in flat list; per-file always).
     already_seen = arg.name in _declared_arg_names
     if not already_seen:
         _declared_arg_names.add(arg.name)
-    _record_declared_arg(arg.name, resolved, flat=not already_seen)
+    _record_declared_arg(arg.name, display, flat=not already_seen)
 
-    # Apply to the launch context — arg was not already set, so use the resolved default.
+    # Apply deferred default to the launch context — resolved on first read.
     if context is not None:
-        context._launch_configurations[arg.name] = resolved
+        context._launch_configurations[arg.name] = _DeferredDefault(dv)
 
 
 class _TrackedOpaqueFunction:

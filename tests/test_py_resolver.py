@@ -2171,8 +2171,8 @@ class TestApplyDeclaredArgLazy:
         # No error — default was not resolved.
         assert not any("nonexistent_pkg" in e for e in R._tracked["errors"])
 
-    def test_default_resolved_when_arg_not_set(self):
-        """Default IS resolved when the arg has no caller-provided value."""
+    def test_default_deferred_when_arg_not_set(self):
+        """Default is stored as _DeferredDefault, resolved on read."""
         R._preview_mode = True
         ctx = _make_context({})
         arg = R._DeclaredArg(
@@ -2180,7 +2180,29 @@ class TestApplyDeclaredArgLazy:
             default_value="simple_default",
         )
         R._apply_declared_arg(arg, ctx)
+        # Stored as deferred, not yet resolved.
+        assert isinstance(ctx._launch_configurations["my_arg"], R._DeferredDefault)
+        # Reading via LaunchConfiguration resolves it.
+        lc = R._LaunchConfiguration("my_arg")
+        assert lc.perform(ctx) == "simple_default"
+        # Now it's resolved in the context.
         assert ctx._launch_configurations["my_arg"] == "simple_default"
+
+    def test_deferred_default_not_resolved_if_never_read(self):
+        """FindPackageShare for uninstalled pkg causes no error if arg is never read."""
+        R._preview_mode = False
+        ctx = _make_context({})
+        arg = R._DeclaredArg(
+            "cuda_param",
+            default_value=[
+                R._TrackedFindPackageShare("uninstalled_cuda_pkg"),
+                "/config/file.yaml",
+            ],
+        )
+        R._apply_declared_arg(arg, ctx)
+        # Default is deferred — no resolution happened, no error.
+        assert isinstance(ctx._launch_configurations["cuda_param"], R._DeferredDefault)
+        assert not any("uninstalled_cuda_pkg" in e for e in R._tracked["errors"])
 
     def test_unresolved_default_recorded_for_show_args(self):
         """When arg is already set, the raw default string is recorded for --show-args."""

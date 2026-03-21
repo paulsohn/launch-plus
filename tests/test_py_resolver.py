@@ -1870,6 +1870,46 @@ class TestResolveXmlElements:
         assert len(R._tracked["nodes"]) == 1
         assert R._tracked["nodes"][0]["package"] == "default_model_pkg"
 
+    def test_set_parameter_merged_into_node(self):
+        """<set_parameter> values should be merged into subsequent nodes."""
+        ctx = _fresh_walker_ctx()
+        elements = R.parse_xml_launch(
+            textwrap.dedent("""\
+                <launch>
+                    <set_parameter name="use_sim_time" value="true"/>
+                    <node pkg="my_pkg" exec="my_node"/>
+                </launch>
+            """),
+            "test.xml",
+        )
+        R.resolve_xml_elements(elements, ctx)
+        assert len(R._tracked["nodes"]) == 1
+        node = R._tracked["nodes"][0]
+        assert node["parameters"].get("use_sim_time") == "true"
+
+    def test_set_parameter_scoped_in_group(self):
+        """<set_parameter> in a scoped group should not leak to outer nodes."""
+        ctx = _fresh_walker_ctx()
+        elements = R.parse_xml_launch(
+            textwrap.dedent("""\
+                <launch>
+                    <group scoped="true">
+                        <set_parameter name="rate" value="10"/>
+                        <node pkg="inner_pkg" exec="inner"/>
+                    </group>
+                    <node pkg="outer_pkg" exec="outer"/>
+                </launch>
+            """),
+            "test.xml",
+        )
+        R.resolve_xml_elements(elements, ctx)
+        nodes = R._tracked["nodes"]
+        assert len(nodes) == 2
+        inner = next(n for n in nodes if n["package"] == "inner_pkg")
+        outer = next(n for n in nodes if n["package"] == "outer_pkg")
+        assert inner["parameters"].get("rate") == "10"
+        assert "rate" not in outer["parameters"]
+
 
 # ─── Resolved IR (resolve_xml_to_ir) ─────────────────────────────────────────
 

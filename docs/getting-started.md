@@ -150,7 +150,8 @@ After building, you can verify that the pre-build (preview) resolution matches
 the post-build resolution:
 
 ```bash
-# Source the built workspace
+# Source the built workspace (sets ROS_DISTRO, AMENT_PREFIX_PATH, etc.)
+source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
 source install/setup.bash
 
 # Preview resolve (pre-build, portable paths)

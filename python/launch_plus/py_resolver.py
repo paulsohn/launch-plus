@@ -2002,6 +2002,9 @@ def _resolve_xml_element(
             saved_vars = dict(ctx.vars)
             saved_env = dict(_env)
             saved_ns_depth = len(_namespace_stack)
+            saved_gp = list(_global_params)
+            saved_gr = list(_global_remaps)
+            saved_gpf = list(_global_param_files)
             resolve_xml_elements(children, ctx, include_stack=include_stack)
             # Restore — but propagate newly declared args
             new_args = {k: v for k, v in ctx.args.items() if k not in saved_args}
@@ -2010,6 +2013,9 @@ def _resolve_xml_element(
             ctx.vars = saved_vars
             _env = saved_env
             del _namespace_stack[saved_ns_depth:]
+            _global_params[:] = saved_gp
+            _global_remaps[:] = saved_gr
+            _global_param_files[:] = saved_gpf
         else:
             # Unscoped: share context, but track namespace depth for cleanup
             saved_ns_depth = len(_namespace_stack)
@@ -2174,6 +2180,11 @@ def _resolve_xml_element(
 
         params, param_files = _resolve_params_xml(data.get("params", []), ctx)
         remaps = _resolve_remaps_xml(data.get("remaps", []), ctx)
+        # Merge scoped global params/remaps/param_files (global first, node-local overrides)
+        merged_params = dict(_global_params)
+        merged_params.update(params)
+        merged_param_files = list(_global_param_files) + param_files
+        merged_remaps = list(_global_remaps) + remaps
         # Env: start with inherited overrides, then node-local envs
         env = dict(_env)
         env.update(_resolve_envs_xml(data.get("envs", []), ctx))
@@ -2186,9 +2197,9 @@ def _resolve_xml_element(
                 "name": name or "",
                 "namespace_stack": list(_namespace_stack),
                 "explicit_namespace": ns,
-                "parameters": params,
-                "param_files": param_files,
-                "remappings": remaps,
+                "parameters": merged_params,
+                "param_files": merged_param_files,
+                "remappings": merged_remaps,
                 "env": env,
                 "kind": node_kind,
                 "plugins": [],
@@ -2225,9 +2236,9 @@ def _resolve_xml_element(
                 "name": name or "",
                 "namespace_stack": list(_namespace_stack),
                 "explicit_namespace": ns,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
+                "parameters": dict(_global_params),
+                "param_files": list(_global_param_files),
+                "remappings": list(_global_remaps),
                 "env": env,
                 "kind": "container",
                 "plugins": plugins,
@@ -2255,9 +2266,9 @@ def _resolve_xml_element(
                 "name": "",
                 "namespace_stack": list(_namespace_stack),
                 "explicit_namespace": ns,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
+                "parameters": dict(_global_params),
+                "param_files": list(_global_param_files),
+                "remappings": list(_global_remaps),
                 "env": {},
                 "kind": "load_composable",
                 "plugins": plugins,
@@ -2290,30 +2301,13 @@ def _resolve_xml_element(
     elif kind == "SetParameter":
         name = resolve_substitutions(data.get("name", ""), ctx)
         value = resolve_substitutions(data.get("value", ""), ctx)
+        _global_params.append((name, value))
         _tracked["global_params"].append([name, value])
 
     elif kind == "SetRemap":
         src = resolve_substitutions(data.get("from", ""), ctx)
         dst = resolve_substitutions(data.get("to", ""), ctx)
-        _track_node(
-            {
-                "package": "",
-                "executable": "",
-                "name": "",
-                "namespace_stack": list(_namespace_stack),
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": "set_remap",
-                "plugins": [],
-                "target": None,
-                "param_value": None,
-                "remap_from": src,
-                "remap_to": dst,
-            }
-        )
+        _global_remaps.append((src, dst))
 
     elif kind == "Log":
         msg = resolve_substitutions(data.get("message", ""), ctx)

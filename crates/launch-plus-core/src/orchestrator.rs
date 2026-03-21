@@ -348,22 +348,26 @@ fn run_py_resolver(
 
     // Build lockfile data for Python: package name → {repo, path, url, version}
     // so py_resolver can fetch missing packages inline via git sparse-checkout.
-    let lockfile_data: HashMap<String, serde_json::Value> = lockfile
-        .packages
-        .iter()
-        .filter_map(|(pkg_name, pkg_lock)| {
-            let repo_lock = lockfile.repositories.get(&pkg_lock.repo)?;
-            Some((
-                pkg_name.clone(),
-                serde_json::json!({
-                    "repo": pkg_lock.repo,
-                    "path": pkg_lock.path,
-                    "url": repo_lock.url,
-                    "version": repo_lock.version,
-                }),
-            ))
-        })
-        .collect();
+    let mut lockfile_data: HashMap<String, serde_json::Value> = HashMap::new();
+    for (pkg_name, pkg_lock) in &lockfile.packages {
+        let Some(repo_lock) = lockfile.repositories.get(&pkg_lock.repo) else {
+            tracing::warn!(
+                "lockfile integrity: package '{}' references unknown repo '{}'",
+                pkg_name,
+                pkg_lock.repo
+            );
+            continue;
+        };
+        lockfile_data.insert(
+            pkg_name.clone(),
+            serde_json::json!({
+                "repo": pkg_lock.repo,
+                "path": pkg_lock.path,
+                "url": repo_lock.url,
+                "version": repo_lock.version,
+            }),
+        );
+    }
 
     let script_str = script_path.to_str().ok_or_else(|| {
         crate::Error::PythonResolver("py_resolver script path is not valid UTF-8".to_string())
@@ -413,6 +417,9 @@ fn run_py_resolver(
     let output = child
         .wait_with_output()
         .map_err(|e| crate::Error::PythonResolver(format!("failed to wait for python3: {e}")))?;
+
+    // Clean up the temp script now that the child has exited.
+    let _ = std::fs::remove_file(&script_path);
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -884,7 +891,6 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                 source: if n.include_chain.is_empty() {
                     None // root-level node — source set by process_parsed_file
                 } else {
-                    // Derive source from last entry of include_chain
                     n.include_chain
                         .last()
                         .map(|(pkg, path)| (pkg.clone(), PathBuf::from(path)))

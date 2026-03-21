@@ -397,6 +397,18 @@ pub(crate) fn effective_namespace(stack: &[String], node_ns: Option<&str>) -> Op
 /// opener and a matching `<!-- end: pkg://path -->` closer.  In flat mode the closer marks
 /// the extent of the section where there is no `</group>` tag.  In nested mode it labels
 /// the closing `</group>` with the originating file name.
+/// Format a source label for XML comments.
+///
+/// Returns `pkg://path` when the package is non-empty, or the bare path
+/// when the package is empty (e.g. absolute includes via `--allow-unportable-paths`).
+fn format_source_label(pkg: &str, path: &std::path::Path) -> String {
+    if pkg.is_empty() {
+        path.display().to_string()
+    } else {
+        format!("{}://{}", pkg, path.display())
+    }
+}
+
 /// Emit `<!-- arg ... -->` comments for a given include boundary.
 ///
 /// Merges explicitly-forwarded args with declared defaults (explicit wins).
@@ -577,10 +589,9 @@ pub fn render_resolved_xml(
                 let vd = visual_src_depth(depth, flatten);
                 let (pkg, path) = target_src[depth].clone();
                 out.push_str(&format!(
-                    "{}<!-- source: {}://{} -->\n",
+                    "{}<!-- source: {} -->\n",
                     pad(vd),
-                    pkg,
-                    path.display()
+                    format_source_label(&pkg, &path)
                 ));
                 if !flatten {
                     out.push_str(&format!("{}<group>\n", pad(vd)));
@@ -602,10 +613,9 @@ pub fn render_resolved_xml(
                 let vd = visual_src_depth(depth, flatten);
                 let (pkg, path) = &target_src[depth];
                 out.push_str(&format!(
-                    "{}<!-- source: {}://{} -->\n",
+                    "{}<!-- source: {} -->\n",
                     pad(vd),
-                    pkg,
-                    path.display()
+                    format_source_label(pkg, path)
                 ));
                 // Emit explicit args and declared defaults for this include boundary.
                 if show_args {
@@ -618,10 +628,9 @@ pub fn render_resolved_xml(
                     );
                 }
                 out.push_str(&format!(
-                    "{}<!-- end: {}://{} -->\n",
+                    "{}<!-- end: {} -->\n",
                     pad(vd),
-                    pkg,
-                    path.display()
+                    format_source_label(pkg, path)
                 ));
             }
             continue;
@@ -637,10 +646,9 @@ pub fn render_resolved_xml(
                     out.push_str(&format!("{}</group>\n", pad(vd)));
                 }
                 out.push_str(&format!(
-                    "{}<!-- end: {}://{} -->\n",
+                    "{}<!-- end: {} -->\n",
                     pad(vd),
-                    pkg,
-                    path.display()
+                    format_source_label(&pkg, &path)
                 ));
             }
 
@@ -650,10 +658,9 @@ pub fn render_resolved_xml(
                 let vd = visual_src_depth(depth, flatten);
                 let (pkg, path) = target_src[depth].clone();
                 out.push_str(&format!(
-                    "{}<!-- source: {}://{} -->\n",
+                    "{}<!-- source: {} -->\n",
                     pad(vd),
-                    pkg,
-                    path.display()
+                    format_source_label(&pkg, &path)
                 ));
                 if !flatten {
                     out.push_str(&format!("{}<group>\n", pad(vd)));
@@ -800,10 +807,9 @@ pub fn render_resolved_xml(
             out.push_str(&format!("{}</group>\n", pad(vd)));
         }
         out.push_str(&format!(
-            "{}<!-- end: {}://{} -->\n",
+            "{}<!-- end: {} -->\n",
             pad(vd),
-            pkg,
-            path.display()
+            format_source_label(&pkg, &path)
         ));
     }
 

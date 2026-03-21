@@ -44,6 +44,9 @@ def _reset_py_resolver_state():
     R._preview_mode = True
     R._inline_params = False
     R._rosdep_fallback = False
+    R._apply_arg_defaults = True
+    R._global_arg_cascade = True
+    R._allow_unportable_paths = False
     R._rosdep_attempted.clear()
     R._env.clear()
     R._include_chain.clear()

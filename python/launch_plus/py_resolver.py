@@ -310,6 +310,21 @@ _lockfile_data: dict = {}
 # in the lockfile or AMENT_PREFIX_PATH before giving up.  Exposed as --rosdep.
 _rosdep_fallback: bool = False
 
+# ─── Strictness flags ────────────────────────────────────────────────────────
+# These flags control whether the resolver operates in strict or permissive
+# mode.  Python always resolves permissively (applies defaults, cascades
+# args); these flags add warnings when the permissive behavior is relied upon.
+#
+# apply_arg_defaults: when False (strict), warn if a DeclareLaunchArgument
+#   default is used because the arg was not explicitly provided.
+# global_arg_cascade: when False (strict), warn if a child file reads an arg
+#   that was not explicitly forwarded via <arg> in the <include> tag.
+# allow_unportable_paths: when True, downgrade unportable path errors to
+#   warnings; when False (strict), report as errors.
+_apply_arg_defaults: bool = False
+_global_arg_cascade: bool = False
+_allow_unportable_paths: bool = False
+
 # ─── Fetch directory ──────────────────────────────────────────────────────────
 # Workspace src/ directory where repositories are cloned.  Set from flags JSON.
 _fetch_dir: str = ""
@@ -1951,9 +1966,14 @@ def _resolve_xml_element(
             resolved = resolve_substitutions(fixed_value, ctx)
             ctx.args[name] = resolved
         elif name and name not in ctx.args and default is not None:
-            # <arg name="X" default="Y"/> — apply default if not already set
-            resolved = resolve_substitutions(default, ctx)
-            ctx.args[name] = resolved
+            # <arg name="X" default="Y"/> — apply default if not already set.
+            # With apply_arg_defaults=True, silently use the default.
+            # With apply_arg_defaults=False, skip — let $(arg X) fail as "undefined".
+            if _apply_arg_defaults:
+                resolved = resolve_substitutions(default, ctx)
+                ctx.args[name] = resolved
+            else:
+                resolved = default or ""
         else:
             resolved = ctx.args.get(name, default or "")
         # Record declaration: always per-file (for --show-args), flat only on first encounter
@@ -2000,8 +2020,23 @@ def _resolve_xml_element(
         cond = data.get("condition")
         if not _evaluate_condition(cond, ctx):
             return
-        file_path = resolve_substitutions(data.get("file", ""), ctx)
+        raw_file = data.get("file", "")
+        file_path = resolve_substitutions(raw_file, ctx)
         include_args = data.get("args", [])
+
+        # Check for unportable absolute paths in preview mode.
+        # Only flag paths that were hardcoded as absolute — not paths that became
+        # absolute through $(find-pkg-share ...) or $(dirname) resolution.
+        if (
+            _preview_mode
+            and os.path.isabs(file_path)
+            and "$(find-pkg-share" not in raw_file
+            and "$(dirname)" not in raw_file
+        ):
+            if _allow_unportable_paths:
+                _warn(f"unportable absolute path in include: {file_path}")
+            else:
+                _error(f"unportable absolute path in include: {file_path}")
 
         # Circular include detection
         if file_path in include_stack:
@@ -2070,8 +2105,12 @@ def _resolve_xml_element(
                     # namespace.  Without this, a grandparent's <let> value can
                     # shadow the include arg when $(var) checks vars first.
                     child_ctx = _SubstitutionContext()
-                    child_ctx.args = {**ctx.args, **child_ctx_args}
-                    child_ctx.vars = {**ctx.vars, **child_ctx_args}
+                    if _global_arg_cascade:
+                        child_ctx.args = {**ctx.args, **child_ctx_args}
+                        child_ctx.vars = {**ctx.vars, **child_ctx_args}
+                    else:
+                        child_ctx.args = dict(child_ctx_args)
+                        child_ctx.vars = dict(child_ctx_args)
                     child_ctx.env = dict(ctx.env)
                     child_ctx.launch_file_dir = os.path.dirname(real_path)
                     child_ctx.preview_mode = ctx.preview_mode
@@ -2086,8 +2125,12 @@ def _resolve_xml_element(
                         content = f.read()
                     child_elements = parse_yaml_launch(content, real_path)
                     child_ctx = _SubstitutionContext()
-                    child_ctx.args = {**ctx.args, **child_ctx_args}
-                    child_ctx.vars = {**ctx.vars, **child_ctx_args}
+                    if _global_arg_cascade:
+                        child_ctx.args = {**ctx.args, **child_ctx_args}
+                        child_ctx.vars = {**ctx.vars, **child_ctx_args}
+                    else:
+                        child_ctx.args = dict(child_ctx_args)
+                        child_ctx.vars = dict(child_ctx_args)
                     child_ctx.env = dict(ctx.env)
                     child_ctx.launch_file_dir = os.path.dirname(real_path)
                     child_ctx.preview_mode = ctx.preview_mode
@@ -2436,8 +2479,11 @@ def _resolve_element_to_ir(
             resolved = resolve_substitutions(fixed_value, ctx)
             ctx.args[name] = resolved
         elif name and name not in ctx.args and default is not None:
-            resolved = resolve_substitutions(default, ctx)
-            ctx.args[name] = resolved
+            if _apply_arg_defaults:
+                resolved = resolve_substitutions(default, ctx)
+                ctx.args[name] = resolved
+            else:
+                resolved = default or ""
         else:
             resolved = ctx.args.get(name, default or "")
         if name:
@@ -3648,6 +3694,14 @@ def _apply_declared_arg(arg: "_DeclaredArg", context) -> None:
         _record_declared_arg(arg.name, raw, flat=not already_seen)
         return
 
+    # In strict mode (apply_arg_defaults=False), skip applying the default.
+    # LaunchConfiguration.perform() will return None, surfacing as "undefined variable".
+    if not _apply_arg_defaults:
+        _record_declared_arg(arg.name, "", flat=arg.name not in _declared_arg_names)
+        if arg.name not in _declared_arg_names:
+            _declared_arg_names.add(arg.name)
+        return
+
     # Store the default as a _DeferredDefault — resolution is deferred until the
     # value is actually read via LaunchConfiguration.perform().  This avoids
     # eagerly resolving FindPackageShare for packages that may not be installed
@@ -4346,6 +4400,10 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
         entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
         # Apply child launch arguments: explicit include args override parent context.
+        # In strict mode (global_arg_cascade=False), strip parent context so the
+        # child only sees explicitly forwarded args + its own DeclareLaunchArgument.
+        if not _global_arg_cascade:
+            parent_context._launch_configurations.clear()
         for k, v in child_args.items():
             parent_context._launch_configurations[k] = v
 
@@ -5297,11 +5355,15 @@ def main():
 
     # Load workflow flags.
     global _preview_mode, _inline_params, _rosdep_fallback
+    global _apply_arg_defaults, _global_arg_cascade, _allow_unportable_paths
     flags = stdin_data.get("flags", {})
     _apply_opaque_file_access = bool(flags.get("apply_opaque_file_access", False))
     _preview_mode = bool(flags.get("preview", True))
     _inline_params = bool(flags.get("inline_params", False))
     _rosdep_fallback = bool(flags.get("rosdep_fallback", False))
+    _apply_arg_defaults = bool(flags.get("apply_arg_defaults", False))
+    _global_arg_cascade = bool(flags.get("global_arg_cascade", False))
+    _allow_unportable_paths = bool(flags.get("allow_unportable_paths", False))
     # lockfile_packages: dict of pkg → {repo, path, url, version}
     lf_data = flags.get("lockfile_packages", {})
     _lockfile_data = lf_data if isinstance(lf_data, dict) else {}

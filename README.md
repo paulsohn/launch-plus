@@ -107,7 +107,6 @@ cargo run --bin launch-plus -- resolve -d autoware_launch autoware.launch.xml \
   --allow-including-unportable-path \
   --show-args \
   --inline-params \
-  --flatten-namespaces \
   --rosdep \
   --preview \
   > resolved.launch.xml

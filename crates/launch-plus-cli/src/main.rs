@@ -197,30 +197,10 @@ enum Commands {
         ///
         /// `<!-- source: pkg://... -->` comments are still emitted for traceability.
         ///
-        /// `<group>` elements that contain a `<push-ros-namespace>` are preserved so
-        /// namespace semantics are not broken.  Combine with `--flatten-namespaces` to
-        /// inline those namespaces too, producing a completely group-free output.
+        /// Namespace stacks are always flattened onto each `<node>` element as a
+        /// `namespace=` attribute, so the output is completely group-free.
         #[arg(long)]
         flatten: bool,
-
-        /// Inline namespace stacks directly onto each `<node>` element instead of
-        /// preserving `<push-ros-namespace>` wrappers.
-        ///
-        /// By default the resolved XML preserves `<push-ros-namespace namespace="..."/>`
-        /// inside `<group>` elements, faithfully representing how namespaces are applied
-        /// in the source launch tree.
-        ///
-        /// With this flag each node's fully composed effective namespace is emitted as a
-        /// `namespace=` attribute on the `<node>` element and `<push-ros-namespace>` is
-        /// omitted.  Nodes from the same source file are grouped into a single `<group>`
-        /// container regardless of their namespace context.  The resulting XML is
-        /// semantically equivalent to the default output at `ros2 launch` time.
-        ///
-        /// Useful for flattening deeply nested namespace hierarchies into a more readable,
-        /// single-file layout.
-        // flatten_namespaces is always enabled — namespaces are resolved into node attributes.
-        #[arg(long, default_value_t = true, hide = true)]
-        flatten_namespaces: bool,
 
         /// Emit `<!-- arg name="..." value="..." -->` comments at each include boundary.
         ///
@@ -733,7 +713,6 @@ fn main() -> Result<()> {
             apply_opaque_file_access,
             inline_params,
             flatten,
-            flatten_namespaces,
             show_args,
             rosdep,
             warn_all,
@@ -761,7 +740,6 @@ fn main() -> Result<()> {
                 report,
                 preview,
                 flatten,
-                flatten_namespaces,
                 show_args,
                 false, // suppress_xml — resolve always emits XML
                 false, // strict — resolve exits non-zero only on errors
@@ -1005,7 +983,6 @@ fn main() -> Result<()> {
                 false, // report
                 preview,
                 false, // flatten
-                true,  // flatten_namespaces
                 false, // show_args — irrelevant, XML is suppressed
                 true,  // suppress_xml — check never writes resolved XML to stdout
                 strict,
@@ -1593,7 +1570,6 @@ fn cmd_resolve(
     report: bool,
     preview: bool,
     flatten: bool,
-    flatten_namespaces: bool,
     show_args: bool,
     suppress_xml: bool,
     strict: bool,
@@ -1635,7 +1611,6 @@ fn cmd_resolve(
             package,
             launcher,
             &result.nodes,
-            flatten_namespaces,
             flatten,
             &result.include_args,
             show_args,

@@ -811,37 +811,18 @@ is deferred to future work.
 
 ---
 
-## 15. `--flatten-namespaces`: Inline Namespace Stack into Node Attributes
+## 15. Namespace Flattening (Always Active)
 
 ### Feature Overview
 
-By default, `launch-plus resolve` preserves `<push-ros-namespace>` wrappers inside
-`<group>` elements.  The `--flatten-namespaces` flag changes this: the full namespace
-is eagerly applied as a `namespace=` attribute directly on each `<node>` element, and
+`launch-plus resolve` always flattens namespace stacks: the full namespace is
+applied as a `namespace=` attribute directly on each `<node>` element, and
 `<push-ros-namespace>` is omitted entirely from the output.
 
 This means each launch-file boundary produces **one `<group>` element** (as a pure
 source-traceability container) rather than splitting into sub-groups per namespace.
 
-```bash
-# Default: preserve push-ros-namespace
-launch-plus resolve autoware_launch autoware.launch.xml ...
-
-# Flatten: inline namespace into each node
-launch-plus resolve autoware_launch autoware.launch.xml --flatten-namespaces ...
-```
-
-**Default output (without flag):**
-```xml
-<group>
-  <!-- source: tier4_sensing_launch://launch/sensing.launch.xml -->
-  <push-ros-namespace namespace="/sensing/lidar"/>
-  <node pkg="lidar_driver" exec="driver_node"/>
-  <node pkg="lidar_filter" exec="filter_node"/>
-</group>
-```
-
-**Flattened output (with `--flatten-namespaces`):**
+**Output:**
 ```xml
 <!-- source: tier4_sensing_launch://launch/sensing.launch.xml -->
 <group>
@@ -880,10 +861,8 @@ Both produce the same effective node namespace.  The `<group>` element without a
 <node pkg="a" exec="b" namespace="/override"/> <!-- absolute: replaces stack → /override -->
 ```
 
-- **Normal mode:** `<push-ros-namespace namespace="/sensing"/>` in `<group>`; nodes emit
-  only the _extra_ part: `namespace="lidar"` or `namespace="/override"` respectively.
-- **Flatten mode:** each node gets its fully composed `node.namespace` value:
-  `namespace="/sensing/lidar"` and `namespace="/override"`.  No information is lost.
+Each node gets its fully composed `node.namespace` value:
+`namespace="/sensing/lidar"` and `namespace="/override"`.  No information is lost.
 
 #### EC-15.2: Absolute `namespace=` on `<push-ros-namespace>` resets the stack
 
@@ -895,15 +874,14 @@ components.
 **Example:** Stack `["sensing", "/abs"]` currently produces `/sensing/abs`, not `/abs`.
 
 > **Known gap** (pre-existing): absolute namespace reset within nested
-> `<push-ros-namespace>` stacks is not modeled correctly.  This affects both normal and
-> flatten mode equally; `--flatten-namespaces` does not worsen the situation.
+> `<push-ros-namespace>` stacks is not modeled correctly.
 >
 > Tracked as part of M9.5 (Unified Resolver IR).
 
 #### EC-15.3: Nodes with no namespace (empty stack, no explicit `namespace=`)
 
 - `node.namespace` is `None`.
-- In flatten mode: `namespace=` attribute is omitted.  Output is identical in both modes.
+- `namespace=` attribute is omitted from the output.
 
 #### EC-15.4: Remappings with relative topic names
 
@@ -911,10 +889,9 @@ components.
 remappings=[("~/input/twist", "/sensing/velocity"), ("output", "concat/pc")]
 ```
 
-- **Normal mode:** Relative topics (`output`) are resolved at runtime by ROS 2 relative
-  to the node's effective namespace (set by `<push-ros-namespace>`).
-- **Flatten mode:** Same runtime semantics, since the node's effective namespace is now
-  set by the `namespace=` attribute instead.  **No behavioral difference.**
+Relative topics (`output`) are resolved at runtime by ROS 2 relative
+to the node's effective namespace (set by the `namespace=` attribute).
+**No behavioral difference** from `<push-ros-namespace>` form.
 
 #### EC-15.5: OpaqueFunction-derived namespace pushes (Python launch files)
 
@@ -922,8 +899,7 @@ Python launch files may call `PushRosNamespace(...)` inside an `OpaqueFunction`.
 If the function succeeds, the namespace is captured in `namespace_stack`.
 If the function fails (missing params, missing files), the namespace is **not** captured.
 
-- In both modes this limitation is the same; `--flatten-namespaces` does not worsen it.
-- When the namespace IS captured, flatten mode correctly inlines it.
+- When the namespace IS captured, it is correctly inlined onto nodes.
 
 #### EC-15.6: Non-consecutive nodes from the same file
 

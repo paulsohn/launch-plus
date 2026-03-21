@@ -264,8 +264,8 @@ Here is what the resolver can and cannot verify.
 - **Parameter file validity** — with `--inline-params`, YAML parameter files are
   parsed and their structure validated (must follow ROS 2 `ros__parameters`
   conventions)
-- **Namespace composition** — with `--flatten-namespaces`, the full namespace
-  stack is computed for every node
+- **Namespace composition** — the full namespace stack is computed for every
+  node and flattened onto the `namespace=` attribute
 - **OpaqueFunction execution** — Python callables are executed (not just parsed),
   so runtime errors in OpaqueFunction bodies are caught during resolution
 

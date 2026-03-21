@@ -278,7 +278,7 @@ All scope-level mutations (`PushROSNamespace`, `SetEnv`, `UnsetEnv`, `SetParamet
 2. **Concrete** — Every `str` field is a resolved value; no `$(...)` substitutions remain.
 3. **No conditions** — Every action in the output is unconditional. Conditions were evaluated during resolution.
 4. **Deterministic** — Same inputs → same IR.
-5. **Namespace and env are effective** — Each node carries its computed effective namespace and environment. Procedural scope actions (`PushROSNamespace`, `SetEnv`, `UnsetEnv`) are consumed; only their effects survive in node fields. Namespaces are always flattened (`--flatten-namespaces` is implicit).
+5. **Namespace and env are effective** — Each node carries its computed effective namespace and environment. Procedural scope actions (`PushROSNamespace`, `SetEnv`, `UnsetEnv`) are consumed; only their effects survive in node fields. Namespaces are always flattened onto node attributes.
 6. **Declarative only** — No procedural actions (push/pop/set/unset for scope) survive in the IR. Only declarative actions (nodes, parameters, remaps, groups) remain.
 
 ---

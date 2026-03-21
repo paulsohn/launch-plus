@@ -265,7 +265,7 @@ pub fn resolve_launch_recursive(
 
     // Start with the entrypoint; CLI args apply only to this top-level file
     let share_path = PathBuf::from("launch").join(launcher);
-    resolve_file_recursive(
+    resolve_launch_file(
         lockfile,
         &locator,
         package,
@@ -277,7 +277,6 @@ pub fn resolve_launch_recursive(
         &mut result,
         &mut fetched_packages,
         &mut failed_repos,
-        vec![], // parent_chain: empty Vec<(String, PathBuf)> for root
     );
 
     info!(
@@ -1293,11 +1292,11 @@ fn resolve_python_file_recursive(
     );
 }
 
-/// Internal recursive resolver
+/// Resolve a single launch file by routing it to the Python resolver.
 ///
-/// This function is resilient - it catches errors and records them
-/// while continuing to resolve as much as possible.
-fn resolve_file_recursive(
+/// Python handles all parsing, substitution resolution, and include
+/// traversal internally.  This function is the Rust→Python bridge.
+fn resolve_launch_file(
     lockfile: &Lockfile,
     locator: &PackageLocator,
     package: &str,
@@ -1309,27 +1308,7 @@ fn resolve_file_recursive(
     result: &mut ResolveResult,
     fetched_packages: &mut HashSet<String>,
     failed_repos: &mut HashSet<String>,
-    parent_chain: Vec<(String, PathBuf)>,
 ) {
-    // Cycle detection: if this exact file already appears anywhere in the current
-    // include chain (parent → grandparent → ...) we are in a recursive include loop
-    // — stop immediately.  This is the only guard needed; explicit deduplication of
-    // same-file same-args invocations is intentionally absent because ROS 2's launch
-    // system treats every <include> as an independent instantiation, and two includes
-    // of the same file (even with identical args) may produce distinct nodes when
-    // wrapped in different PushRosNamespace / <group namespace="..."> contexts.
-    if parent_chain
-        .iter()
-        .any(|(p, s)| p == package && s == share_path)
-    {
-        debug!(
-            "Cycle detected for {}:{}, stopping recursion",
-            package,
-            share_path.display()
-        );
-        return;
-    }
-
     debug!(
         "Resolving launch file: {}:{}",
         package,
@@ -1338,7 +1317,7 @@ fn resolve_file_recursive(
 
     // Route ALL file types through the Python resolver.
     // py_resolver.py detects the format by extension and handles XML/YAML/Python
-    // uniformly, including cross-format includes.
+    // uniformly, including cross-format includes and cycle detection.
     if is_python_launch_file(share_path)
         || is_xml_launch_file(share_path)
         || share_path
@@ -1357,7 +1336,7 @@ fn resolve_file_recursive(
             result,
             fetched_packages,
             failed_repos,
-            parent_chain,
+            vec![], // root-level: no parent chain
         );
         return;
     }

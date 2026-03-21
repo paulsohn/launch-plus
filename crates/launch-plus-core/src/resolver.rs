@@ -387,14 +387,11 @@ pub(crate) fn effective_namespace(stack: &[String], node_ns: Option<&str>) -> Op
 /// **Flatten groups (`flatten=true`):** Source-boundary `<group>` wrappers are suppressed.
 /// Nodes from non-root files carry a `<!-- source: pkg://path -->` comment keyed to the
 /// actual leaf file (not the top-level component boundary), with a matching
-/// `<!-- end: pkg://path -->` comment after each section.  Namespace groups
-/// (`<group><push-ros-namespace>`) are still emitted unless `flatten_namespaces` is also set.
+/// `<!-- end: pkg://path -->` comment after each section.
 ///
-/// **Flatten namespaces (`flatten_namespaces=true`):** `<push-ros-namespace>` inner groups
-/// are suppressed; the fully composed `namespace=` value is emitted directly on each `<node>`
-/// element.  Source groups are unaffected.  Combined with `flatten`, produces entirely
-/// group-free output.  A `<!-- end: pkg://path -->` comment is emitted after each source
-/// `</group>` to aid readability (source groups are the only structural elements in this mode).
+/// Namespaces are always flattened: `<push-ros-namespace>` inner groups are suppressed;
+/// the fully composed `namespace=` value is emitted directly on each `<node>` element.
+/// Combined with `flatten`, produces entirely group-free output.
 ///
 /// **End comments:** Each source section is bracketed by a `<!-- source: pkg://path -->`
 /// opener and a matching `<!-- end: pkg://path -->` closer.  In flat mode the closer marks
@@ -460,7 +457,6 @@ pub fn render_resolved_xml(
     package: &str,
     launcher: &str,
     nodes: &[ResolvedNode],
-    flatten_namespaces: bool,
     flatten: bool,
     include_args: &HashMap<(String, PathBuf), IncludeArgContext>,
     show_args: bool,
@@ -542,12 +538,8 @@ pub fn render_resolved_xml(
             full_stack
         };
 
-        // Namespace target: empty when flattening namespaces (baked into node attribute).
-        let target_ns: Vec<String> = if flatten_namespaces {
-            vec![]
-        } else {
-            node.namespace_stack.clone()
-        };
+        // Namespaces are always flattened (baked into node namespace= attribute).
+        let target_ns: Vec<String> = vec![];
 
         let common = common_prefix_len(&open_src, &target_src);
         let src_changing = common < open_src.len() || open_src.len() < target_src.len();
@@ -1376,7 +1368,6 @@ mod tests {
             "launcher.launch.xml",
             &nodes,
             false,
-            false,
             &HashMap::new(),
             false,
             &HashMap::new(),
@@ -1431,127 +1422,6 @@ mod tests {
             line.starts_with("  <node"),
             "ungrouped node should be at 2-space indent, got: {:?}",
             line
-        );
-    }
-
-    #[test]
-    fn test_render_resolved_xml_push_ros_namespace_boundary() {
-        // Nodes with a namespace_stack should be wrapped in a <group> that includes a
-        // <push-ros-namespace> element.  The node's namespace= attribute should be omitted
-        // when it is fully covered by the stack; it should be preserved when the node has an
-        // additional explicit namespace beyond the stack.
-        let src_a = (
-            "sensing_launch".to_string(),
-            PathBuf::from("launch/sensing.launch.xml"),
-        );
-
-        let nodes = vec![
-            // Stack only — namespace= on <node> should be omitted.
-            ResolvedNode {
-                package: "lidar_pkg".to_string(),
-                executable: "lidar_node".to_string(),
-                name: Some("lidar".to_string()),
-                namespace: Some("/sensing/lidar".to_string()), // effective = stack only
-                explicit_namespace: None,
-                namespace_stack: vec!["sensing".to_string(), "lidar".to_string()],
-                parameters: Default::default(),
-                remappings: vec![],
-                env: Default::default(),
-                source: Some(src_a.clone()),
-                include_chain: vec![],
-                kind: NodeKind::Node,
-                param_files: vec![],
-                output: None,
-                args: None,
-                respawn: None,
-                respawn_delay: None,
-            },
-            // Second node with same context — same group.
-            ResolvedNode {
-                package: "radar_pkg".to_string(),
-                executable: "radar_node".to_string(),
-                name: None,
-                namespace: Some("/sensing/lidar".to_string()),
-                explicit_namespace: None,
-                namespace_stack: vec!["sensing".to_string(), "lidar".to_string()],
-                parameters: Default::default(),
-                remappings: vec![],
-                env: Default::default(),
-                source: Some(src_a.clone()),
-                include_chain: vec![],
-                kind: NodeKind::Node,
-                param_files: vec![],
-                output: None,
-                args: None,
-                respawn: None,
-                respawn_delay: None,
-            },
-            // Node with no namespace stack — flat, no push-ros-namespace.
-            ResolvedNode {
-                package: "planning_pkg".to_string(),
-                executable: "planner".to_string(),
-                name: None,
-                namespace: None,
-                explicit_namespace: None,
-                namespace_stack: vec![],
-                parameters: Default::default(),
-                remappings: vec![],
-                env: Default::default(),
-                source: None,
-                include_chain: vec![],
-                kind: NodeKind::Node,
-                param_files: vec![],
-                output: None,
-                args: None,
-                respawn: None,
-                respawn_delay: None,
-            },
-        ];
-
-        let xml = render_resolved_xml(
-            "my_pkg",
-            "top.launch.xml",
-            &nodes,
-            false,
-            false,
-            &HashMap::new(),
-            false,
-            &HashMap::new(),
-            &HashMap::new(),
-        );
-
-        // Two <group> elements: one source group for src_a, one namespace sub-group inside it.
-        assert_eq!(
-            xml.matches("<group>").count(),
-            2,
-            "expected 2 groups (source + namespace)\n{xml}"
-        );
-        assert_eq!(xml.matches("</group>").count(), 2);
-
-        // <push-ros-namespace> should appear inside the inner (namespace) group.
-        assert!(
-            xml.contains("<push-ros-namespace namespace=\"/sensing/lidar\"/>"),
-            "missing push-ros-namespace\n{xml}"
-        );
-
-        // The lidar and radar <node> elements should NOT carry a namespace= attribute since
-        // the stack fully covers it.  (The <push-ros-namespace> element itself does have
-        // namespace=, so we check the <node> lines specifically.)
-        for line in xml.lines() {
-            if line.trim_start().starts_with("<node") {
-                assert!(
-                    !line.contains("namespace="),
-                    "<node> should not have namespace= when covered by push-ros-namespace: {line}"
-                );
-            }
-        }
-
-        // The planning_pkg node has no stack — it should appear after the first </group>, flat.
-        let group_close_idx = xml.find("</group>").expect("no </group>");
-        let plan_idx = xml.find("planning_pkg").expect("planning_pkg missing");
-        assert!(
-            plan_idx > group_close_idx,
-            "planning_pkg should appear after </group>\n{xml}"
         );
     }
 
@@ -1631,7 +1501,6 @@ mod tests {
             "my_pkg",
             "root.launch.xml",
             &nodes,
-            false,
             false,
             &HashMap::new(),
             false,
@@ -1743,9 +1612,9 @@ mod tests {
     }
 
     #[test]
-    fn test_render_resolved_xml_flatten_namespaces() {
+    fn test_render_resolved_xml_namespace_on_nodes() {
         // Two nodes from the same file in /sensing/lidar namespace, one node from another
-        // file in /planning namespace.  With --flatten-namespaces:
+        // file in /planning namespace.  Namespaces are always flattened:
         // - No <push-ros-namespace> emitted
         // - namespace= attribute appears directly on each node that has one
         // - Same-source nodes end up in one group regardless of namespace stack differences
@@ -1825,24 +1694,22 @@ mod tests {
             "top.launch.xml",
             &nodes,
             true,
-            false,
             &HashMap::new(),
             false,
             &HashMap::new(),
             &HashMap::new(),
         );
 
-        // No push-ros-namespace anywhere.
+        // No push-ros-namespace anywhere (namespaces always flattened onto nodes).
         assert!(
             !xml.contains("<push-ros-namespace"),
-            "push-ros-namespace should be absent in flatten mode\n{xml}"
+            "push-ros-namespace should be absent\n{xml}"
         );
 
-        // Two groups: one per source file.
-        assert_eq!(
-            xml.matches("<group>").count(),
-            2,
-            "expected 2 groups in flatten mode\n{xml}"
+        // flatten=true suppresses source-boundary groups; namespaces always on nodes.
+        assert!(
+            !xml.contains("<group>"),
+            "no groups expected with flatten=true\n{xml}"
         );
 
         // Each node must carry its own namespace= attribute.
@@ -1861,109 +1728,8 @@ mod tests {
     }
 
     #[test]
-    fn test_render_resolved_xml_flatten_no_groups_except_ns() {
-        // --flatten: source-boundary <group>s are suppressed; nodes emitted flat.
-        // A node with a non-empty namespace_stack still gets a <group> + <push-ros-namespace>.
-        let src_a = (
-            "sensor_launch".to_string(),
-            PathBuf::from("launch/sensing.launch.xml"),
-        );
-        let src_b = (
-            "planner_launch".to_string(),
-            PathBuf::from("launch/planning.launch.xml"),
-        );
-
-        let nodes = vec![
-            // No namespace stack → should appear flat (no group) under --flatten.
-            ResolvedNode {
-                package: "sensor_pkg".to_string(),
-                executable: "sensor_node".to_string(),
-                name: None,
-                namespace: None,
-                explicit_namespace: None,
-                namespace_stack: vec![],
-                parameters: Default::default(),
-                remappings: vec![],
-                env: Default::default(),
-                source: Some(src_a.clone()),
-                include_chain: vec![],
-                kind: NodeKind::Node,
-                param_files: vec![],
-                output: None,
-                args: None,
-                respawn: None,
-                respawn_delay: None,
-            },
-            // Non-empty namespace stack → still wrapped in <group>+<push-ros-namespace>.
-            ResolvedNode {
-                package: "lidar_pkg".to_string(),
-                executable: "lidar_node".to_string(),
-                name: None,
-                namespace: Some("/sensing/lidar".to_string()),
-                explicit_namespace: None,
-                namespace_stack: vec!["sensing".to_string(), "lidar".to_string()],
-                parameters: Default::default(),
-                remappings: vec![],
-                env: Default::default(),
-                source: Some(src_b.clone()),
-                include_chain: vec![],
-                kind: NodeKind::Node,
-                param_files: vec![],
-                output: None,
-                args: None,
-                respawn: None,
-                respawn_delay: None,
-            },
-        ];
-
-        let xml = render_resolved_xml(
-            "my_pkg",
-            "top.launch.xml",
-            &nodes,
-            false,
-            true,
-            &HashMap::new(),
-            false,
-            &HashMap::new(),
-            &HashMap::new(),
-        );
-
-        // Only one <group> — the one wrapping the namespace node.
-        assert_eq!(
-            xml.matches("<group>").count(),
-            1,
-            "expected 1 group (ns-only)\n{xml}"
-        );
-        assert!(
-            xml.contains("<push-ros-namespace"),
-            "push-ros-namespace missing\n{xml}"
-        );
-
-        // sensor_node has no namespace stack → must appear flat (no surrounding <group>).
-        // Verify it is present and NOT inside a <group>...</group> block.
-        assert!(xml.contains("sensor_node"), "sensor_node missing\n{xml}");
-        let sensor_idx = xml.find("sensor_node").unwrap();
-        let group_idx = xml.find("<group>").unwrap();
-        assert!(
-            sensor_idx < group_idx,
-            "sensor_node should appear before the namespace group\n{xml}"
-        );
-
-        // End comments should be present for each source section.
-        assert!(
-            xml.contains("<!-- end:"),
-            "end comment missing in flatten mode\n{xml}"
-        );
-        assert_eq!(
-            xml.matches("<!-- end:").count(),
-            2,
-            "expected one end comment per source\n{xml}"
-        );
-    }
-
-    #[test]
-    fn test_render_resolved_xml_flatten_and_flatten_namespaces_no_groups() {
-        // --flatten --flatten-namespaces: completely group-free output.
+    fn test_render_resolved_xml_flatten_no_groups() {
+        // --flatten: completely group-free output (namespaces always on nodes).
         let src_a = (
             "sensor_launch".to_string(),
             PathBuf::from("launch/sensing.launch.xml"),
@@ -2014,7 +1780,6 @@ mod tests {
             "my_pkg",
             "top.launch.xml",
             &nodes,
-            true,
             true,
             &HashMap::new(),
             false,
@@ -2113,7 +1878,6 @@ mod tests {
             "root_pkg",
             "root.launch.xml",
             &nodes,
-            false,
             false,
             &HashMap::new(),
             false,

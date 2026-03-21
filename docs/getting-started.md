@@ -103,9 +103,6 @@ fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
 # Expand <param from="file.yaml"/> entries inline
 --inline-params
 
-# Fold namespace stacks onto each <node> element
---flatten-namespaces
-
 # Allow OpaqueFunction bodies to read parameter files
 --apply-opaque-file-access
 

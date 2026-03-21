@@ -319,8 +319,9 @@ fn run_py_resolver(
     use std::io::Write;
     use std::process::{Command, Stdio};
 
-    // Write the shim script to a unique temp file per invocation to avoid races
-    // when multiple launch-plus processes run concurrently.
+    // Write the shim script to a PID-keyed temp file to avoid races when multiple
+    // launch-plus processes run concurrently.  Within a single process, the file
+    // content is identical (PY_RESOLVER_SCRIPT is constant), so reuse is safe.
     let tmp_dir = std::env::temp_dir().join("launch-plus");
     std::fs::create_dir_all(&tmp_dir)
         .map_err(|e| crate::Error::PythonResolver(format!("failed to create tmp dir: {e}")))?;

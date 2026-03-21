@@ -2263,42 +2263,46 @@ class TestStrictnessFlags:
 
     def test_global_arg_cascade_true_inherits_parent_args(self):
         R._global_arg_cascade = True
-        R._package_shares["child_pkg"] = "/tmp/test_child"
-        os.makedirs("/tmp/test_child/launch", exist_ok=True)
-        with open("/tmp/test_child/launch/child.launch.xml", "w") as f:
-            f.write('<launch><arg name="x" default="fallback"/></launch>')
-        ctx = R._SubstitutionContext()
-        ctx.args = {"x": "from_parent"}
-        elements = R.parse_xml_launch(
-            "<launch>"
-            '<include file="$(find-pkg-share child_pkg)'
-            '/launch/child.launch.xml"/>'
-            "</launch>",
-            "test.xml",
-        )
-        R.resolve_xml_elements(elements, ctx)
-        # Child sees parent arg — no error
-        assert not R._tracked["errors"]
+        with tempfile.TemporaryDirectory() as child_share:
+            R._package_shares["child_pkg"] = child_share
+            launch_dir = os.path.join(child_share, "launch")
+            os.makedirs(launch_dir, exist_ok=True)
+            with open(os.path.join(launch_dir, "child.launch.xml"), "w") as f:
+                f.write('<launch><arg name="x" default="fallback"/></launch>')
+            ctx = R._SubstitutionContext()
+            ctx.args = {"x": "from_parent"}
+            elements = R.parse_xml_launch(
+                "<launch>"
+                '<include file="$(find-pkg-share child_pkg)'
+                '/launch/child.launch.xml"/>'
+                "</launch>",
+                "test.xml",
+            )
+            R.resolve_xml_elements(elements, ctx)
+            # Child sees parent arg — no error
+            assert not R._tracked["errors"]
 
     def test_global_arg_cascade_false_no_parent_args(self):
         R._global_arg_cascade = False
         R._apply_arg_defaults = False
-        R._package_shares["child_pkg"] = "/tmp/test_child2"
-        os.makedirs("/tmp/test_child2/launch", exist_ok=True)
-        with open("/tmp/test_child2/launch/child.launch.xml", "w") as f:
-            f.write('<launch><arg name="x"/><let name="y" value="$(arg x)"/></launch>')
-        ctx = R._SubstitutionContext()
-        ctx.args = {"x": "from_parent"}
-        elements = R.parse_xml_launch(
-            "<launch>"
-            '<include file="$(find-pkg-share child_pkg)'
-            '/launch/child.launch.xml"/>'
-            "</launch>",
-            "test.xml",
-        )
-        R.resolve_xml_elements(elements, ctx)
-        # Child can't see parent arg — undefined error
-        assert any("undefined" in e for e in R._tracked["errors"])
+        with tempfile.TemporaryDirectory() as child_share:
+            R._package_shares["child_pkg"] = child_share
+            launch_dir = os.path.join(child_share, "launch")
+            os.makedirs(launch_dir, exist_ok=True)
+            with open(os.path.join(launch_dir, "child.launch.xml"), "w") as f:
+                f.write('<launch><arg name="x"/><let name="y" value="$(arg x)"/></launch>')
+            ctx = R._SubstitutionContext()
+            ctx.args = {"x": "from_parent"}
+            elements = R.parse_xml_launch(
+                "<launch>"
+                '<include file="$(find-pkg-share child_pkg)'
+                '/launch/child.launch.xml"/>'
+                "</launch>",
+                "test.xml",
+            )
+            R.resolve_xml_elements(elements, ctx)
+            # Child can't see parent arg — undefined error
+            assert any("undefined" in e for e in R._tracked["errors"])
 
     def test_allow_unportable_paths_false_errors(self):
         R._allow_unportable_paths = False

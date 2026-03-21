@@ -319,11 +319,12 @@ fn run_py_resolver(
     use std::io::Write;
     use std::process::{Command, Stdio};
 
-    // Write the shim script to a temp file (always overwrite so updates take effect)
+    // Write the shim script to a unique temp file per invocation to avoid races
+    // when multiple launch-plus processes run concurrently.
     let tmp_dir = std::env::temp_dir().join("launch-plus");
     std::fs::create_dir_all(&tmp_dir)
         .map_err(|e| crate::Error::Git(format!("failed to create tmp dir: {e}")))?;
-    let script_path = tmp_dir.join("py_resolver.py");
+    let script_path = tmp_dir.join(format!("py_resolver_{}.py", std::process::id()));
     {
         let mut f = std::fs::File::create(&script_path)
             .map_err(|e| crate::Error::Git(format!("failed to write py_resolver.py: {e}")))?;
@@ -1094,12 +1095,17 @@ fn process_parsed_file(
     }
 
     // Store declared args for --show-args.
-    // The root file's args come from declared_arg_defaults.
-    result.declared_args_by_file.insert(
-        (package.to_string(), share_path.to_path_buf()),
-        parsed.declared_arg_defaults.clone(),
-    );
-    // Per-file declared args from included files come from declared_args_by_file.
+    // Prefer per-file mapping; ensure the root file has an entry (empty if it
+    // declared no args).  Using declared_arg_defaults for the root key would
+    // incorrectly attribute included files' args to the root when the root
+    // declares no args itself.
+    let root_key = (package.to_string(), share_path.to_path_buf());
+    let root_args = parsed
+        .declared_args_by_file
+        .get(&root_key)
+        .cloned()
+        .unwrap_or_default();
+    result.declared_args_by_file.insert(root_key, root_args);
     for (key, args) in &parsed.declared_args_by_file {
         result
             .declared_args_by_file
@@ -1113,14 +1119,28 @@ fn process_parsed_file(
     for include in parsed.launch_includes {
         let key = (include.package.clone(), include.share_path.clone());
         // Populate include_args for --show-args rendering.
-        result
-            .include_args
-            .entry(key.clone())
-            .or_insert_with(|| IncludeArgContext {
-                explicit: include.explicit_args.clone(),
-                with_cascade: HashMap::new(),
-                namespace_stack: include.namespace_stack.clone(),
-            });
+        if let Some(existing) = result.include_args.get(&key) {
+            // Detect divergent argument contexts for the same included file.
+            if existing.explicit != include.explicit_args
+                || existing.namespace_stack != include.namespace_stack
+            {
+                warn!(
+                    "File {:?} from package {:?} is included multiple times with different \
+                     argument contexts; --show-args will use the first include site's args \
+                     and namespace stack.",
+                    key.1, key.0
+                );
+            }
+        } else {
+            result.include_args.insert(
+                key.clone(),
+                IncludeArgContext {
+                    explicit: include.explicit_args.clone(),
+                    with_cascade: HashMap::new(),
+                    namespace_stack: include.namespace_stack.clone(),
+                },
+            );
+        }
         if !result
             .launch_files
             .iter()

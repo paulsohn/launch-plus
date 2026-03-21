@@ -1121,13 +1121,38 @@ fn render_container_node(
             tag.push_str(&format!(" namespace=\"{}\"", xml_escape(ns)));
         }
     }
-    let has_children = !plugins.is_empty() || !node.env.is_empty();
+    // ComposableNodeContainer IS a Node — render params, param_files, remaps, env
+    // in addition to plugins.
+    let has_children = !plugins.is_empty()
+        || !node.param_files.is_empty()
+        || !node.parameters.is_empty()
+        || !node.remappings.is_empty()
+        || !node.env.is_empty();
     if !has_children {
         tag.push_str("/>\n");
         out.push_str(&tag);
     } else {
         tag.push_str(">\n");
         out.push_str(&tag);
+        for pf in &node.param_files {
+            render_param_file(pf, child_ind, out);
+        }
+        for (key, value) in &node.parameters {
+            out.push_str(&format!(
+                "{}<param name=\"{}\" value=\"{}\"/>\n",
+                child_ind,
+                xml_escape(key),
+                xml_escape(value)
+            ));
+        }
+        for (from, to) in &node.remappings {
+            out.push_str(&format!(
+                "{}<remap from=\"{}\" to=\"{}\"/>\n",
+                child_ind,
+                xml_escape(from),
+                xml_escape(to)
+            ));
+        }
         for (name, value) in &node.env {
             out.push_str(&format!(
                 "{}<env name=\"{}\" value=\"{}\"/>\n",

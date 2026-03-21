@@ -655,7 +655,7 @@ _inline_params: bool = False
 
 # Scoped global parameters set by <set_parameter> at group level.
 # Accumulated during resolution; merged into each node's parameters.
-_global_params: list[tuple[str, str]] = []
+_global_params: list[tuple[str, Any]] = []
 
 # Scoped global remappings set by <set_remap> at group level.
 # Accumulated during resolution; merged into each node's remappings.
@@ -2181,7 +2181,7 @@ def _resolve_xml_element(
         params, param_files = _resolve_params_xml(data.get("params", []), ctx)
         remaps = _resolve_remaps_xml(data.get("remaps", []), ctx)
         # Merge scoped global params/remaps/param_files (global first, node-local overrides)
-        merged_params = dict(_global_params)
+        merged_params = {k: str(v) for k, v in _global_params}
         merged_params.update(params)
         merged_param_files = list(_global_param_files) + param_files
         merged_remaps = list(_global_remaps) + remaps
@@ -2236,7 +2236,7 @@ def _resolve_xml_element(
                 "name": name or "",
                 "namespace_stack": list(_namespace_stack),
                 "explicit_namespace": ns,
-                "parameters": dict(_global_params),
+                "parameters": {k: str(v) for k, v in _global_params},
                 "param_files": list(_global_param_files),
                 "remappings": list(_global_remaps),
                 "env": env,
@@ -2259,6 +2259,9 @@ def _resolve_xml_element(
 
         plugins = _resolve_composable_plugins_xml(data.get("composable_nodes", []), ctx)
 
+        # LoadComposableNode does NOT inherit global params/remaps/param_files.
+        # In ROS 2, only Node/LifecycleNode/ComposableNodeContainer (which IS a Node)
+        # read global_params from the launch context.
         _track_node(
             {
                 "package": "",
@@ -2266,9 +2269,9 @@ def _resolve_xml_element(
                 "name": "",
                 "namespace_stack": list(_namespace_stack),
                 "explicit_namespace": ns,
-                "parameters": dict(_global_params),
-                "param_files": list(_global_param_files),
-                "remappings": list(_global_remaps),
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
                 "env": {},
                 "kind": "load_composable",
                 "plugins": plugins,
@@ -2614,7 +2617,7 @@ def _resolve_element_to_ir(
         env.update(_resolve_envs_xml(data.get("envs", []), ctx))
         effective_ns = _effective_namespace(list(_namespace_stack), ns)
         # Merge scoped global params/remaps/param_files (global first, node-local overrides)
-        merged_params = dict(_global_params)
+        merged_params = {k: str(v) for k, v in _global_params}
         merged_params.update(params)
         merged_param_files = list(_global_param_files) + param_files
         merged_remaps = list(_global_remaps) + [(s, d) for s, d in remaps]
@@ -4175,11 +4178,17 @@ def _resolve_node_details(node, context):
             for k, v in p.items():
                 resolved_v = _resolve_substitution(v, context)
                 params[str(k)] = resolved_v if resolved_v is not None else ""
-    entry["parameters"] = params
-    entry["param_files"] = pf_list
+    # Merge global params from the launch context (global first, node-local overrides).
+    # In ROS 2, Node.execute() reads global_params from context._launch_configurations.
+    # ComposableNodeContainer inherits from Node, so it also gets global params.
+    ctx_global_params = context._launch_configurations.get("global_params", [])
+    merged_params = {k: str(v) for k, v in ctx_global_params}
+    merged_params.update(params)
+    entry["parameters"] = merged_params
+    entry["param_files"] = list(_global_param_files) + pf_list
 
-    # Remappings: list of [src, dst] pairs
-    remaps = []
+    # Remappings: list of [src, dst] pairs — merge global remaps first
+    remaps = list(_global_remaps)
     for r in node._raw_remappings:
         if isinstance(r, (tuple, list)) and len(r) == 2:
             src = _resolve_substitution(r[0], context)
@@ -5443,9 +5452,10 @@ def main():
 
     if persisted_global_params:
         # Store as list of (name, value) tuples matching real ROS 2 SetParameter layout.
-        ctx._launch_configurations["global_params"] = [
-            (entry[0], entry[1]) for entry in persisted_global_params if len(entry) == 2
-        ]
+        gp_tuples = [(entry[0], entry[1]) for entry in persisted_global_params if len(entry) == 2]
+        ctx._launch_configurations["global_params"] = list(gp_tuples)
+        # Also populate _global_params so _resolve_node_details merges them into nodes.
+        _global_params.extend(gp_tuples)
 
     try:
         ld = mod.generate_launch_description()

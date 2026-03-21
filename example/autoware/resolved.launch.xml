@@ -9,6 +9,17 @@
     <!-- arg name="container_name" value="pointcloud_container" -->
     <!-- arg name="use_multithread" value="true" -->
     <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="pointcloud_container">
+      <param name="front_overhang" value="1.0"/>
+      <param name="left_overhang" value="0.128"/>
+      <param name="max_steer_angle" value="0.7"/>
+      <param name="rear_overhang" value="1.1"/>
+      <param name="right_overhang" value="0.128"/>
+      <param name="use_sim_time" value="false"/>
+      <param name="vehicle_height" value="2.5"/>
+      <param name="wheel_base" value="2.79"/>
+      <param name="wheel_radius" value="0.383"/>
+      <param name="wheel_tread" value="1.64"/>
+      <param name="wheel_width" value="0.235"/>
       <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so"/>
     </node_container>
   </group>
@@ -25,7 +36,18 @@
     <!-- arg name="vehicle_id" value="default" -->
     <!-- arg name="vehicle_model" value="sample_vehicle" -->
     <node pkg="robot_state_publisher" exec="robot_state_publisher" name="robot_state_publisher">
+      <param name="front_overhang" value="1.0"/>
+      <param name="left_overhang" value="0.128"/>
+      <param name="max_steer_angle" value="0.7"/>
+      <param name="rear_overhang" value="1.1"/>
+      <param name="right_overhang" value="0.128"/>
       <param name="robot_description" value="$(command 'xacro $(find-pkg-share tier4_vehicle_launch)/urdf/vehicle.xacro vehicle_model:=sample_vehicle sensor_model:=sample_sensor_kit config_dir:=$(find-pkg-share sample_sensor_kit_description)/config' 'warn')"/>
+      <param name="use_sim_time" value="false"/>
+      <param name="vehicle_height" value="2.5"/>
+      <param name="wheel_base" value="2.79"/>
+      <param name="wheel_radius" value="0.383"/>
+      <param name="wheel_tread" value="1.64"/>
+      <param name="wheel_width" value="0.235"/>
     </node>
   </group>
   <!-- end: tier4_vehicle_launch://launch/vehicle.launch.xml -->
@@ -86,6 +108,17 @@
         <!-- arg name="process_monitor_config_file" value="$(find-pkg-share autoware_launch)/config/system/system_monitor/process_monitor.param.yaml" -->
         <!-- arg name="voltage_monitor_config_file" value="$(find-pkg-share autoware_launch)/config/system/system_monitor/voltage_monitor.param.yaml" -->
         <node_container pkg="rclcpp_components" exec="component_container_mt" name="system_monitor_container" namespace="/system/system_monitor/system_monitor">
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <composable_node pkg="autoware_system_monitor" plugin="CPUMonitor" name="cpu_monitor">
             <!-- params from: $(find-pkg-share autoware_launch)/config/system/system_monitor/cpu_monitor.param.yaml -->
             <param name="usage_warn" value="0.96"/>
@@ -181,6 +214,17 @@
           <param name="add_duplicated_node_names_to_msg" value="true"/>
           <param name="nodes_to_ignore" value="[/rviz2, /simulation/getParameter]"/>
           <!-- end params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
         </node>
       </group>
       <!-- end: autoware_duplicated_node_checker://launch/duplicated_node_checker.launch.xml -->
@@ -193,7 +237,18 @@
           <param name="update_rate" value="10.0"/>
           <param name="processing_time_topic_name_list" value="[/control/control_evaluator/debug/processing_time_ms, /control/control_validator/debug/processing_time_ms, /control/trajectory_follower/controller_node_exe/lateral/debug/processing_time_ms, /control/trajectory_follower/controller_node_exe/longitudinal/debug/processing_time_ms, /control/trajectory_follower/lane_departure_checker_node/debug/processing_time_ms, /control/vehicle_cmd_gate/debug/processing_time_ms, /perception/object_recognition/prediction/map_based_prediction/debug/processing_time_ms, /perception/object_recognition/tracking/decorative_object_merger_node/debug/processing_time_ms, /perception/object_recognition/tracking/multi_object_tracker/debug/processing_time_ms, /planning/mission_planning/mission_planner/debug/processing_time_ms, /planning/mission_planning/route_selector/debug/processing_time_ms, /planning/planning_evaluator/debug/processing_time_ms, /planning/planning_validator/debug/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/debug/avoidance_by_lane_change/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/debug/bidirectional_traffic/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/debug/dynamic_obstacle_avoidance/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/debug/goal_planner/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/debug/lane_change_left/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/debug/lane_change_right/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/debug/side_shift/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/debug/start_planner/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/debug/static_obstacle_avoidance/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/debug/total_time/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/debug/blind_spot/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/debug/crosswalk/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/debug/detection_area/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/debug/intersection/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/debug/merge_from_private/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/debug/no_stopping_area/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/debug/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/debug/stop_line/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/debug/virtual_traffic_light/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/debug/walkway/processing_time_ms, /planning/scenario_planning/lane_driving/behavior_planning/path_generator/debug/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/elastic_band_smoother/debug/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/boundary_departure_prevention/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/dynamic_obstacle_stop/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/mvp_common/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/obstacle_cruise/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/obstacle_slow_down/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/obstacle_stop/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/obstacle_velocity_limiter/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/out_of_lane/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/road_user_stop/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/debug/run_out/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/path_optimizer/debug/processing_time_ms, /planning/scenario_planning/lane_driving/motion_planning/surround_obstacle_checker/debug/processing_time_ms, /planning/scenario_planning/parking/costmap_generator/debug/processing_time_ms, /planning/scenario_planning/parking/freespace_planner/debug/processing_time_ms, /planning/scenario_planning/scenario_selector/debug/processing_time_ms, /planning/scenario_planning/velocity_smoother/debug/processing_time_ms, /simulation/shape_estimation/debug/processing_time_ms]"/>
           <!-- end params from: $(find-pkg-share autoware_launch)/config/system/processing_time_checker/processing_time_checker.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
           <param name="output_metrics" value="false"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
         </node>
       </group>
       <!-- end: autoware_processing_time_checker://launch/processing_time_checker.launch.xml -->
@@ -228,12 +283,35 @@
           <param name="processing_steps.control.latency_multiplier" value="1.0e3"/>
           <param name="latency_offsets_ms" value="[0.0, 1.4, 50.0, 15.0, 191.0]"/>
           <!-- end params from: $(find-pkg-share autoware_launch)/config/system/pipeline_latency_monitor/pipeline_latency_monitor.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
         </node>
       </group>
       <!-- end: autoware_pipeline_latency_monitor://launch/pipeline_latency_monitor.launch.xml -->
       <!-- source: autoware_component_interface_tools://launch/service_log_checker.launch.xml -->
       <group>
-        <node pkg="autoware_component_interface_tools" exec="service_log_checker_node" namespace="/system"/>
+        <node pkg="autoware_component_interface_tools" exec="service_log_checker_node" namespace="/system">
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
+        </node>
       </group>
       <!-- end: autoware_component_interface_tools://launch/service_log_checker.launch.xml -->
       <!-- source: autoware_component_state_monitor://launch/component_state_monitor.launch.py -->
@@ -241,6 +319,17 @@
         <!-- arg name="file" value="$(find-pkg-share autoware_launch)/config/system/component_state_monitor/topics.yaml" -->
         <!-- arg name="mode" value="online" -->
         <node_container pkg="rclcpp_components" exec="component_container" name="container" namespace="/system/component_state_monitor">
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <composable_node pkg="autoware_component_state_monitor" plugin="autoware::component_state_monitor::StateMonitor" name="component">
             <param name="autonomous" value="{'localization': ['topic_state_monitor_pose_twist_fusion_filter_pose: localization_topic_status', 'topic_state_monitor_transform_map_to_base_link: localization_topic_status'], 'perception': ['topic_state_monitor_object_recognition_objects: perception_topic_status', 'topic_state_monitor_traffic_light_recognition_traffic_signals: perception_topic_status'], 'planning': ['topic_state_monitor_mission_planning_route: planning_topic_status', 'topic_state_monitor_scenario_planning_trajectory: planning_topic_status'], 'control': ['topic_state_monitor_trajectory_follower_control_cmd: control_topic_status', 'topic_state_monitor_control_command_control_cmd: control_topic_status'], 'vehicle': ['topic_state_monitor_vehicle_status_velocity_status: vehicle_topic_status', 'topic_state_monitor_vehicle_status_steering_status: vehicle_topic_status']}"/>
             <param name="launch" value="{'map': ['topic_state_monitor_vector_map: map_topic_status', 'topic_state_monitor_pointcloud_map: map_topic_status'], 'perception': ['topic_state_monitor_obstacle_segmentation_pointcloud: perception_topic_status'], 'system': ['topic_state_monitor_system_emergency_control_cmd: system_topic_status']}"/>
@@ -253,6 +342,17 @@
       <group>
         <!-- arg name="config_file" value="$(find-pkg-share autoware_launch)/config/system/mrm_comfortable_stop_operator/mrm_comfortable_stop_operator.param.yaml" -->
         <node_container pkg="rclcpp_components" exec="component_container" name="mrm_comfortable_stop_operator_container" namespace="/system/mrm_comfortable_stop_operator">
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <composable_node pkg="autoware_mrm_comfortable_stop_operator" plugin="autoware::mrm_comfortable_stop_operator::MrmComfortableStopOperator" name="mrm_comfortable_stop_operator">
             <param name="max_jerk" value="0.3"/>
             <param name="min_acceleration" value="-1.0"/>
@@ -270,6 +370,17 @@
       <group>
         <!-- arg name="config_file" value="$(find-pkg-share autoware_launch)/config/system/mrm_emergency_stop_operator/mrm_emergency_stop_operator.param.yaml" -->
         <node_container pkg="rclcpp_components" exec="component_container" name="mrm_emergency_stop_operator_container" namespace="/system/mrm_emergency_stop_operator">
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <composable_node pkg="autoware_mrm_emergency_stop_operator" plugin="autoware::mrm_emergency_stop_operator::MrmEmergencyStopOperator" name="mrm_emergency_stop_operator">
             <param name="target_acceleration" value="-2.5"/>
             <param name="target_jerk" value="-1.5"/>
@@ -303,8 +414,19 @@
           <param name="use_command_mode_mappings" value="true"/>
           <param name="command_mode_mappings" value="[{mode: 1001, path: /autoware/modes/stop}, {mode: 1002, path: /autoware/modes/autonomous}, {mode: 1003, path: /autoware/modes/local}, {mode: 1004, path: /autoware/modes/remote}, {mode: 2001, path: /autoware/modes/emergency_stop}, {mode: 2002, path: /autoware/modes/comfortable_stop}, {mode: 2003, path: /autoware/modes/pull_over}]"/>
           <!-- end params from: $(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
           <param name="graph_file" value="$(find-pkg-share autoware_launch)/config/system/diagnostics/autoware-main.yaml"/>
           <param name="graph_vars" value=""/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/diagnostics" to="/diagnostics"/>
           <remap from="~/struct" to="/diagnostics_graph/struct"/>
           <remap from="~/status" to="/diagnostics_graph/status"/>
@@ -322,6 +444,17 @@
           <param name="comfortable_stop" value="2002"/>
           <param name="pull_over" value="2003"/>
           <!-- end params from: $(find-pkg-share autoware_launch)/config/system/command_mode/converter.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/command_mode/availability" to="/system/command_mode/availability"/>
           <remap from="~/operation_mode/availability" to="/system/operation_mode/availability"/>
         </node>
@@ -334,6 +467,17 @@
           <param name="include_latent_fault_in_emergency" value="true"/>
           <param name="use_external_emergency_holding" value="false"/>
           <!-- end params from: $(find-pkg-share autoware_hazard_status_converter)/config/hazard_status_converter.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/diagnostics_graph" to="/diagnostics_graph"/>
           <remap from="~/hazard_status" to="/system/emergency/hazard_status"/>
           <remap from="~/input/emergency_holding" to="/system/emergency_holding"/>
@@ -372,6 +516,17 @@
           <param name="use_comfortable_stop" value="true"/>
           <param name="turning_hazard_on.emergency" value="true"/>
           <!-- end params from: $(find-pkg-share autoware_launch)/config/system/mrm_handler/mrm_handler.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/input/operation_mode_availability" to="/system/operation_mode/availability"/>
           <remap from="~/input/odometry" to="/localization/kinematic_state"/>
           <remap from="~/input/control_mode" to="/vehicle/status/control_mode"/>
@@ -402,10 +557,21 @@
       <!-- arg name="show_rate" value="10.0" -->
       <node pkg="autoware_diagnostic_graph_utils" exec="logging_node" name="logging_diag_graph" output="both">
         <param name="enable_terminal_log" value="true"/>
+        <param name="front_overhang" value="1.0"/>
         <param name="ignore_dependent_error" value="false"/>
+        <param name="left_overhang" value="0.128"/>
         <param name="max_depth" value="3"/>
+        <param name="max_steer_angle" value="0.7"/>
+        <param name="rear_overhang" value="1.1"/>
+        <param name="right_overhang" value="0.128"/>
         <param name="root_path" value="/autoware/modes/autonomous"/>
         <param name="show_rate" value="10.0"/>
+        <param name="use_sim_time" value="false"/>
+        <param name="vehicle_height" value="2.5"/>
+        <param name="wheel_base" value="2.79"/>
+        <param name="wheel_radius" value="0.383"/>
+        <param name="wheel_tread" value="1.64"/>
+        <param name="wheel_width" value="0.235"/>
       </node>
     </group>
     <!-- end: autoware_diagnostic_graph_utils://launch/logging.launch.xml -->
@@ -425,6 +591,17 @@
       <!-- arg name="pointcloud_map_path" value="{map_path}/pointcloud_map.pcd" -->
       <!-- arg name="use_multithread" default="false" -->
       <node_container pkg="rclcpp_components" exec="component_container" name="map_container" namespace="/map">
+        <param name="front_overhang" value="1.0"/>
+        <param name="left_overhang" value="0.128"/>
+        <param name="max_steer_angle" value="0.7"/>
+        <param name="rear_overhang" value="1.1"/>
+        <param name="right_overhang" value="0.128"/>
+        <param name="use_sim_time" value="false"/>
+        <param name="vehicle_height" value="2.5"/>
+        <param name="wheel_base" value="2.79"/>
+        <param name="wheel_radius" value="0.383"/>
+        <param name="wheel_tread" value="1.64"/>
+        <param name="wheel_width" value="0.235"/>
         <composable_node pkg="autoware_map_loader" plugin="autoware::map_loader::PointCloudMapLoaderNode" name="pointcloud_map_loader">
           <!-- params from: $(find-pkg-share autoware_launch)/config/map/pointcloud_map_loader.param.yaml -->
           <param name="enable_whole_load" value="true"/>
@@ -465,8 +642,19 @@
         </composable_node>
       </node_container>
       <node pkg="autoware_map_loader" exec="map_hash_generator" name="map_hash_generator" namespace="/map">
+        <param name="front_overhang" value="1.0"/>
         <param name="lanelet2_map_path" value="{map_path}/lanelet2_map.osm"/>
+        <param name="left_overhang" value="0.128"/>
+        <param name="max_steer_angle" value="0.7"/>
         <param name="pointcloud_map_path" value="{map_path}/pointcloud_map.pcd"/>
+        <param name="rear_overhang" value="1.1"/>
+        <param name="right_overhang" value="0.128"/>
+        <param name="use_sim_time" value="false"/>
+        <param name="vehicle_height" value="2.5"/>
+        <param name="wheel_base" value="2.79"/>
+        <param name="wheel_radius" value="0.383"/>
+        <param name="wheel_tread" value="1.64"/>
+        <param name="wheel_width" value="0.235"/>
       </node>
       <!-- source: autoware_map_projection_loader://launch/map_projection_loader.launch.xml -->
       <group>
@@ -478,6 +666,17 @@
           <param name="map_projector_info_path" value="{map_path}/map_projector_info.yaml"/>
           <param name="lanelet2_map_path" value="{map_path}/lanelet2_map.osm"/>
           <!-- end params from: $(find-pkg-share autoware_launch)/config/map/map_projection_loader.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
         </node>
       </group>
       <!-- end: autoware_map_projection_loader://launch/map_projection_loader.launch.xml -->
@@ -544,13 +743,13 @@
               <!-- arg name="frame_id" value="velodyne_top" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_link" -->
+              <!-- arg name="input_frame" default="base_frame" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="250.0" -->
               <!-- arg name="min_range" value="0.5" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_link" -->
+              <!-- arg name="output_frame" default="base_frame" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
@@ -564,6 +763,17 @@
               <!-- arg name="use_multithread" value="true" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
               <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/top/pointcloud_preprocessor">
+                <param name="front_overhang" value="1.0"/>
+                <param name="left_overhang" value="0.128"/>
+                <param name="max_steer_angle" value="0.7"/>
+                <param name="rear_overhang" value="1.1"/>
+                <param name="right_overhang" value="0.128"/>
+                <param name="use_sim_time" value="false"/>
+                <param name="vehicle_height" value="2.5"/>
+                <param name="wheel_base" value="2.79"/>
+                <param name="wheel_radius" value="0.383"/>
+                <param name="wheel_tread" value="1.64"/>
+                <param name="wheel_width" value="0.235"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
                   <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
                   <param name="cloud_max_angle" value="360"/>
@@ -664,7 +874,18 @@
                 <param name="rpm_ratio_warn" value="0.8"/>
                 <param name="rpm_ratio_error" value="0.7"/>
                 <!-- end params from: $(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml -->
+                <param name="front_overhang" value="1.0"/>
                 <param name="ip_address" value="192.168.1.201"/>
+                <param name="left_overhang" value="0.128"/>
+                <param name="max_steer_angle" value="0.7"/>
+                <param name="rear_overhang" value="1.1"/>
+                <param name="right_overhang" value="0.128"/>
+                <param name="use_sim_time" value="false"/>
+                <param name="vehicle_height" value="2.5"/>
+                <param name="wheel_base" value="2.79"/>
+                <param name="wheel_radius" value="0.383"/>
+                <param name="wheel_tread" value="1.64"/>
+                <param name="wheel_width" value="0.235"/>
               </node>
             </group>
             <!-- end: autoware_velodyne_monitor://launch/velodyne_monitor.launch.xml -->
@@ -700,13 +921,13 @@
               <!-- arg name="frame_id" value="velodyne_top" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_link" -->
+              <!-- arg name="input_frame" default="base_frame" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="250.0" -->
               <!-- arg name="min_range" value="0.5" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_link" -->
+              <!-- arg name="output_frame" default="base_frame" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
@@ -720,6 +941,17 @@
               <!-- arg name="use_multithread" value="true" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
               <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/left/pointcloud_preprocessor">
+                <param name="front_overhang" value="1.0"/>
+                <param name="left_overhang" value="0.128"/>
+                <param name="max_steer_angle" value="0.7"/>
+                <param name="rear_overhang" value="1.1"/>
+                <param name="right_overhang" value="0.128"/>
+                <param name="use_sim_time" value="false"/>
+                <param name="vehicle_height" value="2.5"/>
+                <param name="wheel_base" value="2.79"/>
+                <param name="wheel_radius" value="0.383"/>
+                <param name="wheel_tread" value="1.64"/>
+                <param name="wheel_width" value="0.235"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
                   <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
                   <param name="cloud_max_angle" value="60"/>
@@ -820,7 +1052,18 @@
                 <param name="rpm_ratio_warn" value="0.8"/>
                 <param name="rpm_ratio_error" value="0.7"/>
                 <!-- end params from: $(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml -->
+                <param name="front_overhang" value="1.0"/>
                 <param name="ip_address" value="192.168.1.202"/>
+                <param name="left_overhang" value="0.128"/>
+                <param name="max_steer_angle" value="0.7"/>
+                <param name="rear_overhang" value="1.1"/>
+                <param name="right_overhang" value="0.128"/>
+                <param name="use_sim_time" value="false"/>
+                <param name="vehicle_height" value="2.5"/>
+                <param name="wheel_base" value="2.79"/>
+                <param name="wheel_radius" value="0.383"/>
+                <param name="wheel_tread" value="1.64"/>
+                <param name="wheel_width" value="0.235"/>
               </node>
             </group>
             <!-- end: autoware_velodyne_monitor://launch/velodyne_monitor.launch.xml -->
@@ -837,13 +1080,13 @@
               <!-- arg name="frame_id" value="velodyne_top" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_link" -->
+              <!-- arg name="input_frame" default="base_frame" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="250.0" -->
               <!-- arg name="min_range" value="0.5" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_link" -->
+              <!-- arg name="output_frame" default="base_frame" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
@@ -857,6 +1100,17 @@
               <!-- arg name="use_multithread" value="true" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
               <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/right/pointcloud_preprocessor">
+                <param name="front_overhang" value="1.0"/>
+                <param name="left_overhang" value="0.128"/>
+                <param name="max_steer_angle" value="0.7"/>
+                <param name="rear_overhang" value="1.1"/>
+                <param name="right_overhang" value="0.128"/>
+                <param name="use_sim_time" value="false"/>
+                <param name="vehicle_height" value="2.5"/>
+                <param name="wheel_base" value="2.79"/>
+                <param name="wheel_radius" value="0.383"/>
+                <param name="wheel_tread" value="1.64"/>
+                <param name="wheel_width" value="0.235"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
                   <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
                   <param name="cloud_max_angle" value="60"/>
@@ -957,7 +1211,18 @@
                 <param name="rpm_ratio_warn" value="0.8"/>
                 <param name="rpm_ratio_error" value="0.7"/>
                 <!-- end params from: $(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml -->
+                <param name="front_overhang" value="1.0"/>
                 <param name="ip_address" value="192.168.1.203"/>
+                <param name="left_overhang" value="0.128"/>
+                <param name="max_steer_angle" value="0.7"/>
+                <param name="rear_overhang" value="1.1"/>
+                <param name="right_overhang" value="0.128"/>
+                <param name="use_sim_time" value="false"/>
+                <param name="vehicle_height" value="2.5"/>
+                <param name="wheel_base" value="2.79"/>
+                <param name="wheel_radius" value="0.383"/>
+                <param name="wheel_tread" value="1.64"/>
+                <param name="wheel_width" value="0.235"/>
               </node>
             </group>
             <!-- end: autoware_velodyne_monitor://launch/velodyne_monitor.launch.xml -->
@@ -974,13 +1239,13 @@
               <!-- arg name="frame_id" value="velodyne_top" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_link" -->
+              <!-- arg name="input_frame" default="base_frame" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="250.0" -->
               <!-- arg name="min_range" value="0.5" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_link" -->
+              <!-- arg name="output_frame" default="base_frame" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
@@ -994,6 +1259,17 @@
               <!-- arg name="use_multithread" value="true" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
               <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/rear/pointcloud_preprocessor">
+                <param name="front_overhang" value="1.0"/>
+                <param name="left_overhang" value="0.128"/>
+                <param name="max_steer_angle" value="0.7"/>
+                <param name="rear_overhang" value="1.1"/>
+                <param name="right_overhang" value="0.128"/>
+                <param name="use_sim_time" value="false"/>
+                <param name="vehicle_height" value="2.5"/>
+                <param name="wheel_base" value="2.79"/>
+                <param name="wheel_radius" value="0.383"/>
+                <param name="wheel_tread" value="1.64"/>
+                <param name="wheel_width" value="0.235"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
                   <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
                   <param name="cloud_max_angle" value="60"/>
@@ -1094,7 +1370,18 @@
                 <param name="rpm_ratio_warn" value="0.8"/>
                 <param name="rpm_ratio_error" value="0.7"/>
                 <!-- end params from: $(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml -->
+                <param name="front_overhang" value="1.0"/>
                 <param name="ip_address" value="192.168.1.204"/>
+                <param name="left_overhang" value="0.128"/>
+                <param name="max_steer_angle" value="0.7"/>
+                <param name="rear_overhang" value="1.1"/>
+                <param name="right_overhang" value="0.128"/>
+                <param name="use_sim_time" value="false"/>
+                <param name="vehicle_height" value="2.5"/>
+                <param name="wheel_base" value="2.79"/>
+                <param name="wheel_radius" value="0.383"/>
+                <param name="wheel_tread" value="1.64"/>
+                <param name="wheel_width" value="0.235"/>
               </node>
             </group>
             <!-- end: autoware_velodyne_monitor://launch/velodyne_monitor.launch.xml -->
@@ -1194,6 +1481,17 @@
               <param name="on_off_correction.correct_for_dynamic_bias" value="false"/>
               <param name="on_off_correction.correct_for_scale" value="false"/>
               <!-- end params from: $(find-pkg-share autoware_imu_corrector)/config/gyro_scale_estimator.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
               <remap from="input" to="tamagawa/imu_raw"/>
               <remap from="gyro_bias_input" to="gyro_bias"/>
               <remap from="gyro_scale_input" to="gyro_scale"/>
@@ -1264,6 +1562,17 @@
               <param name="on_off_correction.correct_for_dynamic_bias" value="false"/>
               <param name="on_off_correction.correct_for_scale" value="false"/>
               <!-- end params from: $(find-pkg-share autoware_imu_corrector)/config/gyro_scale_estimator.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
               <remap from="~/input/imu_raw" to="tamagawa/imu_raw"/>
               <remap from="~/input/odom" to="/localization/kinematic_state"/>
               <remap from="~/input/pose_ndt" to="/localization/pose_estimator/pose_with_covariance"/>
@@ -1294,6 +1603,17 @@
             <param name="publish.aid.hui" value="false"/>
             <param name="publish.nav.posecef" value="false"/>
             <!-- end params from: $(find-pkg-share ublox_gps)/config/zed_f9p.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="~/fix" to="~/nav_sat_fix"/>
           </node>
           <!-- source: autoware_gnss_poser://launch/gnss_poser.launch.xml -->
@@ -1314,6 +1634,17 @@
               <param name="use_command_mode_mappings" value="true"/>
               <param name="command_mode_mappings" value="[{mode: 1001, path: /autoware/modes/stop}, {mode: 1002, path: /autoware/modes/autonomous}, {mode: 1003, path: /autoware/modes/local}, {mode: 1004, path: /autoware/modes/remote}, {mode: 2001, path: /autoware/modes/emergency_stop}, {mode: 2002, path: /autoware/modes/comfortable_stop}, {mode: 2003, path: /autoware/modes/pull_over}]"/>
               <!-- end params from: $(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
               <remap from="fix" to="ublox/nav_sat_fix"/>
               <remap from="autoware_orientation" to="/autoware_orientation"/>
               <remap from="gnss_pose" to="pose"/>
@@ -1335,6 +1666,17 @@
             <param name="add_duplicated_node_names_to_msg" value="true"/>
             <param name="nodes_to_ignore" value="[/rviz2, /simulation/getParameter]"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="velocity_status" to="/vehicle/status/velocity_status"/>
             <remap from="twist_with_covariance" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
           </node>
@@ -1444,6 +1786,17 @@
               <param name="dynamic_map_loading.map_radius" value="150.0"/>
               <param name="dynamic_map_loading.lidar_radius" value="100.0"/>
               <!-- end params from: $(find-pkg-share autoware_launch)/config/localization/ndt_scan_matcher/ndt_scan_matcher.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
               <remap from="points_raw" to="/localization/util/downsample/pointcloud"/>
               <remap from="ekf_pose_with_covariance" to="/localization/pose_twist_fusion_filter/biased_pose_with_covariance"/>
               <remap from="regularization_pose_with_covariance" to="/sensing/gnss/pose_with_covariance"/>
@@ -1473,6 +1826,17 @@
               <param name="add_duplicated_node_names_to_msg" value="true"/>
               <param name="nodes_to_ignore" value="[/rviz2, /simulation/getParameter]"/>
               <!-- end params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
               <remap from="vehicle/twist_with_covariance" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
               <remap from="imu" to="/sensing/imu/imu_data"/>
               <remap from="twist_raw" to="gyro_twist_raw"/>
@@ -1512,8 +1876,19 @@
             <param name="gnss_particle_covariance" value="[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0]"/>
             <param name="output_pose_covariance" value="[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2]"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/localization/pose_initializer.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
             <param name="map_height_fitter.map_loader_name" value="/map/pointcloud_map_loader"/>
             <param name="map_height_fitter.target" value="pointcloud_map"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="yabloc_align" to="/localization/pose_estimator/yabloc/initializer/yabloc_align_srv"/>
             <remap from="ndt_align" to="/localization/pose_estimator/ndt_align_srv"/>
             <remap from="stop_check_twist" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
@@ -1529,7 +1904,19 @@
         <!-- end: autoware_pose_initializer://launch/pose_initializer.launch.xml -->
         <!-- source: autoware_automatic_pose_initializer://launch/automatic_pose_initializer.launch.xml -->
         <group>
-          <node pkg="autoware_automatic_pose_initializer" exec="autoware_automatic_pose_initializer_node" namespace="/localization/util/default_adapi/helpers"/>
+          <node pkg="autoware_automatic_pose_initializer" exec="autoware_automatic_pose_initializer_node" namespace="/localization/util/default_adapi/helpers">
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
+          </node>
         </group>
         <!-- end: autoware_automatic_pose_initializer://launch/automatic_pose_initializer.launch.xml -->
         <!-- source: tier4_localization_launch://launch/util/util.launch.xml -->
@@ -1627,6 +2014,17 @@
             <param name="misc.threshold_observable_velocity_mps" value="0.0"/>
             <param name="misc.pose_frame_id" value="map"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/localization/ekf_localizer.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="in_pose_with_covariance" to="/localization/pose_estimator/pose_with_covariance"/>
             <remap from="in_twist_with_covariance" to="/localization/twist_estimator/twist_with_covariance"/>
             <remap from="initialpose" to="/initialpose3d"/>
@@ -1655,6 +2053,17 @@
             <param name="vx_threshold" value="0.1"/>
             <param name="wz_threshold" value="0.02"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/localization/stop_filter.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="input/odom" to="/localization/pose_twist_fusion_filter/kinematic_state"/>
             <remap from="output/odom" to="/localization/kinematic_state"/>
             <remap from="debug/stop_flag" to="debug/stop_flag"/>
@@ -1672,6 +2081,17 @@
             <param name="use_odom" value="true"/>
             <param name="accel_lowpass_gain" value="0.9"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/localization/twist2accel.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="input/odom" to="/localization/kinematic_state"/>
             <remap from="input/twist" to="/localization/twist_estimator/twist_with_covariance"/>
             <remap from="output/accel" to="/localization/acceleration"/>
@@ -1703,6 +2123,17 @@
             <param name="enable_validation.angle_y" value="false"/>
             <param name="enable_validation.angle_z" value="true"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/localization/pose_instability_detector.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="~/input/odometry" to="/localization/kinematic_state"/>
             <remap from="~/input/twist" to="/localization/twist_estimator/twist_with_covariance"/>
           </node>
@@ -1724,6 +2155,17 @@
             <param name="error_ellipse_size_lateral_direction" value="0.3"/>
             <param name="warn_ellipse_size_lateral_direction" value="0.25"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/localization/localization_error_monitor.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="input/odom" to="/localization/kinematic_state"/>
           </node>
         </group>
@@ -2023,6 +2465,17 @@
           <!-- arg name="use_multithread" value="true" -->
           <!-- arg name="use_pointcloud_container" value="true" -->
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="occupancy_grid_map_container" namespace="/perception/occupancy_grid_map">
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <composable_node pkg="autoware_probabilistic_occupancy_grid_map" plugin="autoware::occupancy_grid_map::PointcloudBasedOccupancyGridMapNode" name="occupancy_grid_map_node">
               <param name="OccupancyGridMapFixedBlindSpot" value="{'distance_margin': 1.0}"/>
               <param name="OccupancyGridMapProjectiveBlindSpot" value="{'projection_dz_threshold': 0.01, 'obstacle_separation_threshold': 1.0, 'pub_debug_grid': False}"/>
@@ -2264,7 +2717,19 @@
               <!-- arg name="use_low_height_cropbox" value="false" -->
               <!-- arg name="use_pointcloud_container" value="true" -->
               <!-- arg name="voxel_grid_based_euclidean_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/clustering/voxel_grid_based_euclidean_cluster.param.yaml" -->
-              <node_container pkg="rclcpp_components" exec="component_container" name="euclidean_cluster_container" namespace="/perception/object_recognition/detection/clustering"/>
+              <node_container pkg="rclcpp_components" exec="component_container" name="euclidean_cluster_container" namespace="/perception/object_recognition/detection/clustering">
+                <param name="front_overhang" value="1.0"/>
+                <param name="left_overhang" value="0.128"/>
+                <param name="max_steer_angle" value="0.7"/>
+                <param name="rear_overhang" value="1.1"/>
+                <param name="right_overhang" value="0.128"/>
+                <param name="use_sim_time" value="false"/>
+                <param name="vehicle_height" value="2.5"/>
+                <param name="wheel_base" value="2.79"/>
+                <param name="wheel_radius" value="0.383"/>
+                <param name="wheel_tread" value="1.64"/>
+                <param name="wheel_width" value="0.235"/>
+              </node_container>
               <load_composable_node target="pointcloud_container">
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="low_height_crop_box_filter">
                   <param name="input_frame" value="base_link"/>
@@ -2353,7 +2818,18 @@
               <param name="add_duplicated_node_names_to_msg" value="true"/>
               <param name="nodes_to_ignore" value="[/rviz2, /simulation/getParameter]"/>
               <!-- end params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
               <param name="model_path" value="{home}/autoware_data/lidar_centerpoint"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
               <remap from="input" to="/perception/object_recognition/detection/clustering/clusters"/>
               <remap from="objects" to="/perception/object_recognition/detection/clustering/objects_with_feature"/>
             </node>
@@ -2366,7 +2842,18 @@
             <!-- arg name="output" value="/perception/object_recognition/detection/clustering/objects" -->
             <!-- arg name="run_convex_hull_conversion" default="false" -->
             <node pkg="autoware_detected_object_feature_remover" exec="detected_object_feature_remover_node" name="ndt_scan_matcher" namespace="/perception/object_recognition/detection/clustering" output="screen">
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
               <param name="run_convex_hull_conversion" value="false"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
               <remap from="~/input" to="/perception/object_recognition/detection/clustering/objects_with_feature"/>
               <remap from="~/output" to="/perception/object_recognition/detection/clustering/objects"/>
             </node>
@@ -2397,6 +2884,17 @@
               <param name="tracker_ignore_label.BICYCLE" value="false"/>
               <param name="tracker_ignore_label.PEDESTRIAN" value="false"/>
               <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/detection_by_tracker/detection_by_tracker.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
               <remap from="~/input/tracked_objects" to="/perception/object_recognition/tracking/objects"/>
               <remap from="~/input/initial_objects" to="/perception/object_recognition/detection/clustering/objects_with_feature"/>
               <remap from="~/output" to="/perception/object_recognition/detection/detection_by_tracker/objects"/>
@@ -2462,6 +2960,17 @@
               <param name="using_2d_validator" value="true"/>
               <param name="enable_debugger" value="false"/>
               <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/detected_object_validation/obstacle_pointcloud_based_validator.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
               <remap from="~/input/detected_objects" to="/perception/object_recognition/detection/centerpoint/objects"/>
               <remap from="~/input/obstacle_pointcloud" to="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud"/>
               <remap from="~/output/objects" to="/perception/object_recognition/detection/centerpoint/validation/objects"/>
@@ -2664,6 +3173,7 @@
             <param name="input_channels.camera_vru.optional.name" value="camera_vru"/>
             <param name="input_channels.camera_vru.optional.short_name" value="CamVRU"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/object_recognition/tracking/multi_object_tracker/input_channels.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
             <param name="input/detection01/channel" value="lidar_centerpoint"/>
             <param name="input/detection02/channel" value="none"/>
             <param name="input/detection03/channel" value="none"/>
@@ -2676,7 +3186,17 @@
             <param name="input/detection10/channel" value="none"/>
             <param name="input/detection11/channel" value="none"/>
             <param name="input/detection12/channel" value="none"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
             <param name="publish_merged_objects" value="false"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="~/input/detection01/objects" to="/perception/object_recognition/detection/centerpoint/validation/objects"/>
             <remap from="~/input/detection02/objects" to="/perception/object_recognition/detection/centerpoint_short_range/objects"/>
             <remap from="~/input/detection03/objects" to="/perception/object_recognition/detection/clustering/camera_lidar_fusion/objects"/>
@@ -2701,7 +3221,6 @@
         <!-- arg name="input/objects" default="/perception/object_recognition/detection/clustering/clusters" -->
         <!-- arg name="prediction_model_type" default="map_based" -->
         <!-- arg name="use_vector_map" value="true" -->
-        <set_remap from="objects" to="/perception/object_recognition/objects"/>
         <!-- source: autoware_map_based_prediction://launch/map_based_prediction.launch.xml -->
         <group>
           <!-- arg name="input_topic" value="/perception/object_recognition/detection/clustering/clusters" -->
@@ -2758,6 +3277,18 @@
             <param name="processing_time_tolerance" value="0.5"/>
             <param name="processing_time_consecutive_excess_tolerance" value="1.0"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/object_recognition/prediction/map_based_prediction.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
+            <remap from="objects" to="/perception/object_recognition/objects"/>
             <remap from="/vector_map" to="/map/vector_map"/>
             <remap from="/traffic_signals" to="/perception/traffic_light_recognition/traffic_signals"/>
             <remap from="~/output/objects" to="/perception/object_recognition/objects"/>
@@ -2802,8 +3333,32 @@
         <!-- source: tier4_perception_launch://launch/traffic_light_recognition/traffic_light_camera_info_relay.launch.py -->
         <group>
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
-          <node pkg="topic_tools" exec="relay" name="traffic_light_camera_info_relay" namespace="/perception/traffic_light_recognition/camera6" args="/sensing/camera/camera6/camera_infocamera_info"/>
-          <node pkg="topic_tools" exec="relay" name="traffic_light_camera_info_relay" namespace="/perception/traffic_light_recognition/camera7" args="/sensing/camera/camera7/camera_infocamera_info"/>
+          <node pkg="topic_tools" exec="relay" name="traffic_light_camera_info_relay" namespace="/perception/traffic_light_recognition/camera6" args="/sensing/camera/camera6/camera_infocamera_info">
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
+          </node>
+          <node pkg="topic_tools" exec="relay" name="traffic_light_camera_info_relay" namespace="/perception/traffic_light_recognition/camera7" args="/sensing/camera/camera7/camera_infocamera_info">
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
+          </node>
         </group>
         <!-- end: tier4_perception_launch://launch/traffic_light_recognition/traffic_light_camera_info_relay.launch.py -->
         <!-- source: tier4_perception_launch://launch/traffic_light_recognition/traffic_light_node_container.launch.py -->
@@ -2828,6 +3383,17 @@
           <!-- arg name="whole_image_detection/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
           <!-- arg name="yolox_traffic_light_detector_param_path" value="$(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml" -->
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera6">
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <composable_node pkg="autoware_traffic_light_classifier" plugin="autoware::traffic_light::TrafficLightClassifierNodelet" name="car_traffic_light_classifier">
               <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml -->
               <param name="approximate_sync" value="false"/>
@@ -2956,6 +3522,17 @@
             </composable_node>
           </load_composable_node>
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera7">
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <composable_node pkg="autoware_traffic_light_classifier" plugin="autoware::traffic_light::TrafficLightClassifierNodelet" name="car_traffic_light_classifier">
               <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml -->
               <param name="approximate_sync" value="false"/>
@@ -3098,6 +3675,17 @@
             <param name="prior_log_odds" value="0.0"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_multi_camera_fusion/traffic_light_multi_camera_fusion.param.yaml -->
             <param name="camera_namespaces" value="[camera6, camera7]"/>
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="~/input/vector_map" to="/map/vector_map"/>
             <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/internal/traffic_signals"/>
           </node>
@@ -3117,6 +3705,17 @@
             <param name="source_priority" value="confidence"/>
             <param name="enable_signal_matching" value="false"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_arbiter/traffic_light_arbiter.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="~/sub/vector_map" to="/map/vector_map"/>
             <remap from="~/sub/perception_traffic_signals" to="/perception/traffic_light_recognition/internal/traffic_signals"/>
             <remap from="~/sub/external_traffic_signals" to="/perception/traffic_light_recognition/external/traffic_signals"/>
@@ -3138,6 +3737,17 @@
             <param name="last_detect_color_hold_time" value="2.0"/>
             <param name="last_colors_hold_time" value="1.0"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/crosswalk_traffic_light_estimator/crosswalk_traffic_light_estimator.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="~/input/vector_map" to="/map/vector_map"/>
             <remap from="~/input/classified/traffic_signals" to="/perception/traffic_light_recognition/judged/traffic_signals"/>
             <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/traffic_signals"/>
@@ -3150,6 +3760,17 @@
           <!-- arg name="input/vector_map" default="/map/vector_map" -->
           <!-- arg name="output/traffic_light" default="traffic_signals/markers" -->
           <node pkg="autoware_traffic_light_visualization" exec="traffic_light_map_visualizer_node" name="traffic_light_map_visualizer" namespace="/perception/traffic_light_recognition">
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="~/input/tl_state" to="traffic_signals"/>
             <remap from="~/input/vector_map" to="/map/vector_map"/>
             <remap from="~/output/traffic_light" to="traffic_signals/markers"/>
@@ -3166,6 +3787,17 @@
           <param name="meas_to_tracked_latency_topic_name" value="/perception/object_recognition/tracking/multi_object_tracker/debug/meas_to_tracked_object_ms"/>
           <param name="prediction_latency_topic_name" value="/perception/object_recognition/prediction/map_based_prediction/debug/processing_time_ms"/>
           <!-- end params from: $(find-pkg-share autoware_perception_online_evaluator)/param/perception_analytics_publisher.defaults.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/input/objects" to="/perception/object_recognition/detection/clustering/clusters"/>
           <remap from="~/perception_analytics" to="/perception/perception_analytics_publisher/perception_analytics"/>
         </node>
@@ -3268,6 +3900,17 @@
           <param name="consider_no_drivable_lanes" value="false"/>
           <param name="check_footprint_inside_lanes" value="true"/>
           <!-- end params from: $(find-pkg-share autoware_manual_lane_change_handler)/config/manual_lane_change_handler.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/input/vector_map" to="/map/vector_map"/>
           <remap from="~/input/odometry" to="/localization/kinematic_state"/>
           <remap from="~/input/reroute_availability" to="/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/output/is_reroute_available"/>
@@ -3289,6 +3932,17 @@
           <!-- arg name="set_waypoint_route_service_name" default="/planning/set_waypoint_route" -->
           <!-- arg name="visualization_topic_name" default="/planning/mission_planning/route_marker" -->
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="mission_planner_container" namespace="/planning/mission_planning">
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <composable_node pkg="autoware_mission_planner_universe" plugin="autoware::mission_planner_universe::MissionPlanner" name="mission_planner">
               <!-- params from: $(find-pkg-share autoware_launch)/config/planning/mission_planning/mission_planner/mission_planner.param.yaml -->
               <param name="map_frame" value="map"/>
@@ -3335,6 +3989,17 @@
           <!-- arg name="echo_back_goal_pose_topic_name" default="/planning/mission_planning/echo_back_goal_pose" -->
           <!-- arg name="route_topic_name" default="/planning/route" -->
           <node pkg="autoware_mission_planner_universe" exec="goal_pose_visualizer" name="goal_pose_visualizer" namespace="/planning/mission_planning" output="screen">
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="input/route" to="/planning/route"/>
             <remap from="output/goal_pose" to="/planning/mission_planning/echo_back_goal_pose"/>
           </node>
@@ -3366,6 +4031,17 @@
             <param name="add_duplicated_node_names_to_msg" value="true"/>
             <param name="nodes_to_ignore" value="[/rviz2, /simulation/getParameter]"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="input/lane_driving/trajectory" to="/planning/scenario_planning/lane_driving/trajectory"/>
             <remap from="input/parking/trajectory" to="/planning/scenario_planning/parking/trajectory"/>
             <remap from="input/lanelet_map" to="/map/vector_map"/>
@@ -3441,6 +4117,17 @@
             <param name="over_stop_velocity_warn_thr" value="1.389"/>
             <param name="plan_from_ego_speed_on_manual_mode" value="true"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_velocity_smoother/velocity_smoother.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="input/velocity_limit_from_api" to="/planning/scenario_planning/max_velocity_default"/>
             <remap from="input/velocity_limit_from_internal" to="/planning/scenario_planning/max_velocity_candidates"/>
             <remap from="input/velocity_limit_clear_command_from_internal" to="/planning/scenario_planning/clear_velocity_limit"/>
@@ -3450,6 +4137,17 @@
         </group>
         <!-- end: autoware_external_velocity_limit_selector://launch/external_velocity_limit_selector.launch.xml -->
         <node_container pkg="rclcpp_components" exec="component_container" name="velocity_smoother_container" namespace="/planning/scenario_planning">
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <composable_node pkg="autoware_velocity_smoother" plugin="autoware::velocity_smoother::VelocitySmootherNode" name="velocity_smoother">
             <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/common.param.yaml -->
             <param name="max_vel" value="4.17"/>
@@ -3535,6 +4233,17 @@
             <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_hazard_lights_selector/hazard_lights_selector.param.yaml -->
             <param name="update_rate" value="10"/>
             <!-- end params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_hazard_lights_selector/hazard_lights_selector.param.yaml -->
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <remap from="input/planning/hazard_lights_command" to="/planning/behavior_path_planner/hazard_lights_cmd"/>
             <remap from="input/system/hazard_lights_command" to="/system/hazard_lights_cmd"/>
             <remap from="output/hazard_lights_command" to="/planning/hazard_lights_cmd"/>
@@ -3590,6 +4299,17 @@
             <!-- arg name="launch_virtual_traffic_light_module" default="true" -->
             <!-- arg name="launch_walkway_module" default="true" -->
             <node_container pkg="rclcpp_components" exec="component_container_mt" name="behavior_planning_container" namespace="/planning/scenario_planning/lane_driving/behavior_planning">
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
               <composable_node pkg="autoware_behavior_velocity_planner" plugin="autoware::behavior_velocity_planner::experimental::BehaviorVelocityPlannerNode" name="behavior_velocity_planner">
                 <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/common.param.yaml -->
                 <param name="max_vel" value="4.17"/>
@@ -4981,7 +5701,19 @@
             <!-- arg name="launch_road_user_stop_module" default="true" -->
             <!-- arg name="launch_run_out_module" default="true" -->
             <!-- arg name="motion_velocity_planner_launch_modules" default="[" -->
-            <node_container pkg="rclcpp_components" exec="component_container_mt" name="motion_planning_container" namespace="/planning/scenario_planning/lane_driving/motion_planning"/>
+            <node_container pkg="rclcpp_components" exec="component_container_mt" name="motion_planning_container" namespace="/planning/scenario_planning/lane_driving/motion_planning">
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
+            </node_container>
             <load_composable_node target="/planning/scenario_planning/lane_driving/motion_planning/motion_planning_container">
               <composable_node pkg="autoware_path_smoother" plugin="autoware::path_smoother::ElasticBandSmoother" name="elastic_band_smoother">
                 <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/common.param.yaml -->
@@ -5708,6 +6440,17 @@
           <!-- arg name="input_objects_topic_name" default="/perception/object_recognition/objects" -->
           <!-- arg name="input_pointcloud_topic_name" default="/perception/obstacle_segmentation/pointcloud" -->
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="parking_container" namespace="/planning/scenario_planning/parking">
+            <param name="front_overhang" value="1.0"/>
+            <param name="left_overhang" value="0.128"/>
+            <param name="max_steer_angle" value="0.7"/>
+            <param name="rear_overhang" value="1.1"/>
+            <param name="right_overhang" value="0.128"/>
+            <param name="use_sim_time" value="false"/>
+            <param name="vehicle_height" value="2.5"/>
+            <param name="wheel_base" value="2.79"/>
+            <param name="wheel_radius" value="0.383"/>
+            <param name="wheel_tread" value="1.64"/>
+            <param name="wheel_width" value="0.235"/>
             <composable_node pkg="autoware_costmap_generator" plugin="autoware::costmap_generator::CostmapGenerator" name="costmap_generator">
               <!-- params from: $(find-pkg-share sample_vehicle_description)/config/vehicle_info.param.yaml -->
               <param name="wheel_radius" value="0.383"/>
@@ -5837,6 +6580,17 @@
         <!-- arg name="planning_validator_rear_collision_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/rear_collision_checker.param.yaml" -->
         <!-- arg name="planning_validator_trajectory_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/trajectory_checker.param.yaml" -->
         <node_container pkg="rclcpp_components" exec="component_container_mt" name="planning_validator_container" namespace="/planning">
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <composable_node pkg="autoware_planning_validator" plugin="autoware::planning_validator::PlanningValidatorNode" name="planning_validator">
             <!-- params from: $(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/planning_validator.param.yaml -->
             <param name="planning_hz" value="10.0"/>
@@ -6045,7 +6799,18 @@
           <param name="steer_change_count.window_duration_s" value="5.0"/>
           <param name="steer_change_count.steer_rate_margin" value="0.2"/>
           <!-- end params from: $(find-pkg-share autoware_planning_evaluator)/config/planning_evaluator.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
           <param name="output_metrics" value="false"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/input/odometry" to="/localization/kinematic_state"/>
           <remap from="~/input/acceleration" to="/localization/acceleration"/>
           <remap from="~/input/trajectory" to="/planning/trajectory"/>
@@ -6070,6 +6835,17 @@
           <!-- params from: $(find-pkg-share autoware_remaining_distance_time_calculator)/config/remaining_distance_time_calculator.param.yaml -->
           <param name="update_rate" value="10.0"/>
           <!-- end params from: $(find-pkg-share autoware_remaining_distance_time_calculator)/config/remaining_distance_time_calculator.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/input/odometry" to="/localization/kinematic_state"/>
           <remap from="~/input/map" to="/map/pointcloud_map"/>
           <remap from="~/input/route" to="/planning/mission_planning/route"/>
@@ -6083,8 +6859,19 @@
   </group>
   <!-- end: autoware_launch://launch/components/tier4_planning_component.launch.xml -->
   <node pkg="topic_tools" exec="relay" name="trajectory_relay">
+    <param name="front_overhang" value="1.0"/>
     <param name="input_topic" value="/planning/trajectory"/>
+    <param name="left_overhang" value="0.128"/>
+    <param name="max_steer_angle" value="0.7"/>
     <param name="output_topic" value="/planning/scenario_planning/trajectory"/>
+    <param name="rear_overhang" value="1.1"/>
+    <param name="right_overhang" value="0.128"/>
+    <param name="use_sim_time" value="false"/>
+    <param name="vehicle_height" value="2.5"/>
+    <param name="wheel_base" value="2.79"/>
+    <param name="wheel_radius" value="0.383"/>
+    <param name="wheel_tread" value="1.64"/>
+    <param name="wheel_width" value="0.235"/>
   </node>
   <!-- source: autoware_launch://launch/components/tier4_control_component.launch.xml -->
   <group>
@@ -6141,6 +6928,17 @@
       <!-- arg name="vehicle_id" value="default" -->
       <!-- arg name="vehicle_param_file" value="$(find-pkg-share sample_vehicle_description)/config/vehicle_info.param.yaml" -->
       <node_container pkg="rclcpp_components" exec="component_container" name="control_container" namespace="/control">
+        <param name="front_overhang" value="1.0"/>
+        <param name="left_overhang" value="0.128"/>
+        <param name="max_steer_angle" value="0.7"/>
+        <param name="rear_overhang" value="1.1"/>
+        <param name="right_overhang" value="0.128"/>
+        <param name="use_sim_time" value="false"/>
+        <param name="vehicle_height" value="2.5"/>
+        <param name="wheel_base" value="2.79"/>
+        <param name="wheel_radius" value="0.383"/>
+        <param name="wheel_tread" value="1.64"/>
+        <param name="wheel_width" value="0.235"/>
         <composable_node pkg="autoware_shift_decider" plugin="autoware::shift_decider::ShiftDecider" name="autoware_shift_decider">
           <!-- params from: $(find-pkg-share autoware_launch)/config/control/shift_decider/shift_decider.param.yaml -->
           <param name="park_on_goal" value="true"/>
@@ -6527,7 +7325,19 @@
         </load_composable_node>
       </group>
       <!-- end: autoware_external_cmd_converter://launch/external_cmd_converter.launch.py -->
-      <node_container pkg="rclcpp_components" exec="component_container" name="control_check_container" namespace="/control"/>
+      <node_container pkg="rclcpp_components" exec="component_container" name="control_check_container" namespace="/control">
+        <param name="front_overhang" value="1.0"/>
+        <param name="left_overhang" value="0.128"/>
+        <param name="max_steer_angle" value="0.7"/>
+        <param name="rear_overhang" value="1.1"/>
+        <param name="right_overhang" value="0.128"/>
+        <param name="use_sim_time" value="false"/>
+        <param name="vehicle_height" value="2.5"/>
+        <param name="wheel_base" value="2.79"/>
+        <param name="wheel_radius" value="0.383"/>
+        <param name="wheel_tread" value="1.64"/>
+        <param name="wheel_width" value="0.235"/>
+      </node_container>
       <load_composable_node target="/control/control_check_container">
         <composable_node pkg="autoware_lane_departure_checker" plugin="autoware::lane_departure_checker::LaneDepartureCheckerNode" name="lane_departure_checker_node">
           <!-- params from: $(find-pkg-share autoware_launch)/config/control/common/nearest_search.param.yaml -->
@@ -6701,7 +7511,18 @@
           <param name="planning_factor_metrics.stop_deviation.module_list" value="[blind_spot, crosswalk, detection_area, intersection, merge_from_private, no_drivable_lane, no_stopping_area, stop_line, traffic_light, virtual_traffic_light, walkway]"/>
           <param name="object_metrics.distance_filter_thr_m" value="30.0"/>
           <!-- end params from: $(find-pkg-share autoware_control_evaluator)/config/control_evaluator.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
           <param name="output_metrics" value="false"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/input/odometry" to="/localization/kinematic_state"/>
           <remap from="~/input/acceleration" to="/localization/acceleration"/>
           <remap from="~/input/trajectory" to="/planning/trajectory"/>
@@ -6732,6 +7553,17 @@
       <group>
         <!-- arg name="config" value="$(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml" -->
         <node_container pkg="rclcpp_components" exec="component_container_mt" name="container" namespace="/adapi">
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <composable_node pkg="autoware_default_adapi" plugin="autoware::default_adapi::InterfaceNode" name="interface">
             <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
             <param name="diagnostic_updater.period" value="1.0"/>
@@ -7179,14 +8011,36 @@
           <!-- params from: $(find-pkg-share autoware_adapi_adaptors)/config/initial_pose.param.yaml -->
           <param name="initial_pose_particle_covariance" value="[4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]"/>
           <!-- end params from: $(find-pkg-share autoware_adapi_adaptors)/config/initial_pose.param.yaml -->
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
           <param name="map_height_fitter.map_loader_name" value="/map/pointcloud_map_loader"/>
           <param name="map_height_fitter.target" value="pointcloud_map"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/initialpose" to="/initialpose"/>
           <remap from="~/pointcloud_map" to="/map/pointcloud_map"/>
           <remap from="~/partial_map_load" to="/map/get_partial_pointcloud_map"/>
           <remap from="~/vector_map" to="/map/vector_map"/>
         </node>
         <node pkg="autoware_adapi_adaptors" exec="routing_adaptor_node" namespace="/default_adapi/helpers">
+          <param name="front_overhang" value="1.0"/>
+          <param name="left_overhang" value="0.128"/>
+          <param name="max_steer_angle" value="0.7"/>
+          <param name="rear_overhang" value="1.1"/>
+          <param name="right_overhang" value="0.128"/>
+          <param name="use_sim_time" value="false"/>
+          <param name="vehicle_height" value="2.5"/>
+          <param name="wheel_base" value="2.79"/>
+          <param name="wheel_radius" value="0.383"/>
+          <param name="wheel_tread" value="1.64"/>
+          <param name="wheel_width" value="0.235"/>
           <remap from="~/input/fixed_goal" to="/planning/mission_planning/goal"/>
           <remap from="~/input/rough_goal" to="/rviz/routing/rough_goal"/>
           <remap from="~/input/reroute" to="/rviz/routing/reroute"/>
@@ -7199,6 +8053,17 @@
   </group>
   <!-- end: autoware_launch://launch/components/tier4_autoware_api_component.launch.xml -->
   <node pkg="rviz2" exec="rviz2" name="rviz2" output="screen" args="-d $(find-pkg-share autoware_launch)/rviz/autoware.rviz -s $(find-pkg-share autoware_launch)/rviz/image/autoware.png" respawn="true">
+    <param name="front_overhang" value="1.0"/>
+    <param name="left_overhang" value="0.128"/>
+    <param name="max_steer_angle" value="0.7"/>
+    <param name="rear_overhang" value="1.1"/>
+    <param name="right_overhang" value="0.128"/>
+    <param name="use_sim_time" value="false"/>
+    <param name="vehicle_height" value="2.5"/>
+    <param name="wheel_base" value="2.79"/>
+    <param name="wheel_radius" value="0.383"/>
+    <param name="wheel_tread" value="1.64"/>
+    <param name="wheel_width" value="0.235"/>
     <env name="QT_QPA_PLATFORMTHEME" value="qt5ct"/>
   </node>
 </launch>

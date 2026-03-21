@@ -52,6 +52,10 @@ pub enum Error {
     #[error("circular dependency detected: {0}")]
     CircularDependency(String),
 
+    /// Python resolver failed
+    #[error("Python resolver failed: {0}")]
+    PythonResolver(String),
+
     /// Process execution failed
     #[error("process execution failed: {0}")]
     ProcessExecution(String),

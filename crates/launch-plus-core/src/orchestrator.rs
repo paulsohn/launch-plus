@@ -323,13 +323,15 @@ fn run_py_resolver(
     // when multiple launch-plus processes run concurrently.
     let tmp_dir = std::env::temp_dir().join("launch-plus");
     std::fs::create_dir_all(&tmp_dir)
-        .map_err(|e| crate::Error::Git(format!("failed to create tmp dir: {e}")))?;
+        .map_err(|e| crate::Error::PythonResolver(format!("failed to create tmp dir: {e}")))?;
     let script_path = tmp_dir.join(format!("py_resolver_{}.py", std::process::id()));
     {
-        let mut f = std::fs::File::create(&script_path)
-            .map_err(|e| crate::Error::Git(format!("failed to write py_resolver.py: {e}")))?;
-        f.write_all(PY_RESOLVER_SCRIPT.as_bytes())
-            .map_err(|e| crate::Error::Git(format!("failed to write py_resolver.py: {e}")))?;
+        let mut f = std::fs::File::create(&script_path).map_err(|e| {
+            crate::Error::PythonResolver(format!("failed to write py_resolver.py: {e}"))
+        })?;
+        f.write_all(PY_RESOLVER_SCRIPT.as_bytes()).map_err(|e| {
+            crate::Error::PythonResolver(format!("failed to write py_resolver.py: {e}"))
+        })?;
     }
 
     // Inject persisted global_params into args under the reserved key __global_params__.
@@ -337,8 +339,9 @@ fn run_py_resolver(
     // context.launch_configurations["global_params"] from it.
     let mut args_with_globals = initial_args.clone();
     if !persisted_global_params.is_empty() {
-        let gp_json = serde_json::to_string(persisted_global_params)
-            .map_err(|e| crate::Error::Git(format!("failed to serialize global_params: {e}")))?;
+        let gp_json = serde_json::to_string(persisted_global_params).map_err(|e| {
+            crate::Error::PythonResolver(format!("failed to serialize global_params: {e}"))
+        })?;
         args_with_globals.insert("__global_params__".to_string(), gp_json);
     }
 
@@ -362,10 +365,10 @@ fn run_py_resolver(
         .collect();
 
     let script_str = script_path.to_str().ok_or_else(|| {
-        crate::Error::Git("py_resolver script path is not valid UTF-8".to_string())
+        crate::Error::PythonResolver("py_resolver script path is not valid UTF-8".to_string())
     })?;
     let file_str = file_path.to_str().ok_or_else(|| {
-        crate::Error::Git(format!(
+        crate::Error::PythonResolver(format!(
             "launch file path is not valid UTF-8: {}",
             file_path.display()
         ))
@@ -396,23 +399,23 @@ fn run_py_resolver(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| crate::Error::Git(format!("failed to run python3: {e}")))?;
+        .map_err(|e| crate::Error::PythonResolver(format!("failed to run python3: {e}")))?;
 
     // Write JSON payload to stdin, then close the pipe so Python sees EOF.
     if let Some(mut stdin) = child.stdin.take() {
         use std::io::Write;
-        stdin
-            .write_all(stdin_json.as_bytes())
-            .map_err(|e| crate::Error::Git(format!("failed to write to python3 stdin: {e}")))?;
+        stdin.write_all(stdin_json.as_bytes()).map_err(|e| {
+            crate::Error::PythonResolver(format!("failed to write to python3 stdin: {e}"))
+        })?;
     }
 
     let output = child
         .wait_with_output()
-        .map_err(|e| crate::Error::Git(format!("failed to wait for python3: {e}")))?;
+        .map_err(|e| crate::Error::PythonResolver(format!("failed to wait for python3: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(crate::Error::Git(format!(
+        return Err(crate::Error::PythonResolver(format!(
             "py_resolver failed for {}: {}",
             file_path.display(),
             stderr.trim()
@@ -421,7 +424,7 @@ fn run_py_resolver(
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     serde_json::from_str::<PyResolverOutput>(&stdout).map_err(|e| {
-        crate::Error::Git(format!(
+        crate::Error::PythonResolver(format!(
             "failed to parse py_resolver output for {}: {e}",
             file_path.display()
         ))

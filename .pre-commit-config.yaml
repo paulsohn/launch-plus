@@ -35,3 +35,10 @@ repos:
         entry: ruff format --check
         language: system
         types: [python]
+
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        pass_filenames: true

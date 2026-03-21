@@ -54,7 +54,7 @@ if TYPE_CHECKING:
         namespace_stack: list[str]  # PushRosNamespace stack at resolution time
         explicit_namespace: str | None  # node's own namespace= kwarg, resolved
         parameters: dict[str, str]
-        param_files: list[str]
+        param_files: list[dict]  # [{"path": str, "params": ...?}, ...]
         remappings: list[list[str]]  # [[src, dst], ...]
         env: dict[str, str]
         kind: str  # "node" | "container" | "load_composable"
@@ -113,7 +113,7 @@ class IRComposablePlugin:
     namespace: str | None = None
     parameters: dict[str, str] = field(default_factory=dict)
     remappings: list[tuple[str, str]] = field(default_factory=list)
-    param_files: list[str] = field(default_factory=list)
+    param_files: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -125,7 +125,7 @@ class IRNode:
     name: str | None = None
     namespace: str | None = None
     parameters: dict[str, str] = field(default_factory=dict)
-    param_files: list[str] = field(default_factory=list)
+    param_files: list[dict] = field(default_factory=list)
     remappings: list[tuple[str, str]] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
     output: str | None = None
@@ -552,13 +552,13 @@ def _resolve_pkg_share(package: str) -> str:
             and not os.path.isfile(os.path.join(pkg_path, "package.xml"))
         ):
             if _ensure_fetched(package):
-                return _package_shares[package]
+                return str(_package_shares[package])
             raise _PackageNotFetchedError(package)
         return pkg_path
     # 2. Lockfile package not yet in _package_shares — fetch (preview only).
     if _preview_mode and _lockfile_data and package in _lockfile_data:
         if _ensure_fetched(package):
-            return _package_shares[package]
+            return str(_package_shares[package])
         raise _PackageNotFetchedError(package)
     # 3. Non-lockfile packages (system / rosdep): use AMENT_PREFIX_PATH.
     if _real_get_package_share_directory is not None:
@@ -647,7 +647,7 @@ _global_params: list[tuple[str, str]] = []
 _global_remaps: list[tuple[str, str]] = []
 
 # Scoped global parameter files set by <set_parameters_from_file>.
-_global_param_files: list[str] = []
+_global_param_files: list[dict] = []
 
 # Collected event handlers — separate from the action tree.
 _ir_event_handlers: list[IREventHandler] = []
@@ -2576,7 +2576,7 @@ def _resolve_element_to_ir(
         # Merge scoped global params/remaps/param_files (global first, node-local overrides)
         merged_params = dict(_global_params)
         merged_params.update(params)
-        merged_param_files = [_make_param_file_entry(p) for p in _global_param_files] + param_files
+        merged_param_files = list(_global_param_files) + param_files
         merged_remaps = list(_global_remaps) + [(s, d) for s, d in remaps]
         node_cls = IRLifecycleNode if kind == "LifecycleNode" else IRNode
         return [
@@ -2700,7 +2700,7 @@ def _resolve_element_to_ir(
 
     if kind == "SetParametersFromFile":
         path = resolve_substitutions(data.get("filename", ""), ctx)
-        _global_param_files.append(path)
+        _global_param_files.append(_make_param_file_entry(path))
         return []
 
     if kind == "SetRemap":

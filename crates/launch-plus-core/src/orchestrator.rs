@@ -1022,7 +1022,6 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
 
 /// Common post-processing for any parsed launch file (XML, YAML, or Python).
 ///
-/// Apply a parent file's `<push-ros-namespace>` context to a child node.
 /// Accumulates packages/files/nodes into `result` and updates declared-arg tracking.
 /// The Python resolver handles all includes inline, so this function only records
 /// dependency edges without recursing.

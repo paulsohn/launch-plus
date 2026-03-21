@@ -156,7 +156,12 @@ the post-build resolution:
 # Source the built workspace
 source install/setup.bash
 
-# Post-build resolve
+# Preview resolve (pre-build, portable paths)
+launch-plus resolve --preview -d my_bringup robot.launch.xml \
+  robot_name:=my_robot \
+  > preview.launch.xml
+
+# Post-build resolve (real install paths)
 launch-plus resolve -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > postbuild.launch.xml

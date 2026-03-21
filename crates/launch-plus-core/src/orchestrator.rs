@@ -28,13 +28,10 @@ use crate::indexer::Lockfile;
 use crate::locator::PackageLocator;
 use crate::resolver::{
     ComposablePlugin, DependencyKind, EventHandlerKind, FileDependency, IncludeArgContext,
-    LaunchInclude, NodeKind, ParsedLaunchFile, ResolveOptions, ResolvedEventAction, ResolvedLaunch,
-    ResolvedNode, SubstitutionContext, collect_arg_and_var_refs, collect_declared_args,
-    collect_env_without_fallback, collect_scoped_false_includes, parse_launch_xml, resolve_launch,
+    LaunchInclude, NodeKind, ParsedLaunchFile, ResolvedEventAction, ResolvedNode,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// Options controlling the resolution workflow (distinct from [`FetchOptions`]).
@@ -125,7 +122,7 @@ pub struct ResolveWorkflowOptions {
     /// Exposed via `--apply-opaque-file-access` in the CLI.
     pub apply_opaque_file_access: bool,
 
-    /// Expand `<param from="...">` files at resolve time (see [`ResolveOptions::inline_params`]).
+    /// Expand `<param from="...">` files at resolve time.
     ///
     /// Exposed via `--inline-params` in the CLI.
     pub inline_params: bool,
@@ -222,10 +219,6 @@ impl ResolveResult {
     fn add_warning(&mut self, msg: String) {
         self.warnings.push(msg);
     }
-
-    fn add_info(&mut self, msg: String) {
-        self.infos.push(msg);
-    }
 }
 
 /// Resolve a launch file recursively, fetching packages on demand
@@ -272,7 +265,7 @@ pub fn resolve_launch_recursive(
 
     // Start with the entrypoint; CLI args apply only to this top-level file
     let share_path = PathBuf::from("launch").join(launcher);
-    resolve_file_recursive(
+    resolve_launch_file(
         lockfile,
         &locator,
         package,
@@ -281,11 +274,9 @@ pub fn resolve_launch_recursive(
         options,
         initial_args,
         workflow_options,
-        &HashMap::new(), // persisted_arg_context: empty at root
         &mut result,
         &mut fetched_packages,
         &mut failed_repos,
-        vec![], // parent_chain: empty Vec<(String, PathBuf)> for root
     );
 
     info!(
@@ -320,23 +311,28 @@ fn run_py_resolver(
     file_path: &Path,
     initial_args: &HashMap<String, String>,
     package_shares: &HashMap<String, String>,
-    lockfile_package_names: &[String],
+    lockfile: &Lockfile,
+    fetch_dir: &Path,
     persisted_global_params: &[serde_json::Value],
     workflow_options: &ResolveWorkflowOptions,
 ) -> crate::Result<PyResolverOutput> {
     use std::io::Write;
     use std::process::{Command, Stdio};
 
-    // Write the shim script to a temp file (always overwrite so updates take effect)
+    // Write the shim script to a PID-keyed temp file to avoid races when multiple
+    // launch-plus processes run concurrently.  Within a single process, the file
+    // content is identical (PY_RESOLVER_SCRIPT is constant), so reuse is safe.
     let tmp_dir = std::env::temp_dir().join("launch-plus");
     std::fs::create_dir_all(&tmp_dir)
-        .map_err(|e| crate::Error::Git(format!("failed to create tmp dir: {e}")))?;
-    let script_path = tmp_dir.join("py_resolver.py");
+        .map_err(|e| crate::Error::PythonResolver(format!("failed to create tmp dir: {e}")))?;
+    let script_path = tmp_dir.join(format!("py_resolver_{}.py", std::process::id()));
     {
-        let mut f = std::fs::File::create(&script_path)
-            .map_err(|e| crate::Error::Git(format!("failed to write py_resolver.py: {e}")))?;
-        f.write_all(PY_RESOLVER_SCRIPT.as_bytes())
-            .map_err(|e| crate::Error::Git(format!("failed to write py_resolver.py: {e}")))?;
+        let mut f = std::fs::File::create(&script_path).map_err(|e| {
+            crate::Error::PythonResolver(format!("failed to write py_resolver.py: {e}"))
+        })?;
+        f.write_all(PY_RESOLVER_SCRIPT.as_bytes()).map_err(|e| {
+            crate::Error::PythonResolver(format!("failed to write py_resolver.py: {e}"))
+        })?;
     }
 
     // Inject persisted global_params into args under the reserved key __global_params__.
@@ -344,45 +340,90 @@ fn run_py_resolver(
     // context.launch_configurations["global_params"] from it.
     let mut args_with_globals = initial_args.clone();
     if !persisted_global_params.is_empty() {
-        let gp_json = serde_json::to_string(persisted_global_params)
-            .map_err(|e| crate::Error::Git(format!("failed to serialize global_params: {e}")))?;
+        let gp_json = serde_json::to_string(persisted_global_params).map_err(|e| {
+            crate::Error::PythonResolver(format!("failed to serialize global_params: {e}"))
+        })?;
         args_with_globals.insert("__global_params__".to_string(), gp_json);
     }
 
-    let args_json = serde_json::to_string(&args_with_globals)
-        .map_err(|e| crate::Error::Git(format!("failed to serialize launch args: {e}")))?;
-    let shares_json = serde_json::to_string(package_shares)
-        .map_err(|e| crate::Error::Git(format!("failed to serialize package_shares: {e}")))?;
-
-    // Pass workflow options as a JSON flags object (sys.argv[4] in py_resolver).
-    let flags = serde_json::json!({
-        "apply_opaque_file_access": workflow_options.apply_opaque_file_access,
-        "preview": workflow_options.preview,
-        // Full set of lockfile package names so py_resolver can enforce that lockfile
-        // packages always resolve from source and never fall through to AMENT_PREFIX_PATH.
-        "lockfile_packages": lockfile_package_names,
-    });
-    let flags_json = flags.to_string();
+    // Build lockfile data for Python: package name → {repo, path, url, version}
+    // so py_resolver can fetch missing packages inline via git sparse-checkout.
+    let mut lockfile_data: HashMap<String, serde_json::Value> = HashMap::new();
+    for (pkg_name, pkg_lock) in &lockfile.packages {
+        let Some(repo_lock) = lockfile.repositories.get(&pkg_lock.repo) else {
+            tracing::warn!(
+                "lockfile integrity: package '{}' references unknown repo '{}'",
+                pkg_name,
+                pkg_lock.repo
+            );
+            continue;
+        };
+        lockfile_data.insert(
+            pkg_name.clone(),
+            serde_json::json!({
+                "repo": pkg_lock.repo,
+                "path": pkg_lock.path,
+                "url": repo_lock.url,
+                "version": repo_lock.version,
+            }),
+        );
+    }
 
     let script_str = script_path.to_str().ok_or_else(|| {
-        crate::Error::Git("py_resolver script path is not valid UTF-8".to_string())
+        crate::Error::PythonResolver("py_resolver script path is not valid UTF-8".to_string())
     })?;
     let file_str = file_path.to_str().ok_or_else(|| {
-        crate::Error::Git(format!(
+        crate::Error::PythonResolver(format!(
             "launch file path is not valid UTF-8: {}",
             file_path.display()
         ))
     })?;
-    let output = Command::new("python3")
-        .args([script_str, file_str, &args_json, &shares_json, &flags_json])
+    // Pass JSON data via stdin to avoid hitting the OS ARG_MAX limit.
+    // Large lockfiles + package_shares can easily exceed the ~2MB argument limit.
+    let stdin_payload = serde_json::json!({
+        "launch_file": file_str,
+        "args": &args_with_globals,
+        "package_shares": package_shares,
+        "flags": {
+            "apply_opaque_file_access": workflow_options.apply_opaque_file_access,
+            "preview": workflow_options.preview,
+            "inline_params": workflow_options.inline_params,
+            "rosdep_fallback": workflow_options.rosdep_fallback,
+            "apply_arg_defaults": workflow_options.apply_arg_defaults,
+            "global_arg_cascade": workflow_options.global_arg_cascade,
+            "allow_unportable_paths": workflow_options.allow_unportable_paths,
+            "lockfile_packages": &lockfile_data,
+            "fetch_dir": fetch_dir.to_string_lossy(),
+        },
+    });
+    let stdin_json = stdin_payload.to_string();
+
+    let mut child = Command::new("python3")
+        .args([script_str])
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| crate::Error::Git(format!("failed to run python3: {e}")))?;
+        .spawn()
+        .map_err(|e| crate::Error::PythonResolver(format!("failed to run python3: {e}")))?;
+
+    // Write JSON payload to stdin, then close the pipe so Python sees EOF.
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        stdin.write_all(stdin_json.as_bytes()).map_err(|e| {
+            crate::Error::PythonResolver(format!("failed to write to python3 stdin: {e}"))
+        })?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| crate::Error::PythonResolver(format!("failed to wait for python3: {e}")))?;
+
+    // Clean up the temp script now that the child has exited.
+    let _ = std::fs::remove_file(&script_path);
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(crate::Error::Git(format!(
+        return Err(crate::Error::PythonResolver(format!(
             "py_resolver failed for {}: {}",
             file_path.display(),
             stderr.trim()
@@ -391,7 +432,7 @@ fn run_py_resolver(
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     serde_json::from_str::<PyResolverOutput>(&stdout).map_err(|e| {
-        crate::Error::Git(format!(
+        crate::Error::PythonResolver(format!(
             "failed to parse py_resolver output for {}: {e}",
             file_path.display()
         ))
@@ -433,15 +474,16 @@ struct PyResolverOutput {
     /// Promoted to result.add_error() by the caller.
     #[serde(default)]
     errors: Vec<String>,
-    /// Lockfile packages whose source directories were not found on disk.
-    /// Non-empty when get_package_share_directory() was called for a lockfile package
-    /// that hasn't been cloned yet.  The caller fetches these and retries run_py_resolver.
+    /// Legacy field — Python now fetches packages inline via _ensure_fetched().
+    /// Kept for serde backward compatibility with older py_resolver output.
     #[serde(default)]
+    #[allow(dead_code)]
     packages_to_fetch: Vec<String>,
     /// SetLaunchConfiguration calls: {name: value}.
     /// Propagated into the calling XML file's substitution context so that
     /// subsequent $(var name) references resolve correctly.
     #[serde(default)]
+    #[allow(dead_code)]
     set_launch_configurations: HashMap<String, String>,
     /// Structured include dependencies: [{package, share_path}].
     /// Extracted by the Python resolver from portable or AMENT install paths,
@@ -454,6 +496,9 @@ struct PyResolverOutput {
     /// Event handlers detected in the Python launch file.
     #[serde(default)]
     event_handlers: Vec<PyEventHandler>,
+    /// Per-file declared args for --show-args: {"pkg://share_path": [{name, default}]}
+    #[serde(default)]
+    declared_args_by_file: HashMap<String, Vec<PyDeclaredArg>>,
 }
 
 #[derive(Debug, serde::Deserialize, Clone, PartialEq)]
@@ -479,8 +524,11 @@ enum PyNodeKind {
     Container,
     LoadComposable,
     SetParameter,
+    SetRemap,
+    Log,
     Executable,
     LifecycleNode,
+    EventHandler,
 }
 
 /// A deserialized event handler from the Python resolver.
@@ -518,6 +566,15 @@ struct PyEventAction {
     explicit_namespace: Option<String>,
 }
 
+/// A param file entry from py_resolver: reference or inlined.
+#[derive(Debug, serde::Deserialize)]
+struct PyParamFile {
+    path: String,
+    /// Inlined params as [[key, value], ...]; absent for references.
+    #[serde(default)]
+    params: Option<Vec<(String, String)>>,
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct PyComposablePlugin {
     package: String,
@@ -528,6 +585,8 @@ struct PyComposablePlugin {
     parameters: BTreeMap<String, String>,
     #[serde(default)]
     remappings: Vec<(String, String)>,
+    #[serde(default)]
+    param_files: Vec<PyParamFile>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -555,8 +614,9 @@ struct PyResolvedNode {
     plugins: Vec<PyComposablePlugin>,
     #[serde(default)]
     target: Option<String>,
-    /// For `kind == SetParameter`: the resolved parameter value string.
+    /// Legacy: was used for `kind == SetParameter` (now filtered out).
     #[serde(default)]
+    #[allow(dead_code)]
     param_value: Option<String>,
     /// For `kind == Executable`: the resolved command string.
     #[serde(default)]
@@ -564,6 +624,49 @@ struct PyResolvedNode {
     /// For `kind == Executable`: whether to run via a shell.
     #[serde(default)]
     shell: bool,
+    /// For `kind == SetRemap`: source topic.
+    #[serde(default)]
+    remap_from: Option<String>,
+    /// For `kind == SetRemap`: destination topic.
+    #[serde(default)]
+    remap_to: Option<String>,
+    /// For `kind == Log`: the log message.
+    #[serde(default)]
+    message: Option<String>,
+    /// Include chain from root to this node's source file, as `[package, share_path]` pairs.
+    /// Set by py_resolver for nodes within included files; empty for root-level nodes.
+    #[serde(default)]
+    include_chain: Vec<(String, String)>,
+    /// Param files referenced by this node — reference or inlined.
+    #[serde(default)]
+    param_files: Vec<PyParamFile>,
+    /// Resolved `output=` attribute (e.g. "screen", "log", "both").
+    #[serde(default)]
+    output: Option<String>,
+    /// Resolved `arguments=` (CLI args for the node process).
+    #[serde(default)]
+    args: Option<String>,
+    /// Resolved `respawn=` attribute.
+    #[serde(default)]
+    respawn: Option<String>,
+    /// Resolved `respawn_delay=` attribute.
+    #[serde(default)]
+    respawn_delay: Option<String>,
+    /// Event handler kind (for `kind == EventHandler`).
+    #[serde(default)]
+    handler_kind: Option<String>,
+    /// Event handler target node (for `kind == EventHandler`).
+    #[serde(default)]
+    target_node: Option<String>,
+    /// Lifecycle start state (for `kind == EventHandler`).
+    #[serde(default)]
+    start_state: Option<String>,
+    /// Lifecycle goal state (for `kind == EventHandler`).
+    #[serde(default)]
+    goal_state: Option<String>,
+    /// Event handler actions (for `kind == EventHandler`).
+    #[serde(default)]
+    eh_actions: Vec<PyEventAction>,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -654,62 +757,18 @@ fn try_rosdep_install(package: &str, result: &mut ResolveResult) -> bool {
     }
 }
 
-/// Convert a [`ResolvedLaunch`] (XML/YAML output) into the unified [`ParsedLaunchFile`] IR.
-///
-/// Maps `required_files` into `launch_includes`, `param_files`, and `other_files`,
-/// extracting explicit include args from `include_args`.
-///
-/// Any `required_abs_files` that couldn't be parsed by `extract_file_dependency` are
-/// reported as errors — this indicates a non-standard path pattern (anti-pattern in
-/// ROS 2 launch files that don't use `$(find-pkg-share ...)`).
-fn resolved_launch_to_parsed(resolved: ResolvedLaunch) -> ParsedLaunchFile {
-    let mut launch_includes = Vec::new();
-    let mut param_files = Vec::new();
-    let mut other_files = Vec::new();
-    let mut errors = resolved.errors.clone();
-
-    for dep in &resolved.required_files {
-        match dep.kind {
-            DependencyKind::Launch => {
-                let inc_ctx = resolved
-                    .include_args
-                    .get(&(dep.package.clone(), dep.share_path.clone()));
-                let explicit_args = inc_ctx.map(|ctx| ctx.explicit.clone()).unwrap_or_default();
-                let namespace_stack = inc_ctx
-                    .map(|ctx| ctx.namespace_stack.clone())
-                    .unwrap_or_default();
-                launch_includes.push(LaunchInclude {
-                    package: dep.package.clone(),
-                    share_path: dep.share_path.clone(),
-                    explicit_args,
-                    namespace_stack,
-                });
-            }
-            DependencyKind::Param => param_files.push(dep.clone()),
-            DependencyKind::Other => other_files.push(dep.clone()),
+/// Convert a [`PyParamFile`] from Python output to the renderer's [`ParamFile`].
+fn convert_param_file(pf: &PyParamFile) -> crate::resolver::ParamFile {
+    if let Some(ref params) = pf.params {
+        crate::resolver::ParamFile::Inlined {
+            display: pf.path.clone(),
+            params: params.clone(),
         }
-    }
-
-    for (abs_path, kind, _ctx) in &resolved.required_abs_files {
-        errors.push(format!(
-            "path '{}' ({:?}) could not be decomposed into (package, share_path) — \
-             launch files should use $(find-pkg-share <pkg>) instead of absolute paths",
-            abs_path.display(),
-            kind,
-        ));
-    }
-
-    ParsedLaunchFile {
-        packages: resolved.required_packages.into_iter().collect(),
-        nodes: resolved.nodes,
-        launch_includes,
-        param_files,
-        other_files,
-        declared_arg_defaults: resolved.declared_arg_defaults,
-        global_params: Vec::new(), // XML/YAML has no SetParameter
-        warnings: resolved.warnings,
-        errors,
-        infos: resolved.infos,
+    } else {
+        crate::resolver::ParamFile::Reference {
+            display: pf.path.clone(),
+            abs: pf.path.clone(), // portable path — Rust doesn't need abs
+        }
     }
 }
 
@@ -723,8 +782,10 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
     let mut nodes = py_output
         .nodes
         .iter()
-        .map(|n| {
+        .filter_map(|n| {
             let kind = match n.kind {
+                // SetParameter is absorbed into leaf nodes by the Python resolver.
+                PyNodeKind::SetParameter => return None,
                 PyNodeKind::Container => NodeKind::Container {
                     plugins: n
                         .plugins
@@ -735,7 +796,7 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                             name: p.name.clone(),
                             parameters: p.parameters.clone(),
                             remappings: p.remappings.clone(),
-                            param_files: vec![],
+                            param_files: p.param_files.iter().map(convert_param_file).collect(),
                         })
                         .collect(),
                 },
@@ -750,15 +811,18 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                             name: p.name.clone(),
                             parameters: p.parameters.clone(),
                             remappings: p.remappings.clone(),
-                            param_files: vec![],
+                            param_files: p.param_files.iter().map(convert_param_file).collect(),
                         })
                         .collect(),
                 },
                 PyNodeKind::Node => NodeKind::Node,
                 PyNodeKind::LifecycleNode => NodeKind::LifecycleNode,
-                PyNodeKind::SetParameter => NodeKind::SetParameter {
-                    name: n.name.clone(),
-                    value: n.param_value.clone().unwrap_or_default(),
+                PyNodeKind::SetRemap => NodeKind::SetRemap {
+                    from: n.remap_from.clone().unwrap_or_default(),
+                    to: n.remap_to.clone().unwrap_or_default(),
+                },
+                PyNodeKind::Log => NodeKind::Log {
+                    message: n.message.clone().unwrap_or_default(),
                 },
                 PyNodeKind::Executable => NodeKind::Executable {
                     cmd: n.cmd.clone().unwrap_or_default(),
@@ -769,8 +833,45 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                     },
                     shell: n.shell,
                 },
+                PyNodeKind::EventHandler => {
+                    let hk_str = n.handler_kind.as_deref().unwrap_or("");
+                    let handler_kind = match hk_str {
+                        "on_process_start" => EventHandlerKind::OnProcessStart,
+                        "on_process_exit" => EventHandlerKind::OnProcessExit,
+                        "on_state_transition" => EventHandlerKind::OnStateTransition,
+                        "on_shutdown" => EventHandlerKind::OnShutdown,
+                        other => {
+                            tracing::warn!(
+                                "unknown event handler kind from Python resolver: {other}"
+                            );
+                            return None;
+                        }
+                    };
+                    let handler_ns = crate::resolver::effective_namespace(
+                        &n.namespace_stack,
+                        n.explicit_namespace.as_deref(),
+                    );
+                    let actions = n
+                        .eh_actions
+                        .iter()
+                        .map(|a| ResolvedEventAction::EmitEvent {
+                            event: a.event.clone(),
+                            target_node: a.target_node.clone(),
+                            namespace: a.explicit_namespace.clone(),
+                        })
+                        .collect();
+                    NodeKind::EventHandler {
+                        handler_kind,
+                        target: n.target.clone(),
+                        target_node: n.target_node.clone(),
+                        namespace: handler_ns,
+                        start_state: n.start_state.clone(),
+                        goal_state: n.goal_state.clone(),
+                        actions,
+                    }
+                }
             };
-            ResolvedNode {
+            Some(ResolvedNode {
                 package: n.package.clone(),
                 executable: n.executable.clone(),
                 name: if n.name.is_empty() {
@@ -787,61 +888,74 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
                 parameters: n.parameters.clone(),
                 remappings: n.remappings.clone(),
                 env: n.env.clone(),
-                source: None,              // set by process_parsed_file
-                include_chain: Vec::new(), // set by process_parsed_file
+                source: if n.include_chain.is_empty() {
+                    None // root-level node — source set by process_parsed_file
+                } else {
+                    n.include_chain
+                        .last()
+                        .map(|(pkg, path)| (pkg.clone(), PathBuf::from(path)))
+                },
+                include_chain: n
+                    .include_chain
+                    .iter()
+                    .map(|(pkg, path)| (pkg.clone(), PathBuf::from(path)))
+                    .collect(),
                 kind,
-                param_files: vec![],
-                output: None,
-                args: None,
-                respawn: None, // Python launch API has no respawn support yet
-                respawn_delay: None,
-            }
+                param_files: n.param_files.iter().map(convert_param_file).collect(),
+                output: n.output.clone(),
+                args: n.args.clone(),
+                respawn: n.respawn.clone(),
+                respawn_delay: n.respawn_delay.clone(),
+            })
         })
         .collect::<Vec<_>>();
 
-    // Convert event handlers from the Python output into ResolvedNode entries.
-    for eh in &py_output.event_handlers {
-        let handler_kind = match eh.handler_kind.as_str() {
-            "on_process_start" => EventHandlerKind::OnProcessStart,
-            "on_process_exit" => EventHandlerKind::OnProcessExit,
-            "on_state_transition" => EventHandlerKind::OnStateTransition,
-            "on_shutdown" => EventHandlerKind::OnShutdown,
-            other => {
-                tracing::warn!("unknown event handler kind from Python resolver: {other}");
-                continue;
-            }
-        };
-        let handler_ns = crate::resolver::effective_namespace(
-            &eh.namespace_stack,
-            eh.explicit_namespace.as_deref(),
-        );
-        // Leave action namespaces as None unless the Python resolver recorded
-        // an explicit namespace.  apply_parent_namespace will inherit the
-        // handler's (recomputed) namespace into None actions, avoiding stale
-        // pre-prefix namespaces that would miss cross-file namespace propagation.
-        let actions = eh
-            .actions
-            .iter()
-            .map(|a| ResolvedEventAction::EmitEvent {
-                event: a.event.clone(),
-                target_node: a.target_node.clone(),
-                namespace: a.explicit_namespace.clone(),
-            })
-            .collect();
-        nodes.push(ResolvedNode {
-            namespace_stack: eh.namespace_stack.clone(),
-            explicit_namespace: eh.explicit_namespace.clone(),
-            kind: NodeKind::EventHandler {
-                handler_kind,
-                target: eh.target.clone(),
-                target_node: eh.target_node.clone(),
-                namespace: handler_ns,
-                start_state: eh.start_state.clone(),
-                goal_state: eh.goal_state.clone(),
-                actions,
-            },
-            ..ResolvedNode::default()
-        });
+    // Legacy: convert event handlers from the separate `event_handlers` field
+    // for backward compatibility. Skip if the nodes list already contains
+    // interleaved event handlers (new behavior).
+    let has_inline_eh = nodes
+        .iter()
+        .any(|n| matches!(n.kind, NodeKind::EventHandler { .. }));
+    if !has_inline_eh {
+        for eh in &py_output.event_handlers {
+            let handler_kind = match eh.handler_kind.as_str() {
+                "on_process_start" => EventHandlerKind::OnProcessStart,
+                "on_process_exit" => EventHandlerKind::OnProcessExit,
+                "on_state_transition" => EventHandlerKind::OnStateTransition,
+                "on_shutdown" => EventHandlerKind::OnShutdown,
+                other => {
+                    tracing::warn!("unknown event handler kind from Python resolver: {other}");
+                    continue;
+                }
+            };
+            let handler_ns = crate::resolver::effective_namespace(
+                &eh.namespace_stack,
+                eh.explicit_namespace.as_deref(),
+            );
+            let actions = eh
+                .actions
+                .iter()
+                .map(|a| ResolvedEventAction::EmitEvent {
+                    event: a.event.clone(),
+                    target_node: a.target_node.clone(),
+                    namespace: a.explicit_namespace.clone(),
+                })
+                .collect();
+            nodes.push(ResolvedNode {
+                namespace_stack: eh.namespace_stack.clone(),
+                explicit_namespace: eh.explicit_namespace.clone(),
+                kind: NodeKind::EventHandler {
+                    handler_kind,
+                    target: eh.target.clone(),
+                    target_node: eh.target_node.clone(),
+                    namespace: handler_ns,
+                    start_state: eh.start_state.clone(),
+                    goal_state: eh.goal_state.clone(),
+                    actions,
+                },
+                ..ResolvedNode::default()
+            });
+        }
     }
 
     let launch_includes = py_output
@@ -885,6 +999,25 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
         })
         .collect();
 
+    // Convert per-file declared args from Python's "pkg://share_path" keyed format.
+    let mut declared_args_by_file = HashMap::new();
+    for (key_str, args) in &py_output.declared_args_by_file {
+        // Parse "pkg://share_path" format
+        let (pkg, share_path) = if let Some(idx) = key_str.find("://") {
+            (
+                key_str[..idx].to_string(),
+                PathBuf::from(&key_str[idx + 3..]),
+            )
+        } else {
+            (String::new(), PathBuf::from(key_str))
+        };
+        let arg_map: HashMap<String, String> = args
+            .iter()
+            .map(|a| (a.name.clone(), a.default.clone()))
+            .collect();
+        declared_args_by_file.insert((pkg, share_path), arg_map);
+    }
+
     ParsedLaunchFile {
         packages: py_output.packages,
         nodes,
@@ -892,6 +1025,7 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
         param_files,
         other_files: Vec::new(),
         declared_arg_defaults,
+        declared_args_by_file,
         global_params: py_output.global_params,
         warnings: Vec::new(), // warnings emitted separately by the caller with py_resolver formatting
         errors: Vec::new(),
@@ -901,70 +1035,16 @@ fn py_output_to_parsed(py_output: PyResolverOutput) -> ParsedLaunchFile {
 
 /// Common post-processing for any parsed launch file (XML, YAML, or Python).
 ///
-/// Apply a parent file's `<push-ros-namespace>` context to a child node.
-///
-/// Cross-file namespace propagation: when file A includes file B inside a
-/// `<push-ros-namespace>` group, nodes from B need the parent namespace prepended.
-/// This is a post-hoc adjustment — the child resolver runs namespace-agnostically,
-/// and the caller (orchestrator) applies the enclosing scope's namespace afterward.
-fn apply_parent_namespace(parent_stack: &[String], node: &mut ResolvedNode) {
-    use crate::resolver::effective_namespace;
-
-    // Prepend parent stack to the node's own namespace_stack.
-    let mut new_stack = parent_stack.to_vec();
-    new_stack.extend(node.namespace_stack.iter().cloned());
-    node.namespace_stack = new_stack;
-
-    // Recompute effective namespace from the combined stack + explicit namespace.
-    // This avoids the double-effective-join bug where joining two absolute namespaces
-    // causes the parent to be lost (e.g. "/can0" + "/inner" → "/inner" instead of "/can0/inner").
-    node.namespace = effective_namespace(&node.namespace_stack, node.explicit_namespace.as_deref());
-
-    // For event handlers, also recompute handler and action namespaces.
-    if let NodeKind::EventHandler {
-        ref mut namespace,
-        ref mut actions,
-        ..
-    } = node.kind
-    {
-        // Recompute event handler namespace from combined stack + explicit namespace.
-        *namespace = effective_namespace(&node.namespace_stack, node.explicit_namespace.as_deref());
-        let handler_ns = namespace.clone();
-        for action in actions {
-            match action {
-                ResolvedEventAction::EmitEvent { namespace, .. } => {
-                    // Only inherit handler namespace if the action didn't have an
-                    // explicitly set namespace (e.g. <emit_event namespace="...">).
-                    if namespace.is_none() {
-                        *namespace = handler_ns.clone();
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Accumulates packages/files/nodes into `result`, updates declared-arg tracking,
-/// and recurses into each launch include.  Both `resolve_file_recursive` (XML/YAML)
-/// and `resolve_python_file_recursive` (Python) call this after producing a
-/// [`ParsedLaunchFile`].
-#[allow(clippy::too_many_arguments)]
+/// Accumulates packages/files/nodes into `result` and updates declared-arg tracking.
+/// The Python resolver handles all includes inline, so this function only records
+/// dependency edges without recursing.
 fn process_parsed_file(
     parsed: ParsedLaunchFile,
     package: &str,
     share_path: &Path,
     file_path: &Path,
     current_chain: &[(String, PathBuf)],
-    effective_args: &HashMap<String, String>,
-    persisted_arg_context: &HashMap<String, String>,
     result: &mut ResolveResult,
-    lockfile: &Lockfile,
-    locator: &PackageLocator,
-    fetch_dir: &Path,
-    fetched_packages: &mut HashSet<String>,
-    failed_repos: &mut HashSet<String>,
-    workflow_options: &ResolveWorkflowOptions,
-    options: &FetchOptions,
 ) {
     // Accumulate direct packages
     result
@@ -1001,10 +1081,17 @@ fn process_parsed_file(
     result.parsed_files.push(file_path.to_path_buf());
 
     // Set include_chain and source on all nodes, then accumulate.
-    // IncludeMarker nodes (from inline resolver) get a chain that includes their own source.
+    // If Python already set include_chain (non-empty), prepend current_chain.
+    // Otherwise, use current_chain as the full chain (root-level nodes).
     let source = (package.to_string(), share_path.to_path_buf());
     for mut node in parsed.nodes {
-        if matches!(node.kind, NodeKind::IncludeMarker) {
+        if !node.include_chain.is_empty() {
+            // Python set the chain — prepend current_chain (which includes the root)
+            let mut full_chain = current_chain.to_vec();
+            full_chain.extend(node.include_chain);
+            node.include_chain = full_chain;
+            // source is already set by py_output_to_parsed from the last chain entry
+        } else if matches!(node.kind, NodeKind::IncludeMarker) {
             let mut c = current_chain.to_vec();
             if let Some(ref src) = node.source {
                 c.push(src.clone());
@@ -1017,116 +1104,63 @@ fn process_parsed_file(
         result.nodes.push(node);
     }
 
-    // Store declared args so the excessive-include-arg check and --show-args can use them.
-    result.declared_args_by_file.insert(
-        (package.to_string(), share_path.to_path_buf()),
-        parsed.declared_arg_defaults.clone(),
-    );
+    // Store declared args for --show-args.
+    // Prefer per-file mapping; ensure the root file has an entry (empty if it
+    // declared no args).  Using declared_arg_defaults for the root key would
+    // incorrectly attribute included files' args to the root when the root
+    // declares no args itself.
+    let root_key = (package.to_string(), share_path.to_path_buf());
+    let root_args = parsed
+        .declared_args_by_file
+        .get(&root_key)
+        .cloned()
+        .unwrap_or_default();
+    result.declared_args_by_file.insert(root_key, root_args);
+    for (key, args) in &parsed.declared_args_by_file {
+        result
+            .declared_args_by_file
+            .insert(key.clone(), args.clone());
+    }
 
-    // Build next_persisted: current persisted context + this file's declared defaults.
-    let next_persisted: HashMap<String, String> = persisted_arg_context
-        .iter()
-        .chain(parsed.declared_arg_defaults.iter())
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
-
-    // Recurse into launch includes
+    // Track launch include dependencies (for fetching/building) and populate
+    // include_args for the renderer's --show-args annotations.
+    // The Python resolver already inlines all included files' nodes, so we do NOT
+    // re-resolve them here — only record the dependency edges.
     for include in parsed.launch_includes {
-        // Add to launch files (dedup)
+        let key = (include.package.clone(), include.share_path.clone());
+        // Populate include_args for --show-args rendering.
+        if let Some(existing) = result.include_args.get(&key) {
+            // Detect divergent argument contexts for the same included file.
+            if existing.explicit != include.explicit_args
+                || existing.namespace_stack != include.namespace_stack
+            {
+                warn!(
+                    "File {:?} from package {:?} is included multiple times with different \
+                     argument contexts; --show-args will use the first include site's args \
+                     and namespace stack.",
+                    key.1, key.0
+                );
+            }
+        } else {
+            result.include_args.insert(
+                key.clone(),
+                IncludeArgContext {
+                    explicit: include.explicit_args.clone(),
+                    with_cascade: HashMap::new(),
+                    namespace_stack: include.namespace_stack.clone(),
+                },
+            );
+        }
         if !result
             .launch_files
             .iter()
             .any(|f| f.package == include.package && f.share_path == include.share_path)
         {
             result.launch_files.push(FileDependency {
-                package: include.package.clone(),
-                share_path: include.share_path.clone(),
+                package: include.package,
+                share_path: include.share_path,
                 kind: DependencyKind::Launch,
             });
-        }
-
-        // Build child args:
-        // - cascade mode: parent effective_args as base, explicit args override
-        // - strict mode: only explicit args
-        // Persisted declared defaults from ancestors fill in remaining gaps at lowest priority.
-        let mut child_args = if workflow_options.global_arg_cascade {
-            let mut m = effective_args.clone();
-            for (k, v) in &include.explicit_args {
-                m.insert(k.clone(), v.clone()); // explicit overrides cascade
-            }
-            m
-        } else {
-            include.explicit_args.clone()
-        };
-        for (k, v) in &next_persisted {
-            child_args.entry(k.clone()).or_insert_with(|| v.clone());
-        }
-
-        let nodes_before = result.nodes.len();
-        resolve_file_recursive(
-            lockfile,
-            locator,
-            &include.package,
-            &include.share_path,
-            fetch_dir,
-            options,
-            child_args,
-            workflow_options,
-            &next_persisted,
-            result,
-            fetched_packages,
-            failed_repos,
-            current_chain.to_vec(),
-        );
-
-        // Apply parent namespace to all nodes produced by the child file.
-        // This implements cross-file <push-ros-namespace> propagation: the caller's
-        // namespace context is an enclosing scope concern that the child doesn't know
-        // about, so we apply it post-hoc.
-        if !include.namespace_stack.is_empty() {
-            for node in &mut result.nodes[nodes_before..] {
-                apply_parent_namespace(&include.namespace_stack, node);
-            }
-        }
-
-        // Inject IncludeMarker if the child file (and all descendants) produced no nodes.
-        if result.nodes.len() == nodes_before {
-            let mut chain = current_chain.to_vec();
-            chain.push((include.package.clone(), include.share_path.clone()));
-            result.nodes.push(ResolvedNode {
-                source: Some((include.package.clone(), include.share_path.clone())),
-                include_chain: chain,
-                kind: NodeKind::IncludeMarker,
-                ..Default::default()
-            });
-        }
-
-        // Excessive include arg check: warn about args forwarded to a child that the child
-        // never declares.  Skip in global-cascade mode where children may use args via
-        // LaunchConfiguration without declaring them.
-        if !workflow_options.global_arg_cascade && !include.explicit_args.is_empty() {
-            let child_declared: HashSet<String> = result
-                .declared_args_by_file
-                .get(&(include.package.clone(), include.share_path.clone()))
-                .map(|m| m.keys().cloned().collect())
-                .unwrap_or_default();
-            let explicit_names: HashSet<String> = include.explicit_args.keys().cloned().collect();
-            let mut excessive: Vec<String> = explicit_names
-                .difference(&child_declared)
-                .cloned()
-                .collect();
-            excessive.sort();
-            for arg_name in excessive {
-                result.add_warning(format!(
-                    "{}://{}: excessive include arg '{}' — {}://{} does not declare <arg name=\"{}\"/>",
-                    package,
-                    share_path.display(),
-                    arg_name,
-                    include.package,
-                    include.share_path.display(),
-                    arg_name
-                ));
-            }
         }
     }
 }
@@ -1144,7 +1178,6 @@ fn resolve_python_file_recursive(
     options: &FetchOptions,
     initial_args: &HashMap<String, String>,
     workflow_options: &ResolveWorkflowOptions,
-    persisted_arg_context: &HashMap<String, String>,
     result: &mut ResolveResult,
     fetched_packages: &mut HashSet<String>,
     failed_repos: &mut HashSet<String>,
@@ -1230,11 +1263,6 @@ fn resolve_python_file_recursive(
         locator.all_install_shares()
     };
 
-    // Full list of lockfile package names — passed to py_resolver so it can enforce
-    // that lockfile packages always resolve from source and never fall through to
-    // AMENT_PREFIX_PATH (see _resolve_pkg_share in py_resolver.py).
-    let lockfile_pkg_list: Vec<String> = lockfile.packages.keys().cloned().collect();
-
     // Snapshot the globally accumulated SetParameter values accumulated so far.
     // This file may depend on SetParameter calls from sibling/ancestor files (e.g.
     // vehicle_info.launch.py setting front_overhang before ground_segmentation.launch.py
@@ -1242,89 +1270,31 @@ fn resolve_python_file_recursive(
     // OpaqueFunction bodies can read cross-file parameters.
     let current_global_params = result.global_params.clone();
 
-    // Run the Python resolver shim, retrying if lockfile packages are missing from disk.
-    // py_resolver signals missing packages via `packages_to_fetch` in its JSON output
-    // (raised by get_package_share_directory() when a source directory doesn't exist).
-    // We fetch the missing packages and retry; bounded to avoid infinite loops.
-    let py_output = {
-        const MAX_FETCH_RETRIES: usize = 3;
-        let mut retries_remaining = MAX_FETCH_RETRIES;
-        loop {
-            let out = match run_py_resolver(
-                &file_path,
-                initial_args,
-                &package_shares,
-                &lockfile_pkg_list,
-                &current_global_params,
-                workflow_options,
-            ) {
-                Ok(out) => out,
-                Err(e) => {
-                    result.add_error(format!(
-                        "failed to resolve Python launch file {}: {}",
-                        file_path.display(),
-                        e
-                    ));
-                    return;
-                }
-            };
-
-            if out.packages_to_fetch.is_empty() || retries_remaining == 0 {
-                break out;
-            }
-
-            // Fetch every missing package, then retry py_resolver so that
-            // get_package_share_directory() finds them on disk this time.
-            let mut any_fetched = false;
-            for pkg in &out.packages_to_fetch {
-                if ensure_package_fetched(
-                    lockfile,
-                    pkg,
-                    fetch_dir,
-                    options,
-                    result,
-                    fetched_packages,
-                    failed_repos,
-                ) {
-                    any_fetched = true;
-                }
-            }
-            if !any_fetched {
-                // Nothing could be fetched (e.g. all packages missing from lockfile).
-                // Stop retrying — output may be incomplete.
-                let missing: Vec<_> = out
-                    .packages_to_fetch
-                    .iter()
-                    .filter(|p| !fetched_packages.contains(p.as_str()))
-                    .cloned()
-                    .collect();
-                if !missing.is_empty() {
-                    result.add_warning(format!(
-                        "Python resolver requested packages not in lockfile: {}; \
-                         resolution may be incomplete",
-                        missing.join(", ")
-                    ));
-                }
-                break out;
-            }
-            retries_remaining -= 1;
+    // Run the Python resolver shim.  Python handles package fetching inline via
+    // _ensure_fetched() — no retry loop needed.
+    let py_output = match run_py_resolver(
+        &file_path,
+        initial_args,
+        &package_shares,
+        lockfile,
+        fetch_dir,
+        &current_global_params,
+        workflow_options,
+    ) {
+        Ok(out) => out,
+        Err(e) => {
+            result.add_error(format!(
+                "failed to resolve Python launch file {}: {}",
+                file_path.display(),
+                e
+            ));
+            return;
         }
     };
 
     // Build include chain for this file as (package, share_path) pairs.
     let mut current_chain = parent_chain;
     current_chain.push((package.to_string(), share_path.to_path_buf()));
-
-    // Build effective args before consuming py_output: merge initial_args with declared
-    // defaults (initial_args wins).  Passed to process_parsed_file for cascade-mode children.
-    let mut effective_args = initial_args.clone();
-    if workflow_options.apply_arg_defaults {
-        for declared in &py_output.declared_args {
-            effective_args
-                .entry(declared.name.clone())
-                .or_insert_with(|| declared.default.clone());
-        }
-    }
 
     // Promote shim warnings with py_resolver-specific formatting (package://path: prefix).
     // Done before consuming py_output; py_output_to_parsed intentionally omits warnings.
@@ -1351,24 +1321,15 @@ fn resolve_python_file_recursive(
         share_path,
         &file_path,
         &current_chain,
-        &effective_args,
-        persisted_arg_context,
         result,
-        lockfile,
-        locator,
-        fetch_dir,
-        fetched_packages,
-        failed_repos,
-        workflow_options,
-        options,
     );
 }
 
-/// Internal recursive resolver
+/// Resolve a single launch file by routing it to the Python resolver.
 ///
-/// This function is resilient - it catches errors and records them
-/// while continuing to resolve as much as possible.
-fn resolve_file_recursive(
+/// Python handles all parsing, substitution resolution, and include
+/// traversal internally.  This function is the Rust→Python bridge.
+fn resolve_launch_file(
     lockfile: &Lockfile,
     locator: &PackageLocator,
     package: &str,
@@ -1377,39 +1338,25 @@ fn resolve_file_recursive(
     options: &FetchOptions,
     initial_args: HashMap<String, String>,
     workflow_options: &ResolveWorkflowOptions,
-    persisted_arg_context: &HashMap<String, String>,
     result: &mut ResolveResult,
     fetched_packages: &mut HashSet<String>,
     failed_repos: &mut HashSet<String>,
-    parent_chain: Vec<(String, PathBuf)>,
 ) {
-    // Cycle detection: if this exact file already appears anywhere in the current
-    // include chain (parent → grandparent → ...) we are in a recursive include loop
-    // — stop immediately.  This is the only guard needed; explicit deduplication of
-    // same-file same-args invocations is intentionally absent because ROS 2's launch
-    // system treats every <include> as an independent instantiation, and two includes
-    // of the same file (even with identical args) may produce distinct nodes when
-    // wrapped in different PushRosNamespace / <group namespace="..."> contexts.
-    if parent_chain
-        .iter()
-        .any(|(p, s)| p == package && s == share_path)
-    {
-        debug!(
-            "Cycle detected for {}:{}, stopping recursion",
-            package,
-            share_path.display()
-        );
-        return;
-    }
-
     debug!(
         "Resolving launch file: {}:{}",
         package,
         share_path.display()
     );
 
-    // Route to appropriate handler based on file type
-    if is_python_launch_file(share_path) {
+    // Route ALL file types through the Python resolver.
+    // py_resolver.py detects the format by extension and handles XML/YAML/Python
+    // uniformly, including cross-format includes and cycle detection.
+    if is_python_launch_file(share_path)
+        || is_xml_launch_file(share_path)
+        || share_path
+            .extension()
+            .is_some_and(|e| matches!(e.to_str(), Some("yaml" | "yml")))
+    {
         resolve_python_file_recursive(
             lockfile,
             locator,
@@ -1419,294 +1366,19 @@ fn resolve_file_recursive(
             options,
             &initial_args,
             workflow_options,
-            persisted_arg_context,
             result,
             fetched_packages,
             failed_repos,
-            parent_chain,
+            vec![], // root-level: no parent chain
         );
         return;
     }
 
-    if !is_xml_launch_file(share_path) {
-        debug!(
-            "Skipping unsupported launch file type: {}:{}",
-            package,
-            share_path.display()
-        );
-        return;
-    }
-
-    // Resolve the file path based on mode:
-    //   preview: fetch from source workspace (lockfile) with AMENT_PREFIX_PATH fallback
-    //   non-preview: look up from AMENT_PREFIX_PATH (must be installed after colcon build)
-    let file_path = if workflow_options.preview {
-        if lockfile.packages.contains_key(package) {
-            // Package is in lockfile: fetch workspace source and resolve from there.
-            if !ensure_package_fetched(
-                lockfile,
-                package,
-                fetch_dir,
-                options,
-                result,
-                fetched_packages,
-                failed_repos,
-            ) {
-                return;
-            }
-            match locator.resolve_share_file(package, share_path) {
-                Some(p) => p,
-                None => {
-                    result.add_error(format!(
-                        "package '{}' is in lockfile but the file {}://{} was not found in the workspace source",
-                        package, package, share_path.display()
-                    ));
-                    return;
-                }
-            }
-        } else {
-            // Package is NOT in lockfile (e.g. a ROS buildfarm package like rosbridge_server).
-            // Fall back to AMENT_PREFIX_PATH (requires the package to be installed via apt/rosdep).
-            match locator.resolve_install_file(package, share_path) {
-                Some(p) => p,
-                None => {
-                    if workflow_options.rosdep_fallback {
-                        // Try to install via rosdep, then retry the lookup.
-                        if try_rosdep_install(package, result) {
-                            match locator.resolve_install_file(package, share_path) {
-                                Some(p) => p,
-                                None => {
-                                    result.add_error(format!(
-                                        "package '{}' not found even after rosdep install; \
-                                         it may need to be added to the lockfile",
-                                        package
-                                    ));
-                                    return;
-                                }
-                            }
-                        } else {
-                            return; // error already added by try_rosdep_install
-                        }
-                    } else {
-                        result.add_error(format!(
-                            "package '{}' not found in lockfile or AMENT_PREFIX_PATH; \
-                             if it is a ROS buildfarm package, install it with \
-                             `rosdep install -y --from-keys {}` or use --rosdep to \
-                             install missing packages automatically",
-                            package, package
-                        ));
-                        return;
-                    }
-                }
-            }
-        }
-    } else {
-        match locator.resolve_install_file(package, share_path) {
-            Some(p) => p,
-            None => {
-                result.add_error(format!(
-                    "{}://{} not found in AMENT_PREFIX_PATH; \
-                     run 'colcon build' first, or use --preview to resolve from source workspace",
-                    package,
-                    share_path.display()
-                ));
-                return;
-            }
-        }
-    };
-
-    // Parse the launch file
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
-        Err(e) => {
-            result.add_error(format!("failed to read {}: {}", file_path.display(), e));
-            return;
-        }
-    };
-
-    let ast = match parse_launch_xml(&content, &file_path) {
-        Ok(a) => a,
-        Err(e) => {
-            result.add_error(format!("failed to parse {}: {}", file_path.display(), e));
-            return;
-        }
-    };
-
-    // Static AST scan for declared/referenced arg names (must happen before initial_args is moved).
-    let declared_arg_names = collect_declared_args(&ast.elements);
-    let referenced_arg_names = collect_arg_and_var_refs(&ast.elements);
-
-    // Anti-pattern static scans.
-    let scoped_false_includes = collect_scoped_false_includes(&ast.elements);
-    let env_no_fallback = collect_env_without_fallback(&ast.elements);
-
-    // Resolve (without following includes - we handle that here).
-    // Provide a pkg_share_resolver so that $(find-pkg-share X) substitutions are
-    // expanded to real paths — necessary for inline-resolved includes (e.g. YAML files)
-    // whose content is loaded from the resolved path at resolution time.
-    let locator_for_ctx = locator.clone();
-    let locator_for_cb = locator.clone();
-    let package_shares_for_cb = if workflow_options.preview {
-        locator.all_package_shares()
-    } else {
-        locator.all_install_shares()
-    };
-    let workflow_options_for_cb = workflow_options.clone();
-    let is_preview = workflow_options.preview;
-    let lockfile_pkg_names: Arc<HashSet<String>> =
-        Arc::new(lockfile.packages.keys().cloned().collect());
-    let mut ctx = SubstitutionContext {
-        launch_file_dir: Some(file_path.parent().unwrap_or(Path::new("/")).to_path_buf()),
-        launch_file_path: Some(file_path.clone()),
-        pkg_share_resolver: Some(Arc::new(move |pkg: &str| {
-            if is_preview {
-                locator_for_ctx.locate_package_share(pkg)
-            } else {
-                locator_for_ctx.locate_install_share(pkg)
-            }
-        })),
-        preview_mode: workflow_options.preview,
-        lockfile_packages: lockfile_pkg_names,
-        rosdep_fallback: workflow_options.rosdep_fallback,
-        ..Default::default()
-    };
-    // Build a callback that runs py_resolver inline on Python includes so that
-    // SetLaunchConfiguration side-effects (e.g. current_ros_namespace) become visible
-    // to subsequent $(var ...) substitutions in the same parent XML file.
-    // Note: inline calls receive empty global_params (not the accumulated SetParameter
-    // state) because the inline callback only extracts SetLaunchConfiguration side-effects,
-    // not full resolution output.  Full resolution (with global_params) happens later in
-    // resolve_python_file_recursive when the orchestrator processes the include.
-    let lockfile_pkg_list_for_cb: Vec<String> = lockfile.packages.keys().cloned().collect();
-    let python_cfg_callback: Arc<
-        dyn Fn(&Path, &HashMap<String, String>) -> HashMap<String, String> + Send + Sync,
-    > = Arc::new(move |py_path: &Path, args: &HashMap<String, String>| {
-        // Augment args with the package shares from AMENT_PREFIX_PATH so that
-        // Python files that call get_package_share_directory() resolve correctly.
-        let _ = &locator_for_cb; // keep alive
-        match run_py_resolver(
-            py_path,
-            args,
-            &package_shares_for_cb,
-            &lockfile_pkg_list_for_cb,
-            &[],
-            &workflow_options_for_cb,
-        ) {
-            Ok(output) => output.set_launch_configurations,
-            Err(e) => {
-                tracing::warn!(
-                    "inline py_resolver for '{}' failed: {e} — \
-                     SetLaunchConfiguration side-effects from this file will be missing",
-                    py_path.display()
-                );
-                HashMap::new()
-            }
-        }
-    });
-    let resolve_options = ResolveOptions {
-        apply_arg_defaults: workflow_options.apply_arg_defaults,
-        allow_unportable_paths: workflow_options.allow_unportable_paths,
-        inline_params: workflow_options.inline_params,
-        python_cfg_callback: Some(python_cfg_callback),
-        ..Default::default()
-    };
-
-    // Clone initial_args as effective_args before resolve_launch consumes it.
-    // Used by process_parsed_file to build cascade-mode child args.
-    let effective_args = initial_args.clone();
-
-    let resolved = match resolve_launch(&ast, initial_args, &mut ctx, &resolve_options) {
-        Ok(r) => r,
-        Err(e) => {
-            result.add_error(format!("failed to resolve {}: {}", file_path.display(), e));
-            return;
-        }
-    };
-
-    // Build include chain: parent_chain + (package, share_path).
-    let mut current_chain = parent_chain;
-    current_chain.push((package.to_string(), share_path.to_path_buf()));
-
-    // --- XML-specific anti-pattern checks ---
-
-    // Unused arg: warn about args declared in this file but never referenced via $(arg)
-    // or $(var).  Skipped in global-cascade mode where args flow implicitly.
-    if !workflow_options.global_arg_cascade {
-        let mut unused: Vec<String> = declared_arg_names
-            .iter()
-            .filter(|name| !referenced_arg_names.contains(*name))
-            .cloned()
-            .collect();
-        unused.sort();
-        for name in unused {
-            result.add_warning(format!(
-                "{}://{}: unused arg '{}' — declared but never referenced via $(arg) or $(var) in this file",
-                package,
-                share_path.display(),
-                name
-            ));
-        }
-    }
-
-    // <include> inside <group scoped="false"> leaks included-file variables into parent scope.
-    for file_expr in &scoped_false_includes {
-        let snippet = if file_expr.len() > 60 {
-            format!("{}...", &file_expr[..60])
-        } else {
-            file_expr.clone()
-        };
-        result.add_warning(format!(
-            "{}://{}: <include> inside <group scoped=\"false\"> — '{}' leaks its internal variables into the parent scope; move the <include> out of the group",
-            package, share_path.display(), snippet
-        ));
-    }
-
-    // $(env X) without a fallback crashes at launch time if the variable is unset.
-    // Suppressed by default (info) because common env vars like HOME are always set.
-    {
-        let mut seen = std::collections::HashSet::new();
-        for name in &env_no_fallback {
-            if seen.insert(name.clone()) {
-                result.add_info(format!(
-                    "{}://{}: $(env {}) has no fallback — will fail if the environment variable is unset; use $(env {} <default>)",
-                    package, share_path.display(), name, name
-                ));
-            }
-        }
-    }
-
-    // Preserve result.include_args for API consumers (e.g. external tooling that reads
-    // per-include arg contexts) and the renderer (which emits <!-- arg ... --> annotations).
-    // process_parsed_file uses LaunchInclude.explicit_args directly and does not need
-    // result.include_args, but we keep it populated.
-    result.include_args.extend(
-        resolved
-            .include_args
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone())),
-    );
-    // Convert to unified IR and delegate all common post-processing (accumulation,
-    // node chain/source assignment, declared-arg tracking, include recursion,
-    // IncludeMarker injection, and excessive-include-arg checks).
-    // Note: required_abs_files that couldn't be parsed by extract_file_dependency
-    // are reported as errors inside resolved_launch_to_parsed.
-    let parsed = resolved_launch_to_parsed(resolved);
-    process_parsed_file(
-        parsed,
+    // Unsupported file type
+    debug!(
+        "Skipping unsupported launch file type: {}:{}",
         package,
-        share_path,
-        &file_path,
-        &current_chain,
-        &effective_args,
-        persisted_arg_context,
-        result,
-        lockfile,
-        locator,
-        fetch_dir,
-        fetched_packages,
-        failed_repos,
-        workflow_options,
-        options,
+        share_path.display()
     );
 }
 
@@ -1775,91 +1447,6 @@ mod tests {
                 *expected,
                 "stack={stack:?} explicit={explicit:?}"
             );
-        }
-    }
-
-    /// Cross-file namespace propagation: parent push-ros-namespace is applied post-hoc.
-    #[test]
-    fn test_apply_parent_namespace() {
-        // Node with no namespace, parent has namespace "can0"
-        let parent_stack = vec!["can0".to_string()];
-        let mut node = ResolvedNode {
-            namespace: None,
-            namespace_stack: vec![],
-            kind: NodeKind::LifecycleNode,
-            ..Default::default()
-        };
-        apply_parent_namespace(&parent_stack, &mut node);
-        assert_eq!(node.namespace.as_deref(), Some("/can0"));
-        assert_eq!(node.namespace_stack, vec!["can0"]);
-
-        // Node with explicit namespace="", parent has namespace "can0"
-        // Empty string explicit → effective_namespace returns None → parent applies
-        let mut node2 = ResolvedNode {
-            namespace: None, // effective_namespace([], Some("")) = None
-            explicit_namespace: Some(String::new()),
-            namespace_stack: vec![],
-            kind: NodeKind::Node,
-            ..Default::default()
-        };
-        apply_parent_namespace(&parent_stack, &mut node2);
-        assert_eq!(node2.namespace.as_deref(), Some("/can0"));
-
-        // Node with explicit absolute namespace="/override", parent "can0"
-        // Absolute namespace should override (ros2 semantics)
-        let mut node3 = ResolvedNode {
-            namespace: Some("/override".to_string()),
-            explicit_namespace: Some("/override".to_string()),
-            namespace_stack: vec![],
-            kind: NodeKind::Node,
-            ..Default::default()
-        };
-        apply_parent_namespace(&parent_stack, &mut node3);
-        // Absolute explicit namespace overrides parent via ros2_namespace_join
-        assert_eq!(node3.namespace.as_deref(), Some("/override"));
-
-        // Node with relative child push-ros-namespace, parent "can0"
-        // Previously this was broken: effective("/inner") joined with "/can0" → "/inner"
-        let mut node4 = ResolvedNode {
-            namespace: Some("/inner".to_string()),
-            namespace_stack: vec!["inner".to_string()],
-            kind: NodeKind::Node,
-            ..Default::default()
-        };
-        apply_parent_namespace(&parent_stack, &mut node4);
-        // Combined stack ["can0", "inner"] → effective "/can0/inner"
-        assert_eq!(node4.namespace.as_deref(), Some("/can0/inner"));
-        assert_eq!(node4.namespace_stack, vec!["can0", "inner"]);
-
-        // Event handler: parent namespace should apply to handler and actions
-        let mut node5 = ResolvedNode {
-            namespace: None,
-            namespace_stack: vec![],
-            kind: NodeKind::EventHandler {
-                handler_kind: EventHandlerKind::OnProcessStart,
-                target: Some("my_node".to_string()),
-                target_node: None,
-                namespace: None,
-                start_state: None,
-                goal_state: None,
-                actions: vec![ResolvedEventAction::EmitEvent {
-                    event: "configure".to_string(),
-                    target_node: Some("my_node".to_string()),
-                    namespace: None,
-                }],
-            },
-            ..Default::default()
-        };
-        apply_parent_namespace(&parent_stack, &mut node5);
-        if let NodeKind::EventHandler {
-            namespace, actions, ..
-        } = &node5.kind
-        {
-            assert_eq!(namespace.as_deref(), Some("/can0"));
-            let ResolvedEventAction::EmitEvent { namespace, .. } = &actions[0];
-            assert_eq!(namespace.as_deref(), Some("/can0"));
-        } else {
-            panic!("expected EventHandler");
         }
     }
 

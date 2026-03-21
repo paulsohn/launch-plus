@@ -103,9 +103,6 @@ fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
 # Expand <param from="file.yaml"/> entries inline
 --inline-params
 
-# Fold namespace stacks onto each <node> element
---flatten-namespaces
-
 # Allow OpaqueFunction bodies to read parameter files
 --apply-opaque-file-access
 
@@ -153,22 +150,29 @@ After building, you can verify that the pre-build (preview) resolution matches
 the post-build resolution:
 
 ```bash
-# Source the built workspace
+# Source the built workspace (sets ROS_DISTRO, AMENT_PREFIX_PATH, etc.)
+source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
 source install/setup.bash
 
-# Post-build resolve
+# Preview resolve (pre-build, portable paths)
+launch-plus resolve --preview -d my_bringup robot.launch.xml \
+  robot_name:=my_robot \
+  > preview.launch.xml
+
+# Post-build resolve (real install paths)
 launch-plus resolve -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > postbuild.launch.xml
 
-# Preview resolve with path expansion (for comparison)
-launch-plus resolve -d my_bringup robot.launch.xml \
-  robot_name:=my_robot \
-  --preview --expand-paths \
-  > preview.launch.xml
-
-# Compare — should be identical
-diff preview.launch.xml postbuild.launch.xml
+# Compare preview vs postbuild (normalize paths first)
+INSTALL_DIR="$(pwd)/install"
+ROS_SHARE_DIR="/opt/ros/${ROS_DISTRO}/share"
+sed -E "s|${INSTALL_DIR}/[^/]+/share/([^/]+)|\$(find-pkg-share \1)|g" \
+  postbuild.launch.xml \
+  | sed -E "s|${ROS_SHARE_DIR}/([^/]+)|\$(find-pkg-share \1)|g" \
+  > postbuild_normalized.xml
+grep -v '^<!-- PREVIEW:' preview.launch.xml > preview_clean.xml
+diff preview_clean.xml postbuild_normalized.xml
 ```
 
 ## Directory layout

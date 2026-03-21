@@ -177,19 +177,6 @@ enum Commands {
         #[arg(long)]
         preview: bool,
 
-        /// Expand `$(find-pkg-share ...)` tokens in the output to absolute AMENT install
-        /// paths.
-        ///
-        /// Preview mode normally emits portable `$(find-pkg-share pkg)/...` paths.  With
-        /// this flag every such token is expanded using the current AMENT_PREFIX_PATH, so
-        /// the output is directly comparable (`diff`) with a non-preview (post-build)
-        /// resolution.
-        ///
-        /// Requires `--preview`.  Source the build's `install/setup.bash` before running
-        /// so that AMENT_PREFIX_PATH points to the installed packages.
-        #[arg(long, requires = "preview")]
-        expand_paths: bool,
-
         /// Allow raw filesystem paths in `<include file=...>` and `<param from=...>` in preview
         /// mode instead of requiring $(find-pkg-share ...) substitutions.
         ///
@@ -210,29 +197,10 @@ enum Commands {
         ///
         /// `<!-- source: pkg://... -->` comments are still emitted for traceability.
         ///
-        /// `<group>` elements that contain a `<push-ros-namespace>` are preserved so
-        /// namespace semantics are not broken.  Combine with `--flatten-namespaces` to
-        /// inline those namespaces too, producing a completely group-free output.
+        /// Namespace stacks are always flattened onto each `<node>` element as a
+        /// `namespace=` attribute, so the output is completely group-free.
         #[arg(long)]
         flatten: bool,
-
-        /// Inline namespace stacks directly onto each `<node>` element instead of
-        /// preserving `<push-ros-namespace>` wrappers.
-        ///
-        /// By default the resolved XML preserves `<push-ros-namespace namespace="..."/>`
-        /// inside `<group>` elements, faithfully representing how namespaces are applied
-        /// in the source launch tree.
-        ///
-        /// With this flag each node's fully composed effective namespace is emitted as a
-        /// `namespace=` attribute on the `<node>` element and `<push-ros-namespace>` is
-        /// omitted.  Nodes from the same source file are grouped into a single `<group>`
-        /// container regardless of their namespace context.  The resulting XML is
-        /// semantically equivalent to the default output at `ros2 launch` time.
-        ///
-        /// Useful for flattening deeply nested namespace hierarchies into a more readable,
-        /// single-file layout.
-        #[arg(long)]
-        flatten_namespaces: bool,
 
         /// Emit `<!-- arg name="..." value="..." -->` comments at each include boundary.
         ///
@@ -741,12 +709,10 @@ fn main() -> Result<()> {
             allow_global_arg_cascade,
             apply_launch_arg_defaults,
             preview,
-            expand_paths,
             allow_including_unportable_path,
             apply_opaque_file_access,
             inline_params,
             flatten,
-            flatten_namespaces,
             show_args,
             rosdep,
             warn_all,
@@ -773,9 +739,7 @@ fn main() -> Result<()> {
                 &src,
                 report,
                 preview,
-                expand_paths,
                 flatten,
-                flatten_namespaces,
                 show_args,
                 false, // suppress_xml — resolve always emits XML
                 false, // strict — resolve exits non-zero only on errors
@@ -1018,9 +982,7 @@ fn main() -> Result<()> {
                 &src,
                 false, // report
                 preview,
-                false, // expand_paths — not applicable for check
                 false, // flatten
-                false, // flatten_namespaces
                 false, // show_args — irrelevant, XML is suppressed
                 true,  // suppress_xml — check never writes resolved XML to stdout
                 strict,
@@ -1607,9 +1569,7 @@ fn cmd_resolve(
     src_dir: &str,
     report: bool,
     preview: bool,
-    expand_paths: bool,
     flatten: bool,
-    flatten_namespaces: bool,
     show_args: bool,
     suppress_xml: bool,
     strict: bool,
@@ -1651,22 +1611,13 @@ fn cmd_resolve(
             package,
             launcher,
             &result.nodes,
-            flatten_namespaces,
             flatten,
             &result.include_args,
             show_args,
             &result.initial_args,
             &result.declared_args_by_file,
         );
-        if preview && expand_paths {
-            // Expand $(find-pkg-share <pkg>) tokens to absolute AMENT install paths
-            // so the output is directly comparable with a non-preview (post-build)
-            // resolution.  Requires AMENT_PREFIX_PATH from the build's install tree.
-            use launch_plus_core::locator::PackageLocator;
-            let mut locator = PackageLocator::new();
-            locator.add_ament_from_env();
-            xml = expand_portable_paths(&xml, &locator);
-        } else if preview {
+        if preview {
             // Prepend a preview marker so consumers can distinguish source-path output
             // from post-build install-path output.
             xml.insert_str(
@@ -1788,56 +1739,6 @@ fn cmd_resolve(
     }
 
     Ok(())
-}
-
-/// Expand `$(find-pkg-share <pkg>)` tokens in `text` to absolute AMENT install paths.
-///
-/// Each `$(find-pkg-share <pkg>)` occurrence is resolved via the locator's AMENT prefix
-/// entries.  Tokens whose package cannot be found are left unchanged.
-fn expand_portable_paths(
-    text: &str,
-    locator: &launch_plus_core::locator::PackageLocator,
-) -> String {
-    use std::fmt::Write;
-    let token = "$(find-pkg-share ";
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(start) = rest.find(token) {
-        out.push_str(&rest[..start]);
-        let after = &rest[start + token.len()..];
-        // Find the matching close paren (handle nesting).
-        let mut depth = 1u32;
-        let mut close = None;
-        for (i, c) in after.char_indices() {
-            match c {
-                '(' => depth += 1,
-                ')' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        close = Some(i);
-                        break;
-                    }
-                }
-                _ => {}
-            }
-        }
-        if let Some(close_idx) = close {
-            let pkg = after[..close_idx].trim();
-            if let Some(share_dir) = locator.locate_install_share(pkg) {
-                let _ = write!(out, "{}", share_dir.display());
-            } else {
-                // Package not in AMENT — keep the token as-is.
-                out.push_str(&rest[start..start + token.len() + close_idx + 1]);
-            }
-            rest = &after[close_idx + 1..];
-        } else {
-            // Unmatched paren — keep the rest as-is.
-            out.push_str(&rest[start..]);
-            rest = "";
-        }
-    }
-    out.push_str(rest);
-    out
 }
 
 /// Execute the clean command: remove fetched packages

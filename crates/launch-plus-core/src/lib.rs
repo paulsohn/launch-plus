@@ -18,7 +18,6 @@ pub mod fetcher;
 pub mod indexer;
 pub mod locator;
 pub mod orchestrator;
-pub mod parser;
 pub mod resolver;
 pub mod rosdep;
 
@@ -27,11 +26,9 @@ pub use error::{Error, Result};
 
 // Re-export resolver types for convenience
 pub use resolver::{
-    Condition, ConditionKind, DependencyKind, EventHandlerKind, FileDependency, IncludeArgContext,
-    LaunchElement, LaunchFile, LaunchInclude, ParsedLaunchFile, ResolveOptions,
-    ResolvedEventAction, ResolvedLaunch, ResolvedNode, SemanticNode, SubstitutionContext,
-    extract_file_dependency, parse_launch_xml, parse_launch_yaml, render_resolved_xml,
-    resolve_launch, semantic_eq,
+    DependencyKind, EventHandlerKind, FileDependency, IncludeArgContext, LaunchInclude,
+    ParsedLaunchFile, ResolvedEventAction, ResolvedNode, SemanticNode, render_resolved_xml,
+    semantic_eq,
 };
 
 // Re-export locator types

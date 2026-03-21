@@ -1343,7 +1343,7 @@ fn resolve_file_recursive(
         || is_xml_launch_file(share_path)
         || share_path
             .extension()
-            .is_some_and(|e| e == "yaml" || e == "yml")
+            .is_some_and(|e| matches!(e.to_str(), Some("yaml" | "yml")))
     {
         resolve_python_file_recursive(
             lockfile,

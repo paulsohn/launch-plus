@@ -245,7 +245,7 @@ These input actions are **consumed during resolution** and never appear in the o
 | `RegisterEventHandler` / `Unregister` | Extracted to `ResolvedLaunch.event_handlers` metadata |
 | `LifecycleTransition` | Becomes `IREventHandler` in `event_handlers` metadata |
 | `Shutdown` | Runtime event; consumed |
-| `SetUseSimTime` | Becomes `IRSetParameter(name="use_sim_time", ...)` |
+| `SetUseSimTime` | Merged into child nodes' `parameters` as `use_sim_time` |
 | `SetROSLogDir` | Applied to env context |
 | `SetEnvironmentVariable` / `UnsetEnvironmentVariable` | Applied to env context; reflected in child nodes' `env` |
 | `PushROSNamespace` | Applied to namespace stack; reflected in child nodes' `namespace` |
@@ -332,5 +332,5 @@ DeclaredArg        ::= { name : str, default : str, description : str? }
 
 `includes` exists because even though child actions are inlined, the orchestrator needs the include graph for:
 - Dependency tracking (which packages to fetch/build)
-- Separate-file resolution (each included file may be resolved independently first)
-- Include argument forwarding
+- CLI introspection, such as `--show-args` include argument annotations
+- Tooling and diagnostics that need to reconstruct or visualize the include graph

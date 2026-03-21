@@ -168,8 +168,11 @@ launch-plus resolve -d my_bringup robot.launch.xml \
 
 # Compare preview vs postbuild (normalize paths first)
 INSTALL_DIR="$(pwd)/install"
+ROS_SHARE_DIR="/opt/ros/${ROS_DISTRO}/share"
 sed -E "s|${INSTALL_DIR}/[^/]+/share/([^/]+)|\$(find-pkg-share \1)|g" \
-  postbuild.launch.xml > postbuild_normalized.xml
+  postbuild.launch.xml \
+  | sed -E "s|${ROS_SHARE_DIR}/([^/]+)|\$(find-pkg-share \1)|g" \
+  > postbuild_normalized.xml
 grep -v '^<!-- PREVIEW:' preview.launch.xml > preview_clean.xml
 diff preview_clean.xml postbuild_normalized.xml
 ```

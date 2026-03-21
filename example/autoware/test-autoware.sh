@@ -138,7 +138,12 @@ echo
 echo "==> Step 5: Normalize postbuild paths and diff against preview"
 
 INSTALL_DIR="$(pwd)/install"
-ROS_SHARE="/opt/ros/${ROS_DISTRO:-}/share"
+
+if [[ -z "${ROS_DISTRO:-}" ]]; then
+    echo "ERROR: ROS_DISTRO is not set. Source your ROS 2 environment first." >&2
+    exit 1
+fi
+ROS_SHARE="/opt/ros/${ROS_DISTRO}/share"
 
 # Normalize colcon install paths:  <install>/<pkg>/share/<pkg> → $(find-pkg-share <pkg>)
 # Normalize ROS system paths:      /opt/ros/<distro>/share/<pkg> → $(find-pkg-share <pkg>)

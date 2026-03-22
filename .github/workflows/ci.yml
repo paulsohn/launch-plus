@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install mypy types-PyYAML click pyyaml
-      - run: mypy python/launch_plus/resolver.py
+      - run: mypy launch_plus/resolver.py
 
   pytest:
     name: Test (Python ${{ matrix.python-version }})
@@ -42,4 +42,4 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install pytest pyyaml click
-      - run: PYTHONPATH=python python -m pytest tests/ -v
+      - run: python -m pytest tests/ -v

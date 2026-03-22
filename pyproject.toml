@@ -44,7 +44,7 @@ launch-plus = "launch_plus.cli:main"
 launch-plus = "launch_plus.verb:LaunchPlusCommand"
 
 [tool.hatch.build.targets.wheel]
-packages = ["python/launch_plus"]
+packages = ["launch_plus"]
 
 [tool.ruff]
 line-length = 100
@@ -59,7 +59,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"python/launch_plus/resolver.py" = ["E501", "E402"]  # long lines and import ordering — acceptable in this module
+"launch_plus/resolver.py" = ["E501", "E402"]  # long lines and import ordering — acceptable in this module
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

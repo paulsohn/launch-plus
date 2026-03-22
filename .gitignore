@@ -24,6 +24,7 @@ venv/
 __pycache__/
 
 # Build outputs
+target/
 dist/
 build/
 *.egg-info/

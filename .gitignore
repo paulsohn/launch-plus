@@ -1,6 +1,3 @@
-# Rust
-target/
-
 # IDE
 .idea/
 .vscode/
@@ -38,9 +35,6 @@ build/
 *.egg
 .pytest_cache/
 .ruff_cache/
-
-# Maturin
-.maturin/
 
 # Testing artifacts (created when running launch-plus from repo root)
 /src/

@@ -18,15 +18,16 @@ jobs:
         with:
           ref: devel
 
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Build launch-plus
-        run: cargo build --bin launch-plus --release
+      - name: Install launch-plus
+        run: pip install -e .
 
       - name: Reindex Autoware manifest
         working-directory: example/autoware
-        run: ../../target/release/launch-plus index
+        run: launch-plus index
 
       - name: Create PR if lockfile changed
         uses: peter-evans/create-pull-request@v8

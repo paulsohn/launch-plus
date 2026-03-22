@@ -9,89 +9,61 @@ permissions:
 
 jobs:
   version-check:
-    name: Verify tag matches Cargo.toml
+    name: Verify tag matches pyproject.toml
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
-      - name: Compare tag version with Cargo.toml version
+      - name: Compare tag version with pyproject.toml version
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          CARGO_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('Cargo.toml','rb'))['workspace']['package']['version'])")
-          echo "Tag version:       $TAG_VERSION"
-          echo "Cargo.toml version: $CARGO_VERSION"
-          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
-            echo "::error::Version mismatch: tag is v${TAG_VERSION} but Cargo.toml has ${CARGO_VERSION}"
+          PYPROJECT_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "Tag version:          $TAG_VERSION"
+          echo "pyproject.toml version: $PYPROJECT_VERSION"
+          if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "::error::Version mismatch: tag is v${TAG_VERSION} but pyproject.toml has ${PYPROJECT_VERSION}"
             exit 1
           fi
 
-  build:
-    name: Build (${{ matrix.target }}, ${{ matrix.os }})
+  build-wheel:
+    name: Build wheel
     needs: version-check
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            artifact: launch-plus-linux-amd64-ubuntu22.04
-            cross: false
-
-          - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            artifact: launch-plus-linux-amd64-ubuntu24.04
-            cross: false
-
-          - os: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            artifact: launch-plus-linux-arm64-ubuntu22.04
-            cross: true
-
-          - os: ubuntu-24.04
-            target: aarch64-unknown-linux-gnu
-            artifact: launch-plus-linux-arm64-ubuntu24.04
-            cross: true
-
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
         with:
-          targets: ${{ matrix.target }}
-
-      - uses: Swatinem/rust-cache@v2
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v7
         with:
-          key: release-${{ matrix.artifact }}
+          name: dist
+          path: dist/
 
-      - name: Install cross
-        if: matrix.cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
-
-      - name: Build (native)
-        if: "!matrix.cross"
-        run: cargo build --bin launch-plus --release --target ${{ matrix.target }}
-
-      - name: Build (cross)
-        if: matrix.cross
-        run: cross build --bin launch-plus --release --target ${{ matrix.target }}
-
-      - name: Package binary
-        run: |
-          cp target/${{ matrix.target }}/release/launch-plus ${{ matrix.artifact }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
+  build-deb:
+    name: Build deb (${{ matrix.os }})
+    needs: version-check
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: sudo apt-get update && sudo apt-get install -y python3-all debhelper dh-python
+      - run: dpkg-buildpackage -us -uc -b
+      - uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}
+          name: deb-${{ matrix.os }}
+          path: ../*.deb
 
   release:
     name: Create Release
-    needs: build
+    needs: [build-wheel, build-deb]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v8

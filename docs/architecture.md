@@ -2,28 +2,27 @@
 
 ## Overview
 
-launch-plus is a Rust application that shells out to an external `python3`
-process for resolving Python launch files.  The Python resolver script
-(`py_resolver.py`) is embedded in the Rust binary via `include_str!` at compile
-time, written to a temporary file, and invoked as a subprocess.  The core
-library (`launch-plus-core`) contains all logic; the CLI (`launch-plus-cli`) is
-a thin `clap`-based wrapper.
+launch-plus is a pure Python application providing a Bazel-inspired workflow
+for ROS 2: lazy, on-demand package fetching and building based on actual
+launch-time dependencies.  The CLI is built with Click; all modules are
+importable as a Python library.
 
 ```
 ┌───────────────────────────────────────────────────────┐
-│  CLI (launch-plus-cli)                                │
-│  clap argument parsing → delegates to core            │
+│  CLI (cli.py)                                         │
+│  Click argument parsing → delegates to modules        │
 ├───────────────────────────────────────────────────────┤
-│  Core Library (launch-plus-core)                      │
+│  Core Library (launch_plus)                           │
 │  ├── indexer    — .repos → lockfile                   │
 │  ├── fetcher    — git sparse-checkout on demand       │
-│  ├── resolver   — launch file → resolved XML          │
-│  │   ├── XML parser (quick-xml)                       │
-│  │   ├── substitution engine ($(var), $(eval), etc.)  │
-│  │   └── Python resolver (embedded py_resolver.py)    │
+│  ├── resolver   — launch file resolution              │
+│  │   ├── shim modules for launch/launch_ros           │
+│  │   ├── OpaqueFunction execution with patched I/O    │
+│  │   └── portable path ($find-pkg-share) resolution   │
 │  ├── orchestrator — coordinates resolve + fetch loop  │
-│  ├── builder    — colcon build orchestration          │
-│  └── rosdep     — system dependency resolution        │
+│  ├── renderer  — resolved IR → XML output             │
+│  ├── builder   — colcon build orchestration           │
+│  └── rosdep    — system dependency resolution         │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -63,25 +62,24 @@ launch-plus resolve <pkg> <launcher>
 [resolver] — recursive launch file processing
     │
     ├─── XML launch file?
-    │    ├── parse with quick-xml
+    │    ├── parse with xml.etree.ElementTree
     │    ├── evaluate substitutions: $(var), $(arg), $(find-pkg-share), $(eval)
     │    ├── evaluate conditionals: if="...", unless="..."
     │    ├── follow <include> tags → recurse
     │    └── collect <node>, <param>, <remap>, <composable_node>
     │
     └─── Python launch file?
-         ├── invoke py_resolver.py via subprocess
-         ├── py_resolver imports shimmed launch/launch_ros modules
-         ├── calls generate_launch_description()
-         ├── walks the LaunchDescription tree
-         ├── executes OpaqueFunction bodies with patched filesystem
-         └── returns structured JSON to Rust
+         ├── import shimmed launch/launch_ros modules
+         ├── call generate_launch_description()
+         ├── walk the LaunchDescription tree
+         ├── execute OpaqueFunction bodies with patched filesystem
+         └── return structured ParsedLaunchFile directly
     │
     ├── fetch additional packages on demand (sparse-checkout)
     ├── retry if _PackageNotFetchedError signals missing package
     │
     ▼
-resolved launch XML (stdout)
+[renderer] → resolved launch XML (stdout)
 ```
 
 ### 3. Build phase
@@ -115,14 +113,14 @@ launch-plus build <pkg> <launcher>
 
 ## Key components
 
-### Indexer (`indexer.rs`)
+### Indexer (`indexer.py`)
 
 Generates lockfiles from `.repos` manifests.  Uses `git ls-remote` for version
 resolution and `git archive` to fetch `package.xml` files without full clones.
 Parses `package.xml` to extract dependency information including REP-149
 condition attributes for conditional dependencies.
 
-### Fetcher (`fetcher.rs`)
+### Fetcher (`fetcher.py`)
 
 Manages git sparse-checkout.  The primary API is:
 - **`fetch_packages()`** — full sparse-checkout of one or more package subtrees,
@@ -133,20 +131,10 @@ Manages git sparse-checkout.  The primary API is:
 Sparse-checkout is additive: new paths are added without removing previously
 checked-out files.
 
-### Resolver (`resolver.rs`, `orchestrator.rs`)
+### Resolver (`resolver.py`)
 
-The XML resolver is implemented in Rust using `quick-xml`.  It handles:
-- Substitution expressions: `$(var ...)`, `$(arg ...)`, `$(find-pkg-share ...)`,
-  `$(find-pkg-prefix ...)`, `$(env ...)`, `$(eval ...)`
-- Conditional attributes: `if="..."`, `unless="..."`
-- `<include>` expansion with argument forwarding
-- `<group>` scoping
-- `<push-ros-namespace>` namespace composition
-
-### Python resolver (`py_resolver.py`)
-
-An embedded Python script (`include_str!` at compile time) that resolves Python
-launch files.  It:
+A self-contained Python module that resolves both XML and Python launch files.
+It:
 
 1. Installs a `MetaPathFinder` that intercepts imports of `launch`, `launch_ros`,
    and `ament_index_python`
@@ -154,26 +142,33 @@ launch files.  It:
 3. Loads the target launch file via `importlib`
 4. Calls `generate_launch_description()`
 5. Walks the resulting `LaunchDescription` tree
-6. Returns a JSON structure describing all actions (nodes, includes, params, etc.)
+6. Returns a `ParsedLaunchFile` dataclass describing all actions (nodes,
+   includes, params, etc.)
 
 The shims require no ROS 2 Python packages to be installed.  `OpaqueFunction`
 bodies are executed directly with patched `open()`, `yaml.safe_load()`,
 `os.path.*`, and `pathlib.Path.open`.
 
-### Orchestrator (`orchestrator.rs`)
+### Orchestrator (`orchestrator.py`)
 
-Coordinates the resolve-fetch loop.  When the Python resolver encounters a
-package that hasn't been fetched yet, it signals via `_PackageNotFetchedError`.
-The orchestrator catches this, fetches the missing package, and retries (up to
+Coordinates the resolve-fetch loop.  When the resolver encounters a package
+that hasn't been fetched yet, it signals via `_PackageNotFetchedError`.  The
+orchestrator catches this, fetches the missing package, and retries (up to
 3 times).
 
-### Builder (`builder.rs`)
+### Renderer (`renderer.py`)
+
+Converts the resolved IR (`ResolvedNode` trees) into human-readable XML output.
+Supports namespace flattening, argument display, parameter inlining, and
+include-chain source comments.
+
+### Builder (`builder.py`)
 
 Computes the transitive build-dependency closure and invokes `colcon build`.
 Reads extra arguments from a flagfile.  Validates that flagfile tokens don't
 conflict with launch-plus-managed arguments.
 
-### Rosdep (`rosdep.rs`)
+### Rosdep (`rosdep.py`)
 
 Resolves rosdep keys to system package names via `rosdep resolve`, then installs
 via `apt-get` or `pip` directly.  Caches the set of already-installed ROS
@@ -195,18 +190,11 @@ Installing `launch` and `launch_ros` would require a full ROS 2 Python
 environment on the resolver host.  The shims let launch-plus work with just
 Python 3 and no ROS 2 installation — the resolver is a standalone tool.
 
-### Why Rust?
+### Why pure Python?
 
-- Performance: parsing and resolving large launch graphs (200+ packages) needs
-  to be fast
-- Single binary: no Python environment setup required on the target machine
-  (Python is only invoked as a subprocess for `.launch.py` files)
-- Strong typing: the dependency graph and lockfile schema benefit from
-  compile-time checks
-
-### Why embed py_resolver.py via `include_str!`?
-
-The Python resolver is embedded at compile time so the Rust binary is fully
-self-contained.  No external Python file needs to be distributed alongside the
-binary.  The trade-off is that changes to `py_resolver.py` require a Rust
-rebuild.
+ROS 2 is fundamentally a Python ecosystem.  A Rust+Python hybrid required
+maintaining a subprocess boundary with JSON serialization — every new node
+attribute needed changes in three places (Python shim, JSON serde structs, Rust
+IR types).  Pure Python eliminates this boundary friction, simplifies
+installation to `pip install launch-plus`, and lets the resolver return
+`ParsedLaunchFile` dataclasses directly instead of serializing through JSON.

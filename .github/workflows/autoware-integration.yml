@@ -33,8 +33,7 @@ jobs:
             build-essential \
             curl \
             git \
-            pkg-config \
-            libssl-dev \
+            python3-pip \
             python3-venv \
             ros-dev-tools
 
@@ -44,13 +43,8 @@ jobs:
           rosdep update
         shell: bash
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Build launch-plus
-        run: cargo build --bin launch-plus --release
+      - name: Install launch-plus
+        run: pip install --break-system-packages -e .
 
       - name: Install acados
         run: bash example/autoware/install-acados.sh

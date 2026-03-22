@@ -322,8 +322,8 @@ def _resolve_python_file_recursive(
     # Snapshot global params for this file
     current_global_params = list(result.global_params)
 
-    # Import and call py_resolver directly — no subprocess!
-    from launch_plus.py_resolver import resolve_file as _py_resolve_file
+    # Import and call resolver directly — no subprocess!
+    from launch_plus.resolver import resolve_file as _py_resolve_file
 
     try:
         parsed = _py_resolve_file(

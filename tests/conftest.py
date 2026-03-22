@@ -1,12 +1,12 @@
-"""Shared fixtures for py_resolver tests."""
+"""Shared fixtures for resolver tests."""
 
 import copy
 import sys
 
 import pytest
-from launch_plus import py_resolver as R
+from launch_plus import resolver as R
 
-# Snapshot the initial state of all py_resolver globals so each test starts clean.
+# Snapshot the initial state of all resolver globals so each test starts clean.
 _TRACKED_TEMPLATE = copy.deepcopy(R._tracked)
 
 
@@ -27,8 +27,8 @@ _install_import_patching()
 
 
 @pytest.fixture(autouse=True)
-def _reset_py_resolver_state():
-    """Reset py_resolver module-level globals before every test."""
+def _reset_resolver_state():
+    """Reset resolver module-level globals before every test."""
     # Restore _tracked to a fresh deep-copy of the template.
     R._tracked.clear()
     R._tracked.update(copy.deepcopy(_TRACKED_TEMPLATE))

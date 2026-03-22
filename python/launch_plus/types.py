@@ -303,6 +303,53 @@ class ParsedLaunchFile:
 
 
 # ---------------------------------------------------------------------------
+# Lockfile types (ported from indexer.rs)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RepoLock:
+    """A pinned repository in the lockfile."""
+
+    url: str
+    """Git repository URL."""
+
+    version: str
+    """Pinned SHA."""
+
+    repo_type: str = "git"
+    """Repository type (always ``"git"``)."""
+
+    version_ref: str | None = None
+    """Original version reference (tag, branch, or short SHA)."""
+
+    packages: list[str] = field(default_factory=list)
+    """Package names contained in this repository."""
+
+
+@dataclass
+class PackageLock:
+    """A pinned package in the lockfile."""
+
+    repo: str
+    """Key into :attr:`Lockfile.repositories`."""
+
+    path: str
+    """Path within the repository."""
+
+
+@dataclass
+class Lockfile:
+    """Dual-indexed lockfile: repositories + packages."""
+
+    repositories: dict[str, RepoLock] = field(default_factory=dict)
+    """Repository-centric view (for fetching)."""
+
+    packages: dict[str, PackageLock] = field(default_factory=dict)
+    """Package-centric view (for O(1) lookup)."""
+
+
+# ---------------------------------------------------------------------------
 # Namespace helpers
 # ---------------------------------------------------------------------------
 

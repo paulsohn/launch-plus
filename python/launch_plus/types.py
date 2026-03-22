@@ -348,6 +348,117 @@ class Lockfile:
     packages: dict[str, PackageLock] = field(default_factory=dict)
     """Package-centric view (for O(1) lookup)."""
 
+    def remove_repo(self, workspace_path: str) -> None:
+        """Remove a repository and all its packages from the lockfile."""
+        repo = self.repositories.pop(workspace_path, None)
+        if repo is not None:
+            for pkg_name in repo.packages:
+                self.packages.pop(pkg_name, None)
+
+
+# ---------------------------------------------------------------------------
+# .repos file types
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RepoEntry:
+    """A single repository entry in a .repos file."""
+
+    repo_type: str
+    """Repository type (always ``"git"``)."""
+
+    url: str
+    """Git repository URL."""
+
+    version: str
+    """Version specification (tag, branch, or SHA)."""
+
+
+@dataclass
+class ReposFile:
+    """A .repos file in VCS format."""
+
+    repositories: dict[str, RepoEntry] = field(default_factory=dict)
+    """Map of repository path to repository entry."""
+
+
+# ---------------------------------------------------------------------------
+# Package dependency types (from package.xml)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Dependencies:
+    """Package dependencies categorized by REP-149 tag type.
+
+    Parsed from on-disk ``package.xml`` at resolve/build time — NOT stored in lockfile.
+
+    ``<depend>`` expands to ``build + build_export + exec`` (REP-149 §3).
+    """
+
+    build: list[str] = field(default_factory=list)
+    """``<build_depend>``: needed to compile this package."""
+
+    build_export: list[str] = field(default_factory=list)
+    """``<build_export_depend>``: needed by packages that compile against this one."""
+
+    buildtool: list[str] = field(default_factory=list)
+    """``<buildtool_depend>``: build tool needed to build this package."""
+
+    buildtool_export: list[str] = field(default_factory=list)
+    """``<buildtool_export_depend>``: build tool exported by this package."""
+
+    exec: list[str] = field(default_factory=list)
+    """``<exec_depend>``: needed at runtime."""
+
+    test: list[str] = field(default_factory=list)
+    """``<test_depend>``: needed only for testing."""
+
+
+@dataclass
+class PackageInfo:
+    """Information about a package found in a repository."""
+
+    name: str
+    """Package name from package.xml."""
+
+    path: str
+    """Path within the repository (directory containing package.xml)."""
+
+    dependencies: Dependencies = field(default_factory=Dependencies)
+    """Dependencies extracted from package.xml."""
+
+
+class DependencyMode(Enum):
+    """Dependency resolution mode."""
+
+    BUILD = auto()
+    """Build dependencies only (for colcon build)."""
+
+    EXEC = auto()
+    """Execution dependencies only (for runtime)."""
+
+    BUILD_AND_EXEC = auto()
+    """Both build and exec dependencies."""
+
+    ALL = auto()
+    """All dependencies including test."""
+
+
+@dataclass
+class DependencyGraph:
+    """Result of transitive dependency resolution."""
+
+    packages: set[str] = field(default_factory=set)
+    """All packages needed (root + transitive)."""
+
+    missing: set[str] = field(default_factory=set)
+    """Packages that were requested but not found in lockfile."""
+
+    external: set[str] = field(default_factory=set)
+    """Packages that are external (not in lockfile, e.g., system deps)."""
+
 
 # ---------------------------------------------------------------------------
 # Namespace helpers

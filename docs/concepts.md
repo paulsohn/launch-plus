@@ -111,7 +111,7 @@ the source directory and the install directory**.  Concretely:
 src/my_pkg/launch/bringup.launch.xml
 src/my_pkg/config/params.yaml
 
-# Install path (after colcon build --symlink-install)
+# Install path (after build --symlink-install)
 install/my_pkg/share/my_pkg/launch/bringup.launch.xml
 install/my_pkg/share/my_pkg/config/params.yaml
 ```
@@ -204,7 +204,7 @@ build-dependency closure** from the resolved launch graph:
 3. **System deps** — packages not in the lockfile are resolved via `rosdep`
    (with `--rosdep`)
 
-Only the resulting minimal set is passed to `colcon build --packages-select`.
+Only the resulting minimal set is built by the native backend.
 
 ### The `exec_depend` problem
 
@@ -230,13 +230,14 @@ launch-plus's goal is to avoid this entirely: because the resolver already knows
 which packages are actually needed (it read the launch file), it *should* compute
 the build closure using only `build_depend` and `buildtool_depend`.
 
-**Current status:** today, launch-plus still includes `exec_depend` in the build
-set because it delegates to `colcon build`, which validates that all
-`package.xml` dependencies — including `exec_depend` — have install artifacts
-before running cmake.  There is no colcon flag to disable this check.  Replacing
-colcon with direct ament invocations (see [#18](https://github.com/paulsohn/launch-plus/issues/18))
-will remove this constraint, allowing the build closure to use only true
-build-time dependencies.
+**Status:** launch-plus uses a native build backend (direct cmake/setuptools
+invocations) that does **not** validate `exec_depend` at build time.  The build
+closure uses only true build-time dependencies (`build_depend`,
+`buildtool_depend`, `build_export_depend`, `buildtool_export_depend`, and
+`<depend>`).  Runtime dependencies are tracked through the launch graph itself.
+
+This eliminates the need for workarounds like Autoware's `remove-exec-depend`
+CI action — `exec_depend` packages are simply not included in the build set.
 
 ## Static analysis: what the resolver can verify
 

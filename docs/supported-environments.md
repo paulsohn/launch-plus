@@ -8,7 +8,7 @@
 | Ubuntu 24.04 (x86_64) | Supported | |
 | Ubuntu 22.04 (aarch64) | Planned | Cross-compilation via `cross` |
 | Ubuntu 24.04 (aarch64) | Planned | Cross-compilation via `cross` |
-| macOS | Not supported | No `apt-get`; rosdep/colcon untested |
+| macOS | Not supported | No `apt-get`; rosdep untested |
 | Windows | Not supported | Git sparse-checkout paths untested |
 
 ## ROS 2 distributions
@@ -49,14 +49,15 @@ command — the table below shows which tools are needed and when.
 |---|---|---|
 | `git` | All commands | Sparse-checkout, ls-remote, archive |
 | `python3` | `resolve`, `build`, `check`, `test` | Evaluating Python launch files and `$(eval ...)` |
-| `colcon` | `build`, `test` | Build orchestration; **planned to be replaceable** |
-| `rosdep` | `--rosdep` flag only | System dependency resolution; **planned to be replaceable** |
+| `cmake` | `build`, `test` | Building ament_cmake packages |
+| `make` | `build`, `test` | Building ament_cmake packages |
+| `rosdep` | `--rosdep` flag only | System dependency resolution |
 | `apt-get` | `--rosdep` with `#apt` deps | Called via `sudo` |
 | `pip` | `--rosdep` with `#pip` deps | Called with `--break-system-packages` |
 
-**Planned changes:** `colcon` and `rosdep` are currently invoked as subprocesses,
-but we plan to support alternative build backends and dependency resolvers in
-the future, reducing the number of external dependencies.
+**Note:** `rosdep` is invoked as a subprocess.  The build backend uses direct
+`cmake`/`make` invocations — no external build orchestrator (e.g. colcon) is
+required.
 
 ## Launch file support
 
@@ -157,7 +158,7 @@ resolving a Humble launch file on a Jazzy host) is not supported.
 - **Standard package layout** — packages must have a `package.xml` at their root.
   Non-standard layouts (e.g. nested packages without a top-level `package.xml`)
   may not be detected during indexing.
-- **colcon as build tool** — the `build` command invokes `colcon build`.  Other
-  build tools (catkin_make, catkin_tools) are not supported.
+- **ament build types** — only `ament_cmake` and `ament_python` packages are
+  supported.  Other build types (catkin, cmake, plain) are not handled.
 - **Git repositories** — only git repos are supported in `.repos` files.
   Subversion, Mercurial, etc. are not handled.

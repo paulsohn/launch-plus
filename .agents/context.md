@@ -46,7 +46,7 @@ Key insight: **A launch file IS a build target** that declares its dependencies 
 │  │   ├── conditional  - if/unless evaluation                        │
 │  │   └── flattener    - inline all includes                         │
 │  ├── fetcher      - partial git clone (sparse-checkout)             │
-│  ├── builder      - selective colcon build (subprocess)             │
+│  ├── builder      - native cmake/setuptools build backend          │
 │  └── executor     - process spawning & lifecycle (OUR implementation)│
 ├─────────────────────────────────────────────────────────────────────┤
 │  Python Bindings (PyO3)                                             │
@@ -97,7 +97,7 @@ and direct consumption of resolved launch structures.
      - lockfile.packages[pkg].repo → lockfile.repos[repo]
      - sparse-checkout only needed directories
         ↓
-   [builder] colcon build --packages-select <needed>  (skip if mode=resolve)
+   [builder] native cmake/setuptools build (skip if mode=resolve)
         ↓
    [launcher] ros2 launch <package> <launch_file>     (only if mode=run)
 ```
@@ -396,7 +396,7 @@ launch-plus/
 │   │   │   ├── indexer.rs
 │   │   │   ├── resolver.rs
 │   │   │   ├── fetcher.rs
-│   │   │   ├── builder.rs
+│   │   │   ├── builder/          # native build backend
 │   │   │   └── launcher.rs
 │   │   └── Cargo.toml
 │   └── launch-plus-cli/          # Rust CLI (optional standalone)
@@ -428,7 +428,7 @@ launch-plus/
 - **PyO3/Maturin**: Rust → Python bindings
 - **Python**: Thin CLI layer, ros2 verb integration
 - **Git sparse-checkout**: Partial cloning
-- **colcon**: Build orchestration (called as subprocess)
+- **cmake/make**: Direct build invocation for ament_cmake packages
 
 ## ROS 2 Integration
 
@@ -503,12 +503,10 @@ Fetches and builds only the packages required to run the launch target:
 3. **Fetch** any plan packages not yet on disk (e.g. pure build deps not reached by the
    launch graph traversal)
 4. **Verify** on-disk `package.xml` dependencies match the lockfile for every build package
-5. **Build**: `colcon build --base-paths <src> --build-base <build> --install-base <install>
-   [flagfile tokens] --packages-select <packages>`
+5. **Build**: native cmake/setuptools backend builds each package in topological order
+   using a greedy parallel scheduler
 
-Extra colcon arguments (e.g. `--symlink-install`, `--cmake-args`, `--executor parallel`,
-`--allow-overriding`) are supplied via a **flagfile** (`--colcon-flagfile <path>`):
-one shell token per line, `#` comments allowed.  See `example/colcon-flags.example.txt`.
+Build options are passed directly as CLI flags:
 
 ```bash
 launch-plus build autoware_launch autoware.launch.xml \
@@ -516,17 +514,21 @@ launch-plus build autoware_launch autoware.launch.xml \
   --allow-global-arg-cascade --apply-launch-arg-defaults \
   --lockfile manifest.lock.repos --src src \
   --dirty \
-  --colcon-flagfile colcon-flags.txt
+  --symlink-install \
+  --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```
+
+`BUILD_TESTING` is managed automatically (`OFF` for build, `ON` for test);
+manually passing `-DBUILD_TESTING=...` via `--cmake-args` is rejected with an error.
 
 ### Mode: test
 
-Same pipeline as `build`, but `DependencyMode::All` is used so `test_depend` packages are
+Same pipeline as `build`, but `DependencyMode::BuildAndTest` is used so `test_depend` packages are
 included in the build set.  These packages are never visited during launch-graph traversal
 and are fetched on demand by `fetch_plan_packages`.
 
-The `test` command currently builds the full test dependency set; running `colcon test` is
-a planned future step (M6+).
+The `test` command currently builds the full test dependency set with `BUILD_TESTING=ON`;
+running `ctest`/`pytest` is a planned future step.
 
 ```bash
 launch-plus test autoware_launch autoware.launch.xml \
@@ -534,7 +536,7 @@ launch-plus test autoware_launch autoware.launch.xml \
   --allow-global-arg-cascade --apply-launch-arg-defaults \
   --lockfile manifest.lock.repos --src src \
   --dirty \
-  --colcon-flagfile colcon-flags.txt
+  --symlink-install
 ```
 
 ### Mode: run (default)

@@ -288,7 +288,7 @@ enum Commands {
     /// Fetch and build packages for a launcher (target-focused, Bazel-like)
     ///
     /// Resolves the launch file, computes the transitive build-dependency closure
-    /// (build_depend + `<depend>`), and invokes colcon with the exact package list.
+    /// (build_depend + `<depend>`), and builds packages directly using cmake/setuptools.
     #[command(override_usage = "launch-plus build [OPTIONS] <PACKAGE> <LAUNCHER> [ARG]...")]
     Build {
         /// Package name
@@ -349,48 +349,51 @@ enum Commands {
         #[arg(long)]
         rosdep: bool,
 
-        /// Colcon build output directory
+        /// Build output directory
         #[arg(long, default_value = "build")]
         build_base: String,
 
-        /// Colcon install prefix
+        /// Install prefix
         #[arg(long, default_value = "install")]
         install_base: String,
 
-        /// Colcon log directory
+        /// Log directory
         #[arg(long, default_value = "log")]
         log_base: String,
 
-        /// Path to a colcon flagfile (one token per line, # comments allowed).
-        ///
-        /// The file contents are inserted verbatim into `colcon build` before
-        /// `--packages-select`.  This lets you pass any colcon flag without
-        /// requiring a dedicated launch-plus CLI option, e.g.:
-        ///
-        ///   --symlink-install
-        ///   --cmake-force-configure
-        ///   --cmake-args
-        ///   -DCMAKE_BUILD_TYPE=Release
-        ///   -DCMAKE_CXX_FLAGS=-w
-        ///   --parallel-workers
-        ///   8
-        #[arg(long, value_name = "FILE")]
-        colcon_flagfile: Option<String>,
+        /// Extra arguments passed to cmake (e.g. -DCMAKE_BUILD_TYPE=Release)
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
+        cmake_args: Vec<String>,
 
-        /// Print the colcon command without running it
+        /// Extra arguments passed to make
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
+        make_args: Vec<String>,
+
+        /// Use symlink install instead of copying files
+        #[arg(long)]
+        symlink_install: bool,
+
+        /// Maximum number of parallel build workers (default: available CPUs)
+        #[arg(long)]
+        parallel_workers: Option<usize>,
+
+        /// Continue building independent packages after a failure
+        #[arg(long)]
+        continue_on_error: bool,
+
+        /// Print the build commands without running them
         #[arg(long)]
         dry_run: bool,
     },
 
     /// Build package(s) by name with automatic transitive dependency fetching
     ///
-    /// Unlike `colcon build --packages-select`, this fetches all transitive
-    /// build dependencies from the lockfile before invoking colcon, so you
+    /// Fetches all transitive build dependencies from the lockfile, so you
     /// don't need to manually ensure every dependency is on disk.
     ///
     /// The seed packages are expanded transitively using on-disk `package.xml`
-    /// build/exec dependencies, missing packages are fetched from the lockfile,
-    /// and the result is built in topological order via colcon.
+    /// build dependencies, missing packages are fetched from the lockfile,
+    /// and the result is built in topological order.
     #[command(
         name = "build-pkg",
         override_usage = "launch-plus build-pkg [OPTIONS] <PACKAGES>..."
@@ -424,36 +427,52 @@ enum Commands {
         #[arg(long)]
         shallow: bool,
 
-        /// Colcon build output directory
+        /// Build output directory
         #[arg(long, default_value = "build")]
         build_base: String,
 
-        /// Colcon install prefix
+        /// Install prefix
         #[arg(long, default_value = "install")]
         install_base: String,
 
-        /// Colcon log directory
+        /// Log directory
         #[arg(long, default_value = "log")]
         log_base: String,
 
-        /// Path to a colcon flagfile (one token per line, # comments allowed).
-        /// See `build --colcon-flagfile` for details.
-        #[arg(long, value_name = "FILE")]
-        colcon_flagfile: Option<String>,
+        /// Extra arguments passed to cmake
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
+        cmake_args: Vec<String>,
+
+        /// Extra arguments passed to make
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
+        make_args: Vec<String>,
+
+        /// Use symlink install instead of copying files
+        #[arg(long)]
+        symlink_install: bool,
+
+        /// Maximum number of parallel build workers (default: available CPUs)
+        #[arg(long)]
+        parallel_workers: Option<usize>,
+
+        /// Continue building independent packages after a failure
+        #[arg(long)]
+        continue_on_error: bool,
 
         /// Automatically install external dependencies via rosdep.
         /// See `build --rosdep` for details.
         #[arg(long)]
         rosdep: bool,
 
-        /// Print the colcon command without running it
+        /// Print the build commands without running them
         #[arg(long)]
         dry_run: bool,
     },
 
     /// Fetch, build, and run tests for a launcher
     ///
-    /// Like `build` but also includes test_depend packages in the build set.
+    /// Like `build` but also includes test_depend packages in the build set
+    /// and sets BUILD_TESTING=ON.
     #[command(override_usage = "launch-plus test [OPTIONS] <PACKAGE> <LAUNCHER> [ARG]...")]
     Test {
         /// Package name
@@ -514,24 +533,39 @@ enum Commands {
         #[arg(long)]
         rosdep: bool,
 
-        /// Colcon build output directory
+        /// Build output directory
         #[arg(long, default_value = "build")]
         build_base: String,
 
-        /// Colcon install prefix
+        /// Install prefix
         #[arg(long, default_value = "install")]
         install_base: String,
 
-        /// Colcon log directory
+        /// Log directory
         #[arg(long, default_value = "log")]
         log_base: String,
 
-        /// Path to a colcon flagfile (one token per line, # comments allowed).
-        /// See `build --colcon-flagfile` for details.
-        #[arg(long, value_name = "FILE")]
-        colcon_flagfile: Option<String>,
+        /// Extra arguments passed to cmake
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
+        cmake_args: Vec<String>,
 
-        /// Print the colcon command without running it
+        /// Extra arguments passed to make
+        #[arg(long, num_args = 1.., allow_hyphen_values = true)]
+        make_args: Vec<String>,
+
+        /// Use symlink install instead of copying files
+        #[arg(long)]
+        symlink_install: bool,
+
+        /// Maximum number of parallel build workers (default: available CPUs)
+        #[arg(long)]
+        parallel_workers: Option<usize>,
+
+        /// Continue building independent packages after a failure
+        #[arg(long)]
+        continue_on_error: bool,
+
+        /// Print the build commands without running them
         #[arg(long)]
         dry_run: bool,
     },
@@ -766,7 +800,11 @@ fn main() -> Result<()> {
             build_base,
             install_base,
             log_base,
-            colcon_flagfile,
+            cmake_args,
+            make_args,
+            symlink_install,
+            parallel_workers,
+            continue_on_error,
             dry_run,
         } => {
             let workspace_state = parse_workspace_state(clean, dirty)?;
@@ -780,11 +818,18 @@ fn main() -> Result<()> {
                 rosdep_fallback: rosdep,
                 ..Default::default()
             };
-            let extra_colcon_args = colcon_flagfile
-                .as_deref()
-                .map(read_colcon_flagfile)
-                .transpose()?
-                .unwrap_or_default();
+            let mut build_options = BuildOptions {
+                dry_run,
+                cmake_args,
+                make_args,
+                symlink_install,
+                continue_on_error,
+                test_mode: false,
+                ..Default::default()
+            };
+            if let Some(n) = parallel_workers {
+                build_options.parallel_workers = n;
+            }
             run_build(
                 &package,
                 &launcher,
@@ -796,10 +841,7 @@ fn main() -> Result<()> {
                 &build_base,
                 &install_base,
                 &log_base,
-                BuildOptions {
-                    dry_run,
-                    extra_colcon_args,
-                },
+                build_options,
                 false, // test_mode
                 verbose,
                 shallow,
@@ -815,7 +857,11 @@ fn main() -> Result<()> {
             build_base,
             install_base,
             log_base,
-            colcon_flagfile,
+            cmake_args,
+            make_args,
+            symlink_install,
+            parallel_workers,
+            continue_on_error,
             rosdep,
             dry_run,
         } => {
@@ -854,12 +900,6 @@ fn main() -> Result<()> {
                 false, // test_mode
             )?;
 
-            let extra_colcon_args = colcon_flagfile
-                .as_deref()
-                .map(read_colcon_flagfile)
-                .transpose()?
-                .unwrap_or_default();
-
             tracing::info!(
                 "Building {} packages (from {} seed): {:?}",
                 plan.packages.len(),
@@ -877,13 +917,19 @@ fn main() -> Result<()> {
                     .with_context(|| "failed to install external build dependencies via rosdep")?;
             }
 
-            execute_build(
-                &plan,
-                &BuildOptions {
-                    dry_run,
-                    extra_colcon_args,
-                },
-            )?;
+            let mut build_options = BuildOptions {
+                dry_run,
+                cmake_args,
+                make_args,
+                symlink_install,
+                continue_on_error,
+                test_mode: false,
+                ..Default::default()
+            };
+            if let Some(n) = parallel_workers {
+                build_options.parallel_workers = n;
+            }
+            execute_build(&plan, &build_options, &parsed_lockfile)?;
         }
         Commands::Test {
             package,
@@ -902,7 +948,11 @@ fn main() -> Result<()> {
             build_base,
             install_base,
             log_base,
-            colcon_flagfile,
+            cmake_args,
+            make_args,
+            symlink_install,
+            parallel_workers,
+            continue_on_error,
             dry_run,
         } => {
             let workspace_state = parse_workspace_state(clean, dirty)?;
@@ -916,11 +966,18 @@ fn main() -> Result<()> {
                 rosdep_fallback: rosdep,
                 ..Default::default()
             };
-            let extra_colcon_args = colcon_flagfile
-                .as_deref()
-                .map(read_colcon_flagfile)
-                .transpose()?
-                .unwrap_or_default();
+            let mut build_options = BuildOptions {
+                dry_run,
+                cmake_args,
+                make_args,
+                symlink_install,
+                continue_on_error,
+                test_mode: true,
+                ..Default::default()
+            };
+            if let Some(n) = parallel_workers {
+                build_options.parallel_workers = n;
+            }
             run_build(
                 &package,
                 &launcher,
@@ -932,10 +989,7 @@ fn main() -> Result<()> {
                 &build_base,
                 &install_base,
                 &log_base,
-                BuildOptions {
-                    dry_run,
-                    extra_colcon_args,
-                },
+                build_options,
                 true, // test_mode
                 verbose,
                 shallow,
@@ -1416,57 +1470,7 @@ fn parse_workspace_state(clean: bool, dirty: bool) -> Result<WorkspaceState> {
     }
 }
 
-/// Read a colcon flagfile and return the tokens as a `Vec<String>`.
-///
-/// Format: one token per line; lines starting with `#` (after trimming) are
-/// comments and are ignored; blank lines are ignored.
-///
-/// The following flags are always managed by launch-plus and must **not** appear
-/// in the flagfile (an error is returned if they do):
-/// - `--packages-*` (e.g. `--packages-select`, `--packages-up-to`, `--packages-skip`)
-/// - `--base-paths`, `--build-base`, `--install-base`, `--log-base`
-///
-/// Example file:
-/// ```text
-/// # Build settings
-/// --symlink-install
-/// --cmake-force-configure
-/// --cmake-args
-/// -DCMAKE_BUILD_TYPE=Release
-/// -DCMAKE_CXX_FLAGS=-w
-/// --parallel-workers
-/// 8
-/// ```
-fn read_colcon_flagfile(path: &str) -> Result<Vec<String>> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("failed to read colcon flagfile: {path}"))?;
-    let tokens: Vec<String> = content
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .map(str::to_string)
-        .collect();
-
-    // Reject flags that conflict with arguments launch-plus always manages.
-    for token in &tokens {
-        if token.starts_with("--packages-")
-            || token == "--base-paths"
-            || token == "--build-base"
-            || token == "--install-base"
-            || token == "--log-base"
-        {
-            anyhow::bail!(
-                "colcon flagfile {path:?}: '{}' conflicts with a launch-plus-managed \
-                 argument; remove it from the flagfile",
-                token
-            );
-        }
-    }
-
-    Ok(tokens)
-}
-
-/// Execute the build/test command: resolve → plan → colcon build
+/// Execute the build/test command: resolve → plan → build
 #[allow(clippy::too_many_arguments)]
 fn run_build(
     package: &str,
@@ -1555,7 +1559,7 @@ fn run_build(
         }
     }
 
-    execute_build(&plan, &build_options).with_context(|| "colcon build failed")?;
+    execute_build(&plan, &build_options, &lockfile).with_context(|| "build failed")?;
 
     Ok(())
 }

@@ -12,7 +12,7 @@
 # Requires:
 #   - launch-plus binary on PATH (or built at ../../target/release/launch-plus)
 #   - ROS 2 sourced (for rosdep + ament)
-#   - colcon installed (for the build step)
+#   - cmake and make (for building ament_cmake packages)
 
 set -euo pipefail
 
@@ -110,7 +110,7 @@ echo
 # ── Step 2: Build ────────────────────────────────────────────────────────────
 
 echo "==> Step 2: Build"
-$LP build ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" --colcon-flagfile colcon-flags.txt
+$LP build ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" --symlink-install
 echo "    OK"
 echo
 

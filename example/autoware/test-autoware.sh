@@ -10,7 +10,7 @@
 # they do NOT perform any extra cleanup themselves.
 #
 # Requires:
-#   - launch-plus binary on PATH (or built at ../../target/release/launch-plus)
+#   - launch-plus on PATH (pip install -e . from repo root)
 #   - ROS 2 sourced (for rosdep + ament)
 #   - colcon installed (for the build step)
 
@@ -43,10 +43,8 @@ cd "$SCRIPT_DIR"
 
 if command -v launch-plus &>/dev/null; then
     LP=launch-plus
-elif [[ -x ../../target/release/launch-plus ]]; then
-    LP=../../target/release/launch-plus
 else
-    echo "ERROR: launch-plus not found. Build with: cargo build --bin launch-plus --release"
+    echo "ERROR: launch-plus not found. Install with: pip install -e . (from repo root)"
     exit 1
 fi
 

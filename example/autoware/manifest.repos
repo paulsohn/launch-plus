@@ -35,8 +35,8 @@ repositories:
   # universe
   universe/autoware_universe:
     type: git
-    url: https://github.com/autowarefoundation/autoware_universe.git
-    version: main
+    url: https://github.com/PanConChicharron/autoware.universe.git
+    version: arjun.ram/T4DEV_9960_build_update
   universe/external/tier4_autoware_msgs:
     type: git
     url: https://github.com/tier4/tier4_autoware_msgs.git

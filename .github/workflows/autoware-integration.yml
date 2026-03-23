@@ -44,7 +44,7 @@ jobs:
         shell: bash
 
       - name: Install launch-plus
-        run: pip install --break-system-packages -e .
+        run: pip install -e . || pip install --break-system-packages -e .
 
       - name: Install acados
         run: bash example/autoware/install-acados.sh

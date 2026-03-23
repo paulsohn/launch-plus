@@ -29,6 +29,25 @@ _rosdep_updated = False
 _rosdep_update_lock = threading.Lock()
 _installed_packages_cache: set[str] | None = None
 _installed_packages_lock = threading.Lock()
+_break_system_packages: bool | None = None
+
+
+def _pip_supports_break_system_packages() -> bool:
+    """Check if pip supports --break-system-packages (pip >= 23.0.1, Ubuntu 24.04+)."""
+    global _break_system_packages  # noqa: PLW0603
+    if _break_system_packages is not None:
+        return _break_system_packages
+    try:
+        result = subprocess.run(
+            ["pip", "install", "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        _break_system_packages = "--break-system-packages" in result.stdout
+    except OSError:
+        _break_system_packages = False
+    return _break_system_packages
 
 
 def ensure_rosdep_updated() -> None:
@@ -301,9 +320,10 @@ def rosdep_install(keys: list[str]) -> None:
 
     if pip_pkgs:
         logger.info("Installing %d pip packages", len(pip_pkgs))
-        proc = subprocess.run(
-            ["pip", "install", "--break-system-packages", *pip_pkgs],
-            check=False,
-        )
+        cmd = ["pip", "install"]
+        if _pip_supports_break_system_packages():
+            cmd.append("--break-system-packages")
+        cmd.extend(pip_pkgs)
+        proc = subprocess.run(cmd, check=False)
         if proc.returncode != 0:
             raise ProcessExecutionError(f"pip install failed (exit {proc.returncode})")

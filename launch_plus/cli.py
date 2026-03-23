@@ -92,7 +92,13 @@ def _read_lockfile(lockfile_path: str) -> Lockfile:
     """Read and parse a lockfile."""
     from launch_plus.indexer import parse_lockfile
 
-    content = Path(lockfile_path).read_text()
+    p = Path(lockfile_path)
+    if not p.exists():
+        raise click.ClickException(
+            f"lockfile not found: {p.resolve()}\n"
+            f"  Run from a directory containing {p.name}, or pass --lockfile <path>."
+        )
+    content = p.read_text()
     return parse_lockfile(content)
 
 

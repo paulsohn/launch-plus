@@ -159,7 +159,9 @@ def _render_node(
     out: list[str],
 ) -> None:
     """Emit a single ``<node>`` element."""
-    tag = f'{node_ind}<node pkg="{node.package}" exec="{node.executable}"'
+    pkg_esc = _xml_escape(node.package)
+    exec_esc = _xml_escape(node.executable)
+    tag = f'{node_ind}<node pkg="{pkg_esc}" exec="{exec_esc}"'
     tag += _render_node_common_attrs(node, stack_only_ns)
     if _has_node_children(node):
         out.append(f"{tag}>\n")
@@ -177,7 +179,9 @@ def _render_lifecycle_node(
     out: list[str],
 ) -> None:
     """Emit a ``<lifecycle_node>`` element."""
-    tag = f'{node_ind}<lifecycle_node pkg="{node.package}" exec="{node.executable}"'
+    pkg_esc = _xml_escape(node.package)
+    exec_esc = _xml_escape(node.executable)
+    tag = f'{node_ind}<lifecycle_node pkg="{pkg_esc}" exec="{exec_esc}"'
     tag += _render_node_common_attrs(node, stack_only_ns)
     if _has_node_children(node):
         out.append(f"{tag}>\n")
@@ -219,7 +223,9 @@ def _render_container_node(
     out: list[str],
 ) -> None:
     """Emit a ``<node_container>`` element with nested ``<composable_node>`` children."""
-    tag = f'{node_ind}<node_container pkg="{node.package}" exec="{node.executable}"'
+    pkg_esc = _xml_escape(node.package)
+    exec_esc = _xml_escape(node.executable)
+    tag = f'{node_ind}<node_container pkg="{pkg_esc}" exec="{exec_esc}"'
     if node.name is not None:
         tag += f' name="{_xml_escape(node.name)}"'
     if node.namespace != stack_only_ns and node.namespace is not None:

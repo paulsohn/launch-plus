@@ -433,6 +433,31 @@ def _run_git(
     return result
 
 
+def _run_git_bytes(
+    args: list[str],
+    *,
+    cwd: Path | str | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run a git command returning raw bytes (for binary output like ``git archive``)."""
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            check=False,
+        )
+    except OSError as e:
+        raise GitError(f"failed to run git {args[0]}: {e}") from e
+
+    if check and result.returncode != 0:
+        raise GitError(
+            f"git {' '.join(args)} failed: {result.stderr.decode(errors='replace').strip()}"
+        )
+
+    return result
+
+
 def resolve_version_local(repo_dir: Path, url: str, version_ref: str) -> str:
     """Resolve a ref to a SHA using a local clone via ``git fetch``.
 
@@ -505,9 +530,9 @@ def discover_packages(
 
     # Strategy 2: git archive (skip if submodules needed)
     if not recurse_submodules:
-        result = _run_git(["archive", "--remote", url, sha], check=False)
+        result = _run_git_bytes(["archive", "--remote", url, sha], check=False)
         if result.returncode == 0:
-            return _discover_from_tar(result.stdout.encode("latin-1"))
+            return _discover_from_tar(result.stdout)
 
     # Strategy 3: blobless clone
     if repo_dir is None:

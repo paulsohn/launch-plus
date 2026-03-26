@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 from launch_plus.indexer import (
@@ -315,11 +314,8 @@ def test_condition_error_on_unbalanced_paren() -> None:
 # =========================================================================
 
 
-def _make_test_lockfile_with_deps() -> tuple[Lockfile, Path]:
-    """Create a lockfile and temp dir with package.xml files for dep testing."""
-    tmp = tempfile.mkdtemp()
-    tmp_path = Path(tmp)
-
+def _make_test_lockfile_with_deps(tmp_path: Path) -> Lockfile:
+    """Create a lockfile and package.xml files for dep testing."""
     lockfile = Lockfile()
     lockfile.repositories["repo"] = RepoLock(
         url="https://example.com/repo.git",
@@ -353,34 +349,34 @@ def _make_test_lockfile_with_deps() -> tuple[Lockfile, Path]:
         '<?xml version="1.0"?>\n<package format="3">\n  <name>pkg_c</name>\n</package>\n'
     )
 
-    return lockfile, tmp_path
+    return lockfile
 
 
-def test_resolve_dependencies_build() -> None:
-    lockfile, src_dir = _make_test_lockfile_with_deps()
-    graph = resolve_dependencies(lockfile, src_dir, {"pkg_a"}, DependencyMode.BUILD)
+def test_resolve_dependencies_build(tmp_path: Path) -> None:
+    lockfile = _make_test_lockfile_with_deps(tmp_path)
+    graph = resolve_dependencies(lockfile, tmp_path, {"pkg_a"}, DependencyMode.BUILD)
     assert "pkg_a" in graph.packages
     assert "pkg_b" in graph.packages
     # pkg_c is only an exec dep of pkg_b, not reachable via BUILD mode
     assert "pkg_c" not in graph.packages
 
 
-def test_resolve_dependencies_all() -> None:
-    lockfile, src_dir = _make_test_lockfile_with_deps()
-    graph = resolve_dependencies(lockfile, src_dir, {"pkg_a"}, DependencyMode.ALL)
+def test_resolve_dependencies_all(tmp_path: Path) -> None:
+    lockfile = _make_test_lockfile_with_deps(tmp_path)
+    graph = resolve_dependencies(lockfile, tmp_path, {"pkg_a"}, DependencyMode.ALL)
     assert "pkg_a" in graph.packages
     assert "pkg_b" in graph.packages
     assert "pkg_c" in graph.packages
 
 
-def test_resolve_dependencies_external() -> None:
-    lockfile, src_dir = _make_test_lockfile_with_deps()
-    graph = resolve_dependencies(lockfile, src_dir, {"nonexistent"}, DependencyMode.BUILD)
+def test_resolve_dependencies_external(tmp_path: Path) -> None:
+    lockfile = _make_test_lockfile_with_deps(tmp_path)
+    graph = resolve_dependencies(lockfile, tmp_path, {"nonexistent"}, DependencyMode.BUILD)
     assert "nonexistent" in graph.external
 
 
-def test_compute_build_order() -> None:
-    lockfile, src_dir = _make_test_lockfile_with_deps()
-    order = compute_build_order(lockfile, src_dir, {"pkg_a", "pkg_b", "pkg_c"})
+def test_compute_build_order(tmp_path: Path) -> None:
+    lockfile = _make_test_lockfile_with_deps(tmp_path)
+    order = compute_build_order(lockfile, tmp_path, {"pkg_a", "pkg_b", "pkg_c"})
     # pkg_b must come before pkg_a (pkg_a build-depends on pkg_b)
     assert order.index("pkg_b") < order.index("pkg_a")

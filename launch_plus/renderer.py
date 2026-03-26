@@ -226,10 +226,7 @@ def _render_container_node(
     pkg_esc = _xml_escape(node.package)
     exec_esc = _xml_escape(node.executable)
     tag = f'{node_ind}<node_container pkg="{pkg_esc}" exec="{exec_esc}"'
-    if node.name is not None:
-        tag += f' name="{_xml_escape(node.name)}"'
-    if node.namespace != stack_only_ns and node.namespace is not None:
-        tag += f' namespace="{_xml_escape(node.namespace)}"'
+    tag += _render_node_common_attrs(node, stack_only_ns)
     has_children = bool(
         node.plugins or node.param_files or node.parameters or node.remappings or node.env
     )
@@ -434,7 +431,7 @@ def render_resolved_xml(
                 vd = _visual_src_depth(depth, flatten)
                 if not flatten:
                     out.append(f"{_pad(vd)}</group>\n")
-                out.append(f"{_pad(vd)}<!-- end: {pkg}://{path} -->\n")
+                out.append(f"{_pad(vd)}<!-- end: {_format_source_label(pkg, path)} -->\n")
 
             # Open intermediate levels persistently.
             while len(open_src) + 1 < len(target_src):

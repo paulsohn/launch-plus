@@ -789,7 +789,7 @@ def _portable_display(sub) -> str:
         pkg, _ = sub._resolve_name(None)
         return f"$(find-pkg-share {pkg})"
     if isinstance(sub, _TrackedPathJoinSubstitution):
-        return "".join(_portable_display(s) for s in sub._subs)
+        return "/".join(_portable_display(s) for s in sub._subs)
     return str(sub)
 
 

@@ -15,7 +15,6 @@ from launch_plus.types import (
     ParamFileInlined,
     ParamFileReference,
     ResolvedNode,
-    effective_namespace,
 )
 
 logger = logging.getLogger(__name__)
@@ -91,10 +90,6 @@ def _common_prefix_len(
             break
         n += 1
     return n
-
-
-def _joined_namespace_stack(stack: list[str]) -> str:
-    return effective_namespace(stack, None) or ""
 
 
 # ---------------------------------------------------------------------------
@@ -402,25 +397,14 @@ def render_resolved_xml(
 
     # Stack of currently open source-level <group> boundaries.
     open_src: list[tuple[str, Path]] = []
-    # Currently open namespace sub-group stack.
-    open_ns: list[str] = []
 
     for node in nodes:
         # Compute the target source stack.
         full_stack = _node_source_stack(node, package, root_share_path)
         target_src = [full_stack[-1]] if flatten and full_stack else full_stack
 
-        # Namespaces are always flattened.
-        target_ns: list[str] = []
-
         common = _common_prefix_len(open_src, target_src)
         src_changing = common < len(open_src) or len(open_src) < len(target_src)
-
-        # Close the namespace sub-group whenever source or namespace changes.
-        if (src_changing or target_ns != open_ns) and open_ns:
-            vd = _visual_src_depth(len(open_src), flatten)
-            out.append(f"{_pad(vd)}</group>\n")
-            open_ns.clear()
 
         # IncludeMarker handling.
         if node.kind == NodeKindTag.INCLUDE_MARKER:
@@ -478,24 +462,12 @@ def render_resolved_xml(
                     _render_show_args((pkg, path), include_args, declared_args_by_file, vd + 1, out)
                 open_src.append((pkg, path))
 
-        # Open a namespace sub-group if the namespace changed.
-        if target_ns != open_ns and target_ns:
-            vd = _visual_src_depth(len(open_src), flatten)
-            out.append(f"{_pad(vd)}<group>\n")
-            ns_str = _joined_namespace_stack(target_ns)
-            out.append(f'{_pad(vd)}  <push-ros-namespace namespace="{_xml_escape(ns_str)}"/>\n')
-            open_ns = list(target_ns)
-
-        # Compute node indentation.
+        # Compute node indentation.  Namespaces are always flattened onto
+        # node attributes, so there is no namespace sub-group.
         vd = _visual_src_depth(len(open_src), flatten)
-        effective_depth = vd + (1 if open_ns else 0)
-        node_ind = _pad(effective_depth)
-        child_ind = _pad(effective_depth + 1)
-
-        # Stack-only namespace (for redundancy suppression).
+        node_ind = _pad(vd)
+        child_ind = _pad(vd + 1)
         stack_only_ns: str | None = None
-        if open_ns:
-            stack_only_ns = _joined_namespace_stack(open_ns)
 
         # Render by node kind.
         if node.kind == NodeKindTag.NODE:
@@ -527,10 +499,7 @@ def render_resolved_xml(
         elif node.kind == NodeKindTag.EVENT_HANDLER:
             _render_event_handler(node, node_ind, child_ind, out)
 
-    # Cleanup: close open namespace sub-group.
-    if open_ns:
-        vd = _visual_src_depth(len(open_src), flatten)
-        out.append(f"{_pad(vd)}</group>\n")
+    # Cleanup: no namespace sub-group to close (namespaces always flattened).
 
     # Close remaining source groups, innermost first.
     while open_src:

@@ -4136,7 +4136,7 @@
           </node>
         </group>
         <!-- end: autoware_external_velocity_limit_selector://launch/external_velocity_limit_selector.launch.xml -->
-        <node_container pkg="rclcpp_components" exec="component_container" name="velocity_smoother_container" namespace="/planning/scenario_planning">
+        <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="velocity_smoother_container" namespace="/planning/scenario_planning">
           <param name="front_overhang" value="1.0"/>
           <param name="left_overhang" value="0.128"/>
           <param name="max_steer_angle" value="0.7"/>
@@ -4298,7 +4298,7 @@
             <!-- arg name="launch_traffic_light_module" default="true" -->
             <!-- arg name="launch_virtual_traffic_light_module" default="true" -->
             <!-- arg name="launch_walkway_module" default="true" -->
-            <node_container pkg="rclcpp_components" exec="component_container_mt" name="behavior_planning_container" namespace="/planning/scenario_planning/lane_driving/behavior_planning">
+            <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="behavior_planning_container" namespace="/planning/scenario_planning/lane_driving/behavior_planning">
               <param name="front_overhang" value="1.0"/>
               <param name="left_overhang" value="0.128"/>
               <param name="max_steer_angle" value="0.7"/>
@@ -5701,7 +5701,7 @@
             <!-- arg name="launch_road_user_stop_module" default="true" -->
             <!-- arg name="launch_run_out_module" default="true" -->
             <!-- arg name="motion_velocity_planner_launch_modules" default="[" -->
-            <node_container pkg="rclcpp_components" exec="component_container_mt" name="motion_planning_container" namespace="/planning/scenario_planning/lane_driving/motion_planning">
+            <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="motion_planning_container" namespace="/planning/scenario_planning/lane_driving/motion_planning">
               <param name="front_overhang" value="1.0"/>
               <param name="left_overhang" value="0.128"/>
               <param name="max_steer_angle" value="0.7"/>
@@ -6927,7 +6927,7 @@
       <!-- arg name="vehicle_cmd_gate_param_path" value="$(find-pkg-share autoware_launch)/config/control/vehicle_cmd_gate/vehicle_cmd_gate.param.yaml" -->
       <!-- arg name="vehicle_id" value="default" -->
       <!-- arg name="vehicle_param_file" value="$(find-pkg-share sample_vehicle_description)/config/vehicle_info.param.yaml" -->
-      <node_container pkg="rclcpp_components" exec="component_container" name="control_container" namespace="/control">
+      <node_container pkg="agnocast_components" exec="agnocast_component_container" name="control_container" namespace="/control">
         <param name="front_overhang" value="1.0"/>
         <param name="left_overhang" value="0.128"/>
         <param name="max_steer_angle" value="0.7"/>
@@ -7325,7 +7325,7 @@
         </load_composable_node>
       </group>
       <!-- end: autoware_external_cmd_converter://launch/external_cmd_converter.launch.py -->
-      <node_container pkg="rclcpp_components" exec="component_container" name="control_check_container" namespace="/control">
+      <node_container pkg="agnocast_components" exec="agnocast_component_container" name="control_check_container" namespace="/control">
         <param name="front_overhang" value="1.0"/>
         <param name="left_overhang" value="0.128"/>
         <param name="max_steer_angle" value="0.7"/>

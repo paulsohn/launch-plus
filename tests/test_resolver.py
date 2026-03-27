@@ -1,11 +1,11 @@
-"""Tests for py_resolver internals — substitution handling, node tracking,
+"""Tests for resolver internals — substitution handling, node tracking,
 and inline Python include resolution."""
 
 import os
 import tempfile
 import textwrap
 
-from launch_plus import py_resolver as R
+from launch_plus import resolver as R
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 

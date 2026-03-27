@@ -789,7 +789,7 @@ def _portable_display(sub) -> str:
         pkg, _ = sub._resolve_name(None)
         return f"$(find-pkg-share {pkg})"
     if isinstance(sub, _TrackedPathJoinSubstitution):
-        return "".join(_portable_display(s) for s in sub._subs)
+        return "/".join(_portable_display(s) for s in sub._subs)
     return str(sub)
 
 
@@ -5488,6 +5488,509 @@ def main():
         _error(f"failed to fetch package during action walking: {e}")
 
     _emit(_tracked)
+
+
+def resolve_file(
+    launch_file: "Path",
+    args: dict[str, str],
+    package_shares: dict[str, str],
+    workflow_options: Any = None,
+    lockfile: Any = None,
+    fetch_dir: "Path | None" = None,
+    global_params: list | None = None,
+) -> Any:
+    """Public API: resolve a launch file and return a ParsedLaunchFile.
+
+    This replaces the stdin/stdout JSON boundary used by the Rust orchestrator.
+    Calls the same internal logic as ``main()`` but returns structured data
+    instead of writing JSON to stdout.
+
+    Parameters
+    ----------
+    launch_file : Path
+        Absolute path to the launch file.
+    args : dict
+        Launch arguments (``name:=value`` pairs).
+    package_shares : dict
+        Package name → share directory path.
+    workflow_options : ResolveWorkflowOptions
+        Workflow flags (from orchestrator).
+    lockfile : Lockfile
+        Lockfile with package/repo info.
+    fetch_dir : Path | None
+        Directory for sparse-checkout.
+    global_params : list | None
+        Persisted global params from prior files.
+
+    Returns
+    -------
+    ParsedLaunchFile
+        The resolver result as a structured object (imported from types module).
+    """
+    # ── Set up globals (same as main()) ──────────────────────────────────
+    global _package_shares, _namespace_stack, _apply_opaque_file_access
+    global _lockfile_data, _fetch_dir, _fetched_packages, _root_source_key
+    global _preview_mode, _inline_params, _rosdep_fallback
+    global _apply_arg_defaults, _global_arg_cascade, _allow_unportable_paths
+
+    launch_file_str = str(launch_file)
+
+    _namespace_stack = []
+    root_dep = _extract_pkg_and_share_path(launch_file_str)
+    _root_source_key = f"{root_dep[0]}://{root_dep[1]}" if root_dep else launch_file_str
+
+    _env.clear()
+    _global_params.clear()
+    _global_remaps.clear()
+    _global_param_files.clear()
+    _ir_event_handlers.clear()
+    _fetched_packages.clear()
+    _declared_arg_names.clear()
+    _include_chain.clear()
+    _package_shares = dict(package_shares)
+
+    # Reset _tracked
+    _tracked["packages"] = []
+    _tracked["includes"] = []
+    _tracked["nodes"] = []
+    _tracked["warnings"] = []
+    _tracked["errors"] = []
+    _tracked["declared_args"] = []
+    _tracked["declared_args_by_file"] = {}
+    _tracked["global_params"] = []
+    _tracked["include_args"] = {}
+    _tracked["param_files"] = []
+    _tracked["set_launch_configurations"] = {}
+    _tracked["include_deps"] = []
+    _tracked["param_file_deps"] = []
+    _tracked["event_handlers"] = []
+
+    # Workflow flags
+    if workflow_options is not None:
+        _apply_opaque_file_access = bool(
+            getattr(workflow_options, "apply_opaque_file_access", False)
+        )
+        _preview_mode = bool(getattr(workflow_options, "preview", True))
+        _inline_params = bool(getattr(workflow_options, "inline_params", False))
+        _rosdep_fallback = bool(getattr(workflow_options, "rosdep_fallback", False))
+        _apply_arg_defaults = bool(getattr(workflow_options, "apply_arg_defaults", False))
+        _global_arg_cascade = bool(getattr(workflow_options, "global_arg_cascade", False))
+        _allow_unportable_paths = bool(getattr(workflow_options, "allow_unportable_paths", False))
+    else:
+        _apply_opaque_file_access = False
+        _preview_mode = True
+        _inline_params = False
+        _rosdep_fallback = False
+        _apply_arg_defaults = False
+        _global_arg_cascade = False
+        _allow_unportable_paths = False
+
+    # Build lockfile data from the Lockfile dataclass
+    if lockfile is not None:
+        lf_data = {}
+        for pkg_name, pkg_lock in lockfile.packages.items():
+            repo_lock = lockfile.repositories.get(pkg_lock.repo)
+            if repo_lock is not None:
+                lf_data[pkg_name] = {
+                    "repo": pkg_lock.repo,
+                    "path": pkg_lock.path,
+                    "url": repo_lock.url,
+                    "version": repo_lock.version,
+                }
+        _lockfile_data = lf_data
+    else:
+        _lockfile_data = {}
+
+    _fetch_dir = str(fetch_dir) if fetch_dir else ""
+
+    args_dict = dict(args)
+
+    # Pre-populate global params
+    persisted_global_params = list(global_params) if global_params else []
+
+    # Install the import patcher
+    sys.meta_path.insert(0, _PatchingFinder())
+    for mod_name, builder in _PatchingFinder.PATCHED.items():
+        if mod_name not in _PATCHED_MODULES:
+            _PATCHED_MODULES[mod_name] = builder()
+        sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+
+    # ── Resolve by file type ─────────────────────────────────────────────
+    if launch_file_str.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
+        try:
+            with open(launch_file_str) as f:
+                content = f.read()
+        except Exception as e:
+            _error(f"cannot read {launch_file_str}: {e}")
+            return _tracked_to_parsed_launch_file(_tracked)
+
+        if launch_file_str.endswith((".yaml", ".yml")):
+            elements = parse_yaml_launch(content, launch_file_str)
+        else:
+            elements = parse_xml_launch(content, launch_file_str)
+        subst_ctx = _SubstitutionContext()
+        subst_ctx.args = dict(args_dict)
+        subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
+        subst_ctx.preview_mode = _preview_mode
+        subst_ctx.env = dict(_env)
+        try:
+            resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file_str])
+        except _PackageNotFetchedError as e:
+            _error(f"failed to fetch package: {e}")
+        return _tracked_to_parsed_launch_file(_tracked)
+
+    # ── Python launch files ──────────────────────────────────────────────
+    spec = importlib.util.spec_from_file_location("_target_launch", launch_file_str)
+    if spec is None or spec.loader is None:
+        _error(f"cannot load {launch_file_str}")
+        return _tracked_to_parsed_launch_file(_tracked)
+
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(mod)
+    except _PackageNotFetchedError as e:
+        _error(f"failed to fetch package during module load: {e}")
+        return _tracked_to_parsed_launch_file(_tracked)
+    except Exception as e:
+        _error(f"Error loading launch file: {e}")
+        return _tracked_to_parsed_launch_file(_tracked)
+
+    if not hasattr(mod, "generate_launch_description"):
+        _error("No generate_launch_description() function found")
+        return _tracked_to_parsed_launch_file(_tracked)
+
+    # Inject persisted global params
+    if "__global_params__" in args_dict:
+        try:
+            persisted_global_params = json.loads(args_dict.pop("__global_params__"))
+        except Exception:
+            pass
+
+    ctx = _make_launch_context(args_dict)
+
+    if persisted_global_params:
+        gp_tuples = [(entry[0], entry[1]) for entry in persisted_global_params if len(entry) == 2]
+        ctx._launch_configurations["global_params"] = list(gp_tuples)
+        _global_params.extend(gp_tuples)
+
+    try:
+        ld = mod.generate_launch_description()
+    except _PackageNotFetchedError as e:
+        _error(f"failed to fetch package during generate_launch_description: {e}")
+        return _tracked_to_parsed_launch_file(_tracked)
+    except Exception as e:
+        _error(f"generate_launch_description() failed: {e}")
+        return _tracked_to_parsed_launch_file(_tracked)
+
+    entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
+
+    for entity in entities:
+        if isinstance(entity, _DeclaredArg):
+            _apply_declared_arg(entity, ctx)
+
+    try:
+        _walk_actions(entities, ctx)
+    except _PackageNotFetchedError as e:
+        _error(f"failed to fetch package during action walking: {e}")
+
+    return _tracked_to_parsed_launch_file(_tracked)
+
+
+def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
+    """Convert the internal _tracked dict to a ParsedLaunchFile."""
+    from pathlib import Path as _Path
+
+    from launch_plus.types import (
+        ComposablePlugin as _ComposablePlugin,
+    )
+    from launch_plus.types import (
+        DependencyKind as _DependencyKind,
+    )
+    from launch_plus.types import (
+        EventHandlerKind as _EventHandlerKind,
+    )
+    from launch_plus.types import (
+        FileDependency as _FileDependency,
+    )
+    from launch_plus.types import (
+        LaunchInclude as _LaunchInclude,
+    )
+    from launch_plus.types import (
+        NodeKindTag as _NodeKindTag,
+    )
+    from launch_plus.types import (
+        ParamFileInlined as _ParamFileInlined,
+    )
+    from launch_plus.types import (
+        ParamFileReference as _ParamFileReference,
+    )
+    from launch_plus.types import (
+        ParsedLaunchFile as _ParsedLaunchFile,
+    )
+    from launch_plus.types import (
+        ResolvedEventAction as _ResolvedEventAction,
+    )
+    from launch_plus.types import (
+        ResolvedNode as _ResolvedNode,
+    )
+    from launch_plus.types import (
+        effective_namespace as _effective_namespace,
+    )
+
+    # ── Convert nodes ────────────────────────────────────────────────────
+    resolved_nodes: list[_ResolvedNode] = []
+    for n in tracked.get("nodes", []):
+        kind_str = n.get("kind", "node")
+        if kind_str == "set_parameter":
+            continue
+
+        ns_stack = n.get("namespace_stack", [])
+        explicit_ns = n.get("explicit_namespace")
+        eff_ns = _effective_namespace(ns_stack, explicit_ns)
+        name = n.get("name", "")
+
+        # Map kind
+        kind_tag: _NodeKindTag
+        plugins: list[_ComposablePlugin] = []
+        load_target: str | None = None
+        log_message: str | None = None
+        remap_from: str | None = None
+        remap_to: str | None = None
+        exec_cmd: str | None = None
+        exec_name: str | None = None
+        exec_shell: bool = False
+        handler_kind: _EventHandlerKind | None = None
+        handler_target: str | None = None
+        handler_target_node: str | None = None
+        handler_namespace: str | None = None
+        handler_start_state: str | None = None
+        handler_goal_state: str | None = None
+        handler_actions: list[_ResolvedEventAction] = []
+
+        if kind_str == "container":
+            kind_tag = _NodeKindTag.CONTAINER
+            plugins = _convert_plugins(n.get("plugins", []))
+        elif kind_str == "load_composable":
+            kind_tag = _NodeKindTag.LOAD_COMPOSABLE
+            load_target = n.get("target", "")
+            plugins = _convert_plugins(n.get("plugins", []))
+        elif kind_str == "lifecycle_node":
+            kind_tag = _NodeKindTag.LIFECYCLE_NODE
+        elif kind_str == "set_remap":
+            kind_tag = _NodeKindTag.SET_REMAP
+            remap_from = n.get("remap_from", "")
+            remap_to = n.get("remap_to", "")
+        elif kind_str == "log":
+            kind_tag = _NodeKindTag.LOG
+            log_message = n.get("message", "")
+        elif kind_str == "executable":
+            kind_tag = _NodeKindTag.EXECUTABLE
+            exec_cmd = n.get("cmd", "")
+            exec_name = name if name else None
+            exec_shell = n.get("shell", False)
+        elif kind_str == "event_handler":
+            kind_tag = _NodeKindTag.EVENT_HANDLER
+            hk_str = n.get("handler_kind", "")
+            hk_map = {
+                "on_process_start": _EventHandlerKind.ON_PROCESS_START,
+                "on_process_exit": _EventHandlerKind.ON_PROCESS_EXIT,
+                "on_state_transition": _EventHandlerKind.ON_STATE_TRANSITION,
+                "on_shutdown": _EventHandlerKind.ON_SHUTDOWN,
+            }
+            handler_kind = hk_map.get(hk_str)
+            if handler_kind is None:
+                continue
+            handler_target = n.get("target")
+            handler_target_node = n.get("target_node")
+            handler_namespace = _effective_namespace(ns_stack, explicit_ns)
+            handler_start_state = n.get("start_state")
+            handler_goal_state = n.get("goal_state")
+            handler_actions = [
+                _ResolvedEventAction(
+                    event=a.get("event", ""),
+                    target_node=a.get("target_node"),
+                    namespace=a.get("explicit_namespace"),
+                )
+                for a in n.get("eh_actions", [])
+            ]
+        else:
+            kind_tag = _NodeKindTag.NODE
+
+        # Include chain
+        chain_raw = n.get("include_chain", [])
+        include_chain = [(pkg, _Path(sp)) for pkg, sp in chain_raw]
+        source = include_chain[-1] if include_chain else None
+
+        # Param files
+        param_files: list[_ParamFileReference | _ParamFileInlined] = []
+        for pf in n.get("param_files", []):
+            if pf.get("params") is not None:
+                param_files.append(_ParamFileInlined(display=pf["path"], params=pf["params"]))
+            else:
+                param_files.append(_ParamFileReference(display=pf["path"], abs=pf["path"]))
+
+        resolved_nodes.append(
+            _ResolvedNode(
+                package=n.get("package", ""),
+                executable=n.get("executable", ""),
+                name=name if name else None,
+                namespace=eff_ns,
+                explicit_namespace=explicit_ns,
+                namespace_stack=list(ns_stack),
+                parameters=dict(n.get("parameters", {})),
+                remappings=[(f, t) for f, t in n.get("remappings", [])],
+                env=dict(n.get("env", {})),
+                source=source,
+                include_chain=include_chain,
+                kind=kind_tag,
+                plugins=plugins,
+                load_target=load_target,
+                log_message=log_message,
+                remap_from=remap_from,
+                remap_to=remap_to,
+                exec_cmd=exec_cmd,
+                exec_name=exec_name,
+                exec_shell=exec_shell,
+                handler_kind=handler_kind,
+                handler_target=handler_target,
+                handler_target_node=handler_target_node,
+                handler_namespace=handler_namespace,
+                handler_start_state=handler_start_state,
+                handler_goal_state=handler_goal_state,
+                handler_actions=handler_actions,
+                param_files=param_files,
+                output=n.get("output"),
+                args=n.get("args"),
+                respawn=n.get("respawn"),
+                respawn_delay=n.get("respawn_delay"),
+            )
+        )
+
+    # ── Legacy event handlers ────────────────────────────────────────────
+    has_inline_eh = any(n.kind == _NodeKindTag.EVENT_HANDLER for n in resolved_nodes)
+    if not has_inline_eh:
+        hk_map = {
+            "on_process_start": _EventHandlerKind.ON_PROCESS_START,
+            "on_process_exit": _EventHandlerKind.ON_PROCESS_EXIT,
+            "on_state_transition": _EventHandlerKind.ON_STATE_TRANSITION,
+            "on_shutdown": _EventHandlerKind.ON_SHUTDOWN,
+        }
+        for eh in tracked.get("event_handlers", []):
+            hk = hk_map.get(eh.get("handler_kind", ""))
+            if hk is None:
+                continue
+            ns_stack = eh.get("namespace_stack", [])
+            explicit_ns = eh.get("explicit_namespace")
+            handler_ns = _effective_namespace(ns_stack, explicit_ns)
+            actions = [
+                _ResolvedEventAction(
+                    event=a.get("event", ""),
+                    target_node=a.get("target_node"),
+                    namespace=a.get("explicit_namespace"),
+                )
+                for a in eh.get("actions", [])
+            ]
+            resolved_nodes.append(
+                _ResolvedNode(
+                    kind=_NodeKindTag.EVENT_HANDLER,
+                    namespace_stack=list(ns_stack),
+                    explicit_namespace=explicit_ns,
+                    handler_kind=hk,
+                    handler_target=eh.get("target"),
+                    handler_target_node=eh.get("target_node"),
+                    handler_namespace=handler_ns,
+                    handler_start_state=eh.get("start_state"),
+                    handler_goal_state=eh.get("goal_state"),
+                    handler_actions=actions,
+                )
+            )
+
+    # ── Convert include deps ─────────────────────────────────────────────
+    launch_includes: list[_LaunchInclude] = []
+    include_args_map = tracked.get("include_args", {})
+    for dep in tracked.get("include_deps", []):
+        dep_include_args = dep.get("include_args", {})
+        if not dep_include_args:
+            dep_include_args = include_args_map.get(dep.get("path", ""), {})
+        launch_includes.append(
+            _LaunchInclude(
+                package=dep["package"],
+                share_path=_Path(dep["share_path"]),
+                explicit_args=dep_include_args,
+                namespace_stack=dep.get("namespace_stack", []),
+            )
+        )
+
+    # ── Declared args ────────────────────────────────────────────────────
+    declared_arg_defaults = {a["name"]: a["default"] for a in tracked.get("declared_args", [])}
+
+    # ── Param file deps ──────────────────────────────────────────────────
+    param_file_deps = [
+        _FileDependency(
+            package=dep["package"],
+            share_path=_Path(dep["share_path"]),
+            kind=_DependencyKind.PARAM,
+        )
+        for dep in tracked.get("param_file_deps", [])
+    ]
+
+    # ── Per-file declared args ───────────────────────────────────────────
+    declared_args_by_file: dict[tuple[str, _Path], dict[str, str]] = {}
+    for key_str, args_list in tracked.get("declared_args_by_file", {}).items():
+        if "://" in key_str:
+            idx = key_str.index("://")
+            pkg = key_str[:idx]
+            sp = _Path(key_str[idx + 3 :])
+        else:
+            pkg = ""
+            sp = _Path(key_str)
+        declared_args_by_file[(pkg, sp)] = {a["name"]: a["default"] for a in args_list}
+
+    return _ParsedLaunchFile(
+        packages=list(tracked.get("packages", [])),
+        nodes=resolved_nodes,
+        launch_includes=launch_includes,
+        param_files=param_file_deps,
+        declared_arg_defaults=declared_arg_defaults,
+        declared_args_by_file=declared_args_by_file,
+        global_params=list(tracked.get("global_params", [])),
+        warnings=list(tracked.get("warnings", [])),
+        errors=list(tracked.get("errors", [])),
+        infos=list(tracked.get("infos", [])) if "infos" in tracked else [],
+    )
+
+
+def _convert_plugins(raw_plugins: list[dict]) -> list:
+    """Convert raw plugin dicts to ComposablePlugin dataclasses."""
+    from launch_plus.types import (
+        ComposablePlugin as _ComposablePlugin,
+    )
+    from launch_plus.types import (
+        ParamFileInlined as _ParamFileInlined,
+    )
+    from launch_plus.types import (
+        ParamFileReference as _ParamFileReference,
+    )
+
+    result = []
+    for p in raw_plugins:
+        pf_list: list[_ParamFileReference | _ParamFileInlined] = []
+        for pf in p.get("param_files", []):
+            if pf.get("params") is not None:
+                pf_list.append(_ParamFileInlined(display=pf["path"], params=pf["params"]))
+            else:
+                pf_list.append(_ParamFileReference(display=pf["path"], abs=pf["path"]))
+        result.append(
+            _ComposablePlugin(
+                package=p.get("package", ""),
+                plugin=p.get("plugin", ""),
+                name=p.get("name"),
+                parameters=dict(p.get("parameters", {})),
+                remappings=[(f, t) for f, t in p.get("remappings", [])],
+                param_files=pf_list,
+            )
+        )
+    return result
 
 
 if __name__ == "__main__":

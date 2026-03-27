@@ -1,6 +1,3 @@
-# Rust
-target/
-
 # IDE
 .idea/
 .vscode/
@@ -27,6 +24,7 @@ venv/
 __pycache__/
 
 # Build outputs
+target/
 dist/
 build/
 *.egg-info/
@@ -38,9 +36,6 @@ build/
 *.egg
 .pytest_cache/
 .ruff_cache/
-
-# Maturin
-.maturin/
 
 # Testing artifacts (created when running launch-plus from repo root)
 /src/

@@ -6,85 +6,40 @@ on:
   pull_request:
     branches: [devel]
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
-  fmt:
-    name: Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - run: cargo fmt --all -- --check
-
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace
-
-  msrv:
-    name: MSRV (1.85.0)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: "1.85.0"
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: msrv
-      - run: cargo check --workspace
-
-  doc:
-    name: Doc
-    runs-on: ubuntu-latest
-    env:
-      RUSTDOCFLAGS: "-D warnings"
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: doc
-      - run: cargo doc --workspace --no-deps
-
-  pytest:
-    name: Python Tests
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
-      - run: pip install pytest pyyaml ruff mypy types-PyYAML
+          python-version: "3.12"
+      - run: pip install ruff
       - run: ruff check
       - run: ruff format --check
-      - run: mypy python/launch_plus/py_resolver.py
-      - run: PYTHONPATH=python python -m pytest tests/ -v
 
-  audit:
-    name: Audit
+  mypy:
+    name: Type Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: rustsec/audit-check@v2
+      - uses: actions/setup-python@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          python-version: "3.12"
+      - run: pip install mypy types-PyYAML click pyyaml
+      - run: mypy launch_plus/resolver.py
+
+  pytest:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install pytest pyyaml click
+      - run: python -m pytest tests/ -v

@@ -54,8 +54,6 @@ def _reset_resolver_state():
     R._global_params.clear()
     R._global_param_files.clear()
     R._global_remaps.clear()
-    R._ir_event_handlers.clear()
-
     yield
 
     # No teardown needed — next invocation resets again.

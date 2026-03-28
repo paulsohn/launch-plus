@@ -978,9 +978,373 @@ def _error(msg: str) -> None:
 # Produces a list of element dicts matching the Rust LaunchElement schema.
 # Each element is a single-key dict: {"Arg": {...}}, {"Node": {...}}, etc.
 # Substitutions in attribute values are left as raw strings for the resolver
-# (Phase 2/3) to process — the parser does not resolve them.
+# (Phase 3) to process — the parser does not resolve them.
+#
+# Parsing is delegated to Entity-based parsers in ``launch_plus.parsers``.
+# A bridge function converts Entity trees back to the legacy dict format
+# so that existing resolution code (_resolve_xml_element, _resolve_element_to_ir)
+# continues to work unchanged.  Phase 3 will remove the bridge.
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa: F401 — still used by callers
+
+from launch_plus.parsers.entity import Entity
+from launch_plus.parsers.xml_parser import XmlEntity
+from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
+from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
+
+# ── Entity → legacy dict bridge ──────────────────────────────────────────────
+# Temporary adapter (removed in Phase 4) that converts the new Entity tree
+# into the same dict format that _resolve_xml_element / _resolve_element_to_ir
+# currently expect.
+
+
+def _condition_from_entity(entity: Entity) -> dict[str, str] | None:
+    """Extract if=/unless= condition from an Entity."""
+    if_val = entity.get_attr("if", optional=True)
+    if if_val is not None:
+        return {"kind": "If", "expr": if_val}
+    unless_val = entity.get_attr("unless", optional=True)
+    if unless_val is not None:
+        return {"kind": "Unless", "expr": unless_val}
+    return None
+
+
+def _param_entities_to_dicts(entity: Entity) -> list[dict[str, str | None]]:
+    """Convert <param> child entities to legacy dicts."""
+    items = entity.get_attr("param", data_type=list, optional=True)
+    if not items:
+        return []
+    return [
+        {
+            "name": p.get_attr("name", optional=True),
+            "value": p.get_attr("value", optional=True),
+            "from": p.get_attr("from", optional=True),
+        }
+        for p in items
+    ]
+
+
+def _remap_entities_to_dicts(entity: Entity) -> list[dict[str, str]]:
+    """Convert <remap> child entities to legacy dicts."""
+    items = entity.get_attr("remap", data_type=list, optional=True)
+    if not items:
+        return []
+    return [
+        {
+            "from": r.get_attr("from", optional=True) or "",
+            "to": r.get_attr("to", optional=True) or "",
+        }
+        for r in items
+    ]
+
+
+def _env_entities_to_dicts(entity: Entity) -> list[dict[str, str]]:
+    """Convert <env> child entities to legacy dicts."""
+    items = entity.get_attr("env", data_type=list, optional=True)
+    if not items:
+        return []
+    return [
+        {
+            "name": e.get_attr("name", optional=True) or "",
+            "value": e.get_attr("value", optional=True) or "",
+        }
+        for e in items
+    ]
+
+
+def _composable_node_entities_to_dicts(entity: Entity) -> list[dict[str, Any]]:
+    """Convert <composable_node> child entities to legacy dicts."""
+    items = entity.get_attr("composable_node", data_type=list, optional=True)
+    if not items:
+        return []
+    nodes: list[dict[str, Any]] = []
+    for cn in items:
+        nodes.append(
+            {
+                "pkg": cn.get_attr("pkg", optional=True) or "",
+                "plugin": cn.get_attr("plugin", optional=True) or "",
+                "name": cn.get_attr("name", optional=True),
+                "namespace": cn.get_attr("namespace", optional=True),
+                "condition": _condition_from_entity(cn),
+                "params": _param_entities_to_dicts(cn),
+                "remaps": _remap_entities_to_dicts(cn),
+            }
+        )
+    return nodes
+
+
+def _include_arg_entities_to_dicts(entity: Entity) -> list[dict[str, str]]:
+    """Convert <arg> children inside an <include> entity to legacy dicts."""
+    items = entity.get_attr("arg", data_type=list, optional=True)
+    if not items:
+        return []
+    return [
+        {
+            "name": a.get_attr("name", optional=True) or "",
+            "value": a.get_attr("value", optional=True) or "",
+        }
+        for a in items
+    ]
+
+
+_TAG_TO_LEGACY_KEY: dict[str, str] = {
+    "arg": "Arg",
+    "let": "Let",
+    "group": "Group",
+    "include": "Include",
+    "node": "Node",
+    "lifecycle_node": "LifecycleNode",
+    "node_container": "NodeContainer",
+    "composable_node_container": "NodeContainer",
+    "set_env": "SetEnv",
+    "unset_env": "UnsetEnv",
+    "push-ros-namespace": "PushRosNamespace",
+    "set_parameter": "SetParameter",
+    "set_remap": "SetRemap",
+    "log": "Log",
+    "executable": "Executable",
+    "on_process_start": "EventHandler",
+    "on_process_exit": "EventHandler",
+    "on_state_transition": "EventHandler",
+    "on_shutdown": "EventHandler",
+    "emit_event": "EmitEvent",
+}
+
+_EVENT_KIND_MAP: dict[str, str] = {
+    "on_process_start": "OnProcessStart",
+    "on_process_exit": "OnProcessExit",
+    "on_state_transition": "OnStateTransition",
+    "on_shutdown": "OnShutdown",
+}
+
+
+def _entity_to_legacy_dict(entity: Entity) -> dict[str, Any] | None:
+    """Convert an Entity to the legacy ``{TypeName: {attrs}}`` dict.
+
+    This is a temporary bridge so the existing resolution logic can consume
+    Entity trees produced by the new parsers.
+    """
+    tag = entity.type_name
+
+    if tag == "arg":
+        return {
+            "Arg": {
+                "name": entity.get_attr("name", optional=True) or "",
+                "default": entity.get_attr("default", optional=True),
+                "value": entity.get_attr("value", optional=True),
+                "description": entity.get_attr("description", optional=True),
+            }
+        }
+
+    if tag == "let":
+        return {
+            "Let": {
+                "name": entity.get_attr("name", optional=True) or "",
+                "value": entity.get_attr("value", optional=True) or "",
+                "condition": _condition_from_entity(entity),
+            }
+        }
+
+    if tag == "group":
+        scoped_raw = entity.get_attr("scoped", optional=True)
+        if scoped_raw is None:
+            scoped = True
+        elif isinstance(scoped_raw, bool):
+            scoped = scoped_raw
+        else:
+            scoped = str(scoped_raw).lower() not in ("false", "0", "no")
+        child_dicts = [_entity_to_legacy_dict(c) for c in entity.children]
+        return {
+            "Group": {
+                "condition": _condition_from_entity(entity),
+                "scoped": scoped,
+                "children": [d for d in child_dicts if d is not None],
+            }
+        }
+
+    if tag == "include":
+        return {
+            "Include": {
+                "file": entity.get_attr("file", optional=True) or "",
+                "condition": _condition_from_entity(entity),
+                "args": _include_arg_entities_to_dicts(entity),
+            }
+        }
+
+    if tag in ("node", "lifecycle_node"):
+        pkg = (
+            entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
+        )
+        exe = (
+            entity.get_attr("exec", optional=True)
+            or entity.get_attr("executable", optional=True)
+            or ""
+        )
+        # For unknown_attrs: XmlEntity wraps ET.Element, so we can peek at the raw attribs
+        unknown_attrs: list[str] = []
+        if isinstance(entity, XmlEntity):
+            unknown_attrs = [k for k in entity._xml.attrib if k not in _KNOWN_NODE_ATTRS]
+        variant = "Node" if tag == "node" else "LifecycleNode"
+        return {
+            variant: {
+                "pkg": pkg,
+                "exec": exe,
+                "name": entity.get_attr("name", optional=True),
+                "namespace": entity.get_attr("namespace", optional=True),
+                "condition": _condition_from_entity(entity),
+                "params": _param_entities_to_dicts(entity),
+                "remaps": _remap_entities_to_dicts(entity),
+                "envs": _env_entities_to_dicts(entity),
+                "output": entity.get_attr("output", optional=True),
+                "args": entity.get_attr("args", optional=True),
+                "respawn": entity.get_attr("respawn", optional=True),
+                "respawn_delay": entity.get_attr("respawn_delay", optional=True),
+                "unknown_attrs": unknown_attrs,
+            }
+        }
+
+    if tag in ("node_container", "composable_node_container"):
+        pkg = (
+            entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
+        )
+        exe = (
+            entity.get_attr("exec", optional=True)
+            or entity.get_attr("executable", optional=True)
+            or ""
+        )
+        return {
+            "NodeContainer": {
+                "pkg": pkg,
+                "exec": exe,
+                "name": entity.get_attr("name", optional=True),
+                "namespace": entity.get_attr("namespace", optional=True),
+                "condition": _condition_from_entity(entity),
+                "composable_nodes": _composable_node_entities_to_dicts(entity),
+                "envs": _env_entities_to_dicts(entity),
+            }
+        }
+
+    if tag == "load_composable_node":
+        return {
+            "LoadComposableNode": {
+                "target": entity.get_attr("target", optional=True),
+                "namespace": entity.get_attr("namespace", optional=True),
+                "condition": _condition_from_entity(entity),
+                "composable_nodes": _composable_node_entities_to_dicts(entity),
+            }
+        }
+
+    if tag == "set_env":
+        return {
+            "SetEnv": {
+                "name": entity.get_attr("name", optional=True) or "",
+                "value": entity.get_attr("value", optional=True) or "",
+                "condition": _condition_from_entity(entity),
+            }
+        }
+
+    if tag == "unset_env":
+        return {
+            "UnsetEnv": {
+                "name": entity.get_attr("name", optional=True) or "",
+                "condition": _condition_from_entity(entity),
+            }
+        }
+
+    if tag == "push-ros-namespace":
+        return {
+            "PushRosNamespace": {
+                "namespace": entity.get_attr("namespace", optional=True) or "",
+                "condition": _condition_from_entity(entity),
+            }
+        }
+
+    if tag == "set_parameter":
+        return {
+            "SetParameter": {
+                "name": entity.get_attr("name", optional=True) or "",
+                "value": entity.get_attr("value", optional=True) or "",
+            }
+        }
+
+    if tag == "set_remap":
+        return {
+            "SetRemap": {
+                "from": entity.get_attr("from", optional=True) or "",
+                "to": entity.get_attr("to", optional=True) or "",
+            }
+        }
+
+    if tag == "log":
+        return {"Log": {"message": entity.get_attr("message", optional=True) or ""}}
+
+    if tag == "executable":
+        shell_raw = entity.get_attr("shell", optional=True)
+        if shell_raw is None:
+            shell = False
+        elif isinstance(shell_raw, bool):
+            shell = shell_raw
+        else:
+            shell = str(shell_raw).lower() in ("true", "1", "yes")
+        return {
+            "Executable": {
+                "cmd": entity.get_attr("cmd", optional=True) or "",
+                "name": entity.get_attr("name", optional=True),
+                "shell": shell,
+                "condition": _condition_from_entity(entity),
+            }
+        }
+
+    if tag in _EVENT_KIND_MAP:
+        child_dicts = [_entity_to_legacy_dict(c) for c in entity.children]
+        unknown_attrs: list[str] = []  # type: ignore[no-redef]
+        if isinstance(entity, XmlEntity):
+            unknown_attrs = [
+                k
+                for k in entity._xml.attrib
+                if k
+                not in {
+                    "target",
+                    "target_node",
+                    "namespace",
+                    "start_state",
+                    "goal_state",
+                    "if",
+                    "unless",
+                }
+            ]
+        return {
+            "EventHandler": {
+                "kind": _EVENT_KIND_MAP[tag],
+                "target": entity.get_attr("target", optional=True),
+                "target_node": entity.get_attr("target_node", optional=True),
+                "namespace": entity.get_attr("namespace", optional=True),
+                "start_state": entity.get_attr("start_state", optional=True),
+                "goal_state": entity.get_attr("goal_state", optional=True),
+                "children": [d for d in child_dicts if d is not None],
+                "unknown_attrs": unknown_attrs,
+            }
+        }
+
+    if tag == "emit_event":
+        unknown_attrs: list[str] = []  # type: ignore[no-redef]
+        if isinstance(entity, XmlEntity):
+            unknown_attrs = [
+                k
+                for k in entity._xml.attrib
+                if k not in {"event", "target_node", "namespace", "if", "unless"}
+            ]
+        return {
+            "EmitEvent": {
+                "event": entity.get_attr("event", optional=True) or "",
+                "target_node": entity.get_attr("target_node", optional=True),
+                "namespace": entity.get_attr("namespace", optional=True),
+                "unknown_attrs": unknown_attrs,
+            }
+        }
+
+    # Unknown element
+    return {"UnknownElement": {"tag_name": tag}}
 
 
 def _parse_condition(attrs: dict[str, str]) -> dict[str, str] | None:
@@ -1281,114 +1645,32 @@ def _parse_xml_element(elem: ET.Element) -> dict[str, Any] | None:
 def parse_xml_launch(content: str, file_path: str) -> list[dict[str, Any]]:
     """Parse an XML launch file to a list of LaunchElement dicts.
 
-    The root ``<launch>`` tag is unwrapped; its children become the element list.
-    Substitutions in attribute values are left as raw strings.
+    Delegates to :func:`launch_plus.parsers.xml_parser.parse_xml_launch` for
+    Entity-based parsing, then bridges back to legacy dicts via
+    :func:`_entity_to_legacy_dict`.
     """
-    root = ET.fromstring(content)
-    if root.tag != "launch":
-        _warn(f"XML root tag is '{root.tag}', expected 'launch' — parsing children anyway")
+    entities = _parse_xml_launch_entity(content, file_path)
     elements = []
-    for child in root:
-        elem = _parse_xml_element(child)
-        if elem is not None:
-            elements.append(elem)
+    for ent in entities:
+        d = _entity_to_legacy_dict(ent)
+        if d is not None:
+            elements.append(d)
     return elements
-
-
-def _yaml_tag_to_xml(tag: str) -> str:
-    """Normalize YAML tag names to match XML conventions."""
-    mapping = {
-        "push_ros_namespace": "push-ros-namespace",
-        "composable_node_container": "node_container",
-    }
-    return mapping.get(tag, tag)
-
-
-def _yaml_element_to_xml_element(tag: str, attrs: dict[str, Any]) -> ET.Element:
-    """Convert a YAML element dict to an xml.etree Element for uniform parsing."""
-    xml_tag = _yaml_tag_to_xml(tag)
-    elem = ET.Element(xml_tag)
-
-    # Scalar attributes become XML attributes
-    for k, v in attrs.items():
-        if k == "children":
-            # Recursively convert children
-            for child_dict in v:
-                if isinstance(child_dict, dict) and len(child_dict) == 1:
-                    child_tag = next(iter(child_dict))
-                    child_attrs = child_dict[child_tag]
-                    if isinstance(child_attrs, dict):
-                        elem.append(_yaml_element_to_xml_element(child_tag, child_attrs))
-        elif isinstance(v, list):
-            # List values are child elements (param, remap, env, arg, composable_node)
-            for item in v:
-                if isinstance(item, dict):
-                    child = ET.Element(k if not k.endswith("s") else k)
-                    # Try singular form for common plurals
-                    child_tag = k
-                    # Common YAML list keys that map to child element tags
-                    if k in ("param", "remap", "env", "arg", "composable_node"):
-                        child_tag = k
-                    child = ET.Element(child_tag)
-                    for ck, cv in item.items():
-                        if isinstance(cv, list):
-                            # Nested list (e.g. composable_node with params)
-                            for sub_item in cv:
-                                if isinstance(sub_item, dict):
-                                    sub_child = ET.Element(ck)
-                                    for sk, sv in sub_item.items():
-                                        sub_child.set(sk, str(sv) if sv is not None else "")
-                                    child.append(sub_child)
-                        elif cv is not None:
-                            child.set(ck, str(cv))
-                    elem.append(child)
-        elif v is not None:
-            elem.set(k, str(v))
-
-    return elem
 
 
 def parse_yaml_launch(content: str, file_path: str) -> list[dict[str, Any]]:
     """Parse a YAML launch file to a list of LaunchElement dicts.
 
-    Expects the top-level structure::
-
-        launch:
-          - arg:
-              name: my_arg
-              default: value
-          - node:
-              pkg: my_pkg
-              ...
-
-    Each list entry is a single-key dict whose key is the element type.
+    Delegates to :func:`launch_plus.parsers.yaml_parser.parse_yaml_launch` for
+    Entity-based parsing (no YAML→XML conversion), then bridges back to legacy
+    dicts via :func:`_entity_to_legacy_dict`.
     """
-    import yaml
-
-    data = yaml.safe_load(content)
-    if not isinstance(data, dict) or "launch" not in data:
-        _warn(f"YAML launch file '{file_path}' missing 'launch' root key")
-        return []
-
-    launch_list = data["launch"]
-    if not isinstance(launch_list, list):
-        _warn(f"YAML 'launch' key in '{file_path}' is not a list")
-        return []
-
+    entities = _parse_yaml_launch_entity(content, file_path)
     elements = []
-    for entry in launch_list:
-        if not isinstance(entry, dict) or len(entry) != 1:
-            continue
-        tag = next(iter(entry))
-        attrs = entry[tag]
-        if not isinstance(attrs, dict):
-            continue
-        # Convert to ET.Element for uniform parsing with _parse_xml_element
-        xml_elem = _yaml_element_to_xml_element(tag, attrs)
-        parsed = _parse_xml_element(xml_elem)
-        if parsed is not None:
-            elements.append(parsed)
-
+    for ent in entities:
+        d = _entity_to_legacy_dict(ent)
+        if d is not None:
+            elements.append(d)
     return elements
 
 

@@ -987,6 +987,7 @@ def _error(msg: str) -> None:
 
 import xml.etree.ElementTree as ET  # noqa: F401 — still used by callers
 
+from launch_plus.entities.expose import action_parse_methods, expose_action
 from launch_plus.parsers.entity import Entity
 from launch_plus.parsers.xml_parser import XmlEntity
 from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
@@ -1642,36 +1643,14 @@ def _parse_xml_element(elem: ET.Element) -> dict[str, Any] | None:
     return {"UnknownElement": {"tag_name": tag}}
 
 
-def parse_xml_launch(content: str, file_path: str) -> list[dict[str, Any]]:
-    """Parse an XML launch file to a list of LaunchElement dicts.
-
-    Delegates to :func:`launch_plus.parsers.xml_parser.parse_xml_launch` for
-    Entity-based parsing, then bridges back to legacy dicts via
-    :func:`_entity_to_legacy_dict`.
-    """
-    entities = _parse_xml_launch_entity(content, file_path)
-    elements = []
-    for ent in entities:
-        d = _entity_to_legacy_dict(ent)
-        if d is not None:
-            elements.append(d)
-    return elements
+def parse_xml_launch(content: str, file_path: str) -> list[Entity]:
+    """Parse an XML launch file to a list of Entity objects."""
+    return list(_parse_xml_launch_entity(content, file_path))
 
 
-def parse_yaml_launch(content: str, file_path: str) -> list[dict[str, Any]]:
-    """Parse a YAML launch file to a list of LaunchElement dicts.
-
-    Delegates to :func:`launch_plus.parsers.yaml_parser.parse_yaml_launch` for
-    Entity-based parsing (no YAML→XML conversion), then bridges back to legacy
-    dicts via :func:`_entity_to_legacy_dict`.
-    """
-    entities = _parse_yaml_launch_entity(content, file_path)
-    elements = []
-    for ent in entities:
-        d = _entity_to_legacy_dict(ent)
-        if d is not None:
-            elements.append(d)
-    return elements
+def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
+    """Parse a YAML launch file to a list of Entity objects."""
+    return list(_parse_yaml_launch_entity(content, file_path))
 
 
 # ─── Substitution Engine (for XML/YAML resolution) ───────────────────────────
@@ -2251,7 +2230,7 @@ def _resolve_composable_plugins_xml(
 
 
 def resolve_xml_elements(
-    elements: list[dict[str, Any]],
+    elements: list[Entity] | list[dict[str, Any]],
     ctx: _SubstitutionContext,
     *,
     include_stack: list[str] | None = None,
@@ -2261,10 +2240,19 @@ def resolve_xml_elements(
     This is the XML/YAML counterpart of the Python ``_walk_actions`` mechanism.
     All output goes into the module-level ``_tracked`` dict, ``_namespace_stack``,
     and ``_env``, matching the same format the Rust orchestrator expects.
+
+    Accepts both Entity objects and legacy dicts.  Entities are bridged to
+    legacy dicts via :func:`_entity_to_legacy_dict` for the flat path.
     """
     if include_stack is None:
         include_stack = []
-    for elem_dict in elements:
+    for elem in elements:
+        if isinstance(elem, Entity):
+            elem_dict = _entity_to_legacy_dict(elem)
+            if elem_dict is None:
+                continue
+        else:
+            elem_dict = elem
         _resolve_xml_element(elem_dict, ctx, include_stack)
 
 
@@ -2779,456 +2767,624 @@ def _resolve_xml_element(
 
 
 def _resolve_element_to_ir(
-    elem_dict: dict[str, Any],
+    elem: Entity | dict[str, Any],
     ctx: _SubstitutionContext,
     include_stack: list[str],
 ) -> list[IRAction]:
-    """Resolve a single parsed element to a list of IR actions (tree-structured).
+    """Resolve a single parsed element to IR actions via the action registry.
 
-    Returns a list because some elements (e.g. Include) may expand to multiple actions,
-    while others (e.g. Arg, Let, condition-false) return an empty list.
+    Accepts both Entity objects (new path) and legacy dicts (backward compat).
     """
-    if not elem_dict:
-        return []
-    kind = next(iter(elem_dict))
-    data = elem_dict[kind]
-
-    if kind == "Arg":
-        name = data.get("name", "")
-        default = data.get("default")
-        fixed_value = data.get("value")
-        if fixed_value is not None:
-            resolved = resolve_substitutions(fixed_value, ctx)
-            ctx.args[name] = resolved
-        elif name and name not in ctx.args and default is not None:
-            if _apply_arg_defaults:
-                resolved = resolve_substitutions(default, ctx)
-                ctx.args[name] = resolved
-            else:
-                resolved = default or ""
-        else:
-            resolved = ctx.args.get(name, default or "")
-        if name:
-            already_seen = name in _declared_arg_names
-            if not already_seen:
-                _declared_arg_names.add(name)
-            _record_declared_arg(name, resolved, flat=not already_seen)
+    if isinstance(elem, Entity):
+        tag = elem.type_name
+        if tag in action_parse_methods:
+            parser = _ActionParser(ctx, include_stack)
+            return action_parse_methods[tag](elem, parser)  # type: ignore[no-any-return]
+        _warn(f"unknown element: <{tag}>")
         return []
 
-    if kind == "Let":
-        cond = data.get("condition")
-        if _evaluate_condition(cond, ctx):
-            name = data.get("name", "")
-            value = resolve_substitutions(data.get("value", ""), ctx)
-            ctx.vars[name] = value
+    # Legacy dict path — bridge to Entity and re-dispatch
+    if not elem:
         return []
+    kind = next(iter(elem))
+    data = elem[kind]
+    # Build a simple wrapper Entity from the legacy dict
+    from launch_plus.parsers.yaml_parser import YamlEntity
 
-    if kind == "Group":
-        cond = data.get("condition")
-        if not _evaluate_condition(cond, ctx):
-            return []
-        scoped = data.get("scoped", True)
-        children = data.get("children", [])
-        # Walk children, collecting IR actions
-        if scoped:
-            saved_args = dict(ctx.args)
-            saved_vars = dict(ctx.vars)
-            saved_env = dict(_env)
-            saved_ns_depth = len(_namespace_stack)
-            saved_gp = list(_global_params)
-            saved_gr = list(_global_remaps)
-            saved_gpf = list(_global_param_files)
-        child_actions: list[IRAction] = []
-        for child in children:
-            child_actions.extend(_resolve_element_to_ir(child, ctx, include_stack))
-        if scoped:
-            new_args = {k: v for k, v in ctx.args.items() if k not in saved_args}
-            ctx.args = saved_args
-            ctx.args.update(new_args)
-            ctx.vars = saved_vars
-            globals()["_env"] = saved_env
-            del _namespace_stack[saved_ns_depth:]
-            _global_params[:] = saved_gp
-            _global_remaps[:] = saved_gr
-            _global_param_files[:] = saved_gpf
-        return [IRGroupAction(children=child_actions)]
+    # Map legacy dict key back to entity type_name
+    _LEGACY_KEY_TO_TAG: dict[str, str] = {
+        "Arg": "arg",
+        "Let": "let",
+        "Group": "group",
+        "Include": "include",
+        "Node": "node",
+        "LifecycleNode": "lifecycle_node",
+        "NodeContainer": "node_container",
+        "SetEnv": "set_env",
+        "UnsetEnv": "unset_env",
+        "PushRosNamespace": "push-ros-namespace",
+        "SetParameter": "set_parameter",
+        "SetRemap": "set_remap",
+        "Log": "log",
+        "Executable": "executable",
+        "EventHandler": "event_handler",
+        "EmitEvent": "emit_event",
+        "UnknownElement": "_unknown",
+    }
+    tag = _LEGACY_KEY_TO_TAG.get(kind, kind.lower())
+    entity = YamlEntity(data, tag)
+    return _resolve_element_to_ir(entity, ctx, include_stack)
 
-    if kind == "Include":
-        cond = data.get("condition")
-        if not _evaluate_condition(cond, ctx):
+
+# ── ActionParser — resolver services for action handlers ─────────────────────
+
+
+class _ActionParser:
+    """Provides resolver services to action handlers.
+
+    Wraps the module-level resolver state so action handlers can
+    access substitution resolution, condition evaluation, namespace
+    management, and tracking without importing resolver internals.
+    """
+
+    __slots__ = ("ctx", "include_stack")
+
+    def __init__(self, ctx: _SubstitutionContext, include_stack: list[str]) -> None:
+        self.ctx = ctx
+        self.include_stack = include_stack
+
+    def resolve(self, text: str) -> str:
+        """Resolve ``$(...)`` substitutions in *text*."""
+        return resolve_substitutions(text, self.ctx)
+
+    def resolve_optional(self, text: str | None) -> str | None:
+        if text is None:
+            return None
+        return resolve_substitutions(text, self.ctx)
+
+    def evaluate_condition(self, entity: Entity) -> bool:
+        """Evaluate if=/unless= on *entity*.  Returns True → element should execute."""
+        if_val = entity.get_attr("if", optional=True)
+        unless_val = entity.get_attr("unless", optional=True)
+        cond: dict[str, str] | None = None
+        if if_val is not None:
+            cond = {"kind": "If", "expr": if_val}
+        elif unless_val is not None:
+            cond = {"kind": "Unless", "expr": unless_val}
+        return _evaluate_condition(cond, self.ctx)
+
+    def resolve_children(self, entities: list[Entity] | list[dict[str, Any]]) -> list[IRAction]:
+        """Resolve child entities recursively, returning IR actions."""
+        actions: list[IRAction] = []
+        for child in entities:
+            actions.extend(_resolve_element_to_ir(child, self.ctx, self.include_stack))
+        return actions
+
+    def effective_namespace(self, ns: str | None = None) -> str | None:
+        return _effective_namespace(list(_namespace_stack), ns)
+
+    # ── Param / remap / env resolution from Entity children ──────────
+
+    def resolve_params(self, entity: Entity) -> tuple[dict[str, str], list[dict]]:
+        """Resolve <param> children.  Returns (params_dict, param_files_list)."""
+        items = entity.get_attr("param", data_type=list, optional=True)
+        if not items:
+            return {}, []
+        resolved: dict[str, str] = {}
+        param_files: list[dict] = []
+        seen_paths: set[str] = set()
+        for p in items:
+            name = p.get_attr("name", optional=True)
+            value = p.get_attr("value", optional=True)
+            from_file = p.get_attr("from", optional=True)
+            if from_file:
+                path = self.resolve(from_file)
+                _track_param_file(path)
+                if path not in seen_paths:
+                    seen_paths.add(path)
+                    pf_entry: dict = {"path": path}
+                    if _inline_params:
+                        expanded = _read_and_expand_param_file(path, self.ctx)
+                        if expanded is not None:
+                            pf_entry["params"] = expanded
+                    param_files.append(pf_entry)
+            elif name:
+                resolved[self.resolve(name)] = self.resolve(value or "")
+        return resolved, param_files
+
+    def resolve_remaps(self, entity: Entity) -> list[list[str]]:
+        """Resolve <remap> children."""
+        items = entity.get_attr("remap", data_type=list, optional=True)
+        if not items:
             return []
-        file_path = resolve_substitutions(data.get("file", ""), ctx)
-        include_args_list = data.get("args", [])
-        if file_path in include_stack:
-            _error(f"circular include detected: {file_path}")
+        return [
+            [
+                self.resolve(r.get_attr("from", optional=True) or ""),
+                self.resolve(r.get_attr("to", optional=True) or ""),
+            ]
+            for r in items
+        ]
+
+    def resolve_envs(self, entity: Entity) -> dict[str, str]:
+        """Resolve <env> children into a dict."""
+        items = entity.get_attr("env", data_type=list, optional=True)
+        if not items:
+            return {}
+        return {
+            self.resolve(e.get_attr("name", optional=True) or ""): self.resolve(
+                e.get_attr("value", optional=True) or ""
+            )
+            for e in items
+        }
+
+    def resolve_composable_plugins(self, entity: Entity) -> list[IRComposablePlugin]:
+        """Resolve <composable_node> children into IRComposablePlugin list."""
+        items = entity.get_attr("composable_node", data_type=list, optional=True)
+        if not items:
             return []
-        if len(include_stack) > 20:
-            _warn(f"max include depth exceeded for {file_path}")
-            return []
-        dep_idx = _track_include(file_path)
-        # Build child args sequentially
+        plugins: list[IRComposablePlugin] = []
+        for cn in items:
+            cond_if = cn.get_attr("if", optional=True)
+            cond_unless = cn.get_attr("unless", optional=True)
+            cond: dict[str, str] | None = None
+            if cond_if is not None:
+                cond = {"kind": "If", "expr": cond_if}
+            elif cond_unless is not None:
+                cond = {"kind": "Unless", "expr": cond_unless}
+            if not _evaluate_condition(cond, self.ctx):
+                continue
+            pkg = self.resolve(cn.get_attr("pkg", optional=True) or "")
+            plugin_name = self.resolve(cn.get_attr("plugin", optional=True) or "")
+            name = self.resolve_optional(cn.get_attr("name", optional=True))
+            _track_package(pkg)
+            # Resolve nested params/remaps using a sub-parser on the composable_node entity
+            sub = _ActionParser(self.ctx, self.include_stack)
+            params, param_files = sub.resolve_params(cn)
+            remaps = sub.resolve_remaps(cn)
+            plugins.append(
+                IRComposablePlugin(
+                    package=pkg,
+                    plugin=plugin_name,
+                    name=name,
+                    parameters=params,
+                    remappings=[(r[0], r[1]) for r in remaps],
+                    param_files=param_files,
+                )
+            )
+        return plugins
+
+    # ── Include support ──────────────────────────────────────────────
+
+    def resolve_include_args(self, entity: Entity) -> dict[str, str]:
+        """Resolve <arg> children inside an <include>, sequentially."""
+        items = entity.get_attr("arg", data_type=list, optional=True)
+        if not items:
+            return {}
         child_ctx_args: dict[str, str] = {}
-        for ia in include_args_list:
-            arg_name = ia.get("name", "")
-            arg_value = ia.get("value")
+        for a in items:
+            arg_name = a.get_attr("name", optional=True) or ""
+            arg_value = a.get_attr("value", optional=True)
             if arg_value is not None:
                 tmp_ctx = _SubstitutionContext()
-                tmp_ctx.args = {**ctx.args, **child_ctx_args}
-                tmp_ctx.vars = dict(ctx.vars)
-                tmp_ctx.env = dict(ctx.env)
-                tmp_ctx.launch_file_dir = ctx.launch_file_dir
-                tmp_ctx.preview_mode = ctx.preview_mode
+                tmp_ctx.args = {**self.ctx.args, **child_ctx_args}
+                tmp_ctx.vars = dict(self.ctx.vars)
+                tmp_ctx.env = dict(self.ctx.env)
+                tmp_ctx.launch_file_dir = self.ctx.launch_file_dir
+                tmp_ctx.preview_mode = self.ctx.preview_mode
                 child_ctx_args[arg_name] = resolve_substitutions(arg_value, tmp_ctx)
-        if dep_idx >= 0 and child_ctx_args:
-            _tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
-        if child_ctx_args:
-            _tracked["include_args"][file_path] = child_ctx_args
-        # Resolve inline
-        real_path = file_path
-        parsed = _parse_portable_path(file_path)
-        if parsed:
-            pkg, rest = parsed
-            try:
-                pkg_share = _resolve_pkg_share(pkg)
-                real_path = os.path.join(pkg_share, rest)
-            except _PackageNotFetchedError:
-                raise
-            except Exception:
-                return []
-        result_actions: list[IRAction] = []
-        if os.path.isfile(real_path):
-            new_stack = include_stack + [file_path]
-            if real_path.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
-                with open(real_path) as f:
-                    content = f.read()
-                if real_path.endswith((".yaml", ".yml")):
-                    child_elements = parse_yaml_launch(content, real_path)
-                else:
-                    child_elements = parse_xml_launch(content, real_path)
-                child_ctx = _SubstitutionContext()
-                child_ctx.args = {**ctx.args, **child_ctx_args}
-                child_ctx.vars = {**ctx.vars, **child_ctx_args}
-                child_ctx.env = dict(ctx.env)
-                child_ctx.launch_file_dir = os.path.dirname(real_path)
-                child_ctx.preview_mode = ctx.preview_mode
-                for child in child_elements:
-                    result_actions.extend(_resolve_element_to_ir(child, child_ctx, new_stack))
-                ctx.vars.update(child_ctx.vars)
-            elif real_path.endswith((".launch.py", ".py")):
-                parent_lc = _make_launch_context(ctx.args)
-                if _global_params:
-                    parent_lc._launch_configurations["global_params"] = list(_global_params)
-                _inline_resolve_python_launch(
-                    file_path, parent_lc, child_ctx_args, len(include_stack) + 1
-                )
-        return result_actions
+        return child_ctx_args
 
-    if kind in ("Node", "LifecycleNode"):
-        cond = data.get("condition")
-        if not _evaluate_condition(cond, ctx):
-            return []
-        pkg = resolve_substitutions(data.get("pkg", ""), ctx)
-        exe = resolve_substitutions(data.get("exec", ""), ctx)
-        name = data.get("name")
-        if name:
-            name = resolve_substitutions(name, ctx)
-        ns = data.get("namespace")
-        if ns:
-            ns = resolve_substitutions(ns, ctx)
-        _track_package(pkg)
-        params, param_files = _resolve_params_xml(data.get("params", []), ctx)
-        remaps = _resolve_remaps_xml(data.get("remaps", []), ctx)
-        env = dict(_env)
-        env.update(_resolve_envs_xml(data.get("envs", []), ctx))
-        effective_ns = _effective_namespace(list(_namespace_stack), ns)
-        # Merge scoped global params/remaps/param_files (global first, node-local overrides)
-        merged_params = {k: str(v) for k, v in _global_params}
-        merged_params.update(params)
-        merged_param_files = list(_global_param_files) + param_files
-        merged_remaps = list(_global_remaps) + [(s, d) for s, d in remaps]
-        node_cls = IRLifecycleNode if kind == "LifecycleNode" else IRNode
-        return [
-            node_cls(
-                package=pkg,
-                executable=exe,
-                name=name or None,
-                namespace=effective_ns,
-                parameters=merged_params,
-                param_files=merged_param_files,
-                remappings=merged_remaps,
-                env=env,
-                output=data.get("output"),
-                args=data.get("args"),
-                respawn=data.get("respawn"),
-                respawn_delay=data.get("respawn_delay"),
+    def parse_and_resolve_included_file(
+        self, real_path: str, file_path: str, child_ctx_args: dict[str, str]
+    ) -> list[IRAction]:
+        """Parse an included launch file and resolve it recursively."""
+        new_stack = self.include_stack + [file_path]
+        if real_path.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
+            with open(real_path) as f:
+                content = f.read()
+            child_entities: list[Entity]
+            if real_path.endswith((".yaml", ".yml")):
+                child_entities = list(_parse_yaml_launch_entity(content, real_path))
+            else:
+                child_entities = list(_parse_xml_launch_entity(content, real_path))
+            child_ctx = _SubstitutionContext()
+            child_ctx.args = {**self.ctx.args, **child_ctx_args}
+            child_ctx.vars = {**self.ctx.vars, **child_ctx_args}
+            child_ctx.env = dict(self.ctx.env)
+            child_ctx.launch_file_dir = os.path.dirname(real_path)
+            child_ctx.preview_mode = self.ctx.preview_mode
+            result: list[IRAction] = []
+            for child in child_entities:
+                result.extend(_resolve_element_to_ir(child, child_ctx, new_stack))
+            self.ctx.vars.update(child_ctx.vars)
+            return result
+        if real_path.endswith((".launch.py", ".py")):
+            parent_lc = _make_launch_context(self.ctx.args)
+            if _global_params:
+                parent_lc._launch_configurations["global_params"] = list(_global_params)
+            _inline_resolve_python_launch(
+                file_path, parent_lc, child_ctx_args, len(self.include_stack) + 1
             )
-        ]
-
-    if kind == "NodeContainer":
-        cond = data.get("condition")
-        if not _evaluate_condition(cond, ctx):
-            return []
-        pkg = resolve_substitutions(data.get("pkg", ""), ctx)
-        exe = resolve_substitutions(data.get("exec", ""), ctx)
-        name = data.get("name")
-        if name:
-            name = resolve_substitutions(name, ctx)
-        ns = data.get("namespace")
-        if ns:
-            ns = resolve_substitutions(ns, ctx)
-        _track_package(pkg)
-        env = dict(_env)
-        env.update(_resolve_envs_xml(data.get("envs", []), ctx))
-        plugins = _resolve_composable_plugins_xml(data.get("composable_nodes", []), ctx)
-        effective_ns = _effective_namespace(list(_namespace_stack), ns)
-        return [
-            IRComposableNodeContainer(
-                package=pkg,
-                executable=exe,
-                name=name or None,
-                namespace=effective_ns,
-                env=env,
-                plugins=[
-                    IRComposablePlugin(
-                        package=p.get("package", ""),
-                        plugin=p.get("plugin", ""),
-                        name=p.get("name"),
-                        parameters=p.get("parameters", {}),
-                        remappings=[tuple(r) for r in p.get("remappings", [])],
-                        param_files=p.get("param_files", []),
-                    )
-                    for p in plugins
-                ],
-            )
-        ]
-
-    if kind == "LoadComposableNode":
-        cond = data.get("condition")
-        if not _evaluate_condition(cond, ctx):
-            return []
-        target = data.get("target")
-        if target:
-            target = resolve_substitutions(target, ctx)
-        ns = data.get("namespace")
-        if ns:
-            ns = resolve_substitutions(ns, ctx)
-        plugins = _resolve_composable_plugins_xml(data.get("composable_nodes", []), ctx)
-        effective_ns = _effective_namespace(list(_namespace_stack), ns)
-        return [
-            IRLoadComposableNode(
-                target=target or "",
-                namespace=effective_ns,
-                plugins=[
-                    IRComposablePlugin(
-                        package=p.get("package", ""),
-                        plugin=p.get("plugin", ""),
-                        name=p.get("name"),
-                        parameters=p.get("parameters", {}),
-                        remappings=[tuple(r) for r in p.get("remappings", [])],
-                        param_files=p.get("param_files", []),
-                    )
-                    for p in plugins
-                ],
-            )
-        ]
-
-    if kind == "SetEnv":
-        cond = data.get("condition")
-        if _evaluate_condition(cond, ctx):
-            name = resolve_substitutions(data.get("name", ""), ctx)
-            value = resolve_substitutions(data.get("value", ""), ctx)
-            _env[name] = value
-            ctx.env[name] = value
-        return []
         return []
 
-    if kind == "UnsetEnv":
-        cond = data.get("condition")
-        if _evaluate_condition(cond, ctx):
-            name = resolve_substitutions(data.get("name", ""), ctx)
-            _env.pop(name, None)
-            ctx.env.pop(name, None)
-        return []
-        return []
 
-    if kind == "PushRosNamespace":
-        cond = data.get("condition")
-        if _evaluate_condition(cond, ctx):
-            ns = resolve_substitutions(data.get("namespace", ""), ctx)
-            if ns:
-                _namespace_stack.append(ns)
-        return []
+# ── Registered action handlers (IR path) ─────────────────────────────────────
+#
+# Each handler reads from Entity via get_attr(), resolves substitutions via
+# the parser, and returns list[IRAction].  The @expose_action wrapper
+# validates that all entity attributes were consumed.
 
-    if kind == "SetParameter":
-        name = resolve_substitutions(data.get("name", ""), ctx)
-        value = resolve_substitutions(data.get("value", ""), ctx)
-        _tracked["global_params"].append([name, value])
-        _global_params.append((name, value))
-        return []
 
-    if kind == "SetParametersFromFile":
-        path = resolve_substitutions(data.get("filename", ""), ctx)
-        _global_param_files.append(_make_param_file_entry(path))
-        return []
-
-    if kind == "SetRemap":
-        src = resolve_substitutions(data.get("from", ""), ctx)
-        dst = resolve_substitutions(data.get("to", ""), ctx)
-        _global_remaps.append((src, dst))
-        return []
-
-    if kind == "Log":
-        msg = resolve_substitutions(data.get("message", ""), ctx)
-        return [IRLog(message=msg)]
-
-    if kind == "Executable":
-        cond = data.get("condition")
-        if not _evaluate_condition(cond, ctx):
-            return []
-        cmd = resolve_substitutions(data.get("cmd", ""), ctx)
-        name = data.get("name")
-        if name:
-            name = resolve_substitutions(name, ctx)
-        shell = data.get("shell", False)
-        effective_ns = _effective_namespace(list(_namespace_stack))
-        return [
-            IRExecutable(
-                cmd=cmd, name=name or None, shell=shell, namespace=effective_ns, env=dict(_env)
-            )
-        ]
-
-    if kind == "EventHandler":
-        handler_kind = data.get("kind", "")
-        target = data.get("target")
-        if target:
-            target = resolve_substitutions(target, ctx)
-        target_node = data.get("target_node")
-        if target_node:
-            target_node = resolve_substitutions(target_node, ctx)
-        handler_ns = data.get("namespace")
-        if handler_ns:
-            handler_ns = resolve_substitutions(handler_ns, ctx)
-        start_state = data.get("start_state")
-        if start_state:
-            start_state = resolve_substitutions(start_state, ctx)
-        goal_state = data.get("goal_state")
-        if goal_state:
-            goal_state = resolve_substitutions(goal_state, ctx)
-        actions: list[IRResolvedEventAction] = []
-        for child in data.get("children", []):
-            if "EmitEvent" in child:
-                ee = child["EmitEvent"]
-                event = resolve_substitutions(ee.get("event", ""), ctx)
-                ee_target = ee.get("target_node")
-                if ee_target:
-                    ee_target = resolve_substitutions(ee_target, ctx)
-                ee_ns = ee.get("namespace")
-                if ee_ns:
-                    ee_ns = resolve_substitutions(ee_ns, ctx)
-                actions.append(
-                    IRResolvedEventAction(
-                        event=event,
-                        target_node=ee_target,
-                        namespace=ee_ns,
-                    )
-                )
-        kind_map = {
-            "OnProcessStart": "on_process_start",
-            "OnProcessExit": "on_process_exit",
-            "OnStateTransition": "on_state_transition",
-            "OnShutdown": "on_shutdown",
-        }
-        effective_ns = _effective_namespace(list(_namespace_stack), handler_ns)
-        _ir_event_handlers.append(
-            IREventHandler(
-                kind=kind_map.get(handler_kind, handler_kind),
-                target=target,
-                target_node=target_node,
-                namespace=effective_ns,
-                start_state=start_state,
-                goal_state=goal_state,
-                actions=actions,
-            )
-        )
-        # Also track in nodes list for encounter-order interleaving
-        _track_event_handler(
-            {
-                "handler_kind": kind_map.get(handler_kind, handler_kind),
-                "target": target,
-                "target_node": target_node,
-                "start_state": start_state,
-                "goal_state": goal_state,
-                "namespace_stack": list(_namespace_stack),
-                "explicit_namespace": handler_ns,
-                "actions": [
-                    {
-                        "event": a.event,
-                        "target_node": a.target_node,
-                        "namespace_stack": [],
-                        "explicit_namespace": a.namespace,
-                    }
-                    for a in actions
-                ],
-            }
-        )
-        return []
-
-    if kind == "EmitEvent":
-        event = resolve_substitutions(data.get("event", ""), ctx)
-        target_node = data.get("target_node")
-        if target_node:
-            target_node = resolve_substitutions(target_node, ctx)
-        ee_ns = data.get("namespace")
-        if ee_ns:
-            ee_ns = resolve_substitutions(ee_ns, ctx)
-        effective_ns = _effective_namespace(list(_namespace_stack), ee_ns)
-        _ir_event_handlers.append(
-            IREventHandler(
-                kind="emit_event",
-                target=None,
-                target_node=target_node,
-                namespace=effective_ns,
-                actions=[
-                    IRResolvedEventAction(
-                        event=event,
-                        target_node=target_node,
-                        namespace=effective_ns,
-                    )
-                ],
-            )
-        )
-        # Also track in nodes list for encounter-order interleaving
-        _track_event_handler(
-            {
-                "handler_kind": "emit_event",
-                "target": None,
-                "target_node": target_node,
-                "start_state": None,
-                "goal_state": None,
-                "namespace_stack": list(_namespace_stack),
-                "explicit_namespace": ee_ns,
-                "actions": [
-                    {
-                        "event": event,
-                        "target_node": target_node,
-                        "namespace_stack": list(_namespace_stack),
-                        "explicit_namespace": ee_ns,
-                    }
-                ],
-            }
-        )
-        return []
-
-    if kind == "UnknownElement":
-        tag_name = data.get("tag_name", "")
-        _warn(f"unknown XML element: <{tag_name}>")
-        return []
-
+@expose_action("arg")
+def _action_arg(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    name = entity.get_attr("name", optional=True) or ""
+    default = entity.get_attr("default", optional=True)
+    fixed_value = entity.get_attr("value", optional=True)
+    _ = entity.get_attr("description", optional=True)  # consume
+    ctx = parser.ctx
+    if fixed_value is not None:
+        resolved = parser.resolve(fixed_value)
+        ctx.args[name] = resolved
+    elif name and name not in ctx.args and default is not None:
+        if _apply_arg_defaults:
+            resolved = parser.resolve(default)
+            ctx.args[name] = resolved
+        else:
+            resolved = default or ""
+    else:
+        resolved = ctx.args.get(name, default or "")
+    if name:
+        already_seen = name in _declared_arg_names
+        if not already_seen:
+            _declared_arg_names.add(name)
+        _record_declared_arg(name, resolved, flat=not already_seen)
     return []
 
 
+@expose_action("let")
+def _action_let(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    if parser.evaluate_condition(entity):
+        name = entity.get_attr("name", optional=True) or ""
+        value = parser.resolve(entity.get_attr("value", optional=True) or "")
+        parser.ctx.vars[name] = value
+    return []
+
+
+@expose_action("group")
+def _action_group(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    if not parser.evaluate_condition(entity):
+        return []
+    scoped_raw = entity.get_attr("scoped", optional=True)
+    if scoped_raw is None:
+        scoped = True
+    elif isinstance(scoped_raw, bool):
+        scoped = scoped_raw
+    else:
+        scoped = str(scoped_raw).lower() not in ("false", "0", "no")
+    children = entity.children
+    if scoped:
+        saved_args = dict(parser.ctx.args)
+        saved_vars = dict(parser.ctx.vars)
+        saved_env = dict(_env)
+        saved_ns_depth = len(_namespace_stack)
+        saved_gp = list(_global_params)
+        saved_gr = list(_global_remaps)
+        saved_gpf = list(_global_param_files)
+    child_actions = parser.resolve_children(list(children))
+    if scoped:
+        new_args = {k: v for k, v in parser.ctx.args.items() if k not in saved_args}
+        parser.ctx.args = saved_args
+        parser.ctx.args.update(new_args)
+        parser.ctx.vars = saved_vars
+        globals()["_env"] = saved_env
+        del _namespace_stack[saved_ns_depth:]
+        _global_params[:] = saved_gp
+        _global_remaps[:] = saved_gr
+        _global_param_files[:] = saved_gpf
+    return [IRGroupAction(children=child_actions)]
+
+
+@expose_action("include")
+def _action_include(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    if not parser.evaluate_condition(entity):
+        return []
+    file_path = parser.resolve(entity.get_attr("file", optional=True) or "")
+    if file_path in parser.include_stack:
+        _error(f"circular include detected: {file_path}")
+        return []
+    if len(parser.include_stack) > 20:
+        _warn(f"max include depth exceeded for {file_path}")
+        return []
+    dep_idx = _track_include(file_path)
+    child_ctx_args = parser.resolve_include_args(entity)
+    if dep_idx >= 0 and child_ctx_args:
+        _tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
+    if child_ctx_args:
+        _tracked["include_args"][file_path] = child_ctx_args
+    real_path = file_path
+    parsed_path = _parse_portable_path(file_path)
+    if parsed_path:
+        pkg, rest = parsed_path
+        try:
+            pkg_share = _resolve_pkg_share(pkg)
+            real_path = os.path.join(pkg_share, rest)
+        except _PackageNotFetchedError:
+            raise
+        except Exception:
+            return []
+    if os.path.isfile(real_path):
+        return parser.parse_and_resolve_included_file(real_path, file_path, child_ctx_args)
+    return []
+
+
+@expose_action("node")
+@expose_action("lifecycle_node")
+def _action_node(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    if not parser.evaluate_condition(entity):
+        return []
+    pkg = parser.resolve(
+        entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
+    )
+    exe = parser.resolve(
+        entity.get_attr("exec", optional=True) or entity.get_attr("executable", optional=True) or ""
+    )
+    name = parser.resolve_optional(entity.get_attr("name", optional=True))
+    ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
+    _track_package(pkg)
+    params, param_files = parser.resolve_params(entity)
+    remaps = parser.resolve_remaps(entity)
+    env = dict(_env)
+    env.update(parser.resolve_envs(entity))
+    effective_ns = parser.effective_namespace(ns)
+    merged_params = {k: str(v) for k, v in _global_params}
+    merged_params.update(params)
+    merged_param_files = list(_global_param_files) + param_files
+    merged_remaps = list(_global_remaps) + [(s, d) for s, d in remaps]
+    node_cls = IRLifecycleNode if entity.type_name == "lifecycle_node" else IRNode
+    return [
+        node_cls(
+            package=pkg,
+            executable=exe,
+            name=name or None,
+            namespace=effective_ns,
+            parameters=merged_params,
+            param_files=merged_param_files,
+            remappings=merged_remaps,
+            env=env,
+            output=entity.get_attr("output", optional=True),
+            args=entity.get_attr("args", optional=True),
+            respawn=entity.get_attr("respawn", optional=True),
+            respawn_delay=entity.get_attr("respawn_delay", optional=True),
+        )
+    ]
+
+
+@expose_action("node_container")
+@expose_action("composable_node_container")
+def _action_node_container(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    if not parser.evaluate_condition(entity):
+        return []
+    pkg = parser.resolve(
+        entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
+    )
+    exe = parser.resolve(
+        entity.get_attr("exec", optional=True) or entity.get_attr("executable", optional=True) or ""
+    )
+    name = parser.resolve_optional(entity.get_attr("name", optional=True))
+    ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
+    _track_package(pkg)
+    env = dict(_env)
+    env.update(parser.resolve_envs(entity))
+    plugins = parser.resolve_composable_plugins(entity)
+    effective_ns = parser.effective_namespace(ns)
+    return [
+        IRComposableNodeContainer(
+            package=pkg,
+            executable=exe,
+            name=name or None,
+            namespace=effective_ns,
+            env=env,
+            plugins=plugins,
+        )
+    ]
+
+
+@expose_action("load_composable_node")
+def _action_load_composable_node(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    if not parser.evaluate_condition(entity):
+        return []
+    target = parser.resolve_optional(entity.get_attr("target", optional=True))
+    ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
+    plugins = parser.resolve_composable_plugins(entity)
+    effective_ns = parser.effective_namespace(ns)
+    return [
+        IRLoadComposableNode(
+            target=target or "",
+            namespace=effective_ns,
+            plugins=plugins,
+        )
+    ]
+
+
+@expose_action("set_env")
+def _action_set_env(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    if parser.evaluate_condition(entity):
+        name = parser.resolve(entity.get_attr("name", optional=True) or "")
+        value = parser.resolve(entity.get_attr("value", optional=True) or "")
+        _env[name] = value
+        parser.ctx.env[name] = value
+    return []
+
+
+@expose_action("unset_env")
+def _action_unset_env(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    if parser.evaluate_condition(entity):
+        name = parser.resolve(entity.get_attr("name", optional=True) or "")
+        _env.pop(name, None)
+        parser.ctx.env.pop(name, None)
+    return []
+
+
+@expose_action("push-ros-namespace")
+def _action_push_ros_namespace(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    if parser.evaluate_condition(entity):
+        ns = parser.resolve(entity.get_attr("namespace", optional=True) or "")
+        if ns:
+            _namespace_stack.append(ns)
+    return []
+
+
+@expose_action("set_parameter")
+def _action_set_parameter(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    name = parser.resolve(entity.get_attr("name", optional=True) or "")
+    value = parser.resolve(entity.get_attr("value", optional=True) or "")
+    _tracked["global_params"].append([name, value])
+    _global_params.append((name, value))
+    return []
+
+
+@expose_action("set_remap")
+def _action_set_remap(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    src = parser.resolve(entity.get_attr("from", optional=True) or "")
+    dst = parser.resolve(entity.get_attr("to", optional=True) or "")
+    _global_remaps.append((src, dst))
+    return []
+
+
+@expose_action("log")
+def _action_log(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    msg = parser.resolve(entity.get_attr("message", optional=True) or "")
+    return [IRLog(message=msg)]
+
+
+@expose_action("executable")
+def _action_executable(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    if not parser.evaluate_condition(entity):
+        return []
+    cmd = parser.resolve(entity.get_attr("cmd", optional=True) or "")
+    name = parser.resolve_optional(entity.get_attr("name", optional=True))
+    shell_raw = entity.get_attr("shell", optional=True)
+    if shell_raw is None:
+        shell = False
+    elif isinstance(shell_raw, bool):
+        shell = shell_raw
+    else:
+        shell = str(shell_raw).lower() in ("true", "1", "yes")
+    effective_ns = parser.effective_namespace()
+    return [
+        IRExecutable(
+            cmd=cmd, name=name or None, shell=shell, namespace=effective_ns, env=dict(_env)
+        )
+    ]
+
+
+_IR_EVENT_KIND_MAP: dict[str, str] = {
+    "on_process_start": "on_process_start",
+    "on_process_exit": "on_process_exit",
+    "on_state_transition": "on_state_transition",
+    "on_shutdown": "on_shutdown",
+}
+
+
+@expose_action("on_process_start")
+@expose_action("on_process_exit")
+@expose_action("on_state_transition")
+@expose_action("on_shutdown")
+def _action_event_handler(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    handler_kind = _IR_EVENT_KIND_MAP.get(entity.type_name, entity.type_name)
+    target = parser.resolve_optional(entity.get_attr("target", optional=True))
+    target_node = parser.resolve_optional(entity.get_attr("target_node", optional=True))
+    handler_ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
+    start_state = parser.resolve_optional(entity.get_attr("start_state", optional=True))
+    goal_state = parser.resolve_optional(entity.get_attr("goal_state", optional=True))
+    actions: list[IRResolvedEventAction] = []
+    for child in entity.children:
+        if child.type_name == "emit_event":
+            event = parser.resolve(child.get_attr("event", optional=True) or "")
+            ee_target = parser.resolve_optional(child.get_attr("target_node", optional=True))
+            ee_ns = parser.resolve_optional(child.get_attr("namespace", optional=True))
+            actions.append(
+                IRResolvedEventAction(event=event, target_node=ee_target, namespace=ee_ns)
+            )
+    effective_ns = parser.effective_namespace(handler_ns)
+    _ir_event_handlers.append(
+        IREventHandler(
+            kind=handler_kind,
+            target=target,
+            target_node=target_node,
+            namespace=effective_ns,
+            start_state=start_state,
+            goal_state=goal_state,
+            actions=actions,
+        )
+    )
+    _track_event_handler(
+        {
+            "handler_kind": handler_kind,
+            "target": target,
+            "target_node": target_node,
+            "start_state": start_state,
+            "goal_state": goal_state,
+            "namespace_stack": list(_namespace_stack),
+            "explicit_namespace": handler_ns,
+            "actions": [
+                {
+                    "event": a.event,
+                    "target_node": a.target_node,
+                    "namespace_stack": [],
+                    "explicit_namespace": a.namespace,
+                }
+                for a in actions
+            ],
+        }
+    )
+    return []
+
+
+@expose_action("emit_event")
+def _action_emit_event(entity: Entity, parser: _ActionParser) -> list[IRAction]:
+    event = parser.resolve(entity.get_attr("event", optional=True) or "")
+    target_node = parser.resolve_optional(entity.get_attr("target_node", optional=True))
+    ee_ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
+    effective_ns = parser.effective_namespace(ee_ns)
+    _ir_event_handlers.append(
+        IREventHandler(
+            kind="emit_event",
+            target=None,
+            target_node=target_node,
+            namespace=effective_ns,
+            actions=[
+                IRResolvedEventAction(event=event, target_node=target_node, namespace=effective_ns)
+            ],
+        )
+    )
+    _track_event_handler(
+        {
+            "handler_kind": "emit_event",
+            "target": None,
+            "target_node": target_node,
+            "start_state": None,
+            "goal_state": None,
+            "namespace_stack": list(_namespace_stack),
+            "explicit_namespace": ee_ns,
+            "actions": [
+                {
+                    "event": event,
+                    "target_node": target_node,
+                    "namespace_stack": list(_namespace_stack),
+                    "explicit_namespace": ee_ns,
+                }
+            ],
+        }
+    )
+    return []
+
+
+# ── IR resolution entry point ────────────────────────────────────────────────
+
+
 def resolve_xml_to_ir(
-    elements: list[dict[str, Any]],
+    elements: list[Entity] | list[dict[str, Any]],
     ctx: _SubstitutionContext,
     *,
     include_stack: list[str] | None = None,

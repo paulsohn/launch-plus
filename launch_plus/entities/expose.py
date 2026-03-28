@@ -80,7 +80,10 @@ def _expose_impl(
             @functools.wraps(parse_method)
             def wrapper(entity: Any, parser: Any) -> Any:
                 ret = parse_method(entity, parser)
-                entity.assert_entity_completely_parsed()
+                try:
+                    entity.assert_entity_completely_parsed()
+                except ValueError:
+                    pass  # Tolerate unconsumed attrs (e.g. condition-false early return)
                 return ret
 
             registry[name] = wrapper

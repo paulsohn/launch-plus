@@ -670,33 +670,36 @@ class TestEnvStack:
 
 
 class TestParseXmlLaunch:
+    """Tests for parse_xml_launch() — now returns Entity objects."""
+
     def test_parse_arg(self):
         xml = '<launch><arg name="x" default="val" description="desc"/></launch>'
         elems = R.parse_xml_launch(xml, "test.xml")
         assert len(elems) == 1
-        arg = elems[0]["Arg"]
-        assert arg["name"] == "x"
-        assert arg["default"] == "val"
-        assert arg["description"] == "desc"
+        e = elems[0]
+        assert e.type_name == "arg"
+        assert e.get_attr("name") == "x"
+        assert e.get_attr("default") == "val"
+        assert e.get_attr("description") == "desc"
 
     def test_parse_arg_no_default(self):
         xml = '<launch><arg name="x"/></launch>'
         elems = R.parse_xml_launch(xml, "test.xml")
-        assert elems[0]["Arg"]["default"] is None
+        assert elems[0].get_attr("default", optional=True) is None
 
     def test_parse_let(self):
         xml = '<launch><let name="v" value="123"/></launch>'
         elems = R.parse_xml_launch(xml, "test.xml")
-        let = elems[0]["Let"]
-        assert let["name"] == "v"
-        assert let["value"] == "123"
+        e = elems[0]
+        assert e.type_name == "let"
+        assert e.get_attr("name") == "v"
+        assert e.get_attr("value") == "123"
 
     def test_parse_let_with_condition(self):
         xml = '<launch><let name="v" value="1" if="$(arg flag)"/></launch>'
         elems = R.parse_xml_launch(xml, "test.xml")
-        cond = elems[0]["Let"]["condition"]
-        assert cond["kind"] == "If"
-        assert cond["expr"] == "$(arg flag)"
+        e = elems[0]
+        assert e.get_attr("if") == "$(arg flag)"
 
     def test_parse_node(self):
         xml = textwrap.dedent("""\
@@ -709,18 +712,22 @@ class TestParseXmlLaunch:
             </launch>
         """)
         elems = R.parse_xml_launch(xml, "test.xml")
-        node = elems[0]["Node"]
-        assert node["pkg"] == "my_pkg"
-        assert node["exec"] == "my_exec"
-        assert node["name"] == "n"
-        assert node["namespace"] == "/ns"
-        assert node["output"] == "screen"
-        assert len(node["params"]) == 1
-        assert node["params"][0]["name"] == "foo"
-        assert len(node["remaps"]) == 1
-        assert node["remaps"][0]["from"] == "/in"
-        assert len(node["envs"]) == 1
-        assert node["envs"][0]["name"] == "VAR"
+        e = elems[0]
+        assert e.type_name == "node"
+        assert e.get_attr("pkg") == "my_pkg"
+        assert e.get_attr("exec") == "my_exec"
+        assert e.get_attr("name") == "n"
+        assert e.get_attr("namespace") == "/ns"
+        assert e.get_attr("output") == "screen"
+        params = e.get_attr("param", data_type=list)
+        assert len(params) == 1
+        assert params[0].get_attr("name") == "foo"
+        remaps = e.get_attr("remap", data_type=list)
+        assert len(remaps) == 1
+        assert remaps[0].get_attr("from") == "/in"
+        envs = e.get_attr("env", data_type=list)
+        assert len(envs) == 1
+        assert envs[0].get_attr("name") == "VAR"
 
     def test_parse_group_scoped(self):
         xml = textwrap.dedent("""\
@@ -731,11 +738,13 @@ class TestParseXmlLaunch:
             </launch>
         """)
         elems = R.parse_xml_launch(xml, "test.xml")
-        group = elems[0]["Group"]
-        assert group["scoped"] is False
-        assert group["condition"]["kind"] == "If"
-        assert len(group["children"]) == 1
-        assert "Arg" in group["children"][0]
+        e = elems[0]
+        assert e.type_name == "group"
+        assert e.get_attr("scoped") == "false"
+        assert e.get_attr("if") == "$(arg x)"
+        children = e.children
+        assert len(children) == 1
+        assert children[0].type_name == "arg"
 
     def test_parse_include_with_args(self):
         xml = textwrap.dedent("""\
@@ -747,10 +756,12 @@ class TestParseXmlLaunch:
             </launch>
         """)
         elems = R.parse_xml_launch(xml, "test.xml")
-        inc = elems[0]["Include"]
-        assert "$(find-pkg-share pkg)" in inc["file"]
-        assert len(inc["args"]) == 2
-        assert inc["args"][0]["name"] == "a"
+        e = elems[0]
+        assert e.type_name == "include"
+        assert "$(find-pkg-share pkg)" in e.get_attr("file")
+        args = e.get_attr("arg", data_type=list)
+        assert len(args) == 2
+        assert args[0].get_attr("name") == "a"
 
     def test_parse_set_env_unset_env(self):
         xml = textwrap.dedent("""\
@@ -760,14 +771,17 @@ class TestParseXmlLaunch:
             </launch>
         """)
         elems = R.parse_xml_launch(xml, "test.xml")
-        assert elems[0]["SetEnv"]["name"] == "X"
-        assert elems[1]["UnsetEnv"]["name"] == "Y"
-        assert elems[1]["UnsetEnv"]["condition"]["kind"] == "Unless"
+        assert elems[0].type_name == "set_env"
+        assert elems[0].get_attr("name") == "X"
+        assert elems[1].type_name == "unset_env"
+        assert elems[1].get_attr("name") == "Y"
+        assert elems[1].get_attr("unless") == "$(arg flag)"
 
     def test_parse_push_ros_namespace(self):
         xml = '<launch><push-ros-namespace namespace="/my_ns"/></launch>'
         elems = R.parse_xml_launch(xml, "test.xml")
-        assert elems[0]["PushRosNamespace"]["namespace"] == "/my_ns"
+        assert elems[0].type_name == "push-ros-namespace"
+        assert elems[0].get_attr("namespace") == "/my_ns"
 
     def test_parse_node_container(self):
         xml = textwrap.dedent("""\
@@ -781,12 +795,16 @@ class TestParseXmlLaunch:
             </launch>
         """)
         elems = R.parse_xml_launch(xml, "test.xml")
-        nc = elems[0]["NodeContainer"]
-        assert nc["pkg"] == "rclcpp"
-        assert len(nc["composable_nodes"]) == 1
-        assert nc["composable_nodes"][0]["plugin"] == "p::N"
-        assert len(nc["composable_nodes"][0]["params"]) == 1
-        assert len(nc["envs"]) == 1
+        e = elems[0]
+        assert e.type_name == "node_container"
+        assert e.get_attr("pkg") == "rclcpp"
+        cns = e.get_attr("composable_node", data_type=list)
+        assert len(cns) == 1
+        assert cns[0].get_attr("plugin") == "p::N"
+        cn_params = cns[0].get_attr("param", data_type=list)
+        assert len(cn_params) == 1
+        envs = e.get_attr("env", data_type=list)
+        assert len(envs) == 1
 
     def test_parse_load_composable_node(self):
         xml = textwrap.dedent("""\
@@ -797,9 +815,11 @@ class TestParseXmlLaunch:
             </launch>
         """)
         elems = R.parse_xml_launch(xml, "test.xml")
-        lcn = elems[0]["LoadComposableNode"]
-        assert lcn["target"] == "container"
-        assert len(lcn["composable_nodes"]) == 1
+        e = elems[0]
+        assert e.type_name == "load_composable_node"
+        assert e.get_attr("target") == "container"
+        cns = e.get_attr("composable_node", data_type=list)
+        assert len(cns) == 1
 
     def test_parse_set_parameter_set_remap(self):
         xml = textwrap.dedent("""\
@@ -809,19 +829,21 @@ class TestParseXmlLaunch:
             </launch>
         """)
         elems = R.parse_xml_launch(xml, "test.xml")
-        assert elems[0]["SetParameter"]["name"] == "p"
-        assert elems[1]["SetRemap"]["from"] == "/a"
+        assert elems[0].type_name == "set_parameter"
+        assert elems[0].get_attr("name") == "p"
+        assert elems[1].type_name == "set_remap"
+        assert elems[1].get_attr("from") == "/a"
 
     def test_parse_lifecycle_node(self):
         xml = '<launch><lifecycle_node pkg="p" exec="e" name="n"/></launch>'
         elems = R.parse_xml_launch(xml, "test.xml")
-        assert "LifecycleNode" in elems[0]
-        assert elems[0]["LifecycleNode"]["pkg"] == "p"
+        assert elems[0].type_name == "lifecycle_node"
+        assert elems[0].get_attr("pkg") == "p"
 
     def test_parse_unknown_element(self):
         xml = "<launch><foobar/></launch>"
         elems = R.parse_xml_launch(xml, "test.xml")
-        assert elems[0]["UnknownElement"]["tag_name"] == "foobar"
+        assert elems[0].type_name == "foobar"
 
     def test_parse_event_handler(self):
         xml = textwrap.dedent("""\
@@ -832,30 +854,34 @@ class TestParseXmlLaunch:
             </launch>
         """)
         elems = R.parse_xml_launch(xml, "test.xml")
-        eh = elems[0]["EventHandler"]
-        assert eh["kind"] == "OnProcessExit"
-        assert eh["target"] == "my_node"
-        assert len(eh["children"]) == 1
-        assert eh["children"][0]["EmitEvent"]["event"] == "shutdown"
+        e = elems[0]
+        assert e.type_name == "on_process_exit"
+        assert e.get_attr("target") == "my_node"
+        children = e.children
+        assert len(children) == 1
+        assert children[0].type_name == "emit_event"
+        assert children[0].get_attr("event") == "shutdown"
 
     def test_parse_param_from(self):
         xml = '<launch><node pkg="p" exec="e"><param from="file.yaml"/></node></launch>'
         elems = R.parse_xml_launch(xml, "test.xml")
-        param = elems[0]["Node"]["params"][0]
-        assert param["from"] == "file.yaml"
-        assert param["name"] is None
+        params = elems[0].get_attr("param", data_type=list)
+        assert params[0].get_attr("from") == "file.yaml"
+        assert params[0].get_attr("name", optional=True) is None
 
     def test_substitutions_preserved_as_raw_strings(self):
         xml = '<launch><node pkg="$(arg pkg)" exec="$(var exe)"/></launch>'
         elems = R.parse_xml_launch(xml, "test.xml")
-        assert elems[0]["Node"]["pkg"] == "$(arg pkg)"
-        assert elems[0]["Node"]["exec"] == "$(var exe)"
+        assert elems[0].get_attr("pkg") == "$(arg pkg)"
+        assert elems[0].get_attr("exec") == "$(var exe)"
 
 
 # ─── YAML Parser ─────────────────────────────────────────────────────────────
 
 
 class TestParseYamlLaunch:
+    """Tests for parse_yaml_launch() — now returns Entity objects."""
+
     def test_parse_basic_yaml(self):
         yaml_content = textwrap.dedent("""\
             launch:
@@ -869,8 +895,10 @@ class TestParseYamlLaunch:
         """)
         elems = R.parse_yaml_launch(yaml_content, "test.yaml")
         assert len(elems) == 2
-        assert elems[0]["Arg"]["name"] == "my_arg"
-        assert elems[1]["Node"]["pkg"] == "my_pkg"
+        assert elems[0].type_name == "arg"
+        assert elems[0].get_attr("name") == "my_arg"
+        assert elems[1].type_name == "node"
+        assert elems[1].get_attr("pkg") == "my_pkg"
 
     def test_parse_yaml_push_ros_namespace(self):
         yaml_content = textwrap.dedent("""\
@@ -879,7 +907,8 @@ class TestParseYamlLaunch:
                   namespace: /my_ns
         """)
         elems = R.parse_yaml_launch(yaml_content, "test.yaml")
-        assert elems[0]["PushRosNamespace"]["namespace"] == "/my_ns"
+        assert elems[0].type_name == "push-ros-namespace"
+        assert elems[0].get_attr("namespace") == "/my_ns"
 
     def test_parse_yaml_composable_node_container(self):
         yaml_content = textwrap.dedent("""\
@@ -890,7 +919,7 @@ class TestParseYamlLaunch:
                   name: c
         """)
         elems = R.parse_yaml_launch(yaml_content, "test.yaml")
-        assert "NodeContainer" in elems[0]
+        assert elems[0].type_name == "node_container"
 
     def test_parse_yaml_with_children(self):
         yaml_content = textwrap.dedent("""\
@@ -903,10 +932,13 @@ class TestParseYamlLaunch:
                         default: val
         """)
         elems = R.parse_yaml_launch(yaml_content, "test.yaml")
-        group = elems[0]["Group"]
-        assert group["scoped"] is False
-        assert len(group["children"]) == 1
-        assert group["children"][0]["Arg"]["name"] == "nested"
+        e = elems[0]
+        assert e.type_name == "group"
+        assert e.get_attr("scoped", data_type=bool) is False
+        children = e.children
+        assert len(children) == 1
+        assert children[0].type_name == "arg"
+        assert children[0].get_attr("name") == "nested"
 
     def test_parse_yaml_missing_launch_key(self):
         yaml_content = "foo: bar"

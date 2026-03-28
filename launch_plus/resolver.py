@@ -33,6 +33,10 @@ from typing import TYPE_CHECKING
 
 import yaml
 
+# Ensure substitution entity classes are registered before any parsing occurs.
+import launch_plus.entities  # noqa: F401
+from launch_plus.entities.substitution import Substitution as _SubstitutionType
+
 # ─── Output schema contract ───────────────────────────────────────────────────
 # Defines the exact JSON schema emitted to stdout.  Rust's PyResolvedNode /
 # PyResolverOutput structs must mirror these types.  Guarded by TYPE_CHECKING
@@ -1542,6 +1546,25 @@ def _normalize_eval_expr(expr: str) -> str:
     return expr
 
 
+def resolve_substitutions_from_tokens(
+    tokens: "list[_SubstitutionType]",
+    ctx: _SubstitutionContext,
+    *,
+    _depth: int = 0,
+) -> str:
+    """Resolve a pre-parsed list of :class:`Substitution` objects to a string.
+
+    Each token's ``.perform(ctx)`` is called in order and the results
+    are concatenated.  This is the low-level entry point used by
+    individual substitution implementations when they need to recursively
+    resolve nested tokens.
+    """
+    if _depth > 50:
+        _error("substitution recursion limit exceeded")
+        return "".join(t.serialize() for t in tokens)
+    return "".join(t.perform(ctx, _depth=_depth) for t in tokens)
+
+
 def resolve_substitutions(
     text: str,
     ctx: _SubstitutionContext,
@@ -1549,7 +1572,36 @@ def resolve_substitutions(
 ) -> str:
     """Resolve all substitutions in a string using the given context.
 
-    Recursively resolves nested substitutions (e.g., ``$(find-pkg-share $(arg pkg))``).
+    Parses *text* via the Lark grammar into typed :class:`Substitution`
+    objects, then calls ``.perform()`` on each to produce the resolved
+    string.  Falls back to the legacy depth-counting tokenizer for
+    expressions that the grammar cannot handle (e.g. ``$(eval ...)``
+    with Python operators outside quotes).
+    """
+    if _depth > 50:
+        _error(f"substitution recursion limit exceeded: {text[:100]}")
+        return text
+    from launch_plus.parsers.parse_substitution import parse_substitution as _lark_parse
+
+    try:
+        tokens = _lark_parse(text)
+    except Exception:
+        # Lark grammar is stricter than the original depth-counting parser.
+        # Fall back to the legacy tokenizer for inputs with non-standard syntax
+        # (e.g. $(eval '$(var x)'=='y') mixing Python operators in substitutions).
+        return _resolve_substitutions_legacy(text, ctx, _depth)
+    return resolve_substitutions_from_tokens(tokens, ctx, _depth=_depth)
+
+
+def _resolve_substitutions_legacy(
+    text: str,
+    ctx: _SubstitutionContext,
+    _depth: int = 0,
+) -> str:
+    """Legacy fallback resolver using the depth-counting tokenizer.
+
+    Used when the Lark grammar cannot parse certain edge-case expressions
+    (e.g. ``$(eval '$(var x)'=='y')``).
     """
     if _depth > 50:
         _error(f"substitution recursion limit exceeded: {text[:100]}")
@@ -1577,8 +1629,6 @@ def resolve_substitutions(
         elif kind == "var":
             name = token[1]
             name = resolve_substitutions(name, ctx, _depth + 1)
-            # Check vars first, then args. Use 'in' instead of 'or' to handle
-            # empty string values correctly (empty string is a valid value).
             if name in ctx.vars:
                 value = ctx.vars[name]
             elif name in ctx.args:
@@ -1594,7 +1644,6 @@ def resolve_substitutions(
         elif kind == "env":
             name = token[1]
             default = token[2] if len(token) > 2 else None
-            # Check overrides → process env → default
             value = ctx.env.get(name)
             if value is None:
                 value = os.environ.get(name)
@@ -1625,7 +1674,6 @@ def resolve_substitutions(
             pkg = token[1]
             pkg = resolve_substitutions(pkg, ctx, _depth + 1)
             _track_package(pkg)
-            # Always keep portable for now — prefix resolution not implemented
             parts.append(f"$(find-pkg-prefix {pkg})")
 
         elif kind == "dirname":
@@ -1636,12 +1684,9 @@ def resolve_substitutions(
 
         elif kind == "eval":
             expr = token[1]
-            # Resolve nested substitutions in the expression
             expr = resolve_substitutions(expr, ctx, _depth + 1)
-            # Unescape \' and \" that may come from variable values (e.g. <let value="[\'a\']"/>)
             expr = expr.replace("\\'", "'").replace('\\"', '"')
             try:
-                # Python-native eval — no subprocess needed
                 result = eval(expr)  # noqa: S307
                 parts.append(str(result))
             except Exception as e:
@@ -1652,11 +1697,9 @@ def resolve_substitutions(
         elif kind == "command":
             body = token[1]
             body = resolve_substitutions(body, ctx, _depth + 1)
-            # Cannot evaluate at analysis time — preserve as-is
             parts.append(f"$(command {body})")
 
         else:
-            # Unknown substitution — preserve as-is
             parts.append(f"$({' '.join(token)})")
 
     return "".join(parts)

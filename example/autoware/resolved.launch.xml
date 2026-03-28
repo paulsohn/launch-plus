@@ -41,7 +41,7 @@
       <param name="max_steer_angle" value="0.7"/>
       <param name="rear_overhang" value="1.1"/>
       <param name="right_overhang" value="0.128"/>
-      <param name="robot_description" value="$(command 'xacro $(find-pkg-share tier4_vehicle_launch)/urdf/vehicle.xacro vehicle_model:=sample_vehicle sensor_model:=sample_sensor_kit config_dir:=$(find-pkg-share sample_sensor_kit_description)/config' 'warn')"/>
+      <param name="robot_description" value="$(command 'xacro $(find-pkg-share tier4_vehicle_launch)/urdf/vehicle.xacro vehicle_model:=sample_vehicle sensor_model:=sample_sensor_kit config_dir:=$(find-pkg-share sample_sensor_kit_description)/config' warn)"/>
       <param name="use_sim_time" value="false"/>
       <param name="vehicle_height" value="2.5"/>
       <param name="wheel_base" value="2.79"/>

@@ -17,9 +17,6 @@ from launch_plus.entities.state import (
 )
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
-from launch_plus.resolver import (
-    _state,
-)
 
 
 @expose_action("set_env")
@@ -31,7 +28,7 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
         if parser.evaluate_condition(entity):
             name = parser.resolve(entity.get_attr("name", optional=True) or "")
             value = parser.resolve(entity.get_attr("value", optional=True) or "")
-            _state.env[name] = value
+            parser.env[name] = value
             parser.ctx.env[name] = value
 
     def __init__(self, name=None, value=None, **kwargs):
@@ -64,7 +61,7 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
     def parse(cls, entity: Entity, parser: _ActionParser) -> None:
         if parser.evaluate_condition(entity):
             name = parser.resolve(entity.get_attr("name", optional=True) or "")
-            _state.env.pop(name, None)
+            parser.env.pop(name, None)
             parser.ctx.env.pop(name, None)
 
     def __init__(self, name=None, **kwargs):
@@ -105,7 +102,7 @@ class _TrackedPushRosNamespace(_TrackedAction):
         if parser.evaluate_condition(entity):
             ns = parser.resolve(entity.get_attr("namespace", optional=True) or "")
             if ns:
-                _state.namespace_stack.append(ns)
+                parser.namespace_stack.append(ns)
 
     def __init__(self, namespace=None, **kwargs):
         self._namespace = namespace
@@ -118,16 +115,12 @@ class _TrackedPushRosNamespace(_TrackedAction):
         return None
 
 
-@expose_action("set_parameter")
-def _action_set_parameter(entity: Entity, parser: _ActionParser) -> None:
-    name = parser.resolve(entity.get_attr("name", optional=True) or "")
-    value = parser.resolve(entity.get_attr("value", optional=True) or "")
-    _state.tracked["global_params"].append([name, value])
-    _state.global_params.append((name, value))
-
-
 @expose_action("set_remap")
-def _action_set_remap(entity: Entity, parser: _ActionParser) -> None:
-    src = parser.resolve(entity.get_attr("from", optional=True) or "")
-    dst = parser.resolve(entity.get_attr("to", optional=True) or "")
-    _state.global_remaps.append((src, dst))
+class _SetRemap(_TrackedAction):
+    """Tracks <set_remap> — records a global remap."""
+
+    @classmethod
+    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+        src = parser.resolve(entity.get_attr("from", optional=True) or "")
+        dst = parser.resolve(entity.get_attr("to", optional=True) or "")
+        parser.track_global_remap(src, dst)

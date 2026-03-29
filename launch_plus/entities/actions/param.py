@@ -67,8 +67,15 @@ class _SetLaunchConfiguration(_TrackedAction):
         return None
 
 
+@expose_action("set_parameter")
 class _TrackedSetParameter(_TrackedAction):
-    """Mirrors launch_ros SetParameter: accumulates (name, value) into context['global_params']."""
+    """Mirrors launch_ros SetParameter / <set_parameter>."""
+
+    @classmethod
+    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+        name = parser.resolve(entity.get_attr("name", optional=True) or "")
+        value = parser.resolve(entity.get_attr("value", optional=True) or "")
+        parser.track_global_param(name, value)
 
     def __init__(self, name=None, value=None, **kwargs):
         self._name = name

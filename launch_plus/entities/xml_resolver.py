@@ -329,6 +329,19 @@ class _ActionParser:
         """Delegate to module-level ``_track_node``."""
         return _R._track_node(node_dict)
 
+    def track_event_handler(self, eh_dict: dict) -> int:
+        """Delegate to module-level ``_track_event_handler``."""
+        return _R._track_event_handler(eh_dict)
+
+    def track_global_param(self, name: str, value: str) -> None:
+        """Record a global parameter (from <set_parameter>)."""
+        _state.tracked["global_params"].append([name, value])
+        _state.global_params.append((name, value))
+
+    def track_global_remap(self, src: str, dst: str) -> None:
+        """Record a global remap (from <set_remap>)."""
+        _state.global_remaps.append((src, dst))
+
     @property
     def namespace_stack(self) -> list:
         return _state.namespace_stack

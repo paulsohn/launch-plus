@@ -119,26 +119,8 @@ class _TrackedNode(_TrackedAction):
         )
 
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
-        _R._track_package(_R._state, package)
-        xml_kind = kwargs.pop("_xml_kind", None)
-        self._idx = _R._track_node(
-            _R._state,
-            {
-                "package": str(package) if package else "",
-                "executable": str(executable) if executable else "",
-                "name": str(name) if name else "",
-                "namespace_stack": [],
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": xml_kind or "node",
-                "plugins": [],
-                "target": None,
-            },
-        )
-        # Save raw kwargs for deferred resolution in execute()
+        self._idx = -1  # set lazily in execute()
+        self._kind = kwargs.pop("_xml_kind", None) or "node"
         self._raw_package = package
         self._raw_executable = executable
         self._raw_name = name
@@ -150,17 +132,41 @@ class _TrackedNode(_TrackedAction):
         self._raw_arguments = kwargs.get("arguments")
         self._raw_respawn = kwargs.get("respawn")
         self._raw_respawn_delay = kwargs.get("respawn_delay")
-        # XML-path parsed data (unresolved token structures)
         self._xml_params = kwargs.get("_xml_params")
         self._xml_remaps = kwargs.get("_xml_remaps")
         self._xml_envs = kwargs.get("_xml_envs")
         self._detailed = False
-        # Eager: track any ParameterFile paths identifiable at construction time
+
+    def _ensure_tracked(self, state) -> int:
+        """Create the tracked node entry on first call, return index."""
+        if self._idx >= 0:
+            return int(self._idx)
+        _R._track_package(state, self._raw_package)
         for p in self._raw_parameters:
             if hasattr(p, "_param_file") and p._param_file:
-                _R._track_param_file(_R._state, p._param_file)
+                _R._track_param_file(state, p._param_file)
+        self._idx = _R._track_node(
+            state,
+            {
+                "package": str(self._raw_package) if self._raw_package else "",
+                "executable": str(self._raw_executable) if self._raw_executable else "",
+                "name": str(self._raw_name) if self._raw_name else "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": self._kind,
+                "plugins": [],
+                "target": None,
+            },
+        )
+        return int(self._idx)
 
     def execute(self, context) -> list | None:
+        state = context._state if context is not None and hasattr(context, "_state") else _R._state
+        self._ensure_tracked(state)
         if not self._detailed:
             self._detailed = True
             if self._xml_params is not None:
@@ -226,13 +232,16 @@ class _TrackedNode(_TrackedAction):
         entry["respawn_delay"] = resolve_value(self._raw_respawn_delay, context)
 
     def __repr__(self):
-        return f"TrackedNode(package={_R._state.tracked['nodes'][self._idx]['package']!r})"
+        if self._idx >= 0:
+            return f"TrackedNode(package={_R._state.tracked['nodes'][self._idx]['package']!r})"
+        return f"TrackedNode(package={self._raw_package!r}, untracked)"
 
 
 class _TrackedLifecycleNode(_TrackedNode):
     def __init__(self, **kwargs):
+        kwargs.setdefault("_xml_kind", "lifecycle_node")
         super().__init__(**kwargs)
-        _R._state.tracked["nodes"][self._idx]["kind"] = "lifecycle_node"
+        self._kind = "lifecycle_node"
 
 
 class _TrackedComposableNode(_TrackedAction):

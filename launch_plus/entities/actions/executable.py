@@ -52,12 +52,17 @@ class _TrackedExecutable(_TrackedAction):
         self._shell = bool(shell)
         self._xml_envs = xml_envs
         self._detailed = False
+        self._idx = -1  # set lazily in execute()
+
+    def _ensure_tracked(self, state) -> int:
+        if self._idx >= 0:
+            return int(self._idx)
         self._idx = _R._track_node(
-            _R._state,
+            state,
             {
                 "package": "",
                 "executable": "",
-                "name": str(name) if name is not None and not hasattr(name, "perform") else "",
+                "name": str(self._name) if isinstance(self._name, str) else "",
                 "namespace_stack": [],
                 "explicit_namespace": None,
                 "parameters": {},
@@ -71,8 +76,11 @@ class _TrackedExecutable(_TrackedAction):
                 "shell": self._shell,
             },
         )
+        return int(self._idx)
 
     def execute(self, context) -> list | None:
+        state = context._state if context is not None and hasattr(context, "_state") else _R._state
+        self._ensure_tracked(state)
         if not self._detailed:
             self._detailed = True
             if self._xml_envs is not None:

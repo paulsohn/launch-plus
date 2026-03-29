@@ -223,11 +223,10 @@ class TestNodeDeferredResolution:
             package=R._LaunchConfiguration("my_pkg_var"),
             executable="my_exec",
         )
-        # Before resolution: str(LaunchConfiguration) = variable name
-        assert R._state.tracked["nodes"][node._idx]["package"] == "my_pkg_var"
-        assert "my_pkg_var" not in R._state.tracked["packages"]  # not tracked eagerly
+        # Before execute(): node is not yet tracked
+        assert node._idx == -1
 
-        R._resolve_node_details(node, ctx)
+        node.execute(ctx)
 
         assert R._state.tracked["nodes"][node._idx]["package"] == "actual_package"
         assert "actual_package" in R._state.tracked["packages"]
@@ -240,7 +239,7 @@ class TestNodeDeferredResolution:
             package=R._LaunchConfiguration("unknown_pkg"),
             executable="exec",
         )
-        R._resolve_node_details(node, ctx)
+        node.execute(ctx)
 
         # The entry shows the variable name (display fallback from str(lc))
         assert R._state.tracked["nodes"][node._idx]["package"] == "unknown_pkg"
@@ -268,9 +267,13 @@ class TestNodeDeferredResolution:
         assert entry["name"] == "my_container"
         assert "rclcpp_components" in R._state.tracked["packages"]
 
-    def test_plain_string_package_tracked_eagerly(self):
-        """When package is a plain string, it should be tracked at construction."""
-        R._TrackedNode(package="my_real_pkg", executable="exec")
+    def test_plain_string_package_tracked_on_execute(self):
+        """When package is a plain string, it should be tracked after execute()."""
+        ctx = _make_context()
+        node = R._TrackedNode(package="my_real_pkg", executable="exec")
+        assert node._idx == -1  # not yet tracked
+        node.execute(ctx)
+        assert node._idx >= 0
         assert "my_real_pkg" in R._state.tracked["packages"]
 
 

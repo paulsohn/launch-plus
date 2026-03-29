@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from launch_plus.entities.expose import expose_action
+from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
-    _ActionParser,
     _state,
 )
 

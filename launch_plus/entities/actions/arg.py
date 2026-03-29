@@ -8,9 +8,9 @@ from launch_plus.entities.expose import expose_action
 from launch_plus.entities.state import (
     _warn,
 )
+from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
-    _ActionParser,
     _record_declared_arg,
     _state,
 )

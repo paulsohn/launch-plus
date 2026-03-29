@@ -13,60 +13,113 @@ from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 
+def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
+    """Parse an optional attribute to tokens, or return None."""
+    if text is None:
+        return None
+    return parser.parse_substitution(text)
+
+
+def _resolve_xml_composable_plugins(
+    xml_plugins: list[dict],
+    context,
+) -> list[dict]:
+    """Resolve XML-parsed composable plugin token dicts into final form."""
+    from launch_plus.entities.xml_resolver import (
+        _read_and_expand_param_file,
+        resolve_value,
+    )
+
+    plugins: list[dict] = []
+    for p in xml_plugins or []:
+        pkg = resolve_value(p["package"], context) or ""
+        plugin_name = resolve_value(p["plugin"], context) or ""
+        name_raw = p.get("name")
+        name = resolve_value(_parse_optional_raw(name_raw), context) if name_raw else None
+        if pkg:
+            _R._track_package(pkg)
+        # Resolve params
+        params: dict[str, str] = {}
+        param_files: list[dict] = []
+        for param in p.get("params") or []:
+            if "from" in param:
+                path = resolve_value(param["from"], context) or ""
+                _R._track_param_file(path)
+                pf_entry: dict = {"path": path}
+                if _R._state.inline_params:
+                    expanded = _read_and_expand_param_file(path, context)
+                    if expanded is not None:
+                        pf_entry["params"] = expanded
+                param_files.append(pf_entry)
+            else:
+                k = resolve_value(param["name"], context) or ""
+                v = resolve_value(param["value"], context) or ""
+                params[k] = v
+        # Resolve remaps
+        remaps = [
+            [resolve_value(src, context) or "", resolve_value(dst, context) or ""]
+            for src, dst in (p.get("remaps") or [])
+        ]
+        entry: dict = {
+            "package": pkg,
+            "plugin": plugin_name,
+            "name": name,
+            "parameters": params,
+            "remappings": remaps,
+        }
+        if param_files:
+            entry["param_files"] = param_files
+        plugins.append(entry)
+    return plugins
+
+
+def _parse_optional_raw(text: str | None) -> list | None:
+    """Parse an optional raw text to tokens using the Lark parser directly."""
+    if text is None:
+        return None
+    from launch_plus.parsers.parse_substitution import parse_substitution as _lark_parse
+
+    return _lark_parse(text)
+
+
 @expose_action("node")
 @expose_action("lifecycle_node")
 class _TrackedNode(_TrackedAction):
     """Tracks a Node / LifecycleNode for both XML and Python shim paths."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+    def parse(cls, entity: Entity, parser: _ActionParser):
         if not parser.evaluate_condition(entity):
-            return
-        pkg = parser.resolve(
+            return None
+        pkg = parser.parse_substitution(
             entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
         )
-        exe = parser.resolve(
+        exe = parser.parse_substitution(
             entity.get_attr("exec", optional=True)
             or entity.get_attr("executable", optional=True)
             or ""
         )
-        name = parser.resolve_optional(entity.get_attr("name", optional=True))
-        ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
-        parser.track_package(pkg)
-        params, param_files = parser.resolve_params(entity)
-        remaps = parser.resolve_remaps(entity)
-        env = dict(parser.state.env)
-        env.update(parser.resolve_envs(entity))
-        merged_params = {k: str(v) for k, v in parser.state.global_params}
-        merged_params.update(params)
-        merged_param_files = list(parser.state.global_param_files) + param_files
-        merged_remaps = list(parser.state.global_remaps) + remaps
-        node_kind = "node" if entity.type_name != "lifecycle_node" else "lifecycle_node"
-        parser.track_node(
-            {
-                "package": pkg,
-                "executable": exe,
-                "name": name or "",
-                "namespace_stack": list(parser.state.namespace_stack),
-                "explicit_namespace": ns,
-                "parameters": merged_params,
-                "param_files": merged_param_files,
-                "remappings": merged_remaps,
-                "env": env,
-                "kind": node_kind,
-                "plugins": [],
-                "target": None,
-                "output": parser.resolve_optional(entity.get_attr("output", optional=True)),
-                "args": parser.resolve_optional(entity.get_attr("args", optional=True)),
-                "respawn": parser.resolve_optional(entity.get_attr("respawn", optional=True)),
-                "respawn_delay": parser.resolve_optional(
-                    entity.get_attr("respawn_delay", optional=True)
-                ),
-            }
+        name_raw = entity.get_attr("name", optional=True)
+        ns_raw = entity.get_attr("namespace", optional=True)
+        node_kind = "lifecycle_node" if entity.type_name == "lifecycle_node" else "node"
+        return cls(
+            package=pkg,
+            executable=exe,
+            name=parser.parse_substitution(name_raw) if name_raw else None,
+            namespace=parser.parse_substitution(ns_raw) if ns_raw else None,
+            _xml_params=parser.parse_params(entity),
+            _xml_remaps=parser.parse_remaps(entity),
+            _xml_envs=parser.parse_envs(entity),
+            _xml_kind=node_kind,
+            output=_parse_optional(parser, entity.get_attr("output", optional=True)),
+            arguments=_parse_optional(parser, entity.get_attr("args", optional=True)),
+            respawn=_parse_optional(parser, entity.get_attr("respawn", optional=True)),
+            respawn_delay=_parse_optional(parser, entity.get_attr("respawn_delay", optional=True)),
         )
 
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
         _R._track_package(package)
+        xml_kind = kwargs.pop("_xml_kind", None)
         self._idx = _R._track_node(
             {
                 "package": str(package) if package else "",
@@ -78,7 +131,7 @@ class _TrackedNode(_TrackedAction):
                 "param_files": [],
                 "remappings": [],
                 "env": {},
-                "kind": "node",
+                "kind": xml_kind or "node",
                 "plugins": [],
                 "target": None,
             }
@@ -95,6 +148,10 @@ class _TrackedNode(_TrackedAction):
         self._raw_arguments = kwargs.get("arguments")
         self._raw_respawn = kwargs.get("respawn")
         self._raw_respawn_delay = kwargs.get("respawn_delay")
+        # XML-path parsed data (unresolved token structures)
+        self._xml_params = kwargs.get("_xml_params")
+        self._xml_remaps = kwargs.get("_xml_remaps")
+        self._xml_envs = kwargs.get("_xml_envs")
         self._detailed = False
         # Eager: track any ParameterFile paths identifiable at construction time
         for p in self._raw_parameters:
@@ -102,10 +159,69 @@ class _TrackedNode(_TrackedAction):
                 _R._track_param_file(p._param_file)
 
     def execute(self, context) -> list | None:
-        if context is not None and not self._detailed:
+        if not self._detailed:
             self._detailed = True
-            _R._resolve_node_details(self, context)
+            if self._xml_params is not None:
+                self._resolve_xml_details(context)
+            elif context is not None:
+                _R._resolve_node_details(self, context)
         return None
+
+    def _resolve_xml_details(self, context) -> None:
+        """Resolve XML-parsed token structures into the tracked node entry."""
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        entry = _R._state.tracked["nodes"][self._idx]
+        # Package / executable / name
+        pkg = resolve_value(self._raw_package, context) or ""
+        exe = resolve_value(self._raw_executable, context) or ""
+        name = resolve_value(self._raw_name, context) or ""
+        ns = resolve_value(self._raw_namespace, context)
+        if pkg:
+            _R._track_package(pkg)
+        entry["package"] = pkg
+        entry["executable"] = exe
+        entry["name"] = name
+        entry["namespace_stack"] = list(_R._state.namespace_stack)
+        entry["explicit_namespace"] = ns
+        # Params
+        params: dict[str, str] = {k: str(v) for k, v in _R._state.global_params}
+        param_files: list[dict] = list(_R._state.global_param_files)
+        for p in self._xml_params:
+            if "from" in p:
+                path = resolve_value(p["from"], context) or ""
+                _R._track_param_file(path)
+                pf_entry: dict = {"path": path}
+                if _R._state.inline_params:
+                    from launch_plus.entities.xml_resolver import _read_and_expand_param_file
+
+                    expanded = _read_and_expand_param_file(path, context)
+                    if expanded is not None:
+                        pf_entry["params"] = expanded
+                param_files.append(pf_entry)
+            else:
+                k = resolve_value(p["name"], context) or ""
+                v = resolve_value(p["value"], context) or ""
+                params[k] = v
+        entry["parameters"] = params
+        entry["param_files"] = param_files
+        # Remaps
+        remaps = list(_R._state.global_remaps)
+        for src_tokens, dst_tokens in self._xml_remaps or []:
+            remaps.append(
+                (resolve_value(src_tokens, context) or "", resolve_value(dst_tokens, context) or "")
+            )
+        entry["remappings"] = remaps
+        # Env
+        env = dict(_R._state.env)
+        for k_tokens, v_tokens in self._xml_envs or []:
+            env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
+        entry["env"] = env
+        # Extra fields
+        entry["output"] = resolve_value(self._raw_output, context)
+        entry["args"] = resolve_value(self._raw_arguments, context)
+        entry["respawn"] = resolve_value(self._raw_respawn, context)
+        entry["respawn_delay"] = resolve_value(self._raw_respawn_delay, context)
 
     def __repr__(self):
         return f"TrackedNode(package={_R._state.tracked['nodes'][self._idx]['package']!r})"
@@ -153,38 +269,26 @@ class _TrackedComposableNodeContainer(_TrackedAction):
     """
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+    def parse(cls, entity: Entity, parser: _ActionParser):
         if not parser.evaluate_condition(entity):
-            return
-        pkg = parser.resolve(
+            return None
+        pkg = parser.parse_substitution(
             entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
         )
-        exe = parser.resolve(
+        exe = parser.parse_substitution(
             entity.get_attr("exec", optional=True)
             or entity.get_attr("executable", optional=True)
             or ""
         )
-        name = parser.resolve_optional(entity.get_attr("name", optional=True))
-        ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
-        parser.track_package(pkg)
-        env = dict(parser.state.env)
-        env.update(parser.resolve_envs(entity))
-        plugins = parser.resolve_composable_plugins(entity)
-        parser.track_node(
-            {
-                "package": pkg,
-                "executable": exe,
-                "name": name or "",
-                "namespace_stack": list(parser.state.namespace_stack),
-                "explicit_namespace": ns,
-                "parameters": {k: str(v) for k, v in parser.state.global_params},
-                "param_files": list(parser.state.global_param_files),
-                "remappings": list(parser.state.global_remaps),
-                "env": env,
-                "kind": "container",
-                "plugins": plugins,
-                "target": None,
-            }
+        name_raw = entity.get_attr("name", optional=True)
+        ns_raw = entity.get_attr("namespace", optional=True)
+        return cls(
+            package=pkg,
+            executable=exe,
+            name=parser.parse_substitution(name_raw) if name_raw else None,
+            namespace=parser.parse_substitution(ns_raw) if ns_raw else None,
+            _xml_envs=parser.parse_envs(entity),
+            _xml_plugins=parser.parse_composable_plugins(entity),
         )
 
     def __init__(
@@ -197,6 +301,9 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         **kwargs,
     ):
         _R._track_package(package)
+        # Pop XML-path parsed data before they leak into kwargs
+        xml_envs = kwargs.pop("_xml_envs", None)
+        xml_plugins = kwargs.pop("_xml_plugins", None)
         self._idx = _R._track_node(
             {
                 "package": str(package) if package else "",
@@ -220,6 +327,8 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         self._raw_parameters = list(kwargs.get("parameters") or [])
         self._raw_remappings = list(kwargs.get("remappings") or [])
         self._raw_env = kwargs.get("env") or []
+        self._xml_envs = xml_envs
+        self._xml_plugins = xml_plugins
         self._descs = list(composable_node_descriptions or [])
         self._detailed = False
         for desc in self._descs:
@@ -228,13 +337,45 @@ class _TrackedComposableNodeContainer(_TrackedAction):
                 _R._track_package(raw_pkg)
 
     def execute(self, context) -> list | None:
-        if context is not None and not self._detailed:
+        if not self._detailed:
             self._detailed = True
-            _R._resolve_node_details(self, context)
-            _R._state.tracked["nodes"][self._idx]["plugins"] = _R._resolve_composable_plugins(
-                self._descs, context
-            )
+            if self._xml_plugins is not None:
+                self._resolve_xml_details(context)
+            elif context is not None:
+                _R._resolve_node_details(self, context)
+                _R._state.tracked["nodes"][self._idx]["plugins"] = _R._resolve_composable_plugins(
+                    self._descs, context
+                )
         return None
+
+    def _resolve_xml_details(self, context) -> None:
+        """Resolve XML-parsed token structures into the tracked node entry."""
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        entry = _R._state.tracked["nodes"][self._idx]
+        # Package / executable / name
+        pkg = resolve_value(self._raw_package, context) or ""
+        exe = resolve_value(self._raw_executable, context) or ""
+        name = resolve_value(self._raw_name, context) or ""
+        ns = resolve_value(self._raw_namespace, context)
+        if pkg:
+            _R._track_package(pkg)
+        entry["package"] = pkg
+        entry["executable"] = exe
+        entry["name"] = name
+        entry["namespace_stack"] = list(_R._state.namespace_stack)
+        entry["explicit_namespace"] = ns
+        # Params (container has no inline params from XML — only global)
+        entry["parameters"] = {k: str(v) for k, v in _R._state.global_params}
+        entry["param_files"] = list(_R._state.global_param_files)
+        entry["remappings"] = list(_R._state.global_remaps)
+        # Env
+        env = dict(_R._state.env)
+        for k_tokens, v_tokens in self._xml_envs or []:
+            env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
+        entry["env"] = env
+        # Plugins
+        entry["plugins"] = _resolve_xml_composable_plugins(self._xml_plugins, context)
 
 
 @expose_action("load_composable_node")
@@ -242,31 +383,23 @@ class _TrackedLoadComposableNodes(_TrackedAction):
     """Loads composable nodes into an existing container."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+    def parse(cls, entity: Entity, parser: _ActionParser):
         if not parser.evaluate_condition(entity):
-            return
-        target = parser.resolve_optional(entity.get_attr("target", optional=True))
-        ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
-        plugins = parser.resolve_composable_plugins(entity)
-        parser.track_node(
-            {
-                "package": "",
-                "executable": "",
-                "name": "",
-                "namespace_stack": list(parser.state.namespace_stack),
-                "explicit_namespace": ns,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": "load_composable",
-                "plugins": plugins,
-                "target": target or "",
-            }
+            return None
+        target_raw = entity.get_attr("target", optional=True)
+        ns_raw = entity.get_attr("namespace", optional=True)
+        return cls(
+            target_container=_parse_optional(parser, target_raw),
+            _xml_plugins=parser.parse_composable_plugins(entity),
+            _xml_namespace=_parse_optional(parser, ns_raw),
         )
 
     def __init__(self, *, composable_node_descriptions=None, target_container=None, **kwargs):
         from launch_plus.entities.state import _StubLaunchContext
+
+        # Pop XML-path parsed data before they leak into kwargs
+        xml_plugins = kwargs.pop("_xml_plugins", None)
+        xml_namespace = kwargs.pop("_xml_namespace", None)
 
         if target_container is None:
             target_str = ""
@@ -274,6 +407,9 @@ class _TrackedLoadComposableNodes(_TrackedAction):
             target_str = target_container
         elif isinstance(target_container, _TrackedComposableNodeContainer):
             target_str = _R._state.tracked["nodes"][target_container._idx].get("name", "")
+        elif isinstance(target_container, list):
+            # Token list from XML parse — defer resolution
+            target_str = ""
         elif hasattr(target_container, "perform"):
             try:
                 result = target_container.perform(_StubLaunchContext())
@@ -299,6 +435,8 @@ class _TrackedLoadComposableNodes(_TrackedAction):
                 "target": target_str,
             }
         )
+        self._xml_plugins = xml_plugins
+        self._xml_namespace = xml_namespace
         self._descs = list(composable_node_descriptions or [])
         self._detailed = False
         for desc in self._descs:
@@ -307,17 +445,33 @@ class _TrackedLoadComposableNodes(_TrackedAction):
                 _R._track_package(raw_pkg)
 
     def execute(self, context) -> list | None:
-        if context is not None and not self._detailed:
+        if not self._detailed:
             self._detailed = True
-            entry = _R._state.tracked["nodes"][self._idx]
-            if self._raw_target is not None:
-                if isinstance(self._raw_target, _TrackedComposableNodeContainer):
-                    target = _R._state.tracked["nodes"][self._raw_target._idx].get(
-                        "name"
-                    ) or entry.get("target", "")
-                else:
-                    target = _R._resolve_substitution(self._raw_target, context)
-                if target:
-                    entry["target"] = target
-            entry["plugins"] = _R._resolve_composable_plugins(self._descs, context)
+            if self._xml_plugins is not None:
+                self._resolve_xml_details(context)
+            elif context is not None:
+                entry = _R._state.tracked["nodes"][self._idx]
+                if self._raw_target is not None:
+                    if isinstance(self._raw_target, _TrackedComposableNodeContainer):
+                        target = _R._state.tracked["nodes"][self._raw_target._idx].get(
+                            "name"
+                        ) or entry.get("target", "")
+                    else:
+                        target = _R._resolve_substitution(self._raw_target, context)
+                    if target:
+                        entry["target"] = target
+                entry["plugins"] = _R._resolve_composable_plugins(self._descs, context)
         return None
+
+    def _resolve_xml_details(self, context) -> None:
+        """Resolve XML-parsed token structures into the tracked node entry."""
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        entry = _R._state.tracked["nodes"][self._idx]
+        target = resolve_value(self._raw_target, context) or ""
+        ns = resolve_value(self._xml_namespace, context)
+        entry["target"] = target
+        entry["namespace_stack"] = list(_R._state.namespace_stack)
+        entry["explicit_namespace"] = ns
+        # Plugins
+        entry["plugins"] = _resolve_xml_composable_plugins(self._xml_plugins, context)

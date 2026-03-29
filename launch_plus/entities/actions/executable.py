@@ -9,16 +9,23 @@ from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 
+def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
+    """Parse an optional attribute to tokens, or return None."""
+    if text is None:
+        return None
+    return parser.parse_substitution(text)
+
+
 @expose_action("executable")
 class _TrackedExecutable(_TrackedAction):
     """Tracks an ExecuteProcess so the walker can render it as <executable>."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+    def parse(cls, entity: Entity, parser: _ActionParser):
         if not parser.evaluate_condition(entity):
-            return
-        cmd = parser.resolve(entity.get_attr("cmd", optional=True) or "")
-        name = parser.resolve_optional(entity.get_attr("name", optional=True))
+            return None
+        cmd_raw = entity.get_attr("cmd", optional=True) or ""
+        name_raw = entity.get_attr("name", optional=True)
         shell_raw = entity.get_attr("shell", optional=True)
         if shell_raw is None:
             shell = False
@@ -26,26 +33,15 @@ class _TrackedExecutable(_TrackedAction):
             shell = shell_raw
         else:
             shell = str(shell_raw).lower() in ("true", "1", "yes")
-        parser.track_node(
-            {
-                "package": "",
-                "executable": "",
-                "name": name or "",
-                "namespace_stack": list(parser.state.namespace_stack),
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": dict(parser.state.env),
-                "kind": "executable",
-                "plugins": [],
-                "target": None,
-                "cmd": cmd,
-                "shell": shell,
-            }
+        return cls(
+            cmd=parser.parse_substitution(cmd_raw),
+            name=_parse_optional(parser, name_raw),
+            shell=shell,
+            _xml_envs=parser.parse_envs(entity),
         )
 
     def __init__(self, *, cmd=None, name=None, shell=False, **kwargs):
+        xml_envs = kwargs.pop("_xml_envs", None)
         if isinstance(cmd, list):
             self._cmd = cmd
         elif cmd is not None:
@@ -54,6 +50,8 @@ class _TrackedExecutable(_TrackedAction):
             self._cmd = []
         self._name = name
         self._shell = bool(shell)
+        self._xml_envs = xml_envs
+        self._detailed = False
         self._idx = _R._track_node(
             {
                 "package": "",
@@ -74,6 +72,16 @@ class _TrackedExecutable(_TrackedAction):
         )
 
     def execute(self, context) -> list | None:
+        if not self._detailed:
+            self._detailed = True
+            if self._xml_envs is not None:
+                self._resolve_xml_details(context)
+            else:
+                self._resolve_shim_details(context)
+        return None
+
+    def _resolve_shim_details(self, context) -> None:
+        """Resolve Python shim path details."""
         parts = []
         for part in self._cmd:
             raw_part = part
@@ -95,4 +103,20 @@ class _TrackedExecutable(_TrackedAction):
         _R._state.tracked["nodes"][self._idx]["cmd"] = cmd_str
         _R._state.tracked["nodes"][self._idx]["name"] = name_str
         _R._state.tracked["nodes"][self._idx]["shell"] = self._shell
-        return None
+
+    def _resolve_xml_details(self, context) -> None:
+        """Resolve XML-parsed token structures into the tracked node entry."""
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        entry = _R._state.tracked["nodes"][self._idx]
+        cmd = resolve_value(self._cmd, context) or ""
+        name = resolve_value(self._name, context) or ""
+        entry["cmd"] = cmd
+        entry["name"] = name
+        entry["shell"] = self._shell
+        entry["namespace_stack"] = list(_R._state.namespace_stack)
+        # Env
+        env = dict(_R._state.env)
+        for k_tokens, v_tokens in self._xml_envs or []:
+            env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
+        entry["env"] = env

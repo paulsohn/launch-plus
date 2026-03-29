@@ -338,7 +338,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({"parent_var": "parent_value"})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+            R._inline_resolve_python_launch(child_path, ctx, {})
 
             assert ctx._launch_configurations["child_var"] == "child_value"
             assert ctx._launch_configurations["parent_var"] == "parent_value"
@@ -364,7 +364,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+            R._inline_resolve_python_launch(child_path, ctx, {})
 
             assert "child_only_arg" not in ctx._launch_configurations
             assert ctx._launch_configurations["sticky_var"] == "persists"
@@ -392,7 +392,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {"mode": "custom"}, depth=1)
+            R._inline_resolve_python_launch(child_path, ctx, {"mode": "custom"})
 
             assert ctx._launch_configurations["resolved_mode"] == "custom"
 
@@ -411,14 +411,16 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=21)
+            R._state.walk_depth = 21  # Simulate deep nesting
+            R._inline_resolve_python_launch(child_path, ctx, {})
             # Should not raise; just warns
             assert any("depth" in w.lower() for w in R._state.tracked["warnings"])
+            R._state.walk_depth = 0  # Reset
 
     def test_missing_file_silently_skipped(self):
         """A non-existent include file should not raise."""
         ctx = _make_context({})
-        R._inline_resolve_python_launch("/nonexistent/path.py", ctx, {}, depth=1)
+        R._inline_resolve_python_launch("/nonexistent/path.py", ctx, {})
         # No error, no crash
 
     def test_inline_include_keeps_tracked_nodes(self):
@@ -441,7 +443,7 @@ class TestInlinePythonInclude:
 
             nodes_before = len(R._state.tracked["nodes"])
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+            R._inline_resolve_python_launch(child_path, ctx, {})
 
             # Inline include adds nodes to tracked state
             assert len(R._state.tracked["nodes"]) > nodes_before
@@ -467,7 +469,7 @@ class TestInlinePythonInclude:
 
             gp_before = len(R._state.tracked["global_params"])
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+            R._inline_resolve_python_launch(child_path, ctx, {})
 
             # Global params from inline include are kept
             assert len(R._state.tracked["global_params"]) > gp_before
@@ -515,7 +517,7 @@ class TestInlinePythonInclude:
 
             deps_before = len(R._state.tracked["include_deps"])
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+            R._inline_resolve_python_launch(child_path, ctx, {})
 
             # No new include deps
             assert len(R._state.tracked["include_deps"]) == deps_before
@@ -533,8 +535,8 @@ class TestEnvStack:
         ctx = _make_context()
         set_env = R._TrackedSetEnvironmentVariable(name="FOO", value="bar")
         node = R._TrackedNode(package="p", executable="e", name="n")
-        R._walk_action(set_env, ctx, 0)
-        R._walk_action(node, ctx, 0)
+        set_env.execute(ctx)
+        node.execute(ctx)
         entry = R._state.tracked["nodes"][node._idx]
         assert entry["env"]["FOO"] == "bar"
 
@@ -545,7 +547,7 @@ class TestEnvStack:
         name = f"NONEXISTENT_VAR_{uuid.uuid4().hex[:8]}"
         assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
-        R._walk_action(R._TrackedUnsetEnvironmentVariable(name=name), ctx, 0)
+        R._TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
         errors = R._state.tracked.get("errors", [])
         assert any(name in e and "not set" in e for e in errors)
 
@@ -556,9 +558,9 @@ class TestEnvStack:
         name = f"OVERRIDE_ONLY_{uuid.uuid4().hex[:8]}"
         assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
-        R._walk_action(R._TrackedSetEnvironmentVariable(name=name, value="val"), ctx, 0)
+        R._TrackedSetEnvironmentVariable(name=name, value="val").execute(ctx)
         assert name in R._state.env
-        R._walk_action(R._TrackedUnsetEnvironmentVariable(name=name), ctx, 0)
+        R._TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
         assert name not in R._state.env
         errors = R._state.tracked.get("errors", [])
         assert not any(name in e for e in errors)
@@ -570,9 +572,9 @@ class TestEnvStack:
             actions=[R._TrackedSetEnvironmentVariable(name="SCOPED_VAR", value="val")],
             scoped=True,
         )
-        R._walk_action(group, ctx, 0)
+        group.execute(ctx)
         node = R._TrackedNode(package="p", executable="e", name="n")
-        R._walk_action(node, ctx, 0)
+        node.execute(ctx)
         entry = R._state.tracked["nodes"][node._idx]
         assert "SCOPED_VAR" not in entry["env"]
 
@@ -583,23 +585,23 @@ class TestEnvStack:
             actions=[R._TrackedSetEnvironmentVariable(name="LEAKED_VAR", value="val")],
             scoped=False,
         )
-        R._walk_action(group, ctx, 0)
+        group.execute(ctx)
         node = R._TrackedNode(package="p", executable="e", name="n")
-        R._walk_action(node, ctx, 0)
+        node.execute(ctx)
         entry = R._state.tracked["nodes"][node._idx]
         assert entry["env"]["LEAKED_VAR"] == "val"
 
     def test_node_local_env_overrides_inherited(self):
         """Node-local env overrides inherited env for the same key."""
         ctx = _make_context()
-        R._walk_action(R._TrackedSetEnvironmentVariable(name="FOO", value="inherited"), ctx, 0)
+        R._TrackedSetEnvironmentVariable(name="FOO", value="inherited").execute(ctx)
         node = R._TrackedNode(
             package="p",
             executable="e",
             name="n",
             env=[("FOO", "local")],
         )
-        R._walk_action(node, ctx, 0)
+        node.execute(ctx)
         entry = R._state.tracked["nodes"][node._idx]
         assert entry["env"]["FOO"] == "local"
 
@@ -622,7 +624,7 @@ class TestEnvStack:
                 """)
                 )
             ctx = _make_context()
-            R._inline_resolve_python_launch(child_path, ctx, {}, depth=1)
+            R._inline_resolve_python_launch(child_path, ctx, {})
             assert "CHILD_VAR" not in R._state.env
 
     def test_env_overrides_returns_only_overrides(self):
@@ -656,9 +658,9 @@ class TestEnvStack:
     def test_process_env_never_exposed_in_node(self):
         """Node env should only contain overrides, never process env vars."""
         ctx = _make_context()
-        R._walk_action(R._TrackedSetEnvironmentVariable(name="MY_OVERRIDE", value="val"), ctx, 0)
+        R._TrackedSetEnvironmentVariable(name="MY_OVERRIDE", value="val").execute(ctx)
         node = R._TrackedNode(package="p", executable="e", name="n")
-        R._walk_action(node, ctx, 0)
+        node.execute(ctx)
         entry = R._state.tracked["nodes"][node._idx]
         # Only the explicit override should appear.
         assert entry["env"] == {"MY_OVERRIDE": "val"}

@@ -404,6 +404,7 @@ class ResolverState:
         "fetched_packages",
         "rosdep_attempted",
         "root_source_key",
+        "walk_depth",
     )
 
     def __init__(self) -> None:
@@ -447,6 +448,7 @@ class ResolverState:
         self.fetched_packages: set = set()
         self.rosdep_attempted: set = set()
         self.root_source_key: str = ""
+        self.walk_depth: int = 0
 
 
 _state = ResolverState()
@@ -1243,9 +1245,7 @@ class _ActionParser:
                 parent_lc = _make_launch_context({**self.ctx.args, **self.ctx.vars})
                 if _state.global_params:
                     parent_lc._launch_configurations["global_params"] = list(_state.global_params)
-                _inline_resolve_python_launch(
-                    file_path, parent_lc, child_ctx_args, len(self.include_stack) + 1
-                )
+                _inline_resolve_python_launch(file_path, parent_lc, child_ctx_args)
                 set_configs = _state.tracked["set_launch_configurations"]
                 for k, v in parent_lc._launch_configurations.items():
                     if (k in set_configs or k in child_ctx_args) and k != "global_params":
@@ -1264,7 +1264,20 @@ import launch_plus.entities.actions  # noqa: F401, E402
 # ─── Shim classes ─────────────────────────────────────────────────────────────
 
 
-class _TrackedNode:
+class _TrackedAction:
+    """Base for all tracked Python-side action classes.
+
+    Mirrors the official ROS 2 ``Action.execute(context)`` pattern: each
+    subclass overrides ``execute()`` with its own logic.  The walker calls
+    ``execute()`` and recursively walks any returned child actions.
+    """
+
+    def execute(self, context) -> list | None:
+        """Execute this action. Return child actions to walk, or None."""
+        return None
+
+
+class _TrackedNode(_TrackedAction):
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
         _track_package(package)
         self._idx = _track_node(
@@ -1283,7 +1296,7 @@ class _TrackedNode:
                 "target": None,
             }
         )
-        # Save raw kwargs for deferred resolution in _walk_action
+        # Save raw kwargs for deferred resolution in execute()
         self._raw_package = package
         self._raw_executable = executable
         self._raw_name = name
@@ -1301,6 +1314,12 @@ class _TrackedNode:
             if hasattr(p, "_param_file") and p._param_file:
                 _track_param_file(p._param_file)
 
+    def execute(self, context) -> list | None:
+        if context is not None and not self._detailed:
+            self._detailed = True
+            _resolve_node_details(self, context)
+        return None
+
     def __repr__(self):
         return f"TrackedNode(package={_state.tracked['nodes'][self._idx]['package']!r})"
 
@@ -1311,7 +1330,7 @@ class _TrackedLifecycleNode(_TrackedNode):
         _state.tracked["nodes"][self._idx]["kind"] = "lifecycle_node"
 
 
-class _TrackedEmitEvent:
+class _TrackedEmitEvent(_TrackedAction):
     """Tracked emit_event — records the event type and optional target node."""
 
     def __init__(self, event=None, **kwargs):
@@ -1337,7 +1356,7 @@ class _TrackedEmitEvent:
         }
 
 
-class _TrackedChangeState:
+class _TrackedChangeState(_TrackedAction):
     """Tracked ChangeState event — records the transition and target node.
 
     Real API: ``ChangeState(lifecycle_node_matcher=matches_action(node), transition_id=...)``
@@ -1355,7 +1374,7 @@ class _TrackedChangeState:
             self._explicit_namespace = getattr(lifecycle_node_matcher, "_explicit_namespace", None)
 
 
-class _TrackedShutdown:
+class _TrackedShutdown(_TrackedAction):
     """Tracked Shutdown event.
 
     When used directly as an action (rather than wrapped in EmitEvent),
@@ -1380,7 +1399,7 @@ class _TrackedShutdown:
         }
 
 
-class _TrackedMatchesAction:
+class _TrackedMatchesAction(_TrackedAction):
     """Wraps ``matches_action(node)`` — carries the node name for ChangeState targeting.
 
     The real ``launch.events.matches_action`` returns a callable matcher.
@@ -1413,7 +1432,7 @@ def _transition_name(transition_id):
     return str(transition_id) if transition_id else ""
 
 
-class _TrackedOnProcessStart:
+class _TrackedOnProcessStart(_TrackedAction):
     """Tracked OnProcessStart event handler."""
 
     def __init__(self, target_action=None, on_start=None, **kwargs):
@@ -1434,7 +1453,7 @@ class _TrackedOnProcessStart:
         }
 
 
-class _TrackedOnProcessExit:
+class _TrackedOnProcessExit(_TrackedAction):
     """Tracked OnProcessExit event handler."""
 
     def __init__(self, target_action=None, on_exit=None, **kwargs):
@@ -1455,7 +1474,7 @@ class _TrackedOnProcessExit:
         }
 
 
-class _TrackedOnStateTransition:
+class _TrackedOnStateTransition(_TrackedAction):
     """Tracked OnStateTransition event handler.
 
     Real API: ``OnStateTransition(target_lifecycle_node=node,
@@ -1486,7 +1505,7 @@ class _TrackedOnStateTransition:
         }
 
 
-class _TrackedOnShutdown:
+class _TrackedOnShutdown(_TrackedAction):
     """Tracked OnShutdown event handler.
 
     OnShutdown fires when the launch system is shutting down.  It has no
@@ -1509,7 +1528,7 @@ class _TrackedOnShutdown:
         }
 
 
-class _TrackedRegisterEventHandler:
+class _TrackedRegisterEventHandler(_TrackedAction):
     """Tracked RegisterEventHandler — records the event handler to _state.tracked."""
 
     def __init__(self, event_handler=None, **kwargs):
@@ -1530,7 +1549,7 @@ def _action_namespace_info(action):
     Returns (namespace_stack, explicit_namespace) from the tracked entry.
     By the time event handlers are registered, _resolve_node_details has
     already run on the target node (LifecycleNode is processed before
-    RegisterEventHandler in _walk_actions), so these fields are populated.
+    RegisterEventHandler in execute()s), so these fields are populated.
     """
     if action is None or not hasattr(action, "_idx"):
         return [], None
@@ -1538,11 +1557,11 @@ def _action_namespace_info(action):
     return entry.get("namespace_stack", []), entry.get("explicit_namespace")
 
 
-class _TrackedComposableNode:
+class _TrackedComposableNode(_TrackedAction):
     """A composable node plugin loaded into a container process.
 
     Does NOT add to the flat ``_state.tracked["nodes"]`` list — it is attached to the
-    container's ``plugins`` list when the container is resolved in ``_walk_action``.
+    container's ``plugins`` list when the container is resolved in ``execute()``.
     """
 
     def __init__(self, *, package=None, plugin=None, name=None, **kwargs):
@@ -1564,11 +1583,11 @@ class _TrackedComposableNode:
         return f"TrackedComposableNode(package={self._package!r}, plugin={self._plugin!r})"
 
 
-class _TrackedComposableNodeContainer:
+class _TrackedComposableNodeContainer(_TrackedAction):
     """A composable node container process.
 
     Emits a ``kind='container'`` entry whose ``plugins`` list is populated during
-    deferred resolution in ``_walk_action`` from the *composable_node_descriptions*.
+    deferred resolution in ``execute()`` from the *composable_node_descriptions*.
     """
 
     def __init__(
@@ -1613,12 +1632,21 @@ class _TrackedComposableNodeContainer:
             if raw_pkg:
                 _track_package(raw_pkg)
 
+    def execute(self, context) -> list | None:
+        if context is not None and not self._detailed:
+            self._detailed = True
+            _resolve_node_details(self, context)
+            _state.tracked["nodes"][self._idx]["plugins"] = _resolve_composable_plugins(
+                self._descs, context
+            )
+        return None
 
-class _TrackedLoadComposableNodes:
+
+class _TrackedLoadComposableNodes(_TrackedAction):
     """Loads composable nodes into an existing container.
 
     Emits a ``kind='load_composable'`` entry with ``target`` set to the container
-    name and ``plugins`` populated during deferred resolution in ``_walk_action``.
+    name and ``plugins`` populated during deferred resolution in ``execute()``.
     """
 
     def __init__(self, *, composable_node_descriptions=None, target_container=None, **kwargs):
@@ -1664,15 +1692,38 @@ class _TrackedLoadComposableNodes:
             if raw_pkg:
                 _track_package(raw_pkg)
 
+    def execute(self, context) -> list | None:
+        if context is not None and not self._detailed:
+            self._detailed = True
+            entry = _state.tracked["nodes"][self._idx]
+            if self._raw_target is not None:
+                if isinstance(self._raw_target, _TrackedComposableNodeContainer):
+                    target = _state.tracked["nodes"][self._raw_target._idx].get(
+                        "name"
+                    ) or entry.get("target", "")
+                else:
+                    target = _resolve_substitution(self._raw_target, context)
+                if target:
+                    entry["target"] = target
+            entry["plugins"] = _resolve_composable_plugins(self._descs, context)
+        return None
 
-class _TrackedPushRosNamespace:
-    """Tracks PushRosNamespace so _walk_action can update _state.namespace_stack."""
+
+class _TrackedPushRosNamespace(_TrackedAction):
+    """Tracks PushRosNamespace so execute() can update _state.namespace_stack."""
 
     def __init__(self, namespace=None, **kwargs):
         self._namespace = namespace  # string or substitution object
 
+    def execute(self, context) -> list | None:
+        if self._namespace is not None and context is not None:
+            ns = _resolve_substitution(self._namespace, context)
+            if ns:
+                _state.namespace_stack.append(ns)
+        return None
 
-class _TrackedParameterFile:
+
+class _TrackedParameterFile(_TrackedAction):
     """Tracks ParameterFile references so they can be reported as param_file dependencies."""
 
     def __init__(self, param_file=None, *args, allow_substs=False, **kwargs):
@@ -1698,22 +1749,41 @@ class _TrackedParameterFile:
                 _track_param_file(path)
 
 
-class _SetLaunchConfiguration:
+class _SetLaunchConfiguration(_TrackedAction):
     """Implements SetLaunchConfiguration: updates launch_configurations at walk time."""
 
     def __init__(self, name=None, value=None, **kwargs):
         self._name = name
         self._value = value
 
+    def execute(self, context) -> list | None:
+        name = self._name
+        value = self._value
+        if name and context is not None:
+            if hasattr(value, "perform"):
+                try:
+                    value = value.perform(context)
+                except _PackageNotFetchedError:
+                    raise
+                except Exception:
+                    pass
+            resolved_value = str(value) if value is not None else ""
+            context._launch_configurations[str(name)] = resolved_value
+            _state.tracked["set_launch_configurations"][str(name)] = resolved_value
+        return None
 
-class _TimerAction:
+
+class _TimerAction(_TrackedAction):
     """Stores TimerAction child actions so the walker can recurse into them."""
 
     def __init__(self, *, period=None, actions=None, **kwargs):
         self._actions = list(actions or [])
 
+    def execute(self, context) -> list | None:
+        return self._actions or None
 
-class _TrackedFindPackageShare:
+
+class _TrackedFindPackageShare(_TrackedAction):
     """Tracks FindPackageShare; package may be a string or a list of substitutions."""
 
     def __init__(self, package):
@@ -1777,7 +1847,7 @@ class _TrackedFindPackageShare:
         return f"$(find-pkg-share {pkg})"
 
 
-class _TrackedPathJoinSubstitution:
+class _TrackedPathJoinSubstitution(_TrackedAction):
     def __init__(self, substitutions):
         self._subs = substitutions
         # Track packages from nested FindPackageShare
@@ -1806,7 +1876,7 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
     include_args dict for backward compatibility.
 
     Called both at construction time (with a stub context) and deferred during
-    _walk_action (with the live context, which can resolve LaunchConfiguration
+    execute() (with the live context, which can resolve LaunchConfiguration
     and PathJoinSubstitution values correctly).  A second call for the same
     entry is skipped — the first resolved value wins.
     """
@@ -1858,10 +1928,10 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
         _warn(f"failed to resolve include args for '{path}': {e}")
 
 
-class _TrackedIncludeLaunchDescription:
+class _TrackedIncludeLaunchDescription(_TrackedAction):
     def __init__(self, launch_description_source, launch_arguments=None, **kwargs):
         self._source = launch_description_source
-        # Save raw args for deferred resolution in _walk_action (needed when the source
+        # Save raw args for deferred resolution in execute() (needed when the source
         # is a substitution like PathJoinSubstitution that can only be resolved with a
         # live LaunchContext — typically when constructed inside an OpaqueFunction).
         self._raw_launch_arguments = launch_arguments
@@ -1886,8 +1956,49 @@ class _TrackedIncludeLaunchDescription:
         if launch_arguments and path:
             _resolve_include_args(path, launch_arguments, _StubLaunchContext(), self._dep_idx)
 
+    def execute(self, context) -> list | None:
+        # Deferred resolution: when the source is a substitution (e.g. PathJoinSubstitution),
+        # the path cannot be extracted at construction time because no LaunchContext is
+        # available.  Try again here with the live context.
+        if self._path is None and context is not None:
+            src = self._source
+            path = None
+            if hasattr(src, "perform"):
+                try:
+                    path = src.perform(context)
+                except _PackageNotFetchedError:
+                    raise
+                except Exception as e:
+                    _warn(f"failed to resolve IncludeLaunchDescription source: {e}")
+            if path:
+                self._path = path
+                dep_idx = _track_include(path)
+                _resolve_include_args(path, self._raw_launch_arguments, context, dep_idx)
 
-class _DeferredDefault:
+        # Inline-execute Python includes within the parent context so that
+        # SetLaunchConfiguration side-effects propagate to sibling actions.
+        if self._path and self._path.endswith(".py") and context is not None:
+            child_args = {}
+            if self._raw_launch_arguments:
+                for k, v in self._raw_launch_arguments:
+                    k_str = str(k)
+                    resolved = _resolve_substitution(v, context)
+                    v_str = resolved if resolved is not None else str(v)
+                    child_args[k_str] = v_str
+            inc_dep = _extract_pkg_and_share_path(self._path)
+            if inc_dep:
+                _state.include_chain.append(list(inc_dep))
+            else:
+                _state.include_chain.append(["", self._path])
+            try:
+                _inline_resolve_python_launch(self._path, context, child_args)
+            finally:
+                _state.include_chain.pop()
+
+        return None
+
+
+class _DeferredDefault(_TrackedAction):
     """Wraps an unresolved DeclareLaunchArgument default_value.
 
     Stored in ``_launch_configurations`` instead of a resolved string.
@@ -1918,7 +2029,7 @@ class _DeferredDefault:
         return str(dv)
 
 
-class _LaunchConfiguration:
+class _LaunchConfiguration(_TrackedAction):
     """Substitution that resolves to a launch configuration value at runtime."""
 
     def __init__(self, variable_name, default=None, **kwargs):
@@ -1943,7 +2054,7 @@ class _LaunchConfiguration:
         return self._name
 
 
-class _DeclaredArg:
+class _DeclaredArg(_TrackedAction):
     """Stub for DeclareLaunchArgument: captures name, default_value, and condition."""
 
     def __init__(self, name=None, *positional, default_value=None, condition=None, **kwargs):
@@ -1952,6 +2063,10 @@ class _DeclaredArg:
         self.name = str(name) if name is not None else (str(positional[0]) if positional else None)
         self.default_value = default_value
         self.condition = condition
+
+    def execute(self, context) -> list | None:
+        _apply_declared_arg(self, context)
+        return None
 
 
 def _apply_declared_arg(arg: "_DeclaredArg", context) -> None:
@@ -2041,14 +2156,26 @@ def _apply_declared_arg(arg: "_DeclaredArg", context) -> None:
         context._launch_configurations[arg.name] = _DeferredDefault(dv)
 
 
-class _TrackedOpaqueFunction:
+class _TrackedOpaqueFunction(_TrackedAction):
     """Stores an OpaqueFunction's callable so the walker can invoke it."""
 
     def __init__(self, *, function=None, **kwargs):
         self.function = function
 
+    def execute(self, context) -> list | None:
+        fn = self.function
+        if fn and context:
+            try:
+                result = _call_opaque_with_stubs(fn, context)
+                return result if result else None
+            except _PackageNotFetchedError as e:
+                _error(f"OpaqueFunction failed: package fetch failed: {e}")
+            except Exception as e:
+                _error(f"OpaqueFunction failed: {e}")
+        return None
 
-class _TrackedGroupAction:
+
+class _TrackedGroupAction(_TrackedAction):
     """Stores GroupAction's child actions so the walker can recurse into them."""
 
     def __init__(self, actions=None, **kwargs):
@@ -2056,25 +2183,88 @@ class _TrackedGroupAction:
         self._scoped = kwargs.get("scoped", True)
         self._condition = kwargs.get("condition")
 
+    def execute(self, context) -> list | None:
+        if self._condition is not None and context is not None:
+            try:
+                if not self._condition.evaluate(context):
+                    return None
+            except _PackageNotFetchedError:
+                raise
+            except Exception as e:
+                _warn(f"GroupAction condition evaluation failed: {e}")
+                return None
+        depth_before = len(_state.namespace_stack)
+        saved_env = dict(_state.env) if self._scoped else None
+        _walk_actions(self._actions, context)
+        del _state.namespace_stack[depth_before:]
+        if saved_env is not None:
+            _state.env.clear()
+            _state.env.update(saved_env)
+        return None
 
-class _TrackedSetEnvironmentVariable:
-    """Tracks SetEnvironmentVariable: mutates _state.env in _walk_action."""
+
+class _TrackedSetEnvironmentVariable(_TrackedAction):
+    """Tracks SetEnvironmentVariable: mutates _state.env."""
 
     def __init__(self, name=None, value=None, **kwargs):
         self._name = name
         self._value = value
         self._condition = kwargs.get("condition")
 
+    def execute(self, context) -> list | None:
+        if self._condition is not None and context is not None:
+            try:
+                if not self._condition.evaluate(context):
+                    return None
+            except _PackageNotFetchedError:
+                raise
+            except Exception as e:
+                _warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
+                return None
+        name = _to_str(self._name, context)
+        if not name:
+            _error("SetEnvironmentVariable: resolved name is empty or None — skipping")
+            return None
+        value = _to_str(self._value, context) or ""
+        _state.env[name] = value
+        return None
 
-class _TrackedUnsetEnvironmentVariable:
-    """Tracks UnsetEnvironmentVariable: removes from _state.env in _walk_action."""
+
+class _TrackedUnsetEnvironmentVariable(_TrackedAction):
+    """Tracks UnsetEnvironmentVariable: removes from _state.env."""
 
     def __init__(self, name=None, **kwargs):
         self._name = name
         self._condition = kwargs.get("condition")
 
+    def execute(self, context) -> list | None:
+        if self._condition is not None and context is not None:
+            try:
+                if not self._condition.evaluate(context):
+                    return None
+            except _PackageNotFetchedError:
+                raise
+            except Exception as e:
+                _warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
+                return None
+        name = _to_str(self._name, context)
+        if not name:
+            _error("UnsetEnvironmentVariable: resolved name is empty or None — skipping")
+            return None
+        if name in os.environ:
+            _error(
+                f"unset_env: '{name}' exists in the process env and cannot be unset. "
+                f'Use SetEnvironmentVariable(name="{name}", value="") '
+                "or a scoped group instead"
+            )
+        elif name in _state.env:
+            del _state.env[name]
+        else:
+            _error(f"unset_env: environment variable '{name}' is not set")
+        return None
 
-class _TrackedSetParameter:
+
+class _TrackedSetParameter(_TrackedAction):
     """Mirrors launch_ros SetParameter: accumulates (name, value) into context['global_params'].
 
     In the real ROS 2 launch system, SetParameter.execute() appends (name, ParameterValue)
@@ -2085,14 +2275,49 @@ class _TrackedSetParameter:
     """
 
     def __init__(self, name=None, value=None, **kwargs):
-        # Keep raw for deferred resolution in _walk_action (value may be a substitution).
+        # Keep raw for deferred resolution (value may be a substitution).
         # No node entry — SetParameter is a side-effect action that populates _state.global_params,
         # which are then absorbed into each leaf node's parameters.
         self._name = name
         self._value = value
 
+    def execute(self, context) -> list | None:
+        name = self._name
+        value = self._value
+        if hasattr(name, "perform") and context is not None:
+            try:
+                name = name.perform(context)
+            except _PackageNotFetchedError:
+                raise
+            except Exception:
+                name = str(name)
+        else:
+            name = str(name) if name is not None else ""
+        if name and context is not None:
+            if hasattr(value, "perform"):
+                try:
+                    value = value.perform(context)
+                except _PackageNotFetchedError:
+                    raise
+                except Exception:
+                    pass
+            # Coerce string representations of numerics to native Python types.
+            if isinstance(value, str):
+                try:
+                    value = int(value)
+                except (ValueError, TypeError):
+                    try:
+                        value = float(value)
+                    except (ValueError, TypeError):
+                        pass
+            gp_list = context._launch_configurations.setdefault("global_params", [])
+            gp_list.append((name, value))
+            _state.tracked["global_params"].append([name, value])
+            _state.global_params.append((name, value))
+        return None
 
-class _TrackedExecutable:
+
+class _TrackedExecutable(_TrackedAction):
     """Tracks an ExecuteProcess so the walker can render it as <executable>."""
 
     def __init__(self, *, cmd=None, name=None, shell=False, **kwargs):
@@ -2123,6 +2348,34 @@ class _TrackedExecutable:
                 "shell": self._shell,
             }
         )
+
+    def execute(self, context) -> list | None:
+        parts = []
+        for part in self._cmd:
+            raw_part = part
+            if hasattr(part, "perform") and context is not None:
+                try:
+                    result = part.perform(context)
+                    part = result if result is not None else raw_part
+                except _PackageNotFetchedError:
+                    raise
+                except Exception:
+                    part = str(raw_part)
+            parts.append(str(part))
+        cmd_str = " ".join(parts)
+        name = self._name
+        if hasattr(name, "perform") and context is not None:
+            try:
+                name = name.perform(context)
+            except _PackageNotFetchedError:
+                raise
+            except Exception:
+                name = str(name) if name is not None else ""
+        name_str = str(name) if name is not None else ""
+        _state.tracked["nodes"][self._idx]["cmd"] = cmd_str
+        _state.tracked["nodes"][self._idx]["name"] = name_str
+        _state.tracked["nodes"][self._idx]["shell"] = self._shell
+        return None
 
 
 # ─── LaunchContext stub ────────────────────────────────────────────────────────
@@ -2644,7 +2897,7 @@ def _resolve_composable_plugins(descs, context):
 # ─── Inline Python include resolution ─────────────────────────────────────────
 
 
-def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth):
+def _inline_resolve_python_launch(launch_file, parent_context, child_args):
     """Load a Python launch file and walk its actions in the parent context.
 
     This mirrors real ROS 2 behavior where ``IncludeLaunchDescription``
@@ -2652,9 +2905,6 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
     the child mutate the shared ``LaunchContext``.  The orchestrator still
     handles the recursive node/include dependency resolution separately.
     """
-    if depth > 20:
-        _warn(f"Max inline include depth for {launch_file}")
-        return
 
     # Resolve portable paths — $(find-pkg-share pkg)/rest → real filesystem path.
     real_path = launch_file
@@ -2673,7 +2923,9 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
         return  # File not on disk — orchestrator will fetch and resolve later
 
     try:
-        spec = importlib.util.spec_from_file_location(f"_inline_launch_{depth}", real_path)
+        spec = importlib.util.spec_from_file_location(
+            f"_inline_launch_{_state.walk_depth}", real_path
+        )
         if spec is None or spec.loader is None:
             _warn(f"cannot load included launch file: {real_path}")
             return
@@ -2735,7 +2987,7 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
         # Pass 2: walk actions — SetLaunchConfiguration, OpaqueFunction, etc.
         # all mutate parent_context directly, which is the desired effect.
         # Only context mutations survive; tracked state is rolled back.
-        _walk_actions(entities, parent_context, depth)
+        _walk_actions(entities, parent_context)
     except _PackageNotFetchedError:
         raise
     finally:
@@ -2762,306 +3014,74 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args, depth
 # ─── Action walker ────────────────────────────────────────────────────────────
 
 
-def _walk_actions(actions, context, depth=0):
-    if depth > 20:
-        _warn("Max include depth reached while walking Python launch description")
-        return
+def _walk_actions(actions, context):
+    """Walk a list of actions, calling ``execute()`` on each.
+
+    Tracked actions (subclasses of ``_TrackedAction``) implement the polymorphic
+    ``execute(context)`` method.  Untracked actions (real ROS 2 objects from
+    OpaqueFunction returns) are handled by ``_walk_untracked_action()``.
+    """
     if actions is None:
         return
-    for action in actions:
-        if action is None:
-            continue
-        try:
-            _walk_action(action, context, depth)
-        except _PackageNotFetchedError:
-            raise  # Let it propagate to the OpaqueFunction or top-level handler
-        except Exception as e:
-            _error(f"Error walking action {type(action).__name__}: {e}")
+    _state.walk_depth += 1
+    if _state.walk_depth > 20:
+        _state.walk_depth -= 1
+        _warn("Max include depth reached while walking Python launch description")
+        return
+    try:
+        for action in actions:
+            if action is None:
+                continue
+            try:
+                if isinstance(action, _TrackedAction):
+                    children = action.execute(context)
+                    if children:
+                        _walk_actions(children, context)
+                else:
+                    _walk_untracked_action(action, context)
+            except _PackageNotFetchedError:
+                raise
+            except Exception as e:
+                _error(f"Error walking action {type(action).__name__}: {e}")
+    finally:
+        _state.walk_depth -= 1
 
 
-def _walk_action(action, context, depth):
+def _walk_untracked_action(action, context):
+    """Handle real (unpatched) ROS 2 action objects.
+
+    These come from OpaqueFunction returns that produce real ``launch_ros``
+    classes instead of our shimmed ``_Tracked*`` wrappers.
+    """
     cls_name = type(action).__name__
 
-    # DeclareLaunchArgument: apply default to context so subsequent actions can use it.
-    # This handles nested declarations (inside GroupAction etc.); top-level ones are
-    # already processed in the two-pass logic in main().
-    if isinstance(action, _DeclaredArg):
-        _apply_declared_arg(action, context)
-        return
-
-    # Our tracked nodes — resolve details deferred with the live context
-    if isinstance(action, (_TrackedNode, _TrackedLifecycleNode)):
-        if context is not None and not action._detailed:
-            action._detailed = True
-            _resolve_node_details(action, context)
-        return
-
-    if isinstance(action, _TrackedComposableNodeContainer):
-        if context is not None and not action._detailed:
-            action._detailed = True
-            _resolve_node_details(action, context)
-            _state.tracked["nodes"][action._idx]["plugins"] = _resolve_composable_plugins(
-                action._descs, context
-            )
-        return
-
-    if isinstance(action, _TrackedLoadComposableNodes):
-        if context is not None and not action._detailed:
-            action._detailed = True
-            entry = _state.tracked["nodes"][action._idx]
-            if action._raw_target is not None:
-                if isinstance(action._raw_target, _TrackedComposableNodeContainer):
-                    # Container object: use its already-resolved name (updated by _resolve_node_details).
-                    target = _state.tracked["nodes"][action._raw_target._idx].get(
-                        "name"
-                    ) or entry.get("target", "")
-                else:
-                    target = _resolve_substitution(action._raw_target, context)
-                if target:
-                    entry["target"] = target
-            entry["plugins"] = _resolve_composable_plugins(action._descs, context)
-        return
-
-    if isinstance(action, _TrackedPushRosNamespace):
-        if action._namespace is not None and context is not None:
-            ns = _resolve_substitution(action._namespace, context)
-            if ns:
-                _state.namespace_stack.append(ns)
-        return
-
-    if isinstance(action, _TrackedIncludeLaunchDescription):
-        # Deferred resolution: when the source is a substitution (e.g. PathJoinSubstitution),
-        # the path cannot be extracted at construction time because no LaunchContext is
-        # available.  Try again here with the live context provided by _walk_action.
-        if action._path is None and context is not None:
-            src = action._source
-            path = None
-            if hasattr(src, "perform"):
-                try:
-                    path = src.perform(context)
-                except _PackageNotFetchedError:
-                    raise
-                except Exception as e:
-                    _warn(f"failed to resolve IncludeLaunchDescription source: {e}")
-            if path:
-                action._path = path
-                dep_idx = _track_include(path)
-                _resolve_include_args(path, action._raw_launch_arguments, context, dep_idx)
-
-        # Inline-execute Python includes within the parent context so that
-        # SetLaunchConfiguration side-effects propagate to sibling actions,
-        # just like the real ROS 2 launch system processes includes synchronously.
-        if action._path and action._path.endswith(".py") and context is not None:
-            child_args = {}
-            if action._raw_launch_arguments:
-                for k, v in action._raw_launch_arguments:
-                    k_str = str(k)
-                    resolved = _resolve_substitution(v, context)
-                    v_str = resolved if resolved is not None else str(v)
-                    child_args[k_str] = v_str
-            # Push include chain for source tracking.
-            inc_dep = _extract_pkg_and_share_path(action._path)
-            if inc_dep:
-                _state.include_chain.append(list(inc_dep))
-            else:
-                _state.include_chain.append(["", action._path])
-            try:
-                _inline_resolve_python_launch(action._path, context, child_args, depth + 1)
-            finally:
-                _state.include_chain.pop()
-
-        return
-
-    # SetParameter: append (name, value) to context['global_params'], mirroring the real
-    # launch_ros SetParameter.execute() which does:
-    #   global_param_list = context.launch_configurations.get('global_params', [])
-    #   global_param_list.extend(eval_param_dict.items())
-    #   context.launch_configurations['global_params'] = global_param_list
-    if isinstance(action, _TrackedSetParameter):
-        name = action._name
-        value = action._value
-        # Resolve name substitution if needed
-        if hasattr(name, "perform") and context is not None:
-            try:
-                name = name.perform(context)
-            except _PackageNotFetchedError:
-                raise
-            except Exception:
-                name = str(name)
-        else:
-            name = str(name) if name is not None else ""
-        if name and context is not None:
-            # Resolve value substitution if needed
-            if hasattr(value, "perform"):
-                try:
-                    value = value.perform(context)
-                except _PackageNotFetchedError:
-                    raise
-                except Exception:
-                    pass
-            # Coerce string representations of numerics to native Python types so that
-            # arithmetic in consumer files (e.g. gp["front_overhang"] + gp["wheel_base"])
-            # works without explicit casts.
-            if isinstance(value, str):
-                try:
-                    value = int(value)
-                except (ValueError, TypeError):
-                    try:
-                        value = float(value)
-                    except (ValueError, TypeError):
-                        pass
-            gp_list = context._launch_configurations.setdefault("global_params", [])
-            gp_list.append((name, value))
-            _state.tracked["global_params"].append([name, value])
-            _state.global_params.append((name, value))
-        return
-
-    # ExecuteProcess: resolve cmd parts and name, record as executable.
-    if isinstance(action, _TrackedExecutable):
-        parts = []
-        for part in action._cmd:
-            raw_part = part
-            if hasattr(part, "perform") and context is not None:
-                try:
-                    result = part.perform(context)
-                    part = result if result is not None else raw_part
-                except _PackageNotFetchedError:
-                    raise
-                except Exception:
-                    part = str(raw_part)
-            parts.append(str(part))
-        cmd_str = " ".join(parts)
-        name = action._name
-        if hasattr(name, "perform") and context is not None:
-            try:
-                name = name.perform(context)
-            except _PackageNotFetchedError:
-                raise
-            except Exception:
-                name = str(name) if name is not None else ""
-        name_str = str(name) if name is not None else ""
-        _state.tracked["nodes"][action._idx]["cmd"] = cmd_str
-        _state.tracked["nodes"][action._idx]["name"] = name_str
-        _state.tracked["nodes"][action._idx]["shell"] = action._shell
-        return
-
-    # SetLaunchConfiguration: update launch_configurations at walk time.
-    if isinstance(action, _SetLaunchConfiguration):
-        name = action._name
-        value = action._value
-        if name and context is not None:
-            if hasattr(value, "perform"):
-                try:
-                    value = value.perform(context)
-                except _PackageNotFetchedError:
-                    raise
-                except Exception:
-                    pass
-            resolved_value = str(value) if value is not None else ""
-            context._launch_configurations[str(name)] = resolved_value
-            _state.tracked["set_launch_configurations"][str(name)] = resolved_value
-        return
-
     # OpaqueFunction: execute its function and walk the result
-    if isinstance(action, _TrackedOpaqueFunction) or (
-        cls_name == "OpaqueFunction"
-        or (hasattr(action, "function") and callable(getattr(action, "function", None)))
+    if cls_name == "OpaqueFunction" or (
+        hasattr(action, "function") and callable(getattr(action, "function", None))
     ):
         fn = getattr(action, "function", None)
         if fn and context:
             try:
                 result = _call_opaque_with_stubs(fn, context)
                 if result:
-                    _walk_actions(result, context, depth + 1)
+                    _walk_actions(result, context)
             except _PackageNotFetchedError as e:
                 _error(f"OpaqueFunction failed: package fetch failed: {e}")
             except Exception as e:
                 _error(f"OpaqueFunction failed: {e}")
         return
 
-    # SetEnvironmentVariable: mutate the env map (respects condition)
-    if isinstance(action, _TrackedSetEnvironmentVariable):
-        if action._condition is not None and context is not None:
-            try:
-                if not action._condition.evaluate(context):
-                    return
-            except _PackageNotFetchedError:
-                raise
-            except Exception as e:
-                _warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
-                return
-        name = _to_str(action._name, context)
-        if not name:
-            _error("SetEnvironmentVariable: resolved name is empty or None — skipping")
-            return
-        value = _to_str(action._value, context) or ""
-        _state.env[name] = value
-        return
-
-    # UnsetEnvironmentVariable: remove from env map (respects condition)
-    if isinstance(action, _TrackedUnsetEnvironmentVariable):
-        if action._condition is not None and context is not None:
-            try:
-                if not action._condition.evaluate(context):
-                    return
-            except _PackageNotFetchedError:
-                raise
-            except Exception as e:
-                _warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
-                return
-        name = _to_str(action._name, context)
-        if not name:
-            _error("UnsetEnvironmentVariable: resolved name is empty or None — skipping")
-            return
-        if name in os.environ:
-            # In process env (cases 2 & 3) — can't unset baseline.
-            _error(
-                f"unset_env: '{name}' exists in the process env and cannot be unset. "
-                f'Use SetEnvironmentVariable(name="{name}", value="") '
-                "or a scoped group instead"
-            )
-        elif name in _state.env:
-            # Case 1: override-only, no baseline to expose — safe to remove.
-            del _state.env[name]
-        else:
-            # Case 4: not set anywhere.
-            _error(f"unset_env: environment variable '{name}' is not set")
-        return
-
-    # GroupAction: walk child actions; scoped groups save/restore env + namespace
-    if isinstance(action, _TrackedGroupAction):
-        if action._condition is not None and context is not None:
-            try:
-                if not action._condition.evaluate(context):
-                    return
-            except _PackageNotFetchedError:
-                raise
-            except Exception as e:
-                _warn(f"GroupAction condition evaluation failed: {e}")
-                return
-        depth_before = len(_state.namespace_stack)
-        saved_env = dict(_state.env) if action._scoped else None
-        _walk_actions(action._actions, context, depth + 1)
-        del _state.namespace_stack[depth_before:]
-        if saved_env is not None:
-            _state.env.clear()
-            _state.env.update(saved_env)
-        return
-
-    if isinstance(action, _TimerAction):
-        _walk_actions(action._actions, context, depth + 1)
-        return
-
+    # Walk nested actions/entities from generic action objects
     if hasattr(action, "entities"):
         try:
-            _walk_actions(action.entities, context, depth + 1)
+            _walk_actions(action.entities, context)
         except _PackageNotFetchedError:
             raise
         except Exception as e:
             _warn(f"failed to walk {cls_name}.entities: {e}")
     if hasattr(action, "_actions"):
         try:
-            _walk_actions(action._actions, context, depth + 1)
+            _walk_actions(action._actions, context)
         except _PackageNotFetchedError:
             raise
         except Exception as e:
@@ -3116,52 +3136,28 @@ def _walk_action(action, context, depth):
                 try:
                     loc = loc(context)
                 except _PackageNotFetchedError:
-                    raise  # Let it propagate to the OpaqueFunction or top-level handler
+                    raise
                 except Exception:
                     loc = None
             if loc:
                 _track_include(loc)
 
-    # Warn about action classes we do not recognise.  Any class not in the known set may
-    # represent a node, include, or container that will be absent from the resolved output.
-    if cls_name not in _KNOWN_ACTION_CLASSES:
+    # Warn about action classes we do not recognise.
+    if cls_name not in _KNOWN_UNTRACKED_CLASSES:
         _warn(
             f"Unrecognised action type '{cls_name}' — any nodes or includes it "
             f"declares may not appear in the resolved output"
         )
 
 
-# ─── Known action class names ─────────────────────────────────────────────────
+# ─── Known untracked action class names ──────────────────────────────────────
 
-# Class names that _walk_action handles explicitly or that are safe to skip.
-# Any class not in this set triggers a warning so the user knows the output may
-# be incomplete.  The set covers:
-#   • Our shimmed tracking classes (prefixed with underscore or "Tracked")
-#   • Real launch_ros classes handled via cls_name duck-typing
-#   • ROS 2 lifecycle / event infrastructure that produces no nodes/includes
-_KNOWN_ACTION_CLASSES: frozenset = frozenset(
+# Real ROS 2 class names that _walk_untracked_action handles or that are safe
+# to skip.  Our _TrackedAction subclasses are dispatched via execute() and
+# don't need to be listed here.
+_KNOWN_UNTRACKED_CLASSES: frozenset = frozenset(
     {
-        # Shimmed tracking classes
-        "_DeclaredArg",
-        "_TrackedNode",
-        "_TrackedLifecycleNode",
-        "_TrackedComposableNodeContainer",
-        "_TrackedLoadComposableNodes",
-        "_TrackedPushRosNamespace",
-        "_TrackedIncludeLaunchDescription",
-        "_TrackedSetParameter",
-        "_TrackedExecutable",
-        "_SetLaunchConfiguration",
-        "_TrackedOpaqueFunction",
-        "_TrackedGroupAction",
-        "_TrackedRegisterEventHandler",
-        "_TrackedEmitEvent",
-        "_TrackedOnProcessStart",
-        "_TrackedOnProcessExit",
-        "_TrackedOnStateTransition",
-        "_TrackedOnShutdown",
-        "_TimerAction",
-        # Real launch_ros classes handled via cls_name fallback in _walk_action
+        # Real launch_ros classes handled via cls_name duck-typing
         "Node",
         "LifecycleNode",
         "ComposableNodeContainer",

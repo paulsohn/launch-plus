@@ -328,83 +328,21 @@ class _ActionParser:
     def effective_namespace(self, ns: str | None = None) -> str | None:
         return _effective_namespace(list(self.state.namespace_stack), ns)
 
-    # ── State accessors ──────────────────────────────────────────────
-
-    @property
-    def namespace_stack(self) -> list:
-        return self.state.namespace_stack
-
-    @property
-    def env(self) -> dict:
-        return self.state.env
-
-    @property
-    def global_params(self) -> list:
-        return self.state.global_params
-
-    @property
-    def global_remaps(self) -> list:
-        return self.state.global_remaps
-
-    @property
-    def global_param_files(self) -> list:
-        return self.state.global_param_files
-
-    @property
-    def declared_arg_names(self) -> set:
-        return self.state.declared_arg_names
-
-    @property
-    def tracked(self) -> dict:
-        return self.state.tracked
-
-    @property
-    def preview_mode(self) -> bool:
-        return self.state.preview_mode
-
-    @property
-    def apply_arg_defaults(self) -> bool:
-        return self.state.apply_arg_defaults
-
-    @property
-    def allow_unportable_paths(self) -> bool:
-        return self.state.allow_unportable_paths
-
-    def warn(self, msg: str) -> None:
-        self.state.warn(msg)
-
-    def error(self, msg: str) -> None:
-        self.state.error(msg)
-
-    # ── Tracking helpers ──────────────────────────────────────────────
+    # ── Tracking helpers (delegate to resolver) ─────────────────────
 
     def track_node(self, node_dict: dict) -> int:
-        """Delegate to module-level ``_track_node``."""
         return _R._track_node(node_dict)
 
     def track_event_handler(self, eh_dict: dict) -> int:
-        """Delegate to module-level ``_track_event_handler``."""
         return _R._track_event_handler(eh_dict)
 
-    def track_global_param(self, name: str, value: str) -> None:
-        """Record a global parameter."""
-        self.state.tracked["global_params"].append([name, value])
-        self.state.global_params.append((name, value))
-
-    def track_global_remap(self, src: str, dst: str) -> None:
-        """Record a global remap."""
-        self.state.global_remaps.append((src, dst))
-
     def track_package(self, pkg: str) -> None:
-        """Delegate to module-level ``_track_package``."""
         _R._track_package(pkg)
 
     def track_include(self, path: str) -> int:
-        """Delegate to module-level ``_track_include``."""
         return int(_R._track_include(path))
 
     def record_declared_arg(self, name: str, default: str, *, flat: bool = True) -> None:
-        """Delegate to module-level ``_record_declared_arg``."""
         _R._record_declared_arg(name, default, flat=flat)
 
     def push_include_chain(self, file_path: str) -> None:

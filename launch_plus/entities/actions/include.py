@@ -32,28 +32,28 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
 
         # Check for unportable absolute paths in preview mode
         if (
-            parser.preview_mode
+            parser.state.preview_mode
             and os.path.isabs(file_path)
             and "$(find-pkg-share" not in raw_file
             and "$(dirname)" not in raw_file
         ):
-            if parser.allow_unportable_paths:
-                parser.warn(f"unportable absolute path in include: {file_path}")
+            if parser.state.allow_unportable_paths:
+                parser.state.warn(f"unportable absolute path in include: {file_path}")
             else:
-                parser.error(f"unportable absolute path in include: {file_path}")
+                parser.state.error(f"unportable absolute path in include: {file_path}")
 
         if file_path in parser.include_stack:
-            parser.error(f"circular include detected: {file_path}")
+            parser.state.error(f"circular include detected: {file_path}")
             return
         if len(parser.include_stack) > 20:
-            parser.warn(f"max include depth exceeded for {file_path}")
+            parser.state.warn(f"max include depth exceeded for {file_path}")
             return
         dep_idx = parser.track_include(file_path)
         child_ctx_args = parser.resolve_include_args(entity)
         if dep_idx >= 0 and child_ctx_args:
-            parser.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
+            parser.state.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
         if child_ctx_args:
-            parser.tracked["include_args"][file_path] = child_ctx_args
+            parser.state.tracked["include_args"][file_path] = child_ctx_args
         real_path = file_path
         parsed_path = _parse_portable_path(file_path)
         if parsed_path:

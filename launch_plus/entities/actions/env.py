@@ -28,7 +28,7 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
         if parser.evaluate_condition(entity):
             name = parser.resolve(entity.get_attr("name", optional=True) or "")
             value = parser.resolve(entity.get_attr("value", optional=True) or "")
-            parser.env[name] = value
+            parser.state.env[name] = value
             parser.ctx.env[name] = value
 
     def __init__(self, name=None, value=None, **kwargs):
@@ -61,7 +61,7 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
     def parse(cls, entity: Entity, parser: _ActionParser) -> None:
         if parser.evaluate_condition(entity):
             name = parser.resolve(entity.get_attr("name", optional=True) or "")
-            parser.env.pop(name, None)
+            parser.state.env.pop(name, None)
             parser.ctx.env.pop(name, None)
 
     def __init__(self, name=None, **kwargs):
@@ -102,7 +102,7 @@ class _TrackedPushRosNamespace(_TrackedAction):
         if parser.evaluate_condition(entity):
             ns = parser.resolve(entity.get_attr("namespace", optional=True) or "")
             if ns:
-                parser.namespace_stack.append(ns)
+                parser.state.namespace_stack.append(ns)
 
     def __init__(self, namespace=None, **kwargs):
         self._namespace = namespace
@@ -123,4 +123,4 @@ class _SetRemap(_TrackedAction):
     def parse(cls, entity: Entity, parser: _ActionParser) -> None:
         src = parser.resolve(entity.get_attr("from", optional=True) or "")
         dst = parser.resolve(entity.get_attr("to", optional=True) or "")
-        parser.track_global_remap(src, dst)
+        parser.state.global_remaps.append((src, dst))

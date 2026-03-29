@@ -48,7 +48,7 @@ class _EventHandlerAction(_TrackedAction):
                 "target_node": target_node,
                 "start_state": start_state,
                 "goal_state": goal_state,
-                "namespace_stack": list(parser.namespace_stack),
+                "namespace_stack": list(parser.state.namespace_stack),
                 "explicit_namespace": handler_ns,
                 "actions": eh_actions,
             }
@@ -71,13 +71,13 @@ class _EmitEventAction(_TrackedAction):
                 "target_node": target_node,
                 "start_state": None,
                 "goal_state": None,
-                "namespace_stack": list(parser.namespace_stack),
+                "namespace_stack": list(parser.state.namespace_stack),
                 "explicit_namespace": ee_ns,
                 "actions": [
                     {
                         "event": event,
                         "target_node": target_node,
-                        "namespace_stack": list(parser.namespace_stack),
+                        "namespace_stack": list(parser.state.namespace_stack),
                         "explicit_namespace": ee_ns,
                     }
                 ],

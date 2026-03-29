@@ -32,23 +32,23 @@ class _TrackedGroupAction(_TrackedAction):
         if scoped:
             saved_args = dict(parser.ctx.args)
             saved_vars = dict(parser.ctx.vars)
-            saved_env = dict(parser.env)
-            saved_ns_depth = len(parser.namespace_stack)
-            saved_gp = list(parser.global_params)
-            saved_gr = list(parser.global_remaps)
-            saved_gpf = list(parser.global_param_files)
+            saved_env = dict(parser.state.env)
+            saved_ns_depth = len(parser.state.namespace_stack)
+            saved_gp = list(parser.state.global_params)
+            saved_gr = list(parser.state.global_remaps)
+            saved_gpf = list(parser.state.global_param_files)
         parser.resolve_children(list(children))
         if scoped:
             new_args = {k: v for k, v in parser.ctx.args.items() if k not in saved_args}
             parser.ctx.args = saved_args
             parser.ctx.args.update(new_args)
             parser.ctx.vars = saved_vars
-            parser.env.clear()
-            parser.env.update(saved_env)
-            del parser.namespace_stack[saved_ns_depth:]
-            parser.global_params[:] = saved_gp
-            parser.global_remaps[:] = saved_gr
-            parser.global_param_files[:] = saved_gpf
+            parser.state.env.clear()
+            parser.state.env.update(saved_env)
+            del parser.state.namespace_stack[saved_ns_depth:]
+            parser.state.global_params[:] = saved_gp
+            parser.state.global_remaps[:] = saved_gr
+            parser.state.global_param_files[:] = saved_gpf
 
     def __init__(self, actions=None, **kwargs):
         self._actions = list(actions or [])

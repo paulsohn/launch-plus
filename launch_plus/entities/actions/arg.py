@@ -27,7 +27,7 @@ class _DeclaredArg(_TrackedAction):
             resolved = parser.resolve(fixed_value)
             ctx.args[name] = resolved
         elif name and name not in ctx.args and default is not None:
-            if parser.apply_arg_defaults:
+            if parser.state.apply_arg_defaults:
                 resolved = parser.resolve(default)
                 ctx.args[name] = resolved
             else:
@@ -35,9 +35,9 @@ class _DeclaredArg(_TrackedAction):
         else:
             resolved = ctx.args.get(name, default or "")
         if name:
-            already_seen = name in parser.declared_arg_names
+            already_seen = name in parser.state.declared_arg_names
             if not already_seen:
-                parser.declared_arg_names.add(name)
+                parser.state.declared_arg_names.add(name)
             parser.record_declared_arg(name, resolved, flat=not already_seen)
 
     def __init__(self, name=None, *positional, default_value=None, condition=None, **kwargs):

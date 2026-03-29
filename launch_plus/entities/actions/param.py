@@ -75,7 +75,8 @@ class _TrackedSetParameter(_TrackedAction):
     def parse(cls, entity: Entity, parser: _ActionParser) -> None:
         name = parser.resolve(entity.get_attr("name", optional=True) or "")
         value = parser.resolve(entity.get_attr("value", optional=True) or "")
-        parser.track_global_param(name, value)
+        parser.state.tracked["global_params"].append([name, value])
+        parser.state.global_params.append((name, value))
 
     def __init__(self, name=None, value=None, **kwargs):
         self._name = name

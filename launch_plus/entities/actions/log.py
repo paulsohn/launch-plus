@@ -20,7 +20,7 @@ class _LogAction(_TrackedAction):
                 "package": "",
                 "executable": "",
                 "name": "",
-                "namespace_stack": list(parser.namespace_stack),
+                "namespace_stack": list(parser.state.namespace_stack),
                 "explicit_namespace": None,
                 "parameters": {},
                 "param_files": [],

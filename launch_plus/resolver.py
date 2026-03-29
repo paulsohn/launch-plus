@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
 """
-launch-plus Python launch file resolver.
+launch-plus resolver.
 
-Executes a .launch.py file with import-patching hooks that intercept
-launch_ros and launch classes to track package dependencies.
+Resolves ROS 2 launch files (XML, YAML, and Python) by parsing their
+structure, evaluating substitutions, and tracking nodes, includes, and
+package dependencies.  Python launch files are handled via import-patching
+hooks that intercept ``launch_ros`` and ``launch`` classes.
 
-Usage:
-    python3 py_resolver.py <launch_file> <args_json>
-
-Output (JSON to stdout):
-    {
-        "packages": ["pkg_a", "pkg_b"],
-        "includes": ["path/to/other.launch.py"],
-        "nodes": [{"package": "...", "executable": "...", "name": "..."}],
-        "warnings": ["..."]
-    }
+The main entry point is :func:`resolve_file`, which returns a
+:class:`~launch_plus.types.ParsedLaunchFile`.
 """
 
 import importlib
@@ -89,9 +83,9 @@ def _parse_rosdep_resolve(stdout: str) -> list[str]:
 def _try_rosdep_install(package: str) -> bool:
     """Resolve a rosdep key to system packages and install them.
 
-    Uses ``rosdep resolve`` + ``apt-get install`` (matching the Rust-side
-    approach in rosdep.rs) instead of ``rosdep install`` which treats
-    arguments as ROS package names and fails on plain keys.
+    Uses ``rosdep resolve`` + ``apt-get install`` instead of
+    ``rosdep install`` which treats arguments as ROS package names and
+    fails on plain keys.
     """
     if package in _state.rosdep_attempted:
         return False
@@ -220,8 +214,8 @@ def _ensure_fetched(package: str) -> bool:
 #
 # A "portable path" is a string in $(find-pkg-share <pkg>)/... format.  It is
 # the canonical path representation used internally by launch-plus in all modes.
-# Actual filesystem resolution is deferred to the two sites that require it:
-#   1. Include expansion (Rust orchestrator resolves to read the included file).
+# Actual filesystem resolution happens at:
+#   1. Include expansion (resolver reads the included file inline).
 #   2. File access inside OpaqueFunction bodies (via _stub_open / os.path stubs).
 #
 # This regex extracts the package name and the optional suffix from a portable path.
@@ -265,7 +259,7 @@ def _resolve_pkg_share(package: str) -> str:
     """
     # 1. _state.package_shares lookup.
     #    Preview: contains workspace source paths.
-    #    Postbuild: contains install paths from AMENT (populated by orchestrator).
+    #    Postbuild: contains install paths from AMENT_PREFIX_PATH.
     if package in _state.package_shares:
         pkg_path: str = _state.package_shares[package]
         # In preview mode, lockfile packages may need full fetch.
@@ -393,7 +387,7 @@ def _track_include(path):
         }
         # Don't deduplicate: the same file may be included multiple times under
         # different <push-ros-namespace> contexts, and each entry carries a distinct
-        # namespace_stack that the orchestrator needs for correct namespace propagation.
+        # namespace_stack needed for correct namespace propagation.
         entry["include_args"] = {}
         _state.tracked["include_deps"].append(entry)
     # Return the index of the last entry with this path so callers can
@@ -421,7 +415,7 @@ def _current_source_key() -> str:
     """Return the source key for the current file being resolved.
 
     Uses the last entry of _state.include_chain, or _state.root_source_key for root-level.
-    Format: "pkg://share_path" (matching Rust convention).
+    Format: "pkg://share_path".
     """
     if _state.include_chain:
         pkg, path = _state.include_chain[-1]
@@ -447,7 +441,7 @@ def _portable_display(sub) -> str:
 def _record_declared_arg(name: str, default: str, *, flat: bool = True) -> None:
     """Record a declared arg in the per-file dict, and optionally the flat list.
 
-    The flat list is used by Rust for apply_arg_defaults (first-declaration wins).
+    The flat list is used for apply_arg_defaults (first-declaration wins).
     The per-file dict is used by --show-args to render arg comments per included file.
     """
     if flat:
@@ -608,11 +602,6 @@ def _track_node_from_action(package, executable, name=None):
 
 # ─── XML/YAML Launch File Parser ──────────────────────────────────────────────
 #
-# Produces a list of element dicts matching the Rust LaunchElement schema.
-# Each element is a single-key dict: {"Arg": {...}}, {"Node": {...}}, etc.
-# Substitutions in attribute values are left as raw strings for the resolver
-# (Phase 3) to process — the parser does not resolve them.
-#
 # Parsing is delegated to Entity-based parsers in ``launch_plus.parsers``.
 # Resolution is dispatched through the action registry via _resolve_element().
 
@@ -730,7 +719,7 @@ def _evaluate_condition(
 
 
 def _ros2_namespace_join(base: str | None, next_ns: str) -> str | None:
-    """Join two ROS 2 namespace components.  Matches Rust effective_namespace."""
+    """Join two ROS 2 namespace components."""
     next_ns = next_ns.rstrip("/")
     if not next_ns:
         return base
@@ -864,7 +853,7 @@ def resolve_xml_elements(
 
     This is the XML/YAML counterpart of the Python ``_walk_actions`` mechanism.
     All output goes into the module-level ``_state.tracked`` dict, ``_state.namespace_stack``,
-    and ``_state.env``, matching the same format the Rust orchestrator expects.
+    and ``_state.env``.
 
     Dispatches each element through the action registry via :func:`_resolve_element`.
     """
@@ -1468,7 +1457,7 @@ def _resolve_node_details(node, context):
                 if field_name == "package" and not is_fallback:
                     _track_package(resolved)
 
-    # Namespace: emit raw inputs — Rust computes effective_namespace from these
+    # Namespace: emit raw inputs — effective_namespace is computed downstream
     ns = (
         _resolve_substitution(node._raw_namespace, context)
         if node._raw_namespace is not None
@@ -1663,8 +1652,7 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args):
 
     This mirrors real ROS 2 behavior where ``IncludeLaunchDescription``
     synchronously executes the child, so ``SetLaunchConfiguration`` calls in
-    the child mutate the shared ``LaunchContext``.  The orchestrator still
-    handles the recursive node/include dependency resolution separately.
+    the child mutate the shared ``LaunchContext``.
     """
 
     # Resolve portable paths — $(find-pkg-share pkg)/rest → real filesystem path.
@@ -1675,11 +1663,11 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args):
         try:
             pkg_share = _resolve_pkg_share(pkg)
         except Exception:
-            return  # Package not available — orchestrator will resolve later
+            return  # Package not available
         real_path = os.path.join(pkg_share, rest)
 
     if not os.path.isfile(real_path):
-        return  # File not on disk — orchestrator will fetch and resolve later
+        return  # File not on disk
 
     try:
         spec = importlib.util.spec_from_file_location(
@@ -1698,8 +1686,8 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args):
         return
 
     # Save scoping state that must be restored after inline execution.
-    # Nodes, includes, packages, params, etc. are KEPT — the Python resolver
-    # now handles all includes inline and the orchestrator does NOT re-resolve them.
+    # Nodes, includes, packages, params, etc. are KEPT — the resolver
+    # handles all includes inline.
     saved_declared_arg_names = set(_state.declared_arg_names)
     saved_namespace_depth = len(_state.namespace_stack)
     saved_env = dict(_state.env)
@@ -1745,7 +1733,7 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args):
         _walk_actions(entities, parent_context)
     finally:
         # Restore scoping state only — nodes, includes, packages, params, etc.
-        # are intentionally kept since the orchestrator no longer re-resolves them.
+        # are intentionally kept (includes are resolved inline).
         _state.declared_arg_names.clear()
         _state.declared_arg_names.update(saved_declared_arg_names)
         del _state.namespace_stack[saved_namespace_depth:]
@@ -2396,7 +2384,7 @@ def resolve_file(
     package_shares : dict
         Package name → share directory path.
     workflow_options : ResolveWorkflowOptions
-        Workflow flags (from orchestrator).
+        Workflow flags.
     lockfile : Lockfile
         Lockfile with package/repo info.
     fetch_dir : Path | None

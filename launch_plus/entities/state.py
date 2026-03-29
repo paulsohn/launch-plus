@@ -13,11 +13,11 @@ from typing import Any
 
 
 class _PackageNotFetchedError(RuntimeError):
-    """Raised when a lockfile package cannot be fetched and resolution must abort.
+    """Deprecated — no longer raised.
 
-    This is now a last-resort exception: _ensure_fetched() handles inline fetching
-    for most cases.  This exception is only raised when fetching actually fails
-    (e.g. git error, package not in lockfile but expected).
+    Previously used as a control flow exception for package fetching.
+    Now ``_ensure_fetched()`` handles inline fetching and callers log errors
+    + return fallbacks on failure.  Retained for backward compatibility.
     """
 
     def __init__(self, pkg_name: str):

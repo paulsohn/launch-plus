@@ -62,3 +62,116 @@ def _action_include(entity: Entity, parser: _ActionParser) -> None:
             return
     if os.path.isfile(real_path):
         parser.parse_and_resolve_included_file(real_path, file_path, child_ctx_args)
+
+
+# ─── Python-shim actions ─────────────────────────────────────────────────────
+
+import launch_plus.resolver as _R  # noqa: E402
+from launch_plus.entities.actions.base import _TrackedAction  # noqa: E402
+from launch_plus.entities.state import _StubLaunchContext  # noqa: E402
+
+
+def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
+    """Capture launch_arguments for an include site."""
+    if not launch_arguments or not path:
+        return
+    path = str(path)
+    if dep_idx >= 0 and _R._state.tracked["include_deps"][dep_idx].get("include_args"):
+        return
+    if dep_idx < 0 and path in _R._state.tracked["include_args"]:
+        return
+    try:
+        captured = {}
+        for k, v in launch_arguments:
+            k_str = str(k)
+            if isinstance(v, list):
+                parts = []
+                for sub in v:
+                    if hasattr(sub, "perform"):
+                        try:
+                            result = sub.perform(context)
+                            parts.append(str(result) if result is not None else str(sub))
+                        except _PackageNotFetchedError:
+                            raise
+                        except Exception:
+                            parts.append(str(sub))
+                    else:
+                        parts.append(str(sub))
+                v_str = "".join(parts)
+            elif hasattr(v, "perform"):
+                try:
+                    result = v.perform(context)
+                    v_str = str(result) if result is not None else str(v)
+                except _PackageNotFetchedError:
+                    raise
+                except Exception:
+                    v_str = str(v)
+            else:
+                v_str = str(v)
+            captured[k_str] = v_str
+        if captured:
+            if dep_idx >= 0:
+                _R._state.tracked["include_deps"][dep_idx]["include_args"] = captured
+            else:
+                _R._state.tracked["include_args"][path] = captured
+    except _PackageNotFetchedError:
+        raise
+    except Exception as e:
+        _warn(f"failed to resolve include args for '{path}': {e}")
+
+
+class _TrackedIncludeLaunchDescription(_TrackedAction):
+    def __init__(self, launch_description_source, launch_arguments=None, **kwargs):
+        self._source = launch_description_source
+        self._raw_launch_arguments = launch_arguments
+        path = None
+        if hasattr(launch_description_source, "_location"):
+            path = launch_description_source._location
+        elif hasattr(launch_description_source, "location"):
+            try:
+                path = launch_description_source.location
+            except Exception:
+                pass
+        self._path = path
+        self._dep_idx = -1
+        if path:
+            self._dep_idx = _R._track_include(path)
+
+        if launch_arguments and path:
+            _resolve_include_args(path, launch_arguments, _StubLaunchContext(), self._dep_idx)
+
+    def execute(self, context) -> list | None:
+        if self._path is None and context is not None:
+            src = self._source
+            path = None
+            if hasattr(src, "perform"):
+                try:
+                    path = src.perform(context)
+                except _PackageNotFetchedError:
+                    raise
+                except Exception as e:
+                    _warn(f"failed to resolve IncludeLaunchDescription source: {e}")
+            if path:
+                self._path = path
+                dep_idx = _R._track_include(path)
+                _resolve_include_args(path, self._raw_launch_arguments, context, dep_idx)
+
+        if self._path and self._path.endswith(".py") and context is not None:
+            child_args = {}
+            if self._raw_launch_arguments:
+                for k, v in self._raw_launch_arguments:
+                    k_str = str(k)
+                    resolved = _R._resolve_substitution(v, context)
+                    v_str = resolved if resolved is not None else str(v)
+                    child_args[k_str] = v_str
+            inc_dep = _R._extract_pkg_and_share_path(self._path)
+            if inc_dep:
+                _R._state.include_chain.append(list(inc_dep))
+            else:
+                _R._state.include_chain.append(["", self._path])
+            try:
+                _R._inline_resolve_python_launch(self._path, context, child_args)
+            finally:
+                _R._state.include_chain.pop()
+
+        return None

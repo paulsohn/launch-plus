@@ -41,3 +41,70 @@ def _action_executable(entity: Entity, parser: _ActionParser) -> None:
             "shell": shell,
         }
     )
+
+
+# ─── Python-shim actions ─────────────────────────────────────────────────────
+
+import launch_plus.resolver as _R  # noqa: E402
+from launch_plus.entities.actions.base import _TrackedAction  # noqa: E402
+from launch_plus.entities.state import _PackageNotFetchedError  # noqa: E402
+
+
+class _TrackedExecutable(_TrackedAction):
+    """Tracks an ExecuteProcess so the walker can render it as <executable>."""
+
+    def __init__(self, *, cmd=None, name=None, shell=False, **kwargs):
+        if isinstance(cmd, list):
+            self._cmd = cmd
+        elif cmd is not None:
+            self._cmd = [cmd]
+        else:
+            self._cmd = []
+        self._name = name
+        self._shell = bool(shell)
+        self._idx = _R._track_node(
+            {
+                "package": "",
+                "executable": "",
+                "name": str(name) if name is not None and not hasattr(name, "perform") else "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "executable",
+                "plugins": [],
+                "target": None,
+                "cmd": "",
+                "shell": self._shell,
+            }
+        )
+
+    def execute(self, context) -> list | None:
+        parts = []
+        for part in self._cmd:
+            raw_part = part
+            if hasattr(part, "perform") and context is not None:
+                try:
+                    result = part.perform(context)
+                    part = result if result is not None else raw_part
+                except _PackageNotFetchedError:
+                    raise
+                except Exception:
+                    part = str(raw_part)
+            parts.append(str(part))
+        cmd_str = " ".join(parts)
+        name = self._name
+        if hasattr(name, "perform") and context is not None:
+            try:
+                name = name.perform(context)
+            except _PackageNotFetchedError:
+                raise
+            except Exception:
+                name = str(name) if name is not None else ""
+        name_str = str(name) if name is not None else ""
+        _R._state.tracked["nodes"][self._idx]["cmd"] = cmd_str
+        _R._state.tracked["nodes"][self._idx]["name"] = name_str
+        _R._state.tracked["nodes"][self._idx]["shell"] = self._shell
+        return None

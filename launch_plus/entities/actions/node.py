@@ -120,3 +120,206 @@ def _action_load_composable_node(entity: Entity, parser: _ActionParser) -> None:
             "target": target or "",
         }
     )
+
+
+# ─── Python-shim actions ─────────────────────────────────────────────────────
+
+import launch_plus.resolver as _R  # noqa: E402
+from launch_plus.entities.actions.base import _TrackedAction  # noqa: E402
+
+
+class _TrackedNode(_TrackedAction):
+    def __init__(self, *, package=None, executable=None, name=None, **kwargs):
+        _R._track_package(package)
+        self._idx = _R._track_node(
+            {
+                "package": str(package) if package else "",
+                "executable": str(executable) if executable else "",
+                "name": str(name) if name else "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "node",
+                "plugins": [],
+                "target": None,
+            }
+        )
+        # Save raw kwargs for deferred resolution in execute()
+        self._raw_package = package
+        self._raw_executable = executable
+        self._raw_name = name
+        self._raw_namespace = kwargs.get("namespace")
+        self._raw_parameters = list(kwargs.get("parameters") or [])
+        self._raw_remappings = list(kwargs.get("remappings") or [])
+        self._raw_env = kwargs.get("env") or []
+        self._raw_output = kwargs.get("output")
+        self._raw_arguments = kwargs.get("arguments")
+        self._raw_respawn = kwargs.get("respawn")
+        self._raw_respawn_delay = kwargs.get("respawn_delay")
+        self._detailed = False
+        # Eager: track any ParameterFile paths identifiable at construction time
+        for p in self._raw_parameters:
+            if hasattr(p, "_param_file") and p._param_file:
+                _R._track_param_file(p._param_file)
+
+    def execute(self, context) -> list | None:
+        if context is not None and not self._detailed:
+            self._detailed = True
+            _R._resolve_node_details(self, context)
+        return None
+
+    def __repr__(self):
+        return f"TrackedNode(package={_R._state.tracked['nodes'][self._idx]['package']!r})"
+
+
+class _TrackedLifecycleNode(_TrackedNode):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        _R._state.tracked["nodes"][self._idx]["kind"] = "lifecycle_node"
+
+
+class _TrackedComposableNode(_TrackedAction):
+    """A composable node plugin loaded into a container process.
+
+    Does NOT add to the flat ``_state.tracked["nodes"]`` list — it is attached to the
+    container's ``plugins`` list when the container is resolved in ``execute()``.
+    """
+
+    def __init__(self, *, package=None, plugin=None, name=None, **kwargs):
+        _R._track_package(package)
+        self._raw_package = package
+        self._package = str(package) if package else ""
+        self._raw_plugin = plugin
+        self._plugin = str(plugin) if plugin else ""
+        self._raw_name = name
+        self._name = str(name) if name else ""
+        self._raw_parameters = list(kwargs.get("parameters") or [])
+        self._raw_remappings = list(kwargs.get("remappings") or [])
+        # Eager: track any ParameterFile paths
+        for p in self._raw_parameters:
+            if hasattr(p, "_param_file") and p._param_file:
+                _R._track_param_file(p._param_file)
+
+    def __repr__(self):
+        return f"TrackedComposableNode(package={self._package!r}, plugin={self._plugin!r})"
+
+
+class _TrackedComposableNodeContainer(_TrackedAction):
+    """A composable node container process.
+
+    Emits a ``kind='container'`` entry whose ``plugins`` list is populated during
+    deferred resolution in ``execute()`` from the *composable_node_descriptions*.
+    """
+
+    def __init__(
+        self,
+        *,
+        package=None,
+        executable=None,
+        name=None,
+        composable_node_descriptions=None,
+        **kwargs,
+    ):
+        _R._track_package(package)
+        self._idx = _R._track_node(
+            {
+                "package": str(package) if package else "",
+                "executable": str(executable) if executable else "",
+                "name": str(name) if name else "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "container",
+                "plugins": [],
+                "target": None,
+            }
+        )
+        self._raw_package = package
+        self._raw_executable = executable
+        self._raw_name = name
+        self._raw_namespace = kwargs.get("namespace")
+        self._raw_parameters = list(kwargs.get("parameters") or [])
+        self._raw_remappings = list(kwargs.get("remappings") or [])
+        self._raw_env = kwargs.get("env") or []
+        self._descs = list(composable_node_descriptions or [])
+        self._detailed = False
+        for desc in self._descs:
+            raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
+            if raw_pkg:
+                _R._track_package(raw_pkg)
+
+    def execute(self, context) -> list | None:
+        if context is not None and not self._detailed:
+            self._detailed = True
+            _R._resolve_node_details(self, context)
+            _R._state.tracked["nodes"][self._idx]["plugins"] = _R._resolve_composable_plugins(
+                self._descs, context
+            )
+        return None
+
+
+class _TrackedLoadComposableNodes(_TrackedAction):
+    """Loads composable nodes into an existing container."""
+
+    def __init__(self, *, composable_node_descriptions=None, target_container=None, **kwargs):
+        from launch_plus.entities.state import _StubLaunchContext
+
+        if target_container is None:
+            target_str = ""
+        elif isinstance(target_container, str):
+            target_str = target_container
+        elif isinstance(target_container, _TrackedComposableNodeContainer):
+            target_str = _R._state.tracked["nodes"][target_container._idx].get("name", "")
+        elif hasattr(target_container, "perform"):
+            try:
+                result = target_container.perform(_StubLaunchContext())
+                target_str = str(result) if result is not None else str(target_container)
+            except Exception:
+                target_str = str(target_container)
+        else:
+            target_str = str(target_container)
+        self._raw_target = target_container
+        self._idx = _R._track_node(
+            {
+                "package": "",
+                "executable": "",
+                "name": "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "load_composable",
+                "plugins": [],
+                "target": target_str,
+            }
+        )
+        self._descs = list(composable_node_descriptions or [])
+        self._detailed = False
+        for desc in self._descs:
+            raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
+            if raw_pkg:
+                _R._track_package(raw_pkg)
+
+    def execute(self, context) -> list | None:
+        if context is not None and not self._detailed:
+            self._detailed = True
+            entry = _R._state.tracked["nodes"][self._idx]
+            if self._raw_target is not None:
+                if isinstance(self._raw_target, _TrackedComposableNodeContainer):
+                    target = _R._state.tracked["nodes"][self._raw_target._idx].get(
+                        "name"
+                    ) or entry.get("target", "")
+                else:
+                    target = _R._resolve_substitution(self._raw_target, context)
+                if target:
+                    entry["target"] = target
+            entry["plugins"] = _R._resolve_composable_plugins(self._descs, context)
+        return None

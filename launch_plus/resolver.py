@@ -1124,7 +1124,7 @@ def resolve_file(
         subst_ctx.args = dict(args_dict)
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
         subst_ctx.preview_mode = _state.preview_mode
-        subst_ctx.env = dict(_state.env)
+        subst_ctx.env = _state.env
         resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file_str])
         return _tracked_to_parsed_launch_file(_state.tracked)
 

@@ -21,15 +21,15 @@ from launch_plus.parsers.entity import Entity
 
 @expose_action("set_env")
 class _TrackedSetEnvironmentVariable(_TrackedAction):
-    """Tracks SetEnvironmentVariable: mutates _state.env."""
+    """Tracks SetEnvironmentVariable / <set_env>."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
-        if parser.evaluate_condition(entity):
-            name = parser.resolve(entity.get_attr("name", optional=True) or "")
-            value = parser.resolve(entity.get_attr("value", optional=True) or "")
-            parser.state.env[name] = value
-            parser.ctx.env[name] = value
+    def parse(cls, entity: Entity, parser: _ActionParser):
+        if not parser.evaluate_condition(entity):
+            return None
+        name = parser.resolve(entity.get_attr("name", optional=True) or "")
+        value = parser.resolve(entity.get_attr("value", optional=True) or "")
+        return cls(name=name, value=value)
 
     def __init__(self, name=None, value=None, **kwargs):
         self._name = name
@@ -55,14 +55,14 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
 
 @expose_action("unset_env")
 class _TrackedUnsetEnvironmentVariable(_TrackedAction):
-    """Tracks UnsetEnvironmentVariable: removes from _state.env."""
+    """Tracks UnsetEnvironmentVariable / <unset_env>."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
-        if parser.evaluate_condition(entity):
-            name = parser.resolve(entity.get_attr("name", optional=True) or "")
-            parser.state.env.pop(name, None)
-            parser.ctx.env.pop(name, None)
+    def parse(cls, entity: Entity, parser: _ActionParser):
+        if not parser.evaluate_condition(entity):
+            return None
+        name = parser.resolve(entity.get_attr("name", optional=True) or "")
+        return cls(name=name)
 
     def __init__(self, name=None, **kwargs):
         self._name = name
@@ -95,23 +95,26 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
 
 @expose_action("push-ros-namespace")
 class _TrackedPushRosNamespace(_TrackedAction):
-    """Tracks PushRosNamespace so execute() can update _state.namespace_stack."""
+    """Tracks PushRosNamespace / <push-ros-namespace>."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
-        if parser.evaluate_condition(entity):
-            ns = parser.resolve(entity.get_attr("namespace", optional=True) or "")
-            if ns:
-                parser.state.namespace_stack.append(ns)
+    def parse(cls, entity: Entity, parser: _ActionParser):
+        if not parser.evaluate_condition(entity):
+            return None
+        ns = parser.resolve(entity.get_attr("namespace", optional=True) or "")
+        return cls(namespace=ns) if ns else None
 
     def __init__(self, namespace=None, **kwargs):
         self._namespace = namespace
 
     def execute(self, context) -> list | None:
-        if self._namespace is not None and context is not None:
-            ns = _R._resolve_substitution(self._namespace, context)
-            if ns:
-                _R._state.namespace_stack.append(ns)
+        ns = self._namespace
+        if ns is None:
+            return None
+        if hasattr(ns, "perform") and context is not None:
+            ns = _R._resolve_substitution(ns, context)
+        if ns:
+            _R._state.namespace_stack.append(ns)
         return None
 
 
@@ -120,7 +123,15 @@ class _SetRemap(_TrackedAction):
     """Tracks <set_remap> — records a global remap."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+    def parse(cls, entity: Entity, parser: _ActionParser):
         src = parser.resolve(entity.get_attr("from", optional=True) or "")
         dst = parser.resolve(entity.get_attr("to", optional=True) or "")
-        parser.state.global_remaps.append((src, dst))
+        return cls(src=src, dst=dst)
+
+    def __init__(self, src="", dst="", **kwargs):
+        self._src = src
+        self._dst = dst
+
+    def execute(self, context) -> list | None:
+        _R._state.global_remaps.append((self._src, self._dst))
+        return None

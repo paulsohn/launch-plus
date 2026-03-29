@@ -46,7 +46,7 @@ class _SubstitutionContext:
     def __init__(self) -> None:
         self.args: dict[str, str] = {}
         self.vars: dict[str, str] = {}
-        self.env: dict[str, str] = {}
+        self.env: dict[str, str] = _state.env  # share with ResolverState
         self.launch_file_dir: str | None = None
         self.preview_mode: bool = False
 
@@ -269,11 +269,18 @@ def _resolve_element(
     ctx: _SubstitutionContext,
     include_stack: list[str],
 ) -> None:
-    """Resolve a single parsed element via the action registry."""
+    """Resolve a single parsed element via the action registry.
+
+    The registered parse method may return an action instance (new style)
+    or None (legacy — side effects already executed in parse).  When an
+    action is returned, ``execute()`` is called to perform side effects.
+    """
     tag = elem.type_name
     if tag in action_parse_methods:
         parser = _ActionParser(ctx, include_stack)
-        action_parse_methods[tag](elem, parser)
+        action = action_parse_methods[tag](elem, parser)
+        if action is not None and hasattr(action, "execute"):
+            action.execute(ctx)
         return
     _warn(f"unknown element: <{tag}>")
 

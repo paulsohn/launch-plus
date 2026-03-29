@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.xml_resolver import _ActionParser
@@ -13,14 +14,20 @@ class _LogAction(_TrackedAction):
     """Tracks <log> — records a log message as a node entry."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+    def parse(cls, entity: Entity, parser: _ActionParser):
         msg = parser.resolve(entity.get_attr("message", optional=True) or "")
-        parser.track_node(
+        return cls(message=msg)
+
+    def __init__(self, message="", **kwargs):
+        self._message = message
+
+    def execute(self, context) -> list | None:
+        _R._track_node(
             {
                 "package": "",
                 "executable": "",
                 "name": "",
-                "namespace_stack": list(parser.state.namespace_stack),
+                "namespace_stack": list(_R._state.namespace_stack),
                 "explicit_namespace": None,
                 "parameters": {},
                 "param_files": [],
@@ -29,6 +36,7 @@ class _LogAction(_TrackedAction):
                 "kind": "log",
                 "plugins": [],
                 "target": None,
-                "message": msg,
+                "message": self._message,
             }
         )
+        return None

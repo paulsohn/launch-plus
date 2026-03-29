@@ -72,11 +72,10 @@ class _TrackedSetParameter(_TrackedAction):
     """Mirrors launch_ros SetParameter / <set_parameter>."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+    def parse(cls, entity: Entity, parser: _ActionParser):
         name = parser.resolve(entity.get_attr("name", optional=True) or "")
         value = parser.resolve(entity.get_attr("value", optional=True) or "")
-        parser.state.tracked["global_params"].append([name, value])
-        parser.state.global_params.append((name, value))
+        return cls(name=name, value=value)
 
     def __init__(self, name=None, value=None, **kwargs):
         self._name = name
@@ -92,22 +91,24 @@ class _TrackedSetParameter(_TrackedAction):
                 name = str(name)
         else:
             name = str(name) if name is not None else ""
-        if name and context is not None:
-            if hasattr(value, "perform"):
+        if not name:
+            return None
+        if hasattr(value, "perform") and context is not None:
+            try:
+                value = value.perform(context)
+            except Exception:
+                pass
+        if isinstance(value, str):
+            try:
+                value = int(value)
+            except (ValueError, TypeError):
                 try:
-                    value = value.perform(context)
-                except Exception:
-                    pass
-            if isinstance(value, str):
-                try:
-                    value = int(value)
+                    value = float(value)
                 except (ValueError, TypeError):
-                    try:
-                        value = float(value)
-                    except (ValueError, TypeError):
-                        pass
+                    pass
+        if context is not None and hasattr(context, "_launch_configurations"):
             gp_list = context._launch_configurations.setdefault("global_params", [])
             gp_list.append((name, value))
-            _R._state.tracked["global_params"].append([name, value])
-            _R._state.global_params.append((name, value))
+        _R._state.tracked["global_params"].append([name, value])
+        _R._state.global_params.append((name, value))
         return None

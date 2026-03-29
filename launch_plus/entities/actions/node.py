@@ -6,6 +6,8 @@ Covers: <node>, <lifecycle_node>, <node_container>,
 
 from __future__ import annotations
 
+import launch_plus.resolver as _R
+from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
@@ -17,118 +19,56 @@ from launch_plus.resolver import (
 
 @expose_action("node")
 @expose_action("lifecycle_node")
-def _action_node(entity: Entity, parser: _ActionParser) -> None:
-    if not parser.evaluate_condition(entity):
-        return
-    pkg = parser.resolve(
-        entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
-    )
-    exe = parser.resolve(
-        entity.get_attr("exec", optional=True) or entity.get_attr("executable", optional=True) or ""
-    )
-    name = parser.resolve_optional(entity.get_attr("name", optional=True))
-    ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
-    _track_package(pkg)
-    params, param_files = parser.resolve_params(entity)
-    remaps = parser.resolve_remaps(entity)
-    env = dict(_state.env)
-    env.update(parser.resolve_envs(entity))
-    merged_params = {k: str(v) for k, v in _state.global_params}
-    merged_params.update(params)
-    merged_param_files = list(_state.global_param_files) + param_files
-    merged_remaps = list(_state.global_remaps) + remaps
-    node_kind = "node" if entity.type_name != "lifecycle_node" else "lifecycle_node"
-    parser.track_node(
-        {
-            "package": pkg,
-            "executable": exe,
-            "name": name or "",
-            "namespace_stack": list(_state.namespace_stack),
-            "explicit_namespace": ns,
-            "parameters": merged_params,
-            "param_files": merged_param_files,
-            "remappings": merged_remaps,
-            "env": env,
-            "kind": node_kind,
-            "plugins": [],
-            "target": None,
-            "output": parser.resolve_optional(entity.get_attr("output", optional=True)),
-            "args": parser.resolve_optional(entity.get_attr("args", optional=True)),
-            "respawn": parser.resolve_optional(entity.get_attr("respawn", optional=True)),
-            "respawn_delay": parser.resolve_optional(
-                entity.get_attr("respawn_delay", optional=True)
-            ),
-        }
-    )
-
-
-@expose_action("node_container")
-@expose_action("composable_node_container")
-def _action_node_container(entity: Entity, parser: _ActionParser) -> None:
-    if not parser.evaluate_condition(entity):
-        return
-    pkg = parser.resolve(
-        entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
-    )
-    exe = parser.resolve(
-        entity.get_attr("exec", optional=True) or entity.get_attr("executable", optional=True) or ""
-    )
-    name = parser.resolve_optional(entity.get_attr("name", optional=True))
-    ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
-    _track_package(pkg)
-    env = dict(_state.env)
-    env.update(parser.resolve_envs(entity))
-    plugins = parser.resolve_composable_plugins(entity)
-    parser.track_node(
-        {
-            "package": pkg,
-            "executable": exe,
-            "name": name or "",
-            "namespace_stack": list(_state.namespace_stack),
-            "explicit_namespace": ns,
-            "parameters": {k: str(v) for k, v in _state.global_params},
-            "param_files": list(_state.global_param_files),
-            "remappings": list(_state.global_remaps),
-            "env": env,
-            "kind": "container",
-            "plugins": plugins,
-            "target": None,
-        }
-    )
-
-
-@expose_action("load_composable_node")
-def _action_load_composable_node(entity: Entity, parser: _ActionParser) -> None:
-    if not parser.evaluate_condition(entity):
-        return
-    target = parser.resolve_optional(entity.get_attr("target", optional=True))
-    ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
-    plugins = parser.resolve_composable_plugins(entity)
-    parser.track_node(
-        {
-            "package": "",
-            "executable": "",
-            "name": "",
-            "namespace_stack": list(_state.namespace_stack),
-            "explicit_namespace": ns,
-            "parameters": {},
-            "param_files": [],
-            "remappings": [],
-            "env": {},
-            "kind": "load_composable",
-            "plugins": plugins,
-            "target": target or "",
-        }
-    )
-
-
-# ─── Python-shim actions ─────────────────────────────────────────────────────
-
-import launch_plus.resolver as _R  # noqa: E402
-from launch_plus.entities.actions.base import _TrackedAction  # noqa: E402
-
-
 class _TrackedNode(_TrackedAction):
+    """Tracks a Node / LifecycleNode for both XML and Python shim paths."""
+
+    @classmethod
+    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+        if not parser.evaluate_condition(entity):
+            return
+        pkg = parser.resolve(
+            entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
+        )
+        exe = parser.resolve(
+            entity.get_attr("exec", optional=True)
+            or entity.get_attr("executable", optional=True)
+            or ""
+        )
+        name = parser.resolve_optional(entity.get_attr("name", optional=True))
+        ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
+        _track_package(pkg)
+        params, param_files = parser.resolve_params(entity)
+        remaps = parser.resolve_remaps(entity)
+        env = dict(_state.env)
+        env.update(parser.resolve_envs(entity))
+        merged_params = {k: str(v) for k, v in _state.global_params}
+        merged_params.update(params)
+        merged_param_files = list(_state.global_param_files) + param_files
+        merged_remaps = list(_state.global_remaps) + remaps
+        node_kind = "node" if entity.type_name != "lifecycle_node" else "lifecycle_node"
+        parser.track_node(
+            {
+                "package": pkg,
+                "executable": exe,
+                "name": name or "",
+                "namespace_stack": list(_state.namespace_stack),
+                "explicit_namespace": ns,
+                "parameters": merged_params,
+                "param_files": merged_param_files,
+                "remappings": merged_remaps,
+                "env": env,
+                "kind": node_kind,
+                "plugins": [],
+                "target": None,
+                "output": parser.resolve_optional(entity.get_attr("output", optional=True)),
+                "args": parser.resolve_optional(entity.get_attr("args", optional=True)),
+                "respawn": parser.resolve_optional(entity.get_attr("respawn", optional=True)),
+                "respawn_delay": parser.resolve_optional(
+                    entity.get_attr("respawn_delay", optional=True)
+                ),
+            }
+        )
+
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
         _R._track_package(package)
         self._idx = _R._track_node(
@@ -207,12 +147,49 @@ class _TrackedComposableNode(_TrackedAction):
         return f"TrackedComposableNode(package={self._package!r}, plugin={self._plugin!r})"
 
 
+@expose_action("node_container")
+@expose_action("composable_node_container")
 class _TrackedComposableNodeContainer(_TrackedAction):
     """A composable node container process.
 
     Emits a ``kind='container'`` entry whose ``plugins`` list is populated during
     deferred resolution in ``execute()`` from the *composable_node_descriptions*.
     """
+
+    @classmethod
+    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+        if not parser.evaluate_condition(entity):
+            return
+        pkg = parser.resolve(
+            entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
+        )
+        exe = parser.resolve(
+            entity.get_attr("exec", optional=True)
+            or entity.get_attr("executable", optional=True)
+            or ""
+        )
+        name = parser.resolve_optional(entity.get_attr("name", optional=True))
+        ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
+        _track_package(pkg)
+        env = dict(_state.env)
+        env.update(parser.resolve_envs(entity))
+        plugins = parser.resolve_composable_plugins(entity)
+        parser.track_node(
+            {
+                "package": pkg,
+                "executable": exe,
+                "name": name or "",
+                "namespace_stack": list(_state.namespace_stack),
+                "explicit_namespace": ns,
+                "parameters": {k: str(v) for k, v in _state.global_params},
+                "param_files": list(_state.global_param_files),
+                "remappings": list(_state.global_remaps),
+                "env": env,
+                "kind": "container",
+                "plugins": plugins,
+                "target": None,
+            }
+        )
 
     def __init__(
         self,
@@ -264,8 +241,33 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         return None
 
 
+@expose_action("load_composable_node")
 class _TrackedLoadComposableNodes(_TrackedAction):
     """Loads composable nodes into an existing container."""
+
+    @classmethod
+    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+        if not parser.evaluate_condition(entity):
+            return
+        target = parser.resolve_optional(entity.get_attr("target", optional=True))
+        ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
+        plugins = parser.resolve_composable_plugins(entity)
+        parser.track_node(
+            {
+                "package": "",
+                "executable": "",
+                "name": "",
+                "namespace_stack": list(_state.namespace_stack),
+                "explicit_namespace": ns,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "load_composable",
+                "plugins": plugins,
+                "target": target or "",
+            }
+        )
 
     def __init__(self, *, composable_node_descriptions=None, target_container=None, **kwargs):
         from launch_plus.entities.state import _StubLaunchContext

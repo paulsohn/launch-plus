@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import launch_plus.resolver as _R
+from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
+from launch_plus.entities.state import _PackageNotFetchedError
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
     _ActionParser,
@@ -11,47 +14,40 @@ from launch_plus.resolver import (
 
 
 @expose_action("executable")
-def _action_executable(entity: Entity, parser: _ActionParser) -> None:
-    if not parser.evaluate_condition(entity):
-        return
-    cmd = parser.resolve(entity.get_attr("cmd", optional=True) or "")
-    name = parser.resolve_optional(entity.get_attr("name", optional=True))
-    shell_raw = entity.get_attr("shell", optional=True)
-    if shell_raw is None:
-        shell = False
-    elif isinstance(shell_raw, bool):
-        shell = shell_raw
-    else:
-        shell = str(shell_raw).lower() in ("true", "1", "yes")
-    parser.track_node(
-        {
-            "package": "",
-            "executable": "",
-            "name": name or "",
-            "namespace_stack": list(_state.namespace_stack),
-            "explicit_namespace": None,
-            "parameters": {},
-            "param_files": [],
-            "remappings": [],
-            "env": dict(_state.env),
-            "kind": "executable",
-            "plugins": [],
-            "target": None,
-            "cmd": cmd,
-            "shell": shell,
-        }
-    )
-
-
-# ─── Python-shim actions ─────────────────────────────────────────────────────
-
-import launch_plus.resolver as _R  # noqa: E402
-from launch_plus.entities.actions.base import _TrackedAction  # noqa: E402
-from launch_plus.entities.state import _PackageNotFetchedError  # noqa: E402
-
-
 class _TrackedExecutable(_TrackedAction):
     """Tracks an ExecuteProcess so the walker can render it as <executable>."""
+
+    @classmethod
+    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+        if not parser.evaluate_condition(entity):
+            return
+        cmd = parser.resolve(entity.get_attr("cmd", optional=True) or "")
+        name = parser.resolve_optional(entity.get_attr("name", optional=True))
+        shell_raw = entity.get_attr("shell", optional=True)
+        if shell_raw is None:
+            shell = False
+        elif isinstance(shell_raw, bool):
+            shell = shell_raw
+        else:
+            shell = str(shell_raw).lower() in ("true", "1", "yes")
+        parser.track_node(
+            {
+                "package": "",
+                "executable": "",
+                "name": name or "",
+                "namespace_stack": list(_state.namespace_stack),
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": dict(_state.env),
+                "kind": "executable",
+                "plugins": [],
+                "target": None,
+                "cmd": cmd,
+                "shell": shell,
+            }
+        )
 
     def __init__(self, *, cmd=None, name=None, shell=False, **kwargs):
         if isinstance(cmd, list):

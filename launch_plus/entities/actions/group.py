@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import launch_plus.resolver as _R
+from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
+from launch_plus.entities.state import (
+    _error,
+    _PackageNotFetchedError,
+    _warn,
+)
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
     _ActionParser,
@@ -11,70 +18,40 @@ from launch_plus.resolver import (
 
 
 @expose_action("group")
-def _action_group(entity: Entity, parser: _ActionParser) -> None:
-    if not parser.evaluate_condition(entity):
-        return
-    scoped_raw = entity.get_attr("scoped", optional=True)
-    if scoped_raw is None:
-        scoped = True
-    elif isinstance(scoped_raw, bool):
-        scoped = scoped_raw
-    else:
-        scoped = str(scoped_raw).lower() not in ("false", "0", "no")
-    children = entity.children
-    if scoped:
-        saved_args = dict(parser.ctx.args)
-        saved_vars = dict(parser.ctx.vars)
-        saved_env = dict(_state.env)
-        saved_ns_depth = len(_state.namespace_stack)
-        saved_gp = list(_state.global_params)
-        saved_gr = list(_state.global_remaps)
-        saved_gpf = list(_state.global_param_files)
-    parser.resolve_children(list(children))
-    if scoped:
-        new_args = {k: v for k, v in parser.ctx.args.items() if k not in saved_args}
-        parser.ctx.args = saved_args
-        parser.ctx.args.update(new_args)
-        parser.ctx.vars = saved_vars
-        _state.env = saved_env
-        del _state.namespace_stack[saved_ns_depth:]
-        _state.global_params[:] = saved_gp
-        _state.global_remaps[:] = saved_gr
-        _state.global_param_files[:] = saved_gpf
-
-
-# ─── Python-shim actions ─────────────────────────────────────────────────────
-
-import launch_plus.resolver as _R  # noqa: E402
-from launch_plus.entities.actions.base import _TrackedAction  # noqa: E402
-from launch_plus.entities.state import (  # noqa: E402
-    _error,
-    _PackageNotFetchedError,
-    _warn,
-)
-
-
-class _TrackedOpaqueFunction(_TrackedAction):
-    """Stores an OpaqueFunction's callable so the walker can invoke it."""
-
-    def __init__(self, *, function=None, **kwargs):
-        self.function = function
-
-    def execute(self, context) -> list | None:
-        fn = self.function
-        if fn and context:
-            try:
-                result = _R._call_opaque_with_stubs(fn, context)
-                return result if result else None
-            except _PackageNotFetchedError as e:
-                _error(f"OpaqueFunction failed: package fetch failed: {e}")
-            except Exception as e:
-                _error(f"OpaqueFunction failed: {e}")
-        return None
-
-
 class _TrackedGroupAction(_TrackedAction):
     """Stores GroupAction's child actions so the walker can recurse into them."""
+
+    @classmethod
+    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+        if not parser.evaluate_condition(entity):
+            return
+        scoped_raw = entity.get_attr("scoped", optional=True)
+        if scoped_raw is None:
+            scoped = True
+        elif isinstance(scoped_raw, bool):
+            scoped = scoped_raw
+        else:
+            scoped = str(scoped_raw).lower() not in ("false", "0", "no")
+        children = entity.children
+        if scoped:
+            saved_args = dict(parser.ctx.args)
+            saved_vars = dict(parser.ctx.vars)
+            saved_env = dict(_state.env)
+            saved_ns_depth = len(_state.namespace_stack)
+            saved_gp = list(_state.global_params)
+            saved_gr = list(_state.global_remaps)
+            saved_gpf = list(_state.global_param_files)
+        parser.resolve_children(list(children))
+        if scoped:
+            new_args = {k: v for k, v in parser.ctx.args.items() if k not in saved_args}
+            parser.ctx.args = saved_args
+            parser.ctx.args.update(new_args)
+            parser.ctx.vars = saved_vars
+            _state.env = saved_env
+            del _state.namespace_stack[saved_ns_depth:]
+            _state.global_params[:] = saved_gp
+            _state.global_remaps[:] = saved_gr
+            _state.global_param_files[:] = saved_gpf
 
     def __init__(self, actions=None, **kwargs):
         self._actions = list(actions or [])
@@ -98,6 +75,25 @@ class _TrackedGroupAction(_TrackedAction):
         if saved_env is not None:
             _R._state.env.clear()
             _R._state.env.update(saved_env)
+        return None
+
+
+class _TrackedOpaqueFunction(_TrackedAction):
+    """Stores an OpaqueFunction's callable so the walker can invoke it."""
+
+    def __init__(self, *, function=None, **kwargs):
+        self.function = function
+
+    def execute(self, context) -> list | None:
+        fn = self.function
+        if fn and context:
+            try:
+                result = _R._call_opaque_with_stubs(fn, context)
+                return result if result else None
+            except _PackageNotFetchedError as e:
+                _error(f"OpaqueFunction failed: package fetch failed: {e}")
+            except Exception as e:
+                _error(f"OpaqueFunction failed: {e}")
         return None
 
 

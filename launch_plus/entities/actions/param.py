@@ -1,10 +1,16 @@
-"""Parameter-related tracked Python-shim actions."""
+"""Parameter-related action handlers and tracked Python-shim actions.
+
+Covers: <let> (XML), SetLaunchConfiguration / SetParameter / ParameterFile (Python shim).
+"""
 
 from __future__ import annotations
 
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
+from launch_plus.entities.expose import expose_action
 from launch_plus.entities.state import _PackageNotFetchedError, _StubLaunchContext
+from launch_plus.parsers.entity import Entity
+from launch_plus.resolver import _ActionParser
 
 
 class _TrackedParameterFile(_TrackedAction):
@@ -31,8 +37,16 @@ class _TrackedParameterFile(_TrackedAction):
                 _R._track_param_file(path)
 
 
+@expose_action("let")
 class _SetLaunchConfiguration(_TrackedAction):
-    """Implements SetLaunchConfiguration: updates launch_configurations at walk time."""
+    """Implements SetLaunchConfiguration / <let>: updates launch_configurations."""
+
+    @classmethod
+    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+        if parser.evaluate_condition(entity):
+            name = entity.get_attr("name", optional=True) or ""
+            value = parser.resolve(entity.get_attr("value", optional=True) or "")
+            parser.ctx.vars[name] = value
 
     def __init__(self, name=None, value=None, **kwargs):
         self._name = name

@@ -1172,7 +1172,7 @@ A single substitution string can contain multiple `$(find-pkg-share ...)` tokens
 
 **Lark-based resolver:** `parse_substitution` parses the string via the Lark grammar into typed `Substitution` objects (e.g. `FindPkgShareSubstitution`). `resolve_substitutions_from_tokens` calls `.perform(ctx)` on each, accumulating the output string. The `preview_mode` flag on `ctx` controls whether `FindPkgShareSubstitution.perform()` returns a portable token or a real path.
 
-A legacy fallback (`_resolve_substitutions_legacy`) handles expressions the Lark grammar cannot parse (e.g. `$(eval '$(var x)'=='y')` with Python operators outside quotes).
+The Lark grammar matches the official ROS 2 `grammar.lark` — all valid XML substitution expressions (including `$(eval ...)` with operators inside quoted templates) are handled without a fallback.
 
 **`_resolve_ros_substitutions` (for Python launch file output):** Uses `re.sub` with a global match, finding every `$(find-pkg-share ...)` independently:
 ```python
@@ -1237,7 +1237,7 @@ The shell command is executed by ROS 2 at launch time.  Static analysis cannot r
 - In full (non-preview) mode the value is an empty string, matching the ROS 2 fallback
   when the command fails with the `'warn'` on-error policy.
 
-**Implementation:** The `command` substitution type is parsed by `_parse_substitution_expr` (legacy path) or as a `CommandSubstitution` (Lark path). The resolver reports the error via `_error()` and emits the placeholder. The error appears in `_state.tracked["errors"]`.
+**Implementation:** The `command` substitution type is parsed as a `CommandSubstitution` by the Lark grammar. The resolver reports the error via `_error()` and emits the placeholder. The error appears in `_state.tracked["errors"]`.
 
 ### `$(eval 'python_expr')` failure — **warning**
 
@@ -1253,7 +1253,7 @@ syntax error, etc.) the resolver falls back to `"false"`.
 - Previously only emitted as `tracing::warn!` (developer log); now also appears in the
   user-facing `[warning]` summary.
 
-**Implementation:** In the eval handling of `_resolve_substitutions_legacy` and `EvalSubstitution.perform()`, a failed expression is reported via `_error()` and the result falls back to `"false"` or the original expression (in preview mode).
+**Implementation:** In `EvalSubstitution.perform()`, a failed expression is reported via `_error()` and the result falls back to `"false"` or the original expression (in preview mode).
 
 ### Unknown Python action type — **warning**
 

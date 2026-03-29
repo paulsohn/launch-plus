@@ -101,23 +101,23 @@ class _TrackedExecutable(_TrackedAction):
             except Exception:
                 name = str(name) if name is not None else ""
         name_str = str(name) if name is not None else ""
-        _R._state.tracked["nodes"][self._idx]["cmd"] = cmd_str
-        _R._state.tracked["nodes"][self._idx]["name"] = name_str
-        _R._state.tracked["nodes"][self._idx]["shell"] = self._shell
+        context._state.tracked["nodes"][self._idx]["cmd"] = cmd_str
+        context._state.tracked["nodes"][self._idx]["name"] = name_str
+        context._state.tracked["nodes"][self._idx]["shell"] = self._shell
 
     def _resolve_xml_details(self, context) -> None:
         """Resolve XML-parsed token structures into the tracked node entry."""
         from launch_plus.entities.xml_resolver import resolve_value
 
-        entry = _R._state.tracked["nodes"][self._idx]
+        entry = context._state.tracked["nodes"][self._idx]
         cmd = resolve_value(self._cmd, context) or ""
         name = resolve_value(self._name, context) or ""
         entry["cmd"] = cmd
         entry["name"] = name
         entry["shell"] = self._shell
-        entry["namespace_stack"] = list(_R._state.namespace_stack)
+        entry["namespace_stack"] = list(context._state.namespace_stack)
         # Env
-        env = dict(_R._state.env)
+        env = dict(context._state.env)
         for k_tokens, v_tokens in self._xml_envs or []:
             env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
         entry["env"] = env

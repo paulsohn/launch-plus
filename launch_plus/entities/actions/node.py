@@ -36,17 +36,18 @@ def _resolve_xml_composable_plugins(
         plugin_name = resolve_value(p["plugin"], context) or ""
         name_raw = p.get("name")
         name = resolve_value(_parse_optional_raw(name_raw), context) if name_raw else None
+        state = context._state if context is not None and hasattr(context, "_state") else _R._state
         if pkg:
-            _R._track_package(_R._state, pkg)
+            _R._track_package(state, pkg)
         # Resolve params
         params: dict[str, str] = {}
         param_files: list[dict] = []
         for param in p.get("params") or []:
             if "from" in param:
                 path = resolve_value(param["from"], context) or ""
-                _R._track_param_file(_R._state, path)
+                _R._track_param_file(state, path)
                 pf_entry: dict = {"path": path}
-                if _R._state.inline_params:
+                if state.inline_params:
                     expanded = _read_and_expand_param_file(path, context)
                     if expanded is not None:
                         pf_entry["params"] = expanded
@@ -172,28 +173,28 @@ class _TrackedNode(_TrackedAction):
         """Resolve XML-parsed token structures into the tracked node entry."""
         from launch_plus.entities.xml_resolver import resolve_value
 
-        entry = _R._state.tracked["nodes"][self._idx]
+        entry = context._state.tracked["nodes"][self._idx]
         # Package / executable / name
         pkg = resolve_value(self._raw_package, context) or ""
         exe = resolve_value(self._raw_executable, context) or ""
         name = resolve_value(self._raw_name, context) or ""
         ns = resolve_value(self._raw_namespace, context)
         if pkg:
-            _R._track_package(_R._state, pkg)
+            _R._track_package(context._state, pkg)
         entry["package"] = pkg
         entry["executable"] = exe
         entry["name"] = name
-        entry["namespace_stack"] = list(_R._state.namespace_stack)
+        entry["namespace_stack"] = list(context._state.namespace_stack)
         entry["explicit_namespace"] = ns
         # Params
-        params: dict[str, str] = {k: str(v) for k, v in _R._state.global_params}
-        param_files: list[dict] = list(_R._state.global_param_files)
+        params: dict[str, str] = {k: str(v) for k, v in context._state.global_params}
+        param_files: list[dict] = list(context._state.global_param_files)
         for p in self._xml_params:
             if "from" in p:
                 path = resolve_value(p["from"], context) or ""
-                _R._track_param_file(_R._state, path)
+                _R._track_param_file(context._state, path)
                 pf_entry: dict = {"path": path}
-                if _R._state.inline_params:
+                if context._state.inline_params:
                     from launch_plus.entities.xml_resolver import _read_and_expand_param_file
 
                     expanded = _read_and_expand_param_file(path, context)
@@ -207,14 +208,14 @@ class _TrackedNode(_TrackedAction):
         entry["parameters"] = params
         entry["param_files"] = param_files
         # Remaps
-        remaps: list = list(_R._state.global_remaps)
+        remaps: list = list(context._state.global_remaps)
         for src_tokens, dst_tokens in self._xml_remaps or []:
             remaps.append(
                 [resolve_value(src_tokens, context) or "", resolve_value(dst_tokens, context) or ""]
             )
         entry["remappings"] = remaps
         # Env
-        env = dict(_R._state.env)
+        env = dict(context._state.env)
         for k_tokens, v_tokens in self._xml_envs or []:
             env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
         entry["env"] = env
@@ -345,8 +346,8 @@ class _TrackedComposableNodeContainer(_TrackedAction):
                 self._resolve_xml_details(context)
             elif context is not None:
                 _R._resolve_node_details(self, context)
-                _R._state.tracked["nodes"][self._idx]["plugins"] = _R._resolve_composable_plugins(
-                    self._descs, context
+                context._state.tracked["nodes"][self._idx]["plugins"] = (
+                    _R._resolve_composable_plugins(self._descs, context)
                 )
         return None
 
@@ -354,25 +355,25 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         """Resolve XML-parsed token structures into the tracked node entry."""
         from launch_plus.entities.xml_resolver import resolve_value
 
-        entry = _R._state.tracked["nodes"][self._idx]
+        entry = context._state.tracked["nodes"][self._idx]
         # Package / executable / name
         pkg = resolve_value(self._raw_package, context) or ""
         exe = resolve_value(self._raw_executable, context) or ""
         name = resolve_value(self._raw_name, context) or ""
         ns = resolve_value(self._raw_namespace, context)
         if pkg:
-            _R._track_package(_R._state, pkg)
+            _R._track_package(context._state, pkg)
         entry["package"] = pkg
         entry["executable"] = exe
         entry["name"] = name
-        entry["namespace_stack"] = list(_R._state.namespace_stack)
+        entry["namespace_stack"] = list(context._state.namespace_stack)
         entry["explicit_namespace"] = ns
         # Params (container has no inline params from XML — only global)
-        entry["parameters"] = {k: str(v) for k, v in _R._state.global_params}
-        entry["param_files"] = list(_R._state.global_param_files)
-        entry["remappings"] = list(_R._state.global_remaps)
+        entry["parameters"] = {k: str(v) for k, v in context._state.global_params}
+        entry["param_files"] = list(context._state.global_param_files)
+        entry["remappings"] = list(context._state.global_remaps)
         # Env
-        env = dict(_R._state.env)
+        env = dict(context._state.env)
         for k_tokens, v_tokens in self._xml_envs or []:
             env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
         entry["env"] = env
@@ -453,10 +454,10 @@ class _TrackedLoadComposableNodes(_TrackedAction):
             if self._xml_plugins is not None:
                 self._resolve_xml_details(context)
             elif context is not None:
-                entry = _R._state.tracked["nodes"][self._idx]
+                entry = context._state.tracked["nodes"][self._idx]
                 if self._raw_target is not None:
                     if isinstance(self._raw_target, _TrackedComposableNodeContainer):
-                        target = _R._state.tracked["nodes"][self._raw_target._idx].get(
+                        target = context._state.tracked["nodes"][self._raw_target._idx].get(
                             "name"
                         ) or entry.get("target", "")
                     else:
@@ -470,11 +471,11 @@ class _TrackedLoadComposableNodes(_TrackedAction):
         """Resolve XML-parsed token structures into the tracked node entry."""
         from launch_plus.entities.xml_resolver import resolve_value
 
-        entry = _R._state.tracked["nodes"][self._idx]
+        entry = context._state.tracked["nodes"][self._idx]
         target = resolve_value(self._raw_target, context) or ""
         ns = resolve_value(self._xml_namespace, context)
         entry["target"] = target
-        entry["namespace_stack"] = list(_R._state.namespace_stack)
+        entry["namespace_stack"] = list(context._state.namespace_stack)
         entry["explicit_namespace"] = ns
         # Plugins
         entry["plugins"] = _resolve_xml_composable_plugins(self._xml_plugins, context)

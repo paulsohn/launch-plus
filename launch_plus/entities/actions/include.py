@@ -86,40 +86,40 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
 
         # Check for unportable absolute paths
         if (
-            _R._state.preview_mode
+            ctx._state.preview_mode
             and os.path.isabs(file_path)
             and "$(find-pkg-share" not in (self._xml_raw_file or "")
             and "$(dirname)" not in (self._xml_raw_file or "")
         ):
-            if _R._state.allow_unportable_paths:
-                _R._state.warn(f"unportable absolute path in include: {file_path}")
+            if ctx._state.allow_unportable_paths:
+                ctx._state.warn(f"unportable absolute path in include: {file_path}")
             else:
-                _R._state.error(f"unportable absolute path in include: {file_path}")
+                ctx._state.error(f"unportable absolute path in include: {file_path}")
 
         include_stack = self._xml_include_stack or []
         if file_path in include_stack:
-            _R._state.error(f"circular include detected: {file_path}")
+            ctx._state.error(f"circular include detected: {file_path}")
             return None
         if len(include_stack) > 20:
-            _R._state.warn(f"max include depth exceeded for {file_path}")
+            ctx._state.warn(f"max include depth exceeded for {file_path}")
             return None
 
-        dep_idx = _R._track_include(_R._state, file_path)
+        dep_idx = _R._track_include(ctx._state, file_path)
         # Resolve include args
         child_ctx_args: dict[str, str] = {}
         for arg_name, value_tokens in self._xml_args or []:
             child_ctx_args[arg_name] = resolve_value(value_tokens, ctx) or ""
         if dep_idx >= 0 and child_ctx_args:
-            _R._state.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
+            ctx._state.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
         if child_ctx_args:
-            _R._state.tracked["include_args"][file_path] = child_ctx_args
+            ctx._state.tracked["include_args"][file_path] = child_ctx_args
 
         real_path = file_path
         parsed_path = _parse_portable_path(file_path)
         if parsed_path:
             pkg, rest = parsed_path
             try:
-                pkg_share = _resolve_pkg_share(_R._state, pkg)
+                pkg_share = _resolve_pkg_share(ctx._state, pkg)
                 real_path = os.path.join(pkg_share, rest)
             except Exception:
                 return None
@@ -140,7 +140,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
                     _warn(f"failed to resolve IncludeLaunchDescription source: {e}")
             if path:
                 self._path = path
-                dep_idx = _R._track_include(_R._state, path)
+                dep_idx = _R._track_include(context._state, path)
                 _resolve_include_args(path, self._raw_launch_arguments, context, dep_idx)
 
         if self._path and self._path.endswith(".py") and context is not None:
@@ -153,13 +153,13 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
                     child_args[k_str] = v_str
             inc_dep = _R._extract_pkg_and_share_path(self._path)
             if inc_dep:
-                _R._state.include_chain.append(list(inc_dep))
+                context._state.include_chain.append(list(inc_dep))
             else:
-                _R._state.include_chain.append(["", self._path])
+                context._state.include_chain.append(["", self._path])
             try:
-                _R._inline_resolve_python_launch(_R._state, self._path, context, child_args)
+                _R._inline_resolve_python_launch(context._state, self._path, context, child_args)
             finally:
-                _R._state.include_chain.pop()
+                context._state.include_chain.pop()
 
         return None
 
@@ -168,10 +168,11 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
     """Capture launch_arguments for an include site."""
     if not launch_arguments or not path:
         return
+    state = context._state if context is not None and hasattr(context, "_state") else _R._state
     path = str(path)
-    if dep_idx >= 0 and _R._state.tracked["include_deps"][dep_idx].get("include_args"):
+    if dep_idx >= 0 and state.tracked["include_deps"][dep_idx].get("include_args"):
         return
-    if dep_idx < 0 and path in _R._state.tracked["include_args"]:
+    if dep_idx < 0 and path in state.tracked["include_args"]:
         return
     try:
         captured = {}
@@ -200,8 +201,8 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
             captured[k_str] = v_str
         if captured:
             if dep_idx >= 0:
-                _R._state.tracked["include_deps"][dep_idx]["include_args"] = captured
+                state.tracked["include_deps"][dep_idx]["include_args"] = captured
             else:
-                _R._state.tracked["include_args"][path] = captured
+                state.tracked["include_args"][path] = captured
     except Exception as e:
         _warn(f"failed to resolve include args for '{path}': {e}")

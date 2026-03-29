@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import os
 
-import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.state import (
@@ -51,7 +50,7 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
             _error("SetEnvironmentVariable: resolved name is empty or None — skipping")
             return None
         value = resolve_value(self._value, context) or ""
-        _R._state.env[name] = value
+        context._state.env[name] = value
         return None
 
 
@@ -90,8 +89,8 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
                 f'Use SetEnvironmentVariable(name="{name}", value="") '
                 "or a scoped group instead"
             )
-        elif name in _R._state.env:
-            del _R._state.env[name]
+        elif name in context._state.env:
+            del context._state.env[name]
         else:
             _error(f"unset_env: environment variable '{name}' is not set")
         return None
@@ -116,7 +115,7 @@ class _TrackedPushRosNamespace(_TrackedAction):
 
         ns = resolve_value(self._namespace, context)
         if ns:
-            _R._state.namespace_stack.append(ns)
+            context._state.namespace_stack.append(ns)
         return None
 
 
@@ -139,5 +138,5 @@ class _SetRemap(_TrackedAction):
 
         src = resolve_value(self._src, context) or ""
         dst = resolve_value(self._dst, context) or ""
-        _R._state.global_remaps.append((src, dst))
+        context._state.global_remaps.append((src, dst))
         return None

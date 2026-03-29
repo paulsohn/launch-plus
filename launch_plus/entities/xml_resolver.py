@@ -33,9 +33,14 @@ if TYPE_CHECKING:
 
 
 class _SubstitutionContext:
-    """Context for resolving substitutions in XML/YAML launch files."""
+    """Context for resolving substitutions in XML/YAML launch files.
+
+    Carries a ``_state`` reference so that ``execute()`` methods receiving
+    this as their context can access resolver state uniformly.
+    """
 
     __slots__ = (
+        "_state",
         "args",
         "vars",
         "env",
@@ -44,6 +49,7 @@ class _SubstitutionContext:
     )
 
     def __init__(self) -> None:
+        self._state = _state
         self.args: dict[str, str] = {}
         self.vars: dict[str, str] = {}
         self.env: dict[str, str] = _state.env  # share with ResolverState

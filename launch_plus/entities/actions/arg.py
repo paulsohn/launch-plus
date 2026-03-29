@@ -42,7 +42,7 @@ class _DeclaredArg(_TrackedAction):
             resolved = resolve_value(self._fixed_value, context) or ""
             if context is not None and hasattr(context, "args"):
                 context.args[self.name] = resolved
-            _record_and_track(self.name, resolved)
+            _record_and_track(self.name, resolved, context)
         elif hasattr(context, "args"):
             # XML path: resolve default and record
             _execute_xml_arg(self, context)
@@ -52,14 +52,15 @@ class _DeclaredArg(_TrackedAction):
         return None
 
 
-def _record_and_track(name: str, resolved: str) -> None:
+def _record_and_track(name: str, resolved: str, context=None) -> None:
     """Record a declared arg in tracked state."""
     if not name:
         return
-    already_seen = name in _R._state.declared_arg_names
+    state = context._state if context is not None and hasattr(context, "_state") else _R._state
+    already_seen = name in state.declared_arg_names
     if not already_seen:
-        _R._state.declared_arg_names.add(name)
-    _R._record_declared_arg(_R._state, name, resolved, flat=not already_seen)
+        state.declared_arg_names.add(name)
+    _R._record_declared_arg(state, name, resolved, flat=not already_seen)
 
 
 def _execute_xml_arg(arg: _DeclaredArg, context) -> None:
@@ -71,7 +72,7 @@ def _execute_xml_arg(arg: _DeclaredArg, context) -> None:
         return
     if arg.default_value is not None:
         if name not in context.args:
-            if _R._state.apply_arg_defaults:
+            if context._state.apply_arg_defaults:
                 resolved = resolve_value(arg.default_value, context) or ""
                 context.args[name] = resolved
             else:
@@ -80,7 +81,7 @@ def _execute_xml_arg(arg: _DeclaredArg, context) -> None:
             resolved = context.args.get(name, "")
     else:
         resolved = context.args.get(name, "")
-    _record_and_track(name, resolved)
+    _record_and_track(name, resolved, context)
 
 
 def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
@@ -101,7 +102,7 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
             )
 
     if arg.default_value is None:
-        _record_and_track(arg.name, "")
+        _record_and_track(arg.name, "", context)
         return
 
     already_set = context is not None and arg.name in context._launch_configurations
@@ -111,11 +112,11 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
             raw = "".join(_R._portable_display(s) for s in dv)
         else:
             raw = _R._portable_display(dv)
-        _record_and_track(arg.name, raw)
+        _record_and_track(arg.name, raw, context)
         return
 
-    if not _R._state.apply_arg_defaults:
-        _record_and_track(arg.name, "")
+    if not context._state.apply_arg_defaults:
+        _record_and_track(arg.name, "", context)
         return
 
     dv = arg.default_value
@@ -124,7 +125,7 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
     else:
         display = _R._portable_display(dv)
 
-    _record_and_track(arg.name, display)
+    _record_and_track(arg.name, display, context)
 
     if context is not None:
         context._launch_configurations[arg.name] = _DeferredDefault(dv)

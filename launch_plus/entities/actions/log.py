@@ -26,12 +26,12 @@ class _LogAction(_TrackedAction):
 
         msg = resolve_value(self._message, context) or ""
         _R._track_node(
-            _R._state,
+            context._state,
             {
                 "package": "",
                 "executable": "",
                 "name": "",
-                "namespace_stack": list(_R._state.namespace_stack),
+                "namespace_stack": list(context._state.namespace_stack),
                 "explicit_namespace": None,
                 "parameters": {},
                 "param_files": [],

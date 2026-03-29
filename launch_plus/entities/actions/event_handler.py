@@ -82,14 +82,14 @@ class _EventHandlerAction(_TrackedAction):
                 }
             )
         _R._track_event_handler(
-            _R._state,
+            context._state,
             {
                 "handler_kind": self._handler_kind,
                 "target": resolve_value(self._target, context),
                 "target_node": resolve_value(self._target_node, context),
                 "start_state": resolve_value(self._start_state, context),
                 "goal_state": resolve_value(self._goal_state, context),
-                "namespace_stack": list(_R._state.namespace_stack),
+                "namespace_stack": list(context._state.namespace_stack),
                 "explicit_namespace": resolve_value(self._handler_ns, context),
                 "actions": eh_actions,
             },
@@ -120,20 +120,20 @@ class _EmitEventAction(_TrackedAction):
         target_node = resolve_value(self._target_node_attr, context)
         ee_ns = resolve_value(self._namespace, context)
         _R._track_event_handler(
-            _R._state,
+            context._state,
             {
                 "handler_kind": "emit_event",
                 "target": None,
                 "target_node": target_node,
                 "start_state": None,
                 "goal_state": None,
-                "namespace_stack": list(_R._state.namespace_stack),
+                "namespace_stack": list(context._state.namespace_stack),
                 "explicit_namespace": ee_ns,
                 "actions": [
                     {
                         "event": event,
                         "target_node": target_node,
-                        "namespace_stack": list(_R._state.namespace_stack),
+                        "namespace_stack": list(context._state.namespace_stack),
                         "explicit_namespace": ee_ns,
                     }
                 ],

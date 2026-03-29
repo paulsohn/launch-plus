@@ -65,11 +65,11 @@ class _TrackedGroupAction(_TrackedAction):
         if self._scoped:
             saved_args = dict(ctx.args)
             saved_vars = dict(ctx.vars)
-            saved_env = dict(_R._state.env)
-            saved_ns_depth = len(_R._state.namespace_stack)
-            saved_gp = list(_R._state.global_params)
-            saved_gr = list(_R._state.global_remaps)
-            saved_gpf = list(_R._state.global_param_files)
+            saved_env = dict(ctx._state.env)
+            saved_ns_depth = len(ctx._state.namespace_stack)
+            saved_gp = list(ctx._state.global_params)
+            saved_gr = list(ctx._state.global_remaps)
+            saved_gpf = list(ctx._state.global_param_files)
         for child in self._xml_children:
             _resolve_element(child, ctx, self._xml_include_stack or [])
         if self._scoped:
@@ -77,22 +77,22 @@ class _TrackedGroupAction(_TrackedAction):
             ctx.args = saved_args
             ctx.args.update(new_args)
             ctx.vars = saved_vars
-            _R._state.env.clear()
-            _R._state.env.update(saved_env)
-            del _R._state.namespace_stack[saved_ns_depth:]
-            _R._state.global_params[:] = saved_gp
-            _R._state.global_remaps[:] = saved_gr
-            _R._state.global_param_files[:] = saved_gpf
+            ctx._state.env.clear()
+            ctx._state.env.update(saved_env)
+            del ctx._state.namespace_stack[saved_ns_depth:]
+            ctx._state.global_params[:] = saved_gp
+            ctx._state.global_remaps[:] = saved_gr
+            ctx._state.global_param_files[:] = saved_gpf
 
     def _execute_shim(self, context) -> None:
         """Execute for Python shim path: walk child actions."""
-        depth_before = len(_R._state.namespace_stack)
-        saved_env = dict(_R._state.env) if self._scoped else None
-        _R._walk_actions(_R._state, self._actions, context)
-        del _R._state.namespace_stack[depth_before:]
+        depth_before = len(context._state.namespace_stack)
+        saved_env = dict(context._state.env) if self._scoped else None
+        _R._walk_actions(context._state, self._actions, context)
+        del context._state.namespace_stack[depth_before:]
         if saved_env is not None:
-            _R._state.env.clear()
-            _R._state.env.update(saved_env)
+            context._state.env.clear()
+            context._state.env.update(saved_env)
 
 
 class _TrackedOpaqueFunction(_TrackedAction):

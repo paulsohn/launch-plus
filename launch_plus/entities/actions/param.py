@@ -67,7 +67,7 @@ class _SetLaunchConfiguration(_TrackedAction):
         # Python shim path: set _launch_configurations
         if context is not None and hasattr(context, "_launch_configurations"):
             context._launch_configurations[name] = resolved_value
-        _R._state.tracked["set_launch_configurations"][name] = resolved_value
+        context._state.tracked["set_launch_configurations"][name] = resolved_value
         return None
 
 
@@ -103,6 +103,6 @@ class _TrackedSetParameter(_TrackedAction):
         if context is not None and hasattr(context, "_launch_configurations"):
             gp_list = context._launch_configurations.setdefault("global_params", [])
             gp_list.append((name, value))
-        _R._state.tracked["global_params"].append([name, value])
-        _R._state.global_params.append((name, value))
+        context._state.tracked["global_params"].append([name, value])
+        context._state.global_params.append((name, value))
         return None

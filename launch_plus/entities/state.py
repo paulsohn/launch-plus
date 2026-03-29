@@ -131,10 +131,15 @@ def _error(msg: str) -> None:
 
 
 class _StubLaunchContext:
-    """Minimal LaunchContext: holds launch_configurations for substitution resolution."""
+    """Minimal LaunchContext: holds launch_configurations for substitution resolution.
 
-    def __init__(self):
-        self._launch_configurations = {}
+    Optionally carries a :class:`ResolverState` reference so that
+    ``execute()`` methods can access resolver state via ``context._state``.
+    """
+
+    def __init__(self, state: ResolverState | None = None):
+        self._launch_configurations: dict[str, object] = {}
+        self._state = state if state is not None else _state
 
     @property
     def launch_configurations(self):

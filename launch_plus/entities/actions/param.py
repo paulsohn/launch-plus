@@ -42,28 +42,32 @@ class _SetLaunchConfiguration(_TrackedAction):
     """Implements SetLaunchConfiguration / <let>: updates launch_configurations."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
-        if parser.evaluate_condition(entity):
-            name = entity.get_attr("name", optional=True) or ""
-            value = parser.resolve(entity.get_attr("value", optional=True) or "")
-            parser.ctx.vars[name] = value
+    def parse(cls, entity: Entity, parser: _ActionParser):
+        if not parser.evaluate_condition(entity):
+            return None
+        name = entity.get_attr("name", optional=True) or ""
+        value = parser.parse_substitution(entity.get_attr("value", optional=True) or "")
+        return cls(name=name, value=value)
 
     def __init__(self, name=None, value=None, **kwargs):
         self._name = name
         self._value = value
 
     def execute(self, context) -> list | None:
-        name = self._name
-        value = self._value
-        if name and context is not None:
-            if hasattr(value, "perform"):
-                try:
-                    value = value.perform(context)
-                except Exception:
-                    pass
-            resolved_value = str(value) if value is not None else ""
-            context._launch_configurations[str(name)] = resolved_value
-            _R._state.tracked["set_launch_configurations"][str(name)] = resolved_value
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        name = str(self._name) if self._name else ""
+        if not name:
+            return None
+        value = resolve_value(self._value, context)
+        resolved_value = str(value) if value is not None else ""
+        # XML path: set ctx.vars for subsequent substitution resolution
+        if context is not None and hasattr(context, "vars"):
+            context.vars[name] = resolved_value
+        # Python shim path: set _launch_configurations
+        if context is not None and hasattr(context, "_launch_configurations"):
+            context._launch_configurations[name] = resolved_value
+        _R._state.tracked["set_launch_configurations"][name] = resolved_value
         return None
 
 

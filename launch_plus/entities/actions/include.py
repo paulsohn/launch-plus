@@ -24,59 +24,47 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
     """Tracks IncludeLaunchDescription for both XML and Python shim paths."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+    def parse(cls, entity: Entity, parser: _ActionParser):
         if not parser.evaluate_condition(entity):
-            return
+            return None
         raw_file = entity.get_attr("file", optional=True) or ""
-        file_path = parser.resolve(raw_file)
-
-        # Check for unportable absolute paths in preview mode
-        if (
-            parser.state.preview_mode
-            and os.path.isabs(file_path)
-            and "$(find-pkg-share" not in raw_file
-            and "$(dirname)" not in raw_file
-        ):
-            if parser.state.allow_unportable_paths:
-                parser.state.warn(f"unportable absolute path in include: {file_path}")
-            else:
-                parser.state.error(f"unportable absolute path in include: {file_path}")
-
-        if file_path in parser.include_stack:
-            parser.state.error(f"circular include detected: {file_path}")
-            return
-        if len(parser.include_stack) > 20:
-            parser.state.warn(f"max include depth exceeded for {file_path}")
-            return
-        dep_idx = parser.track_include(file_path)
-        child_ctx_args = parser.resolve_include_args(entity)
-        if dep_idx >= 0 and child_ctx_args:
-            parser.state.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
-        if child_ctx_args:
-            parser.state.tracked["include_args"][file_path] = child_ctx_args
-        real_path = file_path
-        parsed_path = _parse_portable_path(file_path)
-        if parsed_path:
-            pkg, rest = parsed_path
-            try:
-                pkg_share = _resolve_pkg_share(pkg)
-                real_path = os.path.join(pkg_share, rest)
-            except Exception:
-                return
-        if os.path.isfile(real_path):
-            parser.parse_and_resolve_included_file(real_path, file_path, child_ctx_args)
+        file_tokens = parser.parse_substitution(raw_file)
+        # Extract raw <arg> children (name → value_tokens pairs)
+        arg_items = entity.get_attr("arg", data_type=list, optional=True) or []
+        xml_args = []
+        for a in arg_items:
+            arg_name = a.get_attr("name", optional=True) or ""
+            arg_value = a.get_attr("value", optional=True)
+            if arg_value is not None:
+                xml_args.append((arg_name, parser.parse_substitution(arg_value)))
+        return cls(
+            launch_description_source=None,
+            _xml_file_tokens=file_tokens,
+            _xml_raw_file=raw_file,
+            _xml_args=xml_args,
+            _xml_include_stack=list(parser.include_stack),
+            _xml_ctx=parser.ctx,
+        )
 
     def __init__(self, launch_description_source, launch_arguments=None, **kwargs):
         self._source = launch_description_source
         self._raw_launch_arguments = launch_arguments
+        # XML path data
+        self._xml_file_tokens = kwargs.get("_xml_file_tokens")
+        self._xml_raw_file = kwargs.get("_xml_raw_file")
+        self._xml_args = kwargs.get("_xml_args")
+        self._xml_include_stack = kwargs.get("_xml_include_stack")
+        self._xml_ctx = kwargs.get("_xml_ctx")
+        # Python shim path
         path = None
-        if hasattr(launch_description_source, "_location"):
-            path = launch_description_source._location
-        elif hasattr(launch_description_source, "location"):
-            try:
-                path = launch_description_source.location
-            except Exception:
-                pass
+        if launch_description_source is not None:
+            if hasattr(launch_description_source, "_location"):
+                path = launch_description_source._location
+            elif hasattr(launch_description_source, "location"):
+                try:
+                    path = launch_description_source.location
+                except Exception:
+                    pass
         self._path = path
         self._dep_idx = -1
         if path:
@@ -86,6 +74,61 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             _resolve_include_args(path, launch_arguments, _StubLaunchContext(), self._dep_idx)
 
     def execute(self, context) -> list | None:
+        if self._xml_file_tokens is not None:
+            return self._execute_xml(context)
+        return self._execute_shim(context)
+
+    def _execute_xml(self, ctx) -> list | None:
+        """Execute for XML path: resolve file, include args, process included file."""
+        from launch_plus.entities.xml_resolver import _ActionParser, resolve_value
+
+        file_path = resolve_value(self._xml_file_tokens, ctx) or ""
+
+        # Check for unportable absolute paths
+        if (
+            _R._state.preview_mode
+            and os.path.isabs(file_path)
+            and "$(find-pkg-share" not in (self._xml_raw_file or "")
+            and "$(dirname)" not in (self._xml_raw_file or "")
+        ):
+            if _R._state.allow_unportable_paths:
+                _R._state.warn(f"unportable absolute path in include: {file_path}")
+            else:
+                _R._state.error(f"unportable absolute path in include: {file_path}")
+
+        include_stack = self._xml_include_stack or []
+        if file_path in include_stack:
+            _R._state.error(f"circular include detected: {file_path}")
+            return None
+        if len(include_stack) > 20:
+            _R._state.warn(f"max include depth exceeded for {file_path}")
+            return None
+
+        dep_idx = _R._track_include(file_path)
+        # Resolve include args
+        child_ctx_args: dict[str, str] = {}
+        for arg_name, value_tokens in self._xml_args or []:
+            child_ctx_args[arg_name] = resolve_value(value_tokens, ctx) or ""
+        if dep_idx >= 0 and child_ctx_args:
+            _R._state.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
+        if child_ctx_args:
+            _R._state.tracked["include_args"][file_path] = child_ctx_args
+
+        real_path = file_path
+        parsed_path = _parse_portable_path(file_path)
+        if parsed_path:
+            pkg, rest = parsed_path
+            try:
+                pkg_share = _resolve_pkg_share(pkg)
+                real_path = os.path.join(pkg_share, rest)
+            except Exception:
+                return None
+        if os.path.isfile(real_path):
+            parser = _ActionParser(ctx, include_stack)
+            parser.parse_and_resolve_included_file(real_path, file_path, child_ctx_args)
+        return None
+
+    def _execute_shim(self, context) -> list | None:
         if self._path is None and context is not None:
             src = self._source
             path = None

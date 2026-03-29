@@ -206,10 +206,10 @@ class _TrackedNode(_TrackedAction):
         entry["parameters"] = params
         entry["param_files"] = param_files
         # Remaps
-        remaps = list(_R._state.global_remaps)
+        remaps: list = list(_R._state.global_remaps)
         for src_tokens, dst_tokens in self._xml_remaps or []:
             remaps.append(
-                (resolve_value(src_tokens, context) or "", resolve_value(dst_tokens, context) or "")
+                [resolve_value(src_tokens, context) or "", resolve_value(dst_tokens, context) or ""]
             )
         entry["remappings"] = remaps
         # Env

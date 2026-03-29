@@ -14,40 +14,73 @@ from launch_plus.parsers.entity import Entity
 
 @expose_action("arg")
 class _DeclaredArg(_TrackedAction):
-    """Stub for DeclareLaunchArgument: captures name, default_value, and condition."""
+    """Stub for DeclareLaunchArgument / <arg>."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+    def parse(cls, entity: Entity, parser: _ActionParser):
         name = entity.get_attr("name", optional=True) or ""
         default = entity.get_attr("default", optional=True)
         fixed_value = entity.get_attr("value", optional=True)
         _ = entity.get_attr("description", optional=True)  # consume
-        ctx = parser.ctx
-        if fixed_value is not None:
-            resolved = parser.resolve(fixed_value)
-            ctx.args[name] = resolved
-        elif name and name not in ctx.args and default is not None:
-            if parser.state.apply_arg_defaults:
-                resolved = parser.resolve(default)
-                ctx.args[name] = resolved
-            else:
-                resolved = default or ""
-        else:
-            resolved = ctx.args.get(name, default or "")
-        if name:
-            already_seen = name in parser.state.declared_arg_names
-            if not already_seen:
-                parser.state.declared_arg_names.add(name)
-            parser.record_declared_arg(name, resolved, flat=not already_seen)
+        return cls(
+            name=name,
+            default_value=parser.parse_substitution(default) if default else None,
+            _fixed_value=parser.parse_substitution(fixed_value) if fixed_value else None,
+        )
 
     def __init__(self, name=None, *positional, default_value=None, condition=None, **kwargs):
         self.name = str(name) if name is not None else (str(positional[0]) if positional else None)
         self.default_value = default_value
         self.condition = condition
+        self._fixed_value = kwargs.get("_fixed_value")
 
     def execute(self, context) -> list | None:
-        _apply_declared_arg(self, context)
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        if self._fixed_value is not None:
+            # <arg name="x" value="v"/> — fixed value, set immediately
+            resolved = resolve_value(self._fixed_value, context) or ""
+            if context is not None and hasattr(context, "args"):
+                context.args[self.name] = resolved
+            _record_and_track(self.name, resolved)
+        elif hasattr(context, "args"):
+            # XML path: resolve default and record
+            _execute_xml_arg(self, context)
+        elif hasattr(context, "_launch_configurations"):
+            # Python shim path
+            _apply_declared_arg(self, context)
         return None
+
+
+def _record_and_track(name: str, resolved: str) -> None:
+    """Record a declared arg in tracked state."""
+    if not name:
+        return
+    already_seen = name in _R._state.declared_arg_names
+    if not already_seen:
+        _R._state.declared_arg_names.add(name)
+    _R._record_declared_arg(name, resolved, flat=not already_seen)
+
+
+def _execute_xml_arg(arg: _DeclaredArg, context) -> None:
+    """Execute <arg> for the XML path — context is a _SubstitutionContext."""
+    from launch_plus.entities.xml_resolver import resolve_value
+
+    name = arg.name or ""
+    if not name:
+        return
+    if arg.default_value is not None:
+        if name not in context.args:
+            if _R._state.apply_arg_defaults:
+                resolved = resolve_value(arg.default_value, context) or ""
+                context.args[name] = resolved
+            else:
+                resolved = ""
+        else:
+            resolved = context.args.get(name, "")
+    else:
+        resolved = context.args.get(name, "")
+    _record_and_track(name, resolved)
 
 
 def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
@@ -68,10 +101,7 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
             )
 
     if arg.default_value is None:
-        already_seen = arg.name in _R._state.declared_arg_names
-        if not already_seen:
-            _R._state.declared_arg_names.add(arg.name)
-        _R._record_declared_arg(arg.name, "", flat=not already_seen)
+        _record_and_track(arg.name, "")
         return
 
     already_set = context is not None and arg.name in context._launch_configurations
@@ -81,16 +111,11 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
             raw = "".join(_R._portable_display(s) for s in dv)
         else:
             raw = _R._portable_display(dv)
-        already_seen = arg.name in _R._state.declared_arg_names
-        if not already_seen:
-            _R._state.declared_arg_names.add(arg.name)
-        _R._record_declared_arg(arg.name, raw, flat=not already_seen)
+        _record_and_track(arg.name, raw)
         return
 
     if not _R._state.apply_arg_defaults:
-        _R._record_declared_arg(arg.name, "", flat=arg.name not in _R._state.declared_arg_names)
-        if arg.name not in _R._state.declared_arg_names:
-            _R._state.declared_arg_names.add(arg.name)
+        _record_and_track(arg.name, "")
         return
 
     dv = arg.default_value
@@ -99,10 +124,7 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
     else:
         display = _R._portable_display(dv)
 
-    already_seen = arg.name in _R._state.declared_arg_names
-    if not already_seen:
-        _R._state.declared_arg_names.add(arg.name)
-    _R._record_declared_arg(arg.name, display, flat=not already_seen)
+    _record_and_track(arg.name, display)
 
     if context is not None:
         context._launch_configurations[arg.name] = _DeferredDefault(dv)

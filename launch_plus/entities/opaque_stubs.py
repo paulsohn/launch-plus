@@ -80,14 +80,14 @@ def _call_opaque_with_stubs(fn, context):
         if pkg in _state.package_shares:
             pkg_dir = _state.package_shares[pkg]
             if not _orig_path_isfile(os.path.join(pkg_dir, "package.xml")):
-                if _R._ensure_fetched(pkg):
+                if _R._ensure_fetched(_R._state, pkg):
                     pkg_dir = _state.package_shares[pkg]
                 else:
                     _error(f"failed to fetch package '{pkg}' from lockfile")
                     return None
             return os.path.join(pkg_dir, rest) if rest else pkg_dir
         # Try fetching if it's a lockfile package.
-        if pkg in _state.lockfile_data and _R._ensure_fetched(pkg):
+        if pkg in _state.lockfile_data and _R._ensure_fetched(_R._state, pkg):
             pkg_dir = _state.package_shares[pkg]
             return os.path.join(pkg_dir, rest) if rest else pkg_dir
         # Try AMENT_PREFIX_PATH for packages not in the lockfile.
@@ -134,7 +134,7 @@ def _call_opaque_with_stubs(fn, context):
                     pkg_dir_norm + os.sep
                 ):
                     if not _orig_path_isfile(os.path.join(pkg_dir_norm, "package.xml")):
-                        if _R._ensure_fetched(pkg_name):
+                        if _R._ensure_fetched(_R._state, pkg_name):
                             # Retry open after fetching.
                             try:
                                 return _orig_open(path, mode, *args, **kwargs)

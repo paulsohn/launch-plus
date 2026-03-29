@@ -68,7 +68,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
         self._path = path
         self._dep_idx = -1
         if path:
-            self._dep_idx = _R._track_include(path)
+            self._dep_idx = _R._track_include(_R._state, path)
 
         if launch_arguments and path:
             _resolve_include_args(path, launch_arguments, _StubLaunchContext(), self._dep_idx)
@@ -104,7 +104,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             _R._state.warn(f"max include depth exceeded for {file_path}")
             return None
 
-        dep_idx = _R._track_include(file_path)
+        dep_idx = _R._track_include(_R._state, file_path)
         # Resolve include args
         child_ctx_args: dict[str, str] = {}
         for arg_name, value_tokens in self._xml_args or []:
@@ -119,7 +119,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
         if parsed_path:
             pkg, rest = parsed_path
             try:
-                pkg_share = _resolve_pkg_share(pkg)
+                pkg_share = _resolve_pkg_share(_R._state, pkg)
                 real_path = os.path.join(pkg_share, rest)
             except Exception:
                 return None
@@ -140,7 +140,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
                     _warn(f"failed to resolve IncludeLaunchDescription source: {e}")
             if path:
                 self._path = path
-                dep_idx = _R._track_include(path)
+                dep_idx = _R._track_include(_R._state, path)
                 _resolve_include_args(path, self._raw_launch_arguments, context, dep_idx)
 
         if self._path and self._path.endswith(".py") and context is not None:
@@ -157,7 +157,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             else:
                 _R._state.include_chain.append(["", self._path])
             try:
-                _R._inline_resolve_python_launch(self._path, context, child_args)
+                _R._inline_resolve_python_launch(_R._state, self._path, context, child_args)
             finally:
                 _R._state.include_chain.pop()
 

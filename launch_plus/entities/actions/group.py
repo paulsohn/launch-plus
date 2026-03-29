@@ -88,7 +88,7 @@ class _TrackedGroupAction(_TrackedAction):
         """Execute for Python shim path: walk child actions."""
         depth_before = len(_R._state.namespace_stack)
         saved_env = dict(_R._state.env) if self._scoped else None
-        _R._walk_actions(self._actions, context)
+        _R._walk_actions(_R._state, self._actions, context)
         del _R._state.namespace_stack[depth_before:]
         if saved_env is not None:
             _R._state.env.clear()

@@ -34,7 +34,7 @@ class _TrackedParameterFile(_TrackedAction):
                 path = str(param_file) if param_file is not None else None
             if path:
                 self._param_file = path
-                _R._track_param_file(path)
+                _R._track_param_file(_R._state, path)
 
 
 @expose_action("let")

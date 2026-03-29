@@ -36,7 +36,7 @@ def _resolve_node_details(node, context):
             if resolved is not None:
                 entry[field_name] = resolved
                 if field_name == "package" and not is_fallback:
-                    _R._track_package(resolved)
+                    _R._track_package(_R._state, resolved)
 
     # Namespace: emit raw inputs — effective_namespace is computed downstream
     ns = (
@@ -201,7 +201,7 @@ def _resolve_composable_plugins(descs, context):
             if resolved_pkg is not None:
                 pkg = resolved_pkg
                 if not is_fallback:
-                    _R._track_package(resolved_pkg)
+                    _R._track_package(_R._state, resolved_pkg)
         plg = desc._plugin
         if _R._is_substitution(desc._raw_plugin):
             resolved_plg = _R._resolve_substitution(desc._raw_plugin, context)

@@ -91,28 +91,28 @@ class TestIsSubstitution:
 
 class TestTrackPackage:
     def test_tracks_plain_string(self):
-        R._track_package("my_pkg")
+        R._track_package(R._state, "my_pkg")
         assert "my_pkg" in R._state.tracked["packages"]
 
     def test_skips_substitution_object(self):
         lc = R._LaunchConfiguration("container_pkg")
-        R._track_package(lc)
+        R._track_package(R._state, lc)
         assert "container_pkg" not in R._state.tracked["packages"]
         assert len(R._state.tracked["packages"]) == 0
 
     def test_skips_empty_and_none(self):
-        R._track_package(None)
-        R._track_package("")
+        R._track_package(R._state, None)
+        R._track_package(R._state, "")
         assert len(R._state.tracked["packages"]) == 0
 
     def test_deduplicates(self):
-        R._track_package("pkg_a")
-        R._track_package("pkg_a")
+        R._track_package(R._state, "pkg_a")
+        R._track_package(R._state, "pkg_a")
         assert R._state.tracked["packages"].count("pkg_a") == 1
 
     def test_skips_list_of_substitutions(self):
         parts = [R._LaunchConfiguration("pkg_var"), "_suffix"]
-        R._track_package(parts)
+        R._track_package(R._state, parts)
         assert len(R._state.tracked["packages"]) == 0
 
 
@@ -338,7 +338,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({"parent_var": "parent_value"})
-            R._inline_resolve_python_launch(child_path, ctx, {})
+            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
 
             assert ctx._launch_configurations["child_var"] == "child_value"
             assert ctx._launch_configurations["parent_var"] == "parent_value"
@@ -364,7 +364,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {})
+            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
 
             assert "child_only_arg" not in ctx._launch_configurations
             assert ctx._launch_configurations["sticky_var"] == "persists"
@@ -392,7 +392,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {"mode": "custom"})
+            R._inline_resolve_python_launch(R._state, child_path, ctx, {"mode": "custom"})
 
             assert ctx._launch_configurations["resolved_mode"] == "custom"
 
@@ -412,7 +412,7 @@ class TestInlinePythonInclude:
 
             ctx = _make_context({})
             R._state.walk_depth = 21  # Simulate deep nesting
-            R._inline_resolve_python_launch(child_path, ctx, {})
+            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
             # Should not raise; just warns
             assert any("depth" in w.lower() for w in R._state.tracked["warnings"])
             R._state.walk_depth = 0  # Reset
@@ -420,7 +420,7 @@ class TestInlinePythonInclude:
     def test_missing_file_silently_skipped(self):
         """A non-existent include file should not raise."""
         ctx = _make_context({})
-        R._inline_resolve_python_launch("/nonexistent/path.py", ctx, {})
+        R._inline_resolve_python_launch(R._state, "/nonexistent/path.py", ctx, {})
         # No error, no crash
 
     def test_inline_include_keeps_tracked_nodes(self):
@@ -443,7 +443,7 @@ class TestInlinePythonInclude:
 
             nodes_before = len(R._state.tracked["nodes"])
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {})
+            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
 
             # Inline include adds nodes to tracked state
             assert len(R._state.tracked["nodes"]) > nodes_before
@@ -469,7 +469,7 @@ class TestInlinePythonInclude:
 
             gp_before = len(R._state.tracked["global_params"])
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {})
+            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
 
             # Global params from inline include are kept
             assert len(R._state.tracked["global_params"]) > gp_before
@@ -517,7 +517,7 @@ class TestInlinePythonInclude:
 
             deps_before = len(R._state.tracked["include_deps"])
             ctx = _make_context({})
-            R._inline_resolve_python_launch(child_path, ctx, {})
+            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
 
             # No new include deps
             assert len(R._state.tracked["include_deps"]) == deps_before
@@ -624,7 +624,7 @@ class TestEnvStack:
                 """)
                 )
             ctx = _make_context()
-            R._inline_resolve_python_launch(child_path, ctx, {})
+            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
             assert "CHILD_VAR" not in R._state.env
 
     def test_env_overrides_returns_only_overrides(self):
@@ -2306,24 +2306,24 @@ class TestResolvePkgShare:
     def test_preview_returns_source_path_from_package_shares(self):
         R._state.preview_mode = True
         R._state.package_shares["my_pkg"] = "/ws/src/my_pkg"
-        assert R._resolve_pkg_share("my_pkg") == "/ws/src/my_pkg"
+        assert R._resolve_pkg_share(R._state, "my_pkg") == "/ws/src/my_pkg"
 
     def test_preview_unknown_pkg_returns_portable(self):
         R._state.preview_mode = True
-        result = R._resolve_pkg_share("unknown_pkg")
+        result = R._resolve_pkg_share(R._state, "unknown_pkg")
         assert result == "$(find-pkg-share unknown_pkg)"
 
     def test_postbuild_returns_install_path_from_package_shares(self):
         R._state.preview_mode = False
         R._state.package_shares["my_pkg"] = "/ws/install/my_pkg/share/my_pkg"
-        assert R._resolve_pkg_share("my_pkg") == "/ws/install/my_pkg/share/my_pkg"
+        assert R._resolve_pkg_share(R._state, "my_pkg") == "/ws/install/my_pkg/share/my_pkg"
 
     def test_postbuild_unknown_pkg_raises(self):
         R._state.preview_mode = False
         import pytest
 
         with pytest.raises(LookupError, match="not found in AMENT_PREFIX_PATH"):
-            R._resolve_pkg_share("unknown_pkg")
+            R._resolve_pkg_share(R._state, "unknown_pkg")
 
     def test_postbuild_skips_lockfile_fetch(self):
         """In postbuild mode, lockfile packages not in _package_shares are not fetched."""
@@ -2340,7 +2340,7 @@ class TestResolvePkgShare:
 
         # Should raise, not attempt to fetch
         with pytest.raises(LookupError, match="not found in AMENT_PREFIX_PATH"):
-            R._resolve_pkg_share("lockfile_pkg")
+            R._resolve_pkg_share(R._state, "lockfile_pkg")
 
 
 class TestTrackedFindPackageShare:

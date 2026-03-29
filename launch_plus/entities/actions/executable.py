@@ -53,6 +53,7 @@ class _TrackedExecutable(_TrackedAction):
         self._xml_envs = xml_envs
         self._detailed = False
         self._idx = _R._track_node(
+            _R._state,
             {
                 "package": "",
                 "executable": "",
@@ -68,7 +69,7 @@ class _TrackedExecutable(_TrackedAction):
                 "target": None,
                 "cmd": "",
                 "shell": self._shell,
-            }
+            },
         )
 
     def execute(self, context) -> list | None:

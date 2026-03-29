@@ -26,6 +26,7 @@ class _LogAction(_TrackedAction):
 
         msg = resolve_value(self._message, context) or ""
         _R._track_node(
+            _R._state,
             {
                 "package": "",
                 "executable": "",
@@ -40,6 +41,6 @@ class _LogAction(_TrackedAction):
                 "plugins": [],
                 "target": None,
                 "message": msg,
-            }
+            },
         )
         return None

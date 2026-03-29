@@ -350,7 +350,7 @@ def _build_patched_ament_index_python_packages():
             f"get_package_share_directory('{package_name}') is non-idiomatic; "
             f"prefer FindPackageShare('{package_name}') from launch_ros.substitutions"
         )
-        _R._track_package(package_name)
+        _R._track_package(_R._state, package_name)
         # Early fetch check using the actual package dir (before returning a portable path).
         # This ensures that if the package is in the lockfile but hasn't been fully fetched
         # yet (no package.xml), we fetch it inline — important for module-level callers
@@ -358,11 +358,11 @@ def _build_patched_ament_index_python_packages():
         if package_name in _state.package_shares:
             pkg_dir = _state.package_shares[package_name]
             if not os.path.isfile(os.path.join(pkg_dir, "package.xml")) and not _R._ensure_fetched(
-                package_name
+                _R._state, package_name
             ):
                 _error(f"failed to fetch package '{package_name}' from lockfile")
         elif package_name in _state.lockfile_data:
-            if not _R._ensure_fetched(package_name):
+            if not _R._ensure_fetched(_R._state, package_name):
                 _error(f"failed to fetch package '{package_name}' from lockfile")
         # In non-preview mode, return the real install path so the output contains
         # absolute paths matching the installed layout.
@@ -378,7 +378,7 @@ def _build_patched_ament_index_python_packages():
         # Return the parent of the share directory as a best-effort prefix.
         # For unresolved packages the share path is portable syntax like
         # "$(find-pkg-share pkg)" — fall back to the ROS distro prefix.
-        share = _R._resolve_pkg_share(package_name)
+        share = _R._resolve_pkg_share(_R._state, package_name)
         if share.startswith("$("):
             return _ROS_DISTRO_PREFIX
         p = Path(share)

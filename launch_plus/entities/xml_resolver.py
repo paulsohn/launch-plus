@@ -241,18 +241,18 @@ def _read_and_expand_param_file(
         pkg_share = _state.package_shares.get(pkg)
         if not pkg_share:
             # Try fetching the package if it's in the lockfile.
-            if _R._ensure_fetched(pkg):
+            if _R._ensure_fetched(_R._state, pkg):
                 pkg_share = _state.package_shares.get(pkg)
             if not pkg_share:
                 try:
-                    pkg_share = _R._resolve_pkg_share(pkg)
+                    pkg_share = _R._resolve_pkg_share(_R._state, pkg)
                 except Exception:
                     _error(f"param file not found: '{path}' (package not available)")
                     return None
         real_path = os.path.join(pkg_share, rest)
     if not os.path.isfile(real_path):
         # Package share was known but file missing — try full fetch.
-        if parsed and _R._ensure_fetched(parsed[0]):
+        if parsed and _R._ensure_fetched(_R._state, parsed[0]):
             pkg_share = _state.package_shares.get(parsed[0])
             if pkg_share:
                 real_path = os.path.join(pkg_share, parsed[1])
@@ -484,7 +484,7 @@ def resolve_included_file(
             parent_lc = _R._make_launch_context({**ctx.args, **ctx.vars})
             if _state.global_params:
                 parent_lc._launch_configurations["global_params"] = list(_state.global_params)
-            _R._inline_resolve_python_launch(file_path, parent_lc, child_ctx_args)
+            _R._inline_resolve_python_launch(_R._state, file_path, parent_lc, child_ctx_args)
             set_configs = _state.tracked["set_launch_configurations"]
             for k, v in parent_lc._launch_configurations.items():
                 if (k in set_configs or k in child_ctx_args) and k != "global_params":

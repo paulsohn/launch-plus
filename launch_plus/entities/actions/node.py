@@ -37,14 +37,14 @@ def _resolve_xml_composable_plugins(
         name_raw = p.get("name")
         name = resolve_value(_parse_optional_raw(name_raw), context) if name_raw else None
         if pkg:
-            _R._track_package(pkg)
+            _R._track_package(_R._state, pkg)
         # Resolve params
         params: dict[str, str] = {}
         param_files: list[dict] = []
         for param in p.get("params") or []:
             if "from" in param:
                 path = resolve_value(param["from"], context) or ""
-                _R._track_param_file(path)
+                _R._track_param_file(_R._state, path)
                 pf_entry: dict = {"path": path}
                 if _R._state.inline_params:
                     expanded = _read_and_expand_param_file(path, context)
@@ -118,9 +118,10 @@ class _TrackedNode(_TrackedAction):
         )
 
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
-        _R._track_package(package)
+        _R._track_package(_R._state, package)
         xml_kind = kwargs.pop("_xml_kind", None)
         self._idx = _R._track_node(
+            _R._state,
             {
                 "package": str(package) if package else "",
                 "executable": str(executable) if executable else "",
@@ -134,7 +135,7 @@ class _TrackedNode(_TrackedAction):
                 "kind": xml_kind or "node",
                 "plugins": [],
                 "target": None,
-            }
+            },
         )
         # Save raw kwargs for deferred resolution in execute()
         self._raw_package = package
@@ -156,7 +157,7 @@ class _TrackedNode(_TrackedAction):
         # Eager: track any ParameterFile paths identifiable at construction time
         for p in self._raw_parameters:
             if hasattr(p, "_param_file") and p._param_file:
-                _R._track_param_file(p._param_file)
+                _R._track_param_file(_R._state, p._param_file)
 
     def execute(self, context) -> list | None:
         if not self._detailed:
@@ -178,7 +179,7 @@ class _TrackedNode(_TrackedAction):
         name = resolve_value(self._raw_name, context) or ""
         ns = resolve_value(self._raw_namespace, context)
         if pkg:
-            _R._track_package(pkg)
+            _R._track_package(_R._state, pkg)
         entry["package"] = pkg
         entry["executable"] = exe
         entry["name"] = name
@@ -190,7 +191,7 @@ class _TrackedNode(_TrackedAction):
         for p in self._xml_params:
             if "from" in p:
                 path = resolve_value(p["from"], context) or ""
-                _R._track_param_file(path)
+                _R._track_param_file(_R._state, path)
                 pf_entry: dict = {"path": path}
                 if _R._state.inline_params:
                     from launch_plus.entities.xml_resolver import _read_and_expand_param_file
@@ -241,7 +242,7 @@ class _TrackedComposableNode(_TrackedAction):
     """
 
     def __init__(self, *, package=None, plugin=None, name=None, **kwargs):
-        _R._track_package(package)
+        _R._track_package(_R._state, package)
         self._raw_package = package
         self._package = str(package) if package else ""
         self._raw_plugin = plugin
@@ -253,7 +254,7 @@ class _TrackedComposableNode(_TrackedAction):
         # Eager: track any ParameterFile paths
         for p in self._raw_parameters:
             if hasattr(p, "_param_file") and p._param_file:
-                _R._track_param_file(p._param_file)
+                _R._track_param_file(_R._state, p._param_file)
 
     def __repr__(self):
         return f"TrackedComposableNode(package={self._package!r}, plugin={self._plugin!r})"
@@ -300,11 +301,12 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         composable_node_descriptions=None,
         **kwargs,
     ):
-        _R._track_package(package)
+        _R._track_package(_R._state, package)
         # Pop XML-path parsed data before they leak into kwargs
         xml_envs = kwargs.pop("_xml_envs", None)
         xml_plugins = kwargs.pop("_xml_plugins", None)
         self._idx = _R._track_node(
+            _R._state,
             {
                 "package": str(package) if package else "",
                 "executable": str(executable) if executable else "",
@@ -318,7 +320,7 @@ class _TrackedComposableNodeContainer(_TrackedAction):
                 "kind": "container",
                 "plugins": [],
                 "target": None,
-            }
+            },
         )
         self._raw_package = package
         self._raw_executable = executable
@@ -334,7 +336,7 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         for desc in self._descs:
             raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
             if raw_pkg:
-                _R._track_package(raw_pkg)
+                _R._track_package(_R._state, raw_pkg)
 
     def execute(self, context) -> list | None:
         if not self._detailed:
@@ -359,7 +361,7 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         name = resolve_value(self._raw_name, context) or ""
         ns = resolve_value(self._raw_namespace, context)
         if pkg:
-            _R._track_package(pkg)
+            _R._track_package(_R._state, pkg)
         entry["package"] = pkg
         entry["executable"] = exe
         entry["name"] = name
@@ -420,6 +422,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
             target_str = str(target_container)
         self._raw_target = target_container
         self._idx = _R._track_node(
+            _R._state,
             {
                 "package": "",
                 "executable": "",
@@ -433,7 +436,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
                 "kind": "load_composable",
                 "plugins": [],
                 "target": target_str,
-            }
+            },
         )
         self._xml_plugins = xml_plugins
         self._xml_namespace = xml_namespace
@@ -442,7 +445,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
         for desc in self._descs:
             raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
             if raw_pkg:
-                _R._track_package(raw_pkg)
+                _R._track_package(_R._state, raw_pkg)
 
     def execute(self, context) -> list | None:
         if not self._detailed:

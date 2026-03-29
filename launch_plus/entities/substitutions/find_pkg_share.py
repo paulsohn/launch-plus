@@ -31,16 +31,17 @@ class FindPackageShareSubstitution(Substitution):
     def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
         from launch_plus.resolver import (
             _resolve_pkg_share,
+            _state,
             _track_package,
             resolve_substitutions_from_tokens,
         )
 
         pkg = resolve_substitutions_from_tokens(self.package, ctx, _depth=_depth + 1)
-        _track_package(pkg)
+        _track_package(_state, pkg)
         if ctx.preview_mode:
             return f"$(find-pkg-share {pkg})"
         try:
-            return _resolve_pkg_share(pkg)
+            return _resolve_pkg_share(_state, pkg)
         except Exception:
             return f"$(find-pkg-share {pkg})"
 
@@ -60,7 +61,7 @@ class _TrackedFindPackageShare:
         self._package_subs = package
         # Track statically when the name is a plain string
         if isinstance(package, str):
-            _R._track_package(package)
+            _R._track_package(_R._state, package)
 
     def _resolve_name(self, context=None):
         """Concatenate package name from string or list of substitution objects.
@@ -96,7 +97,7 @@ class _TrackedFindPackageShare:
         import launch_plus.resolver as _R
 
         try:
-            return _R._resolve_pkg_share(pkg)
+            return _R._resolve_pkg_share(_R._state, pkg)
         except Exception as e:
             if not _R._state.preview_mode:
                 _R._error(f"$(find-pkg-share {pkg}): {e}")
@@ -107,7 +108,7 @@ class _TrackedFindPackageShare:
 
         pkg, is_fallback = self._resolve_name(context)
         if not is_fallback:
-            _R._track_package(pkg)
+            _R._track_package(_R._state, pkg)
         if not _R._state.preview_mode:
             return self._try_ament_resolve(pkg)
         return f"$(find-pkg-share {pkg})"

@@ -82,6 +82,7 @@ class _EventHandlerAction(_TrackedAction):
                 }
             )
         _R._track_event_handler(
+            _R._state,
             {
                 "handler_kind": self._handler_kind,
                 "target": resolve_value(self._target, context),
@@ -91,7 +92,7 @@ class _EventHandlerAction(_TrackedAction):
                 "namespace_stack": list(_R._state.namespace_stack),
                 "explicit_namespace": resolve_value(self._handler_ns, context),
                 "actions": eh_actions,
-            }
+            },
         )
         return None
 
@@ -119,6 +120,7 @@ class _EmitEventAction(_TrackedAction):
         target_node = resolve_value(self._target_node_attr, context)
         ee_ns = resolve_value(self._namespace, context)
         _R._track_event_handler(
+            _R._state,
             {
                 "handler_kind": "emit_event",
                 "target": None,
@@ -135,7 +137,7 @@ class _EmitEventAction(_TrackedAction):
                         "explicit_namespace": ee_ns,
                     }
                 ],
-            }
+            },
         )
         return None
 
@@ -342,4 +344,4 @@ class _TrackedRegisterEventHandler(_TrackedAction):
 
     def __init__(self, event_handler=None, **kwargs):
         if event_handler is not None and hasattr(event_handler, "to_event_handler"):
-            _R._track_event_handler(event_handler.to_event_handler())
+            _R._track_event_handler(_R._state, event_handler.to_event_handler())

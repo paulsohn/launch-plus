@@ -59,7 +59,7 @@ def _record_and_track(name: str, resolved: str) -> None:
     already_seen = name in _R._state.declared_arg_names
     if not already_seen:
         _R._state.declared_arg_names.add(name)
-    _R._record_declared_arg(name, resolved, flat=not already_seen)
+    _R._record_declared_arg(_R._state, name, resolved, flat=not already_seen)
 
 
 def _execute_xml_arg(arg: _DeclaredArg, context) -> None:

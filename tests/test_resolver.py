@@ -1854,7 +1854,7 @@ class TestResolveXmlElements:
     def test_unknown_element_warns(self):
         xml = '<launch><foobar attr="val"/></launch>'
         _, tracked = _parse_and_walk(xml)
-        assert any("unknown XML element" in w for w in tracked["warnings"])
+        assert any("unknown element" in w for w in tracked["warnings"])
 
     # ── Namespace helper functions ──
 
@@ -1950,7 +1950,8 @@ def _parse_to_tracked(xml_str, **ctx_kwargs):
     """Parse XML string, resolve via action registry, return _tracked."""
     ctx = _fresh_walker_ctx(**ctx_kwargs)
     elements = R.parse_xml_launch(xml_str, "test.launch.xml")
-    return R.resolve_xml_to_ir(elements, ctx)
+    R.resolve_xml_elements(elements, ctx)
+    return R._tracked
 
 
 def _tracked_nodes(tracked):

@@ -343,5 +343,10 @@ class _TrackedRegisterEventHandler(_TrackedAction):
     """Tracked RegisterEventHandler — records the event handler to _state.tracked."""
 
     def __init__(self, event_handler=None, **kwargs):
-        if event_handler is not None and hasattr(event_handler, "to_event_handler"):
-            _R._track_event_handler(_R._state, event_handler.to_event_handler())
+        self._event_handler = event_handler
+
+    def execute(self, context) -> list | None:
+        eh = self._event_handler
+        if eh is not None and hasattr(eh, "to_event_handler"):
+            _R._track_event_handler(context._state, eh.to_event_handler())
+        return None

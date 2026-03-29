@@ -7,10 +7,7 @@ import os
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.state import (
-    _StubLaunchContext,
-    _warn,
-)
+from launch_plus.entities.state import _warn
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
@@ -67,11 +64,6 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
                     pass
         self._path = path
         self._dep_idx = -1
-        if path:
-            self._dep_idx = _R._track_include(_R._state, path)
-
-        if launch_arguments and path:
-            _resolve_include_args(path, launch_arguments, _StubLaunchContext(), self._dep_idx)
 
     def execute(self, context) -> list | None:
         if self._xml_file_tokens is not None:
@@ -130,6 +122,11 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
         return None
 
     def _execute_shim(self, context) -> list | None:
+        # Deferred tracking from __init__ (path known at construction time)
+        if self._path and self._dep_idx < 0:
+            self._dep_idx = _R._track_include(context._state, self._path)
+            _resolve_include_args(self._path, self._raw_launch_arguments, context, self._dep_idx)
+
         if self._path is None and context is not None:
             src = self._source
             path = None

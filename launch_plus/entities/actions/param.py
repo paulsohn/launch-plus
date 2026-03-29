@@ -5,7 +5,6 @@ Covers: <let> (XML), SetLaunchConfiguration / SetParameter / ParameterFile (Pyth
 
 from __future__ import annotations
 
-import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.state import _StubLaunchContext
@@ -34,7 +33,6 @@ class _TrackedParameterFile(_TrackedAction):
                 path = str(param_file) if param_file is not None else None
             if path:
                 self._param_file = path
-                _R._track_param_file(_R._state, path)
 
 
 @expose_action("let")

@@ -56,12 +56,7 @@ class _TrackedFindPackageShare:
     """Tracks FindPackageShare; package may be a string or a list of substitutions."""
 
     def __init__(self, package):
-        import launch_plus.resolver as _R
-
         self._package_subs = package
-        # Track statically when the name is a plain string
-        if isinstance(package, str):
-            _R._track_package(_R._state, package)
 
     def _resolve_name(self, context=None):
         """Concatenate package name from string or list of substitution objects.

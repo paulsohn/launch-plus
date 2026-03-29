@@ -26,13 +26,13 @@ class FindPackagePrefixSubstitution(Substitution):
 
     def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
         from launch_plus.resolver import (
-            _state,
             _track_package,
             resolve_substitutions_from_tokens,
         )
 
+        state = ctx._state
         pkg = resolve_substitutions_from_tokens(self.package, ctx, _depth=_depth + 1)
-        _track_package(_state, pkg)
+        _track_package(state, pkg)
         # Always keep portable — prefix resolution not implemented.
         return f"$(find-pkg-prefix {pkg})"
 

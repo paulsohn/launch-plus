@@ -31,17 +31,17 @@ class FindPackageShareSubstitution(Substitution):
     def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
         from launch_plus.resolver import (
             _resolve_pkg_share,
-            _state,
             _track_package,
             resolve_substitutions_from_tokens,
         )
 
+        state = ctx._state
         pkg = resolve_substitutions_from_tokens(self.package, ctx, _depth=_depth + 1)
-        _track_package(_state, pkg)
+        _track_package(state, pkg)
         if ctx.preview_mode:
             return f"$(find-pkg-share {pkg})"
         try:
-            return _resolve_pkg_share(_state, pkg)
+            return _resolve_pkg_share(state, pkg)
         except Exception:
             return f"$(find-pkg-share {pkg})"
 
@@ -87,31 +87,39 @@ class _TrackedFindPackageShare:
             return str(subs), True
         return str(subs), False
 
-    def _try_ament_resolve(self, pkg: str) -> str:
+    def _get_state(self, context=None):
+        """Get state from context, falling back to _R._state."""
+        import launch_plus.resolver as _R
+
+        if context is not None and hasattr(context, "_state"):
+            return context._state
+        return _R._state
+
+    def _try_ament_resolve(self, state, pkg: str) -> str:
         """Resolve to a real path, return portable form on failure."""
         import launch_plus.resolver as _R
 
         try:
-            return _R._resolve_pkg_share(_R._state, pkg)
+            return _R._resolve_pkg_share(state, pkg)
         except Exception as e:
-            if not _R._state.preview_mode:
+            if not state.preview_mode:
                 _R._error(f"$(find-pkg-share {pkg}): {e}")
             return f"$(find-pkg-share {pkg})"
 
     def perform(self, context):
         import launch_plus.resolver as _R
 
+        state = self._get_state(context)
         pkg, is_fallback = self._resolve_name(context)
         if not is_fallback:
-            _R._track_package(_R._state, pkg)
-        if not _R._state.preview_mode:
-            return self._try_ament_resolve(pkg)
+            _R._track_package(state, pkg)
+        if not state.preview_mode:
+            return self._try_ament_resolve(state, pkg)
         return f"$(find-pkg-share {pkg})"
 
     def __str__(self):
-        import launch_plus.resolver as _R
-
+        state = self._get_state(None)
         pkg, is_fallback = self._resolve_name(None)
-        if not _R._state.preview_mode:
-            return self._try_ament_resolve(pkg)
+        if not state.preview_mode:
+            return self._try_ament_resolve(state, pkg)
         return f"$(find-pkg-share {pkg})"

@@ -104,8 +104,9 @@ class _TrackedOpaqueFunction(_TrackedAction):
     def execute(self, context) -> list | None:
         fn = self.function
         if fn and context:
+            state = context._state if hasattr(context, "_state") else _R._state
             try:
-                result = _R._call_opaque_with_stubs(fn, context)
+                result = _R._call_opaque_with_stubs(state, fn, context)
                 return result if result else None
             except Exception as e:
                 _error(f"OpaqueFunction failed: {e}")

@@ -260,7 +260,7 @@ class TestNodeDeferredResolution:
             name=R._LaunchConfiguration("cname"),
         )
         container._ensure_tracked(ctx._state)
-        R._resolve_node_details(container, ctx)
+        R._resolve_node_details(ctx._state, container, ctx)
 
         entry = R._state.tracked["nodes"][container._idx]
         assert entry["package"] == "rclcpp_components"
@@ -289,7 +289,7 @@ class TestComposablePluginResolution:
             plugin="sensor_driver::SensorNode",
             name="sensor",
         )
-        plugins = R._resolve_composable_plugins([desc], ctx)
+        plugins = R._resolve_composable_plugins(ctx._state, [desc], ctx)
         assert len(plugins) == 1
         assert plugins[0]["package"] == "sensor_driver"
         assert "sensor_driver" in R._state.tracked["packages"]
@@ -300,7 +300,7 @@ class TestComposablePluginResolution:
             package=R._LaunchConfiguration("unknown"),
             plugin="foo::Bar",
         )
-        plugins = R._resolve_composable_plugins([desc], ctx)
+        plugins = R._resolve_composable_plugins(ctx._state, [desc], ctx)
         assert plugins[0]["package"] == "unknown"  # display fallback
         assert "unknown" not in R._state.tracked["packages"]
 
@@ -315,7 +315,7 @@ class TestComposablePluginResolution:
         desc._raw_remappings = [
             (R._LaunchConfiguration("remap_src"), R._LaunchConfiguration("remap_dst")),
         ]
-        plugins = R._resolve_composable_plugins([desc], ctx)
+        plugins = R._resolve_composable_plugins(ctx._state, [desc], ctx)
         assert plugins[0]["remappings"] == [["", ""]]
 
 
@@ -634,7 +634,7 @@ class TestEnvStack:
     def test_env_overrides_returns_only_overrides(self):
         """_env_overrides() returns only explicitly set vars, not process env."""
         R._state.env["NEW_VAR"] = "new_val"
-        overrides = R._env_overrides()
+        overrides = R._env_overrides(R._state)
         assert overrides["NEW_VAR"] == "new_val"
         # Process env vars must NOT appear in overrides.
         import os
@@ -644,7 +644,7 @@ class TestEnvStack:
 
     def test_env_overrides_empty_when_no_overrides(self):
         """Empty overrides when nothing has been set."""
-        assert R._env_overrides() == {}
+        assert R._env_overrides(R._state) == {}
 
     def test_net_zero_error_includes_value(self):
         """Net-zero leak error includes the override value (safe, user-set)."""

@@ -15,7 +15,7 @@ import yaml
 
 import launch_plus.resolver as _R
 from launch_plus.entities.expose import action_parse_methods
-from launch_plus.entities.state import _error, _state, _warn
+from launch_plus.entities.state import _error, _warn
 from launch_plus.parsers.entity import Entity
 from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
 from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
@@ -48,11 +48,15 @@ class _SubstitutionContext:
         "preview_mode",
     )
 
-    def __init__(self) -> None:
-        self._state = _state
+    def __init__(self, state=None) -> None:
+        if state is None:
+            from launch_plus.entities.state import _state
+
+            state = _state
+        self._state = state
         self.args: dict[str, str] = {}
         self.vars: dict[str, str] = {}
-        self.env: dict[str, str] = _state.env  # share with ResolverState
+        self.env: dict[str, str] = state.env  # share with ResolverState
         self.launch_file_dir: str | None = None
         self.preview_mode: bool = False
 
@@ -238,28 +242,32 @@ def _yaml_value_to_str(v: object) -> str:
 def _read_and_expand_param_file(
     path: str,
     ctx: _SubstitutionContext | None = None,
+    *,
+    state=None,
 ) -> list[tuple[str, str]] | None:
     """Read a param file and expand ros__parameters. Returns None on failure."""
+    if state is None:
+        state = ctx._state if ctx is not None and hasattr(ctx, "_state") else _R._state
     real_path = path
     parsed = _R._parse_portable_path(path)
     if parsed:
         pkg, rest = parsed
-        pkg_share = _state.package_shares.get(pkg)
+        pkg_share = state.package_shares.get(pkg)
         if not pkg_share:
             # Try fetching the package if it's in the lockfile.
-            if _R._ensure_fetched(_R._state, pkg):
-                pkg_share = _state.package_shares.get(pkg)
+            if _R._ensure_fetched(state, pkg):
+                pkg_share = state.package_shares.get(pkg)
             if not pkg_share:
                 try:
-                    pkg_share = _R._resolve_pkg_share(_R._state, pkg)
+                    pkg_share = _R._resolve_pkg_share(state, pkg)
                 except Exception:
                     _error(f"param file not found: '{path}' (package not available)")
                     return None
         real_path = os.path.join(pkg_share, rest)
     if not os.path.isfile(real_path):
         # Package share was known but file missing — try full fetch.
-        if parsed and _R._ensure_fetched(_R._state, parsed[0]):
-            pkg_share = _state.package_shares.get(parsed[0])
+        if parsed and _R._ensure_fetched(state, parsed[0]):
+            pkg_share = state.package_shares.get(parsed[0])
             if pkg_share:
                 real_path = os.path.join(pkg_share, parsed[1])
         if not os.path.isfile(real_path):
@@ -457,11 +465,12 @@ def resolve_included_file(
     child_ctx_args: dict[str, str],
 ) -> None:
     """Parse an included launch file and resolve it recursively."""
+    state = ctx._state
     inc_dep = _R._extract_pkg_and_share_path(file_path)
     if inc_dep:
-        _state.include_chain.append(list(inc_dep))
+        state.include_chain.append(list(inc_dep))
     else:
-        _state.include_chain.append(["", file_path])
+        state.include_chain.append(["", file_path])
     new_stack = include_stack + [file_path]
     try:
         if real_path.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
@@ -472,8 +481,8 @@ def resolve_included_file(
                 child_entities = list(_parse_yaml_launch_entity(content, real_path))
             else:
                 child_entities = list(_parse_xml_launch_entity(content, real_path))
-            child_ctx = _SubstitutionContext()
-            if _state.global_arg_cascade:
+            child_ctx = _SubstitutionContext(state)
+            if state.global_arg_cascade:
                 child_ctx.args = {**ctx.args, **child_ctx_args}
                 child_ctx.vars = {**ctx.vars, **child_ctx_args}
             else:
@@ -488,12 +497,12 @@ def resolve_included_file(
             ctx.vars.update(child_ctx.vars)
         elif real_path.endswith((".launch.py", ".py")):
             parent_lc = _R._make_launch_context({**ctx.args, **ctx.vars})
-            if _state.global_params:
-                parent_lc._launch_configurations["global_params"] = list(_state.global_params)
-            _R._inline_resolve_python_launch(_R._state, file_path, parent_lc, child_ctx_args)
-            set_configs = _state.tracked["set_launch_configurations"]
+            if state.global_params:
+                parent_lc._launch_configurations["global_params"] = list(state.global_params)
+            _R._inline_resolve_python_launch(state, file_path, parent_lc, child_ctx_args)
+            set_configs = state.tracked["set_launch_configurations"]
             for k, v in parent_lc._launch_configurations.items():
                 if (k in set_configs or k in child_ctx_args) and k != "global_params":
                     ctx.vars[k] = str(v) if not isinstance(v, str) else v
     finally:
-        _state.include_chain.pop()
+        state.include_chain.pop()

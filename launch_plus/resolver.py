@@ -869,7 +869,7 @@ def _walk_untracked_action(state, action, context):
         fn = getattr(action, "function", None)
         if fn and context:
             try:
-                result = _call_opaque_with_stubs(fn, context)
+                result = _call_opaque_with_stubs(state, fn, context)
                 if result:
                     _walk_actions(state, result, context)
             except Exception as e:
@@ -1123,7 +1123,7 @@ def resolve_file(
             elements = parse_yaml_launch(content, launch_file_str)
         else:
             elements = parse_xml_launch(content, launch_file_str)
-        subst_ctx = _SubstitutionContext()
+        subst_ctx = _SubstitutionContext(_state)
         subst_ctx.args = dict(args_dict)
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
         subst_ctx.preview_mode = _state.preview_mode

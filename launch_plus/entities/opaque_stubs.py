@@ -13,7 +13,7 @@ import os
 import pathlib as _pathlib
 
 import launch_plus.resolver as _R
-from launch_plus.entities.state import _error, _state
+from launch_plus.entities.state import _error
 
 _STUB_ROS_PARAM_YAML = "/**:\n  ros__parameters: {}\n"
 
@@ -38,13 +38,13 @@ class _DefaultParamDict(dict):
         return _DefaultParamDict()
 
 
-def _call_opaque_with_stubs(fn, context):
+def _call_opaque_with_stubs(state, fn, context):
     """Call ``fn(context)`` with file-not-found stubs active.
 
     In **preview mode**, patches ``builtins.open``, ``yaml.safe_load``, and
     ``os.path`` predicates for the duration of the call so that portable
     ``$(find-pkg-share pkg)/...`` paths are intercepted and resolved to actual
-    filesystem paths via the ``_state.package_shares`` map.  If the target package
+    filesystem paths via the ``state.package_shares`` map.  If the target package
     exists in the lockfile but hasn't been fully fetched yet (no
     ``package.xml``), ``_ensure_fetched()`` is called inline.  If fetching fails,
     an error is logged and a stub/fallback is returned.
@@ -54,7 +54,7 @@ def _call_opaque_with_stubs(fn, context):
     ``os.path.*`` work natively.  No shimming is performed.
     """
     # Non-preview: packages are installed, paths are real — no shimming needed.
-    if not _state.preview_mode:
+    if not state.preview_mode:
         return fn(context)
 
     import yaml as _yaml
@@ -77,18 +77,18 @@ def _call_opaque_with_stubs(fn, context):
         if parsed is None:
             return None
         pkg, rest = parsed
-        if pkg in _state.package_shares:
-            pkg_dir = _state.package_shares[pkg]
+        if pkg in state.package_shares:
+            pkg_dir = state.package_shares[pkg]
             if not _orig_path_isfile(os.path.join(pkg_dir, "package.xml")):
-                if _R._ensure_fetched(_R._state, pkg):
-                    pkg_dir = _state.package_shares[pkg]
+                if _R._ensure_fetched(state, pkg):
+                    pkg_dir = state.package_shares[pkg]
                 else:
                     _error(f"failed to fetch package '{pkg}' from lockfile")
                     return None
             return os.path.join(pkg_dir, rest) if rest else pkg_dir
         # Try fetching if it's a lockfile package.
-        if pkg in _state.lockfile_data and _R._ensure_fetched(_R._state, pkg):
-            pkg_dir = _state.package_shares[pkg]
+        if pkg in state.lockfile_data and _R._ensure_fetched(state, pkg):
+            pkg_dir = state.package_shares[pkg]
             return os.path.join(pkg_dir, rest) if rest else pkg_dir
         # Try AMENT_PREFIX_PATH for packages not in the lockfile.
         if _R._real_get_package_share_directory is not None:
@@ -104,7 +104,7 @@ def _call_opaque_with_stubs(fn, context):
         path_str = str(path)
         # Handle portable paths.
         if _R._parse_portable_path(path_str) is not None:
-            if not _state.apply_opaque_file_access:
+            if not state.apply_opaque_file_access:
                 _error(
                     f"OpaqueFunction opened a portable path without --apply-opaque-file-access "
                     f"(stub returned): {path}"
@@ -128,13 +128,13 @@ def _call_opaque_with_stubs(fn, context):
         except (FileNotFoundError, OSError):
             # If the missing file is inside a lockfile package that hasn't been fully
             # fetched yet (no package.xml), try to fetch it inline.
-            for pkg_name, pkg_dir in list(_state.package_shares.items()):
+            for pkg_name, pkg_dir in list(state.package_shares.items()):
                 pkg_dir_norm = pkg_dir.rstrip("/")
                 if path_str.startswith(pkg_dir_norm + "/") or path_str.startswith(
                     pkg_dir_norm + os.sep
                 ):
                     if not _orig_path_isfile(os.path.join(pkg_dir_norm, "package.xml")):
-                        if _R._ensure_fetched(_R._state, pkg_name):
+                        if _R._ensure_fetched(state, pkg_name):
                             # Retry open after fetching.
                             try:
                                 return _orig_open(path, mode, *args, **kwargs)
@@ -150,7 +150,7 @@ def _call_opaque_with_stubs(fn, context):
     def _stub_path_exists(path):
         path_str = str(path)
         if _R._parse_portable_path(path_str) is not None:
-            if not _state.apply_opaque_file_access:
+            if not state.apply_opaque_file_access:
                 _error(
                     f"OpaqueFunction called os.path.exists on a portable path without "
                     f"--apply-opaque-file-access (returning False): {path}"
@@ -165,7 +165,7 @@ def _call_opaque_with_stubs(fn, context):
     def _stub_path_isfile(path):
         path_str = str(path)
         if _R._parse_portable_path(path_str) is not None:
-            if not _state.apply_opaque_file_access:
+            if not state.apply_opaque_file_access:
                 _error(
                     f"OpaqueFunction called os.path.isfile on a portable path without "
                     f"--apply-opaque-file-access (returning False): {path}"
@@ -180,7 +180,7 @@ def _call_opaque_with_stubs(fn, context):
     def _stub_path_isdir(path):
         path_str = str(path)
         if _R._parse_portable_path(path_str) is not None:
-            if not _state.apply_opaque_file_access:
+            if not state.apply_opaque_file_access:
                 _error(
                     f"OpaqueFunction called os.path.isdir on a portable path without "
                     f"--apply-opaque-file-access (returning False): {path}"
@@ -203,7 +203,7 @@ def _call_opaque_with_stubs(fn, context):
         """
         path_str = str(path_self)
         if _R._parse_portable_path(path_str) is not None:
-            if not _state.apply_opaque_file_access:
+            if not state.apply_opaque_file_access:
                 _error(
                     f"OpaqueFunction called Path.open on a portable path without "
                     f"--apply-opaque-file-access (stub returned): {path_str}"

@@ -172,7 +172,7 @@ class _TrackedNode(_TrackedAction):
             if self._xml_params is not None:
                 self._resolve_xml_details(context)
             elif context is not None:
-                _R._resolve_node_details(self, context)
+                _R._resolve_node_details(state, self, context)
         return None
 
     def _resolve_xml_details(self, context) -> None:
@@ -358,9 +358,9 @@ class _TrackedComposableNodeContainer(_TrackedAction):
             if self._xml_plugins is not None:
                 self._resolve_xml_details(context)
             elif context is not None:
-                _R._resolve_node_details(self, context)
+                _R._resolve_node_details(state, self, context)
                 context._state.tracked["nodes"][self._idx]["plugins"] = (
-                    _R._resolve_composable_plugins(self._descs, context)
+                    _R._resolve_composable_plugins(state, self._descs, context)
                 )
         return None
 
@@ -467,7 +467,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
                         target = _R._resolve_substitution(self._raw_target, context)
                     if target:
                         entry["target"] = target
-                entry["plugins"] = _R._resolve_composable_plugins(self._descs, context)
+                entry["plugins"] = _R._resolve_composable_plugins(state, self._descs, context)
         return None
 
     def _resolve_xml_details(self, context) -> None:

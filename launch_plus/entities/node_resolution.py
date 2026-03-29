@@ -9,23 +9,22 @@ from __future__ import annotations
 
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.node import _TrackedComposableNode
-from launch_plus.entities.state import _state
 
 # ─── Node detail resolution helpers ──────────────────────────────────────────
 
 
-def _env_overrides():
+def _env_overrides(state):
     """Return a copy of the current env overrides for per-node output."""
-    return dict(_state.env)
+    return dict(state.env)
 
 
-def _resolve_node_details(node, context):
+def _resolve_node_details(state, node, context):
     """Fill in deferred details (package, executable, name, namespace, params, remaps, env).
 
     Works for both ``_TrackedNode`` / ``_TrackedLifecycleNode`` and
     ``_TrackedComposableNodeContainer`` — both expose the same raw fields.
     """
-    entry = _state.tracked["nodes"][node._idx]
+    entry = state.tracked["nodes"][node._idx]
 
     # Package / executable / name: resolve substitutions (e.g. LaunchConfiguration)
     # that could not be resolved at construction time.
@@ -36,7 +35,7 @@ def _resolve_node_details(node, context):
             if resolved is not None:
                 entry[field_name] = resolved
                 if field_name == "package" and not is_fallback:
-                    _R._track_package(_R._state, resolved)
+                    _R._track_package(state, resolved)
 
     # Namespace: emit raw inputs — effective_namespace is computed downstream
     ns = (
@@ -44,7 +43,7 @@ def _resolve_node_details(node, context):
         if node._raw_namespace is not None
         else None
     )
-    entry["namespace_stack"] = list(_state.namespace_stack)
+    entry["namespace_stack"] = list(state.namespace_stack)
     entry["explicit_namespace"] = ns
 
     # Parameters and param files
@@ -71,7 +70,7 @@ def _resolve_node_details(node, context):
                 if path not in seen_pf:
                     seen_pf.add(path)
                     pf_entry: dict = {"path": path}
-                    if _state.inline_params:
+                    if state.inline_params:
                         expanded = _R._read_and_expand_param_file(path)
                         if expanded is not None:
                             pf_entry["params"] = expanded
@@ -87,10 +86,10 @@ def _resolve_node_details(node, context):
     merged_params = {k: str(v) for k, v in ctx_global_params}
     merged_params.update(params)
     entry["parameters"] = merged_params
-    entry["param_files"] = list(_state.global_param_files) + pf_list
+    entry["param_files"] = list(state.global_param_files) + pf_list
 
     # Remappings: list of [src, dst] pairs — merge global remaps first
-    remaps = list(_state.global_remaps)
+    remaps = list(state.global_remaps)
     for r in node._raw_remappings:
         if isinstance(r, (tuple, list)) and len(r) == 2:
             src = _R._resolve_substitution(r[0], context)
@@ -99,7 +98,7 @@ def _resolve_node_details(node, context):
     entry["remappings"] = remaps
 
     # Env vars: start with inherited env diff, then node-local overrides
-    env = _env_overrides()
+    env = _env_overrides(state)
     raw_env = node._raw_env
     if isinstance(raw_env, dict):
         for k, v in raw_env.items():
@@ -132,7 +131,7 @@ def _resolve_node_details(node, context):
                 entry[key] = str(raw)
 
 
-def _resolve_composable_plugins(descs, context):
+def _resolve_composable_plugins(state, descs, context):
     """Convert ``_TrackedComposableNode`` descriptions to serialisable plugin dicts."""
     plugins = []
     for desc in descs:
@@ -174,7 +173,7 @@ def _resolve_composable_plugins(descs, context):
                     if path not in seen_pf:
                         seen_pf.add(path)
                         pf_entry: dict = {"path": path}
-                        if _state.inline_params:
+                        if state.inline_params:
                             expanded = _R._read_and_expand_param_file(path)
                             if expanded is not None:
                                 pf_entry["params"] = expanded
@@ -201,7 +200,7 @@ def _resolve_composable_plugins(descs, context):
             if resolved_pkg is not None:
                 pkg = resolved_pkg
                 if not is_fallback:
-                    _R._track_package(_R._state, resolved_pkg)
+                    _R._track_package(state, resolved_pkg)
         plg = desc._plugin
         if _R._is_substitution(desc._raw_plugin):
             resolved_plg = _R._resolve_substitution(desc._raw_plugin, context)

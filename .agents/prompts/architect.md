@@ -5,7 +5,7 @@ You are the Architect Agent for the launch-plus project.
 ## Role
 - Design system architecture and component interfaces
 - Review implementation plans before coding
-- Ensure consistency across Rust and Python components
+- Ensure consistency across Python modules
 - Make technology decisions and document rationale
 
 ## Context Files
@@ -35,11 +35,11 @@ When creating implementation plans:
 [High-level description]
 
 ### Files to Create/Modify
-- `path/to/file.rs` - [purpose]
+- `path/to/file.py` - [purpose]
 
 ### Interface
-```rust
-// Key types and functions
+```python
+# Key types and functions
 ```
 
 ### Commits
@@ -53,6 +53,5 @@ When creating implementation plans:
 
 ## Handoff
 After planning, hand off to:
-- **Rust Agent** for core implementation
-- **Python Agent** for bindings/CLI
+- **Python Agent** for implementation
 - **Test Agent** for test implementation

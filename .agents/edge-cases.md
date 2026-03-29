@@ -302,8 +302,8 @@ All three colcon install conventions are handled transparently:
 | `--merge-install` | `install/` | `install/share/<pkg>/` |
 | `--symlink-install` | `install/<pkg>:...` | symlink → source file |
 
-This works because both the Rust `PackageLocator` (Strategy 3 in `locate_package_share`)
-and Python `_real_get_package_share_directory` resolve via `AMENT_PREFIX_PATH` directly.
+This works because `_resolve_pkg_share` and `_real_get_package_share_directory`
+resolve via `AMENT_PREFIX_PATH` directly.
 The `share/<pkg>/` tree structure is identical across all conventions.
 
 **Residual gap — source-first priority:**
@@ -1154,14 +1154,13 @@ Safe pattern with fallback:
 | **Full** | `false` (default) | Expands to a real filesystem path (workspace source path → AMENT_PREFIX_PATH → fallback). Used when a real path is needed to open a file. |
 | **Preview** | `true` | Keeps the portable `$(find-pkg-share pkg)` form. Used for all output values so the resolved XML/YAML is machine-independent. |
 
-**API contract (Rust `resolver.rs`):**
+**API contract (`resolver.py`):**
 
-- `resolve_substitutions(input, ctx)` — mode-aware: calls `resolve_substitutions_inner` with `resolve_pkg_share = !ctx.preview_mode`.  Use for **every value except include file paths**.
-- `resolve_substitutions_full(input, ctx)` — private, always full: calls `resolve_substitutions_inner` with `resolve_pkg_share = true`.  Use **only** for `<include file=...>` paths that must be real filesystem paths so the file can be opened.
+- `resolve_substitutions(text, ctx)` — mode-aware: in preview mode, `$(find-pkg-share pkg)` is preserved as a portable token; in full mode, it resolves to a real path.
+- `_ActionParser.resolve(text)` and `_ActionParser.resolve_optional(text)` delegate to `resolve_substitutions`.
+- For `<include file=...>` paths, the action handler resolves the substitution normally and then separately resolves the portable path to a real filesystem path via `_parse_portable_path` + `_resolve_pkg_share`, so the file can be opened.
 
-`resolve_substitutions_full` is intentionally private and used in exactly one place (the `<include>` path where the file must be opened for recursive parsing).  All other callers use the mode-aware public API.
-
-When `resolve_pkg_share = true` and the package resolver cannot find the package, the output is also `$(find-pkg-share pkg)` (lines 505–511) — the same portable form as preview mode.  The output is never a wrong hardcoded path.
+When `_resolve_pkg_share` cannot find a package, it returns `$(find-pkg-share pkg)` — the portable form.  The output is never a wrong hardcoded path.
 
 ### Multi-value Strings
 
@@ -1171,13 +1170,11 @@ A single substitution string can contain multiple `$(find-pkg-share ...)` tokens
 "[$(find-pkg-share pkg1)/path/to/resource1, $(find-pkg-share pkg2)/path/to/resource2]"
 ```
 
-**Rust resolver:** `parse_substitutions` tokenises the string character-by-character into `Substitution` variants:
-```
-[Literal("["), FindPkgShare("pkg1"), Literal("/path/to/resource1, "), FindPkgShare("pkg2"), Literal("/path/to/resource2]")]
-```
-`resolve_substitutions_inner` processes each token independently and accumulates the output string.  The `resolve_pkg_share` flag is propagated through all recursive calls (including `$(arg ...)` and `$(var ...)` expansion), so every `FindPkgShare` token anywhere in the string respects the mode.
+**Lark-based resolver:** `parse_substitution` parses the string via the Lark grammar into typed `Substitution` objects (e.g. `FindPkgShareSubstitution`). `resolve_substitutions_from_tokens` calls `.perform(ctx)` on each, accumulating the output string. The `preview_mode` flag on `ctx` controls whether `FindPkgShareSubstitution.perform()` returns a portable token or a real path.
 
-**Python resolver (`_resolve_ros_substitutions`):** Uses `re.sub` with a global match, finding every `$(find-pkg-share ...)` independently:
+A legacy fallback (`_resolve_substitutions_legacy`) handles expressions the Lark grammar cannot parse (e.g. `$(eval '$(var x)'=='y')` with Python operators outside quotes).
+
+**`_resolve_ros_substitutions` (for Python launch file output):** Uses `re.sub` with a global match, finding every `$(find-pkg-share ...)` independently:
 ```python
 re.sub(r'\$\(find-pkg-share ([^)]+)\)', lambda m: _resolve_pkg_share(m.group(1).strip()), value)
 ```
@@ -1189,24 +1186,24 @@ For each match: if the package is found, the token is replaced with the real sou
 ```
 This is the maximally-resolved form for that environment; the not-found token remains portable.
 
-### Python Resolver Fallback
+### Package Resolution Fallback
 
-`_resolve_pkg_share(package)` in `py_resolver.py` follows this chain:
-1. Workspace source packages (from orchestrator lockfile) → real path
-2. Installed packages via `ament_index_python` (AMENT_PREFIX_PATH) → real path
+`_resolve_pkg_share(package)` in `resolver.py` follows this chain:
+1. Workspace source packages (from lockfile `package_shares`) → real path
+2. Installed packages via `AMENT_PREFIX_PATH` → real path
 3. **Not found anywhere: returns `$(find-pkg-share {package})`** — the portable form
 
-The Python resolver has no explicit `preview_mode` flag: it always resolves found packages to real paths (needed for `open()` calls and include tracking) and falls back to the portable form only when the package is genuinely unknown.  Portability of the final output XML/YAML is the responsibility of the Rust output layer (`ctx.preview_mode`).
+In preview mode, `FindPkgShareSubstitution.perform()` always returns the portable form `$(find-pkg-share pkg)`. In full mode, it calls `_resolve_pkg_share` for a real path.
 
 ### Known Limitation: Nested Substitutions in Python Regex
 
-`_resolve_ros_substitutions` uses `[^)]+` to match the package name, which stops at the first `)`.  Nested substitutions of the form `$(find-pkg-share $(var pkg_name))` would be mismatched.  This syntax appears only in XML/YAML launch files; arg values cascaded from the Rust orchestrator to the Python resolver have already had `$(var ...)` expanded by the Rust layer, so this pattern is not encountered in practice.
+`_resolve_ros_substitutions` uses `[^)]+` to match the package name, which stops at the first `)`.  Nested substitutions of the form `$(find-pkg-share $(var pkg_name))` would be mismatched.  In practice, `$(var ...)` is expanded before `_resolve_ros_substitutions` is called, so this pattern is not encountered.
 
 ### Where the Rule Is Applied
 
 | Location | Call | Mode |
 |----------|------|------|
-| `<include file=...>` open path | `resolve_substitutions_full` | Always full (needs real path) |
+| `<include file=...>` open path | `resolve` + `_parse_portable_path` + `_resolve_pkg_share` | Mode-aware resolve, then separate real-path resolution |
 | `<arg default=...>` | `resolve_substitutions` | Mode-aware |
 | `<let value=...>` | `resolve_substitutions` | Mode-aware |
 | `<node pkg=...>`, `exec=...`, etc. | `resolve_substitutions` | Mode-aware |
@@ -1215,7 +1212,7 @@ The Python resolver has no explicit `preview_mode` flag: it always resolves foun
 | `<push-ros-namespace namespace=...>` | `resolve_substitutions` | Mode-aware |
 | `include_args` forwarded to child | `resolve_substitutions` | Mode-aware |
 | Condition expressions | `resolve_substitutions` | Mode-aware |
-| Python `_resolve_ros_substitutions` | regex replace | Always resolves if found; portable fallback if not found |
+| `_resolve_ros_substitutions` (Python launch output) | regex replace | Always resolves if found; portable fallback if not found |
 
 ## 15. Unresolvable Constructs (static-analysis limitations)
 
@@ -1240,10 +1237,7 @@ The shell command is executed by ROS 2 at launch time.  Static analysis cannot r
 - In full (non-preview) mode the value is an empty string, matching the ROS 2 fallback
   when the command fails with the `'warn'` on-error policy.
 
-**Rust:** `Substitution::Command(String)` variant in the `Substitution` enum.
-`parse_substitution_expr` populates it; `resolve_substitutions_inner` reports the error and
-emits the placeholder.  The error is propagated via `SubstitutionResult::errors` to
-`ResolvedLaunch::errors`.
+**Implementation:** The `command` substitution type is parsed by `_parse_substitution_expr` (legacy path) or as a `CommandSubstitution` (Lark path). The resolver reports the error via `_error()` and emits the placeholder. The error appears in `_state.tracked["errors"]`.
 
 ### `$(eval 'python_expr')` failure — **warning**
 
@@ -1259,8 +1253,7 @@ syntax error, etc.) the resolver falls back to `"false"`.
 - Previously only emitted as `tracing::warn!` (developer log); now also appears in the
   user-facing `[warning]` summary.
 
-**Rust:** In the `Eval` arm of `resolve_substitutions_inner`, the `Err` branch pushes to
-`SubstitutionResult::warnings` in addition to `tracing::warn!`.
+**Implementation:** In the eval handling of `_resolve_substitutions_legacy` and `EvalSubstitution.perform()`, a failed expression is reported via `_error()` and the result falls back to `"false"` or the original expression (in preview mode).
 
 ### Unknown Python action type — **warning**
 

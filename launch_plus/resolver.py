@@ -1244,16 +1244,6 @@ def _read_and_expand_param_file(
         return None
 
 
-def _make_param_file_entry(path: str) -> dict:
-    """Create a param_file dict entry, with optional inline expansion."""
-    pf_entry: dict = {"path": path}
-    if _state.inline_params:
-        expanded = _read_and_expand_param_file(path)
-        if expanded is not None:
-            pf_entry["params"] = expanded
-    return pf_entry
-
-
 def resolve_xml_elements(
     elements: list[Entity],
     ctx: _SubstitutionContext,

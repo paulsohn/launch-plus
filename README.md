@@ -70,18 +70,22 @@ variables substituted — invaluable for debugging and CI validation.
 
 ### Prerequisites
 
-- **Rust toolchain** — [rustup.rs](https://rustup.rs) (edition 2024, MSRV 1.85)
-- **Python 3.10+** in `PATH` — used to evaluate Python launch files and `$(eval ...)` substitutions in XML
+- **Python 3.10+** — used to evaluate Python launch files and `$(eval ...)` substitutions in XML
 - **Git** — for sparse-checkout operations
 - **ROS 2** — source your ROS 2 environment (`source /opt/ros/<distro>/setup.bash`)
 
 ### Install
 
 ```bash
+pip install git+https://github.com/paulsohn/launch-plus.git
+```
+
+Or for development:
+
+```bash
 git clone https://github.com/paulsohn/launch-plus.git
 cd launch-plus
-cargo build --bin launch-plus --release
-# binary: target/release/launch-plus
+pip install -e .
 ```
 
 ### Try the bundled Autoware example
@@ -97,14 +101,13 @@ source /opt/ros/humble/setup.bash
 cd example/autoware
 
 # Preview-resolve: produces flattened XML without building
-cargo run --bin launch-plus -- resolve -d autoware_launch autoware.launch.xml \
+launch-plus resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
-  map_path:="[map_path]" \
+  "map_path:={map_path}" \
   --allow-global-arg-cascade \
   --apply-launch-arg-defaults \
   --apply-opaque-file-access \
-  --allow-including-unportable-path \
   --show-args \
   --inline-params \
   --rosdep \
@@ -123,14 +126,13 @@ The pre-generated output files are included for reference:
 To build the resolved packages (requires a sourced ROS 2 environment and `colcon`):
 
 ```bash
-cargo run --bin launch-plus -- build -d autoware_launch autoware.launch.xml \
+launch-plus build -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
-  map_path:="[map_path]" \
+  "map_path:={map_path}" \
   --allow-global-arg-cascade \
   --apply-launch-arg-defaults \
   --apply-opaque-file-access \
-  --allow-including-unportable-path \
   --rosdep \
   --colcon-flagfile colcon-flags.txt
 ```

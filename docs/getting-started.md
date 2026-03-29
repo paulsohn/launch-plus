@@ -4,7 +4,6 @@ This guide walks through using launch-plus with your own ROS 2 project.
 
 ## Prerequisites
 
-- **Rust toolchain** (edition 2024, MSRV 1.85) — install via [rustup.rs](https://rustup.rs)
 - **Python 3.10+** — used to evaluate Python launch files and `$(eval ...)`
   substitutions in XML launch files
 - **Git** — for sparse-checkout operations
@@ -15,12 +14,15 @@ This guide walks through using launch-plus with your own ROS 2 project.
 ## Installation
 
 ```bash
+pip install git+https://github.com/paulsohn/launch-plus.git
+```
+
+Or for development:
+
+```bash
 git clone https://github.com/paulsohn/launch-plus.git
 cd launch-plus
-cargo build --bin launch-plus --release
-
-# Add to PATH (optional)
-export PATH="$PWD/target/release:$PATH"
+pip install -e .
 ```
 
 ## Step 1: Create a .repos manifest

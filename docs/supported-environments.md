@@ -6,8 +6,8 @@
 |---|---|---|
 | Ubuntu 22.04 (x86_64) | Supported | Primary development platform |
 | Ubuntu 24.04 (x86_64) | Supported | |
-| Ubuntu 22.04 (aarch64) | Planned | Cross-compilation via `cross` |
-| Ubuntu 24.04 (aarch64) | Planned | Cross-compilation via `cross` |
+| Ubuntu 22.04 (aarch64) | Planned | |
+| Ubuntu 24.04 (aarch64) | Planned | |
 | macOS | Not supported | No `apt-get`; rosdep/colcon untested |
 | Windows | Not supported | Git sparse-checkout paths untested |
 
@@ -24,12 +24,6 @@ any ROS 2 libraries, it relies on `AMENT_PREFIX_PATH` to locate installed ROS
 packages (e.g. buildfarm packages like `rosbridge_server` or `tf2_ros`).  Source
 your ROS 2 setup file (`source /opt/ros/<distro>/setup.bash`) before running
 launch-plus.
-
-## Rust toolchain
-
-- **Minimum supported Rust version (MSRV):** 1.85
-- **Edition:** 2024
-- Install via [rustup.rs](https://rustup.rs)
 
 ## Python
 
@@ -133,9 +127,8 @@ They may fail when:
 ### stdout in Python launch files
 
 Any `print()` output in Python launch files (including inside `OpaqueFunction`
-bodies) is redirected to stderr.  This is because the Python resolver
-communicates with Rust via JSON on stdout — any extraneous output would corrupt
-the protocol.
+bodies) is redirected to stderr.  This is because the resolver writes resolved
+XML to stdout — any extraneous output would corrupt the result.
 
 ### Conditional dependencies (REP-149)
 

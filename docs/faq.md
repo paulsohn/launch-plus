@@ -121,10 +121,10 @@ OpaqueFunction bodies produces an error (strict mode).
 
 ### Why is the resolver redirecting my print() output?
 
-The Python resolver communicates with the Rust host via JSON on stdout.  Any
-`print()` in your launch file (including inside OpaqueFunction bodies) would
-corrupt this channel.  launch-plus redirects `sys.stdout` to `sys.stderr` before
-executing your launch file, so `print()` still works — it just goes to stderr.
+The resolver writes resolved XML to stdout.  Any `print()` in your launch file
+(including inside OpaqueFunction bodies) would corrupt the output.  launch-plus
+redirects `sys.stdout` to `sys.stderr` before executing your launch file, so
+`print()` still works — it just goes to stderr.
 
 ## Building
 

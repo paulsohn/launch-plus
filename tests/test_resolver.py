@@ -259,6 +259,7 @@ class TestNodeDeferredResolution:
             executable=R._LaunchConfiguration("exe"),
             name=R._LaunchConfiguration("cname"),
         )
+        container._ensure_tracked(ctx._state)
         R._resolve_node_details(container, ctx)
 
         entry = R._state.tracked["nodes"][container._idx]

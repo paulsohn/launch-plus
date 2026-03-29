@@ -252,7 +252,6 @@ class _TrackedComposableNode(_TrackedAction):
     """
 
     def __init__(self, *, package=None, plugin=None, name=None, **kwargs):
-        _R._track_package(_R._state, package)
         self._raw_package = package
         self._package = str(package) if package else ""
         self._raw_plugin = plugin
@@ -261,10 +260,6 @@ class _TrackedComposableNode(_TrackedAction):
         self._name = str(name) if name else ""
         self._raw_parameters = list(kwargs.get("parameters") or [])
         self._raw_remappings = list(kwargs.get("remappings") or [])
-        # Eager: track any ParameterFile paths
-        for p in self._raw_parameters:
-            if hasattr(p, "_param_file") and p._param_file:
-                _R._track_param_file(_R._state, p._param_file)
 
     def __repr__(self):
         return f"TrackedComposableNode(package={self._package!r}, plugin={self._plugin!r})"
@@ -311,27 +306,10 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         composable_node_descriptions=None,
         **kwargs,
     ):
-        _R._track_package(_R._state, package)
+        self._idx = -1  # set lazily in execute()
         # Pop XML-path parsed data before they leak into kwargs
         xml_envs = kwargs.pop("_xml_envs", None)
         xml_plugins = kwargs.pop("_xml_plugins", None)
-        self._idx = _R._track_node(
-            _R._state,
-            {
-                "package": str(package) if package else "",
-                "executable": str(executable) if executable else "",
-                "name": str(name) if name else "",
-                "namespace_stack": [],
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": "container",
-                "plugins": [],
-                "target": None,
-            },
-        )
         self._raw_package = package
         self._raw_executable = executable
         self._raw_name = name
@@ -343,12 +321,38 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         self._xml_plugins = xml_plugins
         self._descs = list(composable_node_descriptions or [])
         self._detailed = False
+
+    def _ensure_tracked(self, state) -> int:
+        """Create the tracked container entry on first call, return index."""
+        if self._idx >= 0:
+            return int(self._idx)
+        _R._track_package(state, self._raw_package)
         for desc in self._descs:
             raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
             if raw_pkg:
-                _R._track_package(_R._state, raw_pkg)
+                _R._track_package(state, raw_pkg)
+        self._idx = _R._track_node(
+            state,
+            {
+                "package": str(self._raw_package) if self._raw_package else "",
+                "executable": str(self._raw_executable) if self._raw_executable else "",
+                "name": str(self._raw_name) if self._raw_name else "",
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "container",
+                "plugins": [],
+                "target": None,
+            },
+        )
+        return int(self._idx)
 
     def execute(self, context) -> list | None:
+        state = context._state if context is not None and hasattr(context, "_state") else _R._state
+        self._ensure_tracked(state)
         if not self._detailed:
             self._detailed = True
             if self._xml_plugins is not None:
@@ -407,32 +411,26 @@ class _TrackedLoadComposableNodes(_TrackedAction):
         )
 
     def __init__(self, *, composable_node_descriptions=None, target_container=None, **kwargs):
-        from launch_plus.entities.state import _StubLaunchContext
-
+        self._idx = -1  # set lazily in execute()
         # Pop XML-path parsed data before they leak into kwargs
         xml_plugins = kwargs.pop("_xml_plugins", None)
         xml_namespace = kwargs.pop("_xml_namespace", None)
-
-        if target_container is None:
-            target_str = ""
-        elif isinstance(target_container, str):
-            target_str = target_container
-        elif isinstance(target_container, _TrackedComposableNodeContainer):
-            target_str = _R._state.tracked["nodes"][target_container._idx].get("name", "")
-        elif isinstance(target_container, list):
-            # Token list from XML parse — defer resolution
-            target_str = ""
-        elif hasattr(target_container, "perform"):
-            try:
-                result = target_container.perform(_StubLaunchContext())
-                target_str = str(result) if result is not None else str(target_container)
-            except Exception:
-                target_str = str(target_container)
-        else:
-            target_str = str(target_container)
         self._raw_target = target_container
+        self._xml_plugins = xml_plugins
+        self._xml_namespace = xml_namespace
+        self._descs = list(composable_node_descriptions or [])
+        self._detailed = False
+
+    def _ensure_tracked(self, state) -> int:
+        """Create the tracked load_composable entry on first call, return index."""
+        if self._idx >= 0:
+            return int(self._idx)
+        for desc in self._descs:
+            raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
+            if raw_pkg:
+                _R._track_package(state, raw_pkg)
         self._idx = _R._track_node(
-            _R._state,
+            state,
             {
                 "package": "",
                 "executable": "",
@@ -445,19 +443,14 @@ class _TrackedLoadComposableNodes(_TrackedAction):
                 "env": {},
                 "kind": "load_composable",
                 "plugins": [],
-                "target": target_str,
+                "target": "",
             },
         )
-        self._xml_plugins = xml_plugins
-        self._xml_namespace = xml_namespace
-        self._descs = list(composable_node_descriptions or [])
-        self._detailed = False
-        for desc in self._descs:
-            raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
-            if raw_pkg:
-                _R._track_package(_R._state, raw_pkg)
+        return int(self._idx)
 
     def execute(self, context) -> list | None:
+        state = context._state if context is not None and hasattr(context, "_state") else _R._state
+        self._ensure_tracked(state)
         if not self._detailed:
             self._detailed = True
             if self._xml_plugins is not None:
@@ -466,6 +459,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
                 entry = context._state.tracked["nodes"][self._idx]
                 if self._raw_target is not None:
                     if isinstance(self._raw_target, _TrackedComposableNodeContainer):
+                        self._raw_target._ensure_tracked(state)
                         target = context._state.tracked["nodes"][self._raw_target._idx].get(
                             "name"
                         ) or entry.get("target", "")

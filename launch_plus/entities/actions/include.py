@@ -14,11 +14,8 @@ from launch_plus.entities.state import (
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
-    _error,
     _parse_portable_path,
     _resolve_pkg_share,
-    _state,
-    _track_include,
 )
 
 
@@ -35,28 +32,28 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
 
         # Check for unportable absolute paths in preview mode
         if (
-            _state.preview_mode
+            parser.preview_mode
             and os.path.isabs(file_path)
             and "$(find-pkg-share" not in raw_file
             and "$(dirname)" not in raw_file
         ):
-            if _state.allow_unportable_paths:
-                _warn(f"unportable absolute path in include: {file_path}")
+            if parser.allow_unportable_paths:
+                parser.warn(f"unportable absolute path in include: {file_path}")
             else:
-                _error(f"unportable absolute path in include: {file_path}")
+                parser.error(f"unportable absolute path in include: {file_path}")
 
         if file_path in parser.include_stack:
-            _error(f"circular include detected: {file_path}")
+            parser.error(f"circular include detected: {file_path}")
             return
         if len(parser.include_stack) > 20:
-            _warn(f"max include depth exceeded for {file_path}")
+            parser.warn(f"max include depth exceeded for {file_path}")
             return
-        dep_idx = _track_include(file_path)
+        dep_idx = parser.track_include(file_path)
         child_ctx_args = parser.resolve_include_args(entity)
         if dep_idx >= 0 and child_ctx_args:
-            _state.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
+            parser.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
         if child_ctx_args:
-            _state.tracked["include_args"][file_path] = child_ctx_args
+            parser.tracked["include_args"][file_path] = child_ctx_args
         real_path = file_path
         parsed_path = _parse_portable_path(file_path)
         if parsed_path:

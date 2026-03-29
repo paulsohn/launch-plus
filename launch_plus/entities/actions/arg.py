@@ -10,10 +10,6 @@ from launch_plus.entities.state import (
 )
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
-from launch_plus.resolver import (
-    _record_declared_arg,
-    _state,
-)
 
 
 @expose_action("arg")
@@ -31,7 +27,7 @@ class _DeclaredArg(_TrackedAction):
             resolved = parser.resolve(fixed_value)
             ctx.args[name] = resolved
         elif name and name not in ctx.args and default is not None:
-            if _state.apply_arg_defaults:
+            if parser.apply_arg_defaults:
                 resolved = parser.resolve(default)
                 ctx.args[name] = resolved
             else:
@@ -39,10 +35,10 @@ class _DeclaredArg(_TrackedAction):
         else:
             resolved = ctx.args.get(name, default or "")
         if name:
-            already_seen = name in _state.declared_arg_names
+            already_seen = name in parser.declared_arg_names
             if not already_seen:
-                _state.declared_arg_names.add(name)
-            _record_declared_arg(name, resolved, flat=not already_seen)
+                parser.declared_arg_names.add(name)
+            parser.record_declared_arg(name, resolved, flat=not already_seen)
 
     def __init__(self, name=None, *positional, default_value=None, condition=None, **kwargs):
         self.name = str(name) if name is not None else (str(positional[0]) if positional else None)

@@ -7,9 +7,6 @@ from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
-from launch_plus.resolver import (
-    _state,
-)
 
 
 @expose_action("executable")
@@ -34,12 +31,12 @@ class _TrackedExecutable(_TrackedAction):
                 "package": "",
                 "executable": "",
                 "name": name or "",
-                "namespace_stack": list(_state.namespace_stack),
+                "namespace_stack": list(parser.namespace_stack),
                 "explicit_namespace": None,
                 "parameters": {},
                 "param_files": [],
                 "remappings": [],
-                "env": dict(_state.env),
+                "env": dict(parser.env),
                 "kind": "executable",
                 "plugins": [],
                 "target": None,

@@ -11,10 +11,6 @@ from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
-from launch_plus.resolver import (
-    _state,
-    _track_package,
-)
 
 
 @expose_action("node")
@@ -36,22 +32,22 @@ class _TrackedNode(_TrackedAction):
         )
         name = parser.resolve_optional(entity.get_attr("name", optional=True))
         ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
-        _track_package(pkg)
+        parser.track_package(pkg)
         params, param_files = parser.resolve_params(entity)
         remaps = parser.resolve_remaps(entity)
-        env = dict(_state.env)
+        env = dict(parser.env)
         env.update(parser.resolve_envs(entity))
-        merged_params = {k: str(v) for k, v in _state.global_params}
+        merged_params = {k: str(v) for k, v in parser.global_params}
         merged_params.update(params)
-        merged_param_files = list(_state.global_param_files) + param_files
-        merged_remaps = list(_state.global_remaps) + remaps
+        merged_param_files = list(parser.global_param_files) + param_files
+        merged_remaps = list(parser.global_remaps) + remaps
         node_kind = "node" if entity.type_name != "lifecycle_node" else "lifecycle_node"
         parser.track_node(
             {
                 "package": pkg,
                 "executable": exe,
                 "name": name or "",
-                "namespace_stack": list(_state.namespace_stack),
+                "namespace_stack": list(parser.namespace_stack),
                 "explicit_namespace": ns,
                 "parameters": merged_params,
                 "param_files": merged_param_files,
@@ -170,8 +166,8 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         )
         name = parser.resolve_optional(entity.get_attr("name", optional=True))
         ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
-        _track_package(pkg)
-        env = dict(_state.env)
+        parser.track_package(pkg)
+        env = dict(parser.env)
         env.update(parser.resolve_envs(entity))
         plugins = parser.resolve_composable_plugins(entity)
         parser.track_node(
@@ -179,11 +175,11 @@ class _TrackedComposableNodeContainer(_TrackedAction):
                 "package": pkg,
                 "executable": exe,
                 "name": name or "",
-                "namespace_stack": list(_state.namespace_stack),
+                "namespace_stack": list(parser.namespace_stack),
                 "explicit_namespace": ns,
-                "parameters": {k: str(v) for k, v in _state.global_params},
-                "param_files": list(_state.global_param_files),
-                "remappings": list(_state.global_remaps),
+                "parameters": {k: str(v) for k, v in parser.global_params},
+                "param_files": list(parser.global_param_files),
+                "remappings": list(parser.global_remaps),
                 "env": env,
                 "kind": "container",
                 "plugins": plugins,
@@ -257,7 +253,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
                 "package": "",
                 "executable": "",
                 "name": "",
-                "namespace_stack": list(_state.namespace_stack),
+                "namespace_stack": list(parser.namespace_stack),
                 "explicit_namespace": ns,
                 "parameters": {},
                 "param_files": [],

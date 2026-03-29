@@ -9,7 +9,7 @@ handlers.  Python launch files use the import-patching machinery in
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -284,16 +284,21 @@ def _resolve_element(
 class _ActionParser:
     """Provides resolver services to action handlers.
 
-    Wraps the module-level resolver state so action handlers can
-    access substitution resolution, condition evaluation, namespace
-    management, and tracking without importing resolver internals.
+    Wraps the resolver state so action handlers can access substitution
+    resolution, condition evaluation, namespace management, and tracking
+    without importing resolver internals.  The ``state`` parameter carries
+    the :class:`ResolverState` — action ``parse()`` methods should access
+    all mutable state through ``parser.*`` properties.
     """
 
-    __slots__ = ("ctx", "include_stack")
+    __slots__ = ("ctx", "include_stack", "state")
 
-    def __init__(self, ctx: _SubstitutionContext, include_stack: list[str]) -> None:
+    def __init__(
+        self, ctx: _SubstitutionContext, include_stack: list[str], state: Any = None
+    ) -> None:
         self.ctx = ctx
         self.include_stack = include_stack
+        self.state = state if state is not None else _state
 
     def resolve(self, text: str) -> str:
         """Resolve ``$(...)`` substitutions in *text*."""
@@ -321,7 +326,55 @@ class _ActionParser:
             _resolve_element(child, self.ctx, self.include_stack)
 
     def effective_namespace(self, ns: str | None = None) -> str | None:
-        return _effective_namespace(list(_state.namespace_stack), ns)
+        return _effective_namespace(list(self.state.namespace_stack), ns)
+
+    # ── State accessors ──────────────────────────────────────────────
+
+    @property
+    def namespace_stack(self) -> list:
+        return self.state.namespace_stack
+
+    @property
+    def env(self) -> dict:
+        return self.state.env
+
+    @property
+    def global_params(self) -> list:
+        return self.state.global_params
+
+    @property
+    def global_remaps(self) -> list:
+        return self.state.global_remaps
+
+    @property
+    def global_param_files(self) -> list:
+        return self.state.global_param_files
+
+    @property
+    def declared_arg_names(self) -> set:
+        return self.state.declared_arg_names
+
+    @property
+    def tracked(self) -> dict:
+        return self.state.tracked
+
+    @property
+    def preview_mode(self) -> bool:
+        return self.state.preview_mode
+
+    @property
+    def apply_arg_defaults(self) -> bool:
+        return self.state.apply_arg_defaults
+
+    @property
+    def allow_unportable_paths(self) -> bool:
+        return self.state.allow_unportable_paths
+
+    def warn(self, msg: str) -> None:
+        self.state.warn(msg)
+
+    def error(self, msg: str) -> None:
+        self.state.error(msg)
 
     # ── Tracking helpers ──────────────────────────────────────────────
 
@@ -334,31 +387,35 @@ class _ActionParser:
         return _R._track_event_handler(eh_dict)
 
     def track_global_param(self, name: str, value: str) -> None:
-        """Record a global parameter (from <set_parameter>)."""
-        _state.tracked["global_params"].append([name, value])
-        _state.global_params.append((name, value))
+        """Record a global parameter."""
+        self.state.tracked["global_params"].append([name, value])
+        self.state.global_params.append((name, value))
 
     def track_global_remap(self, src: str, dst: str) -> None:
-        """Record a global remap (from <set_remap>)."""
-        _state.global_remaps.append((src, dst))
+        """Record a global remap."""
+        self.state.global_remaps.append((src, dst))
 
-    @property
-    def namespace_stack(self) -> list:
-        return _state.namespace_stack
+    def track_package(self, pkg: str) -> None:
+        """Delegate to module-level ``_track_package``."""
+        _R._track_package(pkg)
 
-    @property
-    def env(self) -> dict:
-        return _state.env
+    def track_include(self, path: str) -> int:
+        """Delegate to module-level ``_track_include``."""
+        return int(_R._track_include(path))
+
+    def record_declared_arg(self, name: str, default: str, *, flat: bool = True) -> None:
+        """Delegate to module-level ``_record_declared_arg``."""
+        _R._record_declared_arg(name, default, flat=flat)
 
     def push_include_chain(self, file_path: str) -> None:
         inc_dep = _R._extract_pkg_and_share_path(file_path)
         if inc_dep:
-            _state.include_chain.append(list(inc_dep))
+            self.state.include_chain.append(list(inc_dep))
         else:
-            _state.include_chain.append(["", file_path])
+            self.state.include_chain.append(["", file_path])
 
     def pop_include_chain(self) -> None:
-        _state.include_chain.pop()
+        self.state.include_chain.pop()
 
     # ── Param / remap / env resolution from Entity children ──────────
 
@@ -380,7 +437,7 @@ class _ActionParser:
                 if path not in seen_paths:
                     seen_paths.add(path)
                     pf_entry: dict = {"path": path}
-                    if _state.inline_params:
+                    if self.state.inline_params:
                         expanded = _read_and_expand_param_file(path, self.ctx)
                         if expanded is not None:
                             pf_entry["params"] = expanded
@@ -486,7 +543,7 @@ class _ActionParser:
                 else:
                     child_entities = list(_parse_xml_launch_entity(content, real_path))
                 child_ctx = _SubstitutionContext()
-                if _state.global_arg_cascade:
+                if self.state.global_arg_cascade:
                     child_ctx.args = {**self.ctx.args, **child_ctx_args}
                     child_ctx.vars = {**self.ctx.vars, **child_ctx_args}
                 else:
@@ -501,10 +558,12 @@ class _ActionParser:
                 self.ctx.vars.update(child_ctx.vars)
             elif real_path.endswith((".launch.py", ".py")):
                 parent_lc = _R._make_launch_context({**self.ctx.args, **self.ctx.vars})
-                if _state.global_params:
-                    parent_lc._launch_configurations["global_params"] = list(_state.global_params)
+                if self.state.global_params:
+                    parent_lc._launch_configurations["global_params"] = list(
+                        self.state.global_params
+                    )
                 _R._inline_resolve_python_launch(file_path, parent_lc, child_ctx_args)
-                set_configs = _state.tracked["set_launch_configurations"]
+                set_configs = self.state.tracked["set_launch_configurations"]
                 for k, v in parent_lc._launch_configurations.items():
                     if (k in set_configs or k in child_ctx_args) and k != "global_params":
                         self.ctx.vars[k] = str(v) if not isinstance(v, str) else v

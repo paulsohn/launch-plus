@@ -11,9 +11,6 @@ from launch_plus.entities.state import (
 )
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
-from launch_plus.resolver import (
-    _state,
-)
 
 
 @expose_action("group")
@@ -35,22 +32,23 @@ class _TrackedGroupAction(_TrackedAction):
         if scoped:
             saved_args = dict(parser.ctx.args)
             saved_vars = dict(parser.ctx.vars)
-            saved_env = dict(_state.env)
-            saved_ns_depth = len(_state.namespace_stack)
-            saved_gp = list(_state.global_params)
-            saved_gr = list(_state.global_remaps)
-            saved_gpf = list(_state.global_param_files)
+            saved_env = dict(parser.env)
+            saved_ns_depth = len(parser.namespace_stack)
+            saved_gp = list(parser.global_params)
+            saved_gr = list(parser.global_remaps)
+            saved_gpf = list(parser.global_param_files)
         parser.resolve_children(list(children))
         if scoped:
             new_args = {k: v for k, v in parser.ctx.args.items() if k not in saved_args}
             parser.ctx.args = saved_args
             parser.ctx.args.update(new_args)
             parser.ctx.vars = saved_vars
-            _state.env = saved_env
-            del _state.namespace_stack[saved_ns_depth:]
-            _state.global_params[:] = saved_gp
-            _state.global_remaps[:] = saved_gr
-            _state.global_param_files[:] = saved_gpf
+            parser.env.clear()
+            parser.env.update(saved_env)
+            del parser.namespace_stack[saved_ns_depth:]
+            parser.global_params[:] = saved_gp
+            parser.global_remaps[:] = saved_gr
+            parser.global_param_files[:] = saved_gpf
 
     def __init__(self, actions=None, **kwargs):
         self._actions = list(actions or [])

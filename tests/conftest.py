@@ -1,14 +1,10 @@
 """Shared fixtures for resolver tests."""
 
-import copy
 import sys
 
 import pytest
 
 from launch_plus import resolver as R
-
-# Snapshot the initial state of all resolver globals so each test starts clean.
-_TRACKED_TEMPLATE = copy.deepcopy(R._tracked)
 
 
 def _install_import_patching():
@@ -29,31 +25,11 @@ _install_import_patching()
 
 @pytest.fixture(autouse=True)
 def _reset_resolver_state():
-    """Reset resolver module-level globals before every test."""
-    # Restore _tracked to a fresh deep-copy of the template.
-    R._tracked.clear()
-    R._tracked.update(copy.deepcopy(_TRACKED_TEMPLATE))
-
-    # Scalar / set / list globals
-    R._declared_arg_names.clear()
-    R._namespace_stack.clear()
-    R._package_shares.clear()
-    R._lockfile_data.clear()
-    R._fetch_dir = ""
-    R._fetched_packages.clear()
-    R._apply_opaque_file_access = False
-    R._preview_mode = True
-    R._inline_params = False
-    R._rosdep_fallback = False
-    R._apply_arg_defaults = True
-    R._global_arg_cascade = True
-    R._allow_unportable_paths = False
-    R._rosdep_attempted.clear()
-    R._env.clear()
-    R._include_chain.clear()
-    R._global_params.clear()
-    R._global_param_files.clear()
-    R._global_remaps.clear()
+    """Reset resolver module-level state before every test."""
+    R._state.reset()
+    # Test defaults differ from production defaults:
+    R._state.preview_mode = True
+    R._state.apply_arg_defaults = True
+    R._state.global_arg_cascade = True
     yield
-
     # No teardown needed — next invocation resets again.

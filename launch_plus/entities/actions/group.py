@@ -7,7 +7,6 @@ from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.state import (
     _error,
-    _PackageNotFetchedError,
     _warn,
 )
 from launch_plus.parsers.entity import Entity
@@ -63,8 +62,6 @@ class _TrackedGroupAction(_TrackedAction):
             try:
                 if not self._condition.evaluate(context):
                     return None
-            except _PackageNotFetchedError:
-                raise
             except Exception as e:
                 _warn(f"GroupAction condition evaluation failed: {e}")
                 return None
@@ -90,8 +87,6 @@ class _TrackedOpaqueFunction(_TrackedAction):
             try:
                 result = _R._call_opaque_with_stubs(fn, context)
                 return result if result else None
-            except _PackageNotFetchedError as e:
-                _error(f"OpaqueFunction failed: package fetch failed: {e}")
             except Exception as e:
                 _error(f"OpaqueFunction failed: {e}")
         return None

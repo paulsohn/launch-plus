@@ -5,7 +5,6 @@ from __future__ import annotations
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.state import _PackageNotFetchedError
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
     _ActionParser,
@@ -85,8 +84,6 @@ class _TrackedExecutable(_TrackedAction):
                 try:
                     result = part.perform(context)
                     part = result if result is not None else raw_part
-                except _PackageNotFetchedError:
-                    raise
                 except Exception:
                     part = str(raw_part)
             parts.append(str(part))
@@ -95,8 +92,6 @@ class _TrackedExecutable(_TrackedAction):
         if hasattr(name, "perform") and context is not None:
             try:
                 name = name.perform(context)
-            except _PackageNotFetchedError:
-                raise
             except Exception:
                 name = str(name) if name is not None else ""
         name_str = str(name) if name is not None else ""

@@ -8,7 +8,6 @@ import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.state import (
-    _PackageNotFetchedError,
     _StubLaunchContext,
     _warn,
 )
@@ -65,8 +64,6 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             try:
                 pkg_share = _resolve_pkg_share(pkg)
                 real_path = os.path.join(pkg_share, rest)
-            except _PackageNotFetchedError:
-                raise
             except Exception:
                 return
         if os.path.isfile(real_path):
@@ -98,8 +95,6 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             if hasattr(src, "perform"):
                 try:
                     path = src.perform(context)
-                except _PackageNotFetchedError:
-                    raise
                 except Exception as e:
                     _warn(f"failed to resolve IncludeLaunchDescription source: {e}")
             if path:
@@ -148,8 +143,6 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
                         try:
                             result = sub.perform(context)
                             parts.append(str(result) if result is not None else str(sub))
-                        except _PackageNotFetchedError:
-                            raise
                         except Exception:
                             parts.append(str(sub))
                     else:
@@ -159,8 +152,6 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
                 try:
                     result = v.perform(context)
                     v_str = str(result) if result is not None else str(v)
-                except _PackageNotFetchedError:
-                    raise
                 except Exception:
                     v_str = str(v)
             else:
@@ -171,7 +162,5 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
                 _R._state.tracked["include_deps"][dep_idx]["include_args"] = captured
             else:
                 _R._state.tracked["include_args"][path] = captured
-    except _PackageNotFetchedError:
-        raise
     except Exception as e:
         _warn(f"failed to resolve include args for '{path}': {e}")

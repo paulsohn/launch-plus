@@ -36,7 +36,6 @@ import yaml
 import launch_plus.entities  # noqa: F401
 from launch_plus.entities.state import (  # noqa: E402
     _error,
-    _PackageNotFetchedError,
     _state,
     _StubLaunchContext,
     _warn,
@@ -278,19 +277,19 @@ def _resolve_pkg_share(package: str) -> str:
         ):
             if _ensure_fetched(package):
                 return str(_state.package_shares[package])
-            raise _PackageNotFetchedError(package)
+            _error(f"failed to fetch package '{package}' from lockfile")
+            return f"$(find-pkg-share {package})"
         return pkg_path
     # 2. Lockfile package not yet in _state.package_shares — fetch (preview only).
     if _state.preview_mode and _state.lockfile_data and package in _state.lockfile_data:
         if _ensure_fetched(package):
             return str(_state.package_shares[package])
-        raise _PackageNotFetchedError(package)
+        _error(f"failed to fetch package '{package}' from lockfile")
+        return f"$(find-pkg-share {package})"
     # 3. Non-lockfile packages (system / rosdep): use AMENT_PREFIX_PATH.
     if _real_get_package_share_directory is not None:
         try:
             return str(_real_get_package_share_directory(package))
-        except _PackageNotFetchedError:
-            raise
         except Exception:
             pass  # Fall through to rosdep or portable fallback.
     # 4. Try rosdep install if enabled.
@@ -521,8 +520,6 @@ def _to_str(value: object, context: Any = None) -> str | None:
         try:
             res = value.perform(context)
             return str(res) if res is not None else None
-        except _PackageNotFetchedError:
-            raise
         except Exception:
             return str(value)
     return str(value)
@@ -563,8 +560,6 @@ def _resolve_substitution_ex(sub: object, context: Any) -> tuple[str | None, boo
                         else:
                             parts.append(str(s))
                             any_fallback = True
-                    except _PackageNotFetchedError:
-                        raise
                     except Exception:
                         parts.append(str(s))
                         any_fallback = True
@@ -580,8 +575,6 @@ def _resolve_substitution_ex(sub: object, context: Any) -> tuple[str | None, boo
             if result is None:
                 return str(sub), True  # unresolved — use display name
             return str(result), False
-        except _PackageNotFetchedError:
-            raise
         except Exception:
             return str(sub), True
     return str(sub), True
@@ -1225,8 +1218,8 @@ def _call_opaque_with_stubs(fn, context):
     ``$(find-pkg-share pkg)/...`` paths are intercepted and resolved to actual
     filesystem paths via the ``_state.package_shares`` map.  If the target package
     exists in the lockfile but hasn't been fully fetched yet (no
-    ``package.xml``), ``_PackageNotFetchedError`` is raised immediately so the
-    Rust orchestrator can fetch the package and retry.
+    ``package.xml``), ``_ensure_fetched()`` is called inline.  If fetching fails,
+    an error is logged and a stub/fallback is returned.
 
     In **non-preview mode** (post-build), all packages are installed and
     ``FindPackageShare`` returns real AMENT paths, so ``open()`` and
@@ -1250,7 +1243,7 @@ def _call_opaque_with_stubs(fn, context):
 
         Returns the resolved path string, or ``None`` if the input is not a
         portable path.  Fetches the package inline if needed via _ensure_fetched().
-        Raises ``_PackageNotFetchedError`` only if fetching fails.
+        Returns ``None`` if the package cannot be resolved.
         """
         parsed = _parse_portable_path(path_str)
         if parsed is None:
@@ -1262,7 +1255,8 @@ def _call_opaque_with_stubs(fn, context):
                 if _ensure_fetched(pkg):
                     pkg_dir = _state.package_shares[pkg]
                 else:
-                    raise _PackageNotFetchedError(pkg)
+                    _error(f"failed to fetch package '{pkg}' from lockfile")
+                    return None
             return os.path.join(pkg_dir, rest) if rest else pkg_dir
         # Try fetching if it's a lockfile package.
         if pkg in _state.lockfile_data and _ensure_fetched(pkg):
@@ -1273,8 +1267,6 @@ def _call_opaque_with_stubs(fn, context):
             try:
                 share = _real_get_package_share_directory(pkg)
                 return os.path.join(share, rest) if rest else share
-            except _PackageNotFetchedError:
-                raise
             except Exception:
                 pass
         # Package not found anywhere that we know about — can't resolve.
@@ -1290,7 +1282,7 @@ def _call_opaque_with_stubs(fn, context):
                     f"(stub returned): {path}"
                 )
                 return _io.StringIO(_STUB_ROS_PARAM_YAML)
-            actual = _resolve_portable(path_str)  # may raise _PackageNotFetchedError
+            actual = _resolve_portable(path_str)
             if actual is not None:
                 try:
                     return _orig_open(actual, mode, *args, **kwargs)
@@ -1320,7 +1312,8 @@ def _call_opaque_with_stubs(fn, context):
                             except (FileNotFoundError, OSError):
                                 pass  # File still missing after fetch → fall through to error
                         else:
-                            raise _PackageNotFetchedError(pkg_name) from None
+                            _error(f"failed to fetch package '{pkg_name}' from lockfile")
+                            break
                     break  # package is fully fetched; file genuinely missing → error
             _error(f"param file not found: '{path}' — stub defaults used")
             return _io.StringIO(_STUB_ROS_PARAM_YAML)
@@ -1334,7 +1327,7 @@ def _call_opaque_with_stubs(fn, context):
                     f"--apply-opaque-file-access (returning False): {path}"
                 )
                 return False
-            actual = _resolve_portable(path_str)  # may raise _PackageNotFetchedError
+            actual = _resolve_portable(path_str)
             if actual is not None:
                 return _orig_path_exists(actual)
             return False
@@ -1349,7 +1342,7 @@ def _call_opaque_with_stubs(fn, context):
                     f"--apply-opaque-file-access (returning False): {path}"
                 )
                 return False
-            actual = _resolve_portable(path_str)  # may raise _PackageNotFetchedError
+            actual = _resolve_portable(path_str)
             if actual is not None:
                 return _orig_path_isfile(actual)
             return False
@@ -1364,7 +1357,7 @@ def _call_opaque_with_stubs(fn, context):
                     f"--apply-opaque-file-access (returning False): {path}"
                 )
                 return False
-            actual = _resolve_portable(path_str)  # may raise _PackageNotFetchedError
+            actual = _resolve_portable(path_str)
             if actual is not None:
                 return _orig_path_isdir(actual)
             return False
@@ -1387,7 +1380,7 @@ def _call_opaque_with_stubs(fn, context):
                     f"--apply-opaque-file-access (stub returned): {path_str}"
                 )
                 return _io.StringIO(_STUB_ROS_PARAM_YAML)
-            actual = _resolve_portable(path_str)  # may raise _PackageNotFetchedError
+            actual = _resolve_portable(path_str)
             if actual is not None:
                 try:
                     return _orig_pathlib_open(
@@ -1681,8 +1674,6 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args):
         pkg, rest = parsed
         try:
             pkg_share = _resolve_pkg_share(pkg)
-        except _PackageNotFetchedError:
-            raise
         except Exception:
             return  # Package not available — orchestrator will resolve later
         real_path = os.path.join(pkg_share, rest)
@@ -1699,8 +1690,6 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args):
             return
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-    except _PackageNotFetchedError:
-        raise
     except Exception as e:
         _warn(f"failed to load included launch file {real_path}: {e}")
         return
@@ -1731,8 +1720,6 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args):
     try:
         try:
             ld = mod.generate_launch_description()
-        except _PackageNotFetchedError:
-            raise
         except Exception as e:
             _warn(f"generate_launch_description() failed in {launch_file}: {e}")
             return
@@ -1756,8 +1743,6 @@ def _inline_resolve_python_launch(launch_file, parent_context, child_args):
         # all mutate parent_context directly, which is the desired effect.
         # Only context mutations survive; tracked state is rolled back.
         _walk_actions(entities, parent_context)
-    except _PackageNotFetchedError:
-        raise
     finally:
         # Restore scoping state only — nodes, includes, packages, params, etc.
         # are intentionally kept since the orchestrator no longer re-resolves them.
@@ -1807,8 +1792,6 @@ def _walk_actions(actions, context):
                         _walk_actions(children, context)
                 else:
                     _walk_untracked_action(action, context)
-            except _PackageNotFetchedError:
-                raise
             except Exception as e:
                 _error(f"Error walking action {type(action).__name__}: {e}")
     finally:
@@ -1833,8 +1816,6 @@ def _walk_untracked_action(action, context):
                 result = _call_opaque_with_stubs(fn, context)
                 if result:
                     _walk_actions(result, context)
-            except _PackageNotFetchedError as e:
-                _error(f"OpaqueFunction failed: package fetch failed: {e}")
             except Exception as e:
                 _error(f"OpaqueFunction failed: {e}")
         return
@@ -1843,15 +1824,11 @@ def _walk_untracked_action(action, context):
     if hasattr(action, "entities"):
         try:
             _walk_actions(action.entities, context)
-        except _PackageNotFetchedError:
-            raise
         except Exception as e:
             _warn(f"failed to walk {cls_name}.entities: {e}")
     if hasattr(action, "_actions"):
         try:
             _walk_actions(action._actions, context)
-        except _PackageNotFetchedError:
-            raise
         except Exception as e:
             _warn(f"failed to walk {cls_name}._actions: {e}")
 
@@ -1903,8 +1880,6 @@ def _walk_untracked_action(action, context):
             if callable(loc) and context:
                 try:
                     loc = loc(context)
-                except _PackageNotFetchedError:
-                    raise
                 except Exception:
                     loc = None
             if loc:
@@ -2251,10 +2226,10 @@ def _build_patched_ament_index_python_packages():
             if not os.path.isfile(os.path.join(pkg_dir, "package.xml")) and not _ensure_fetched(
                 package_name
             ):
-                raise _PackageNotFetchedError(package_name)
+                _error(f"failed to fetch package '{package_name}' from lockfile")
         elif package_name in _state.lockfile_data:
             if not _ensure_fetched(package_name):
-                raise _PackageNotFetchedError(package_name)
+                _error(f"failed to fetch package '{package_name}' from lockfile")
         # In non-preview mode, return the real install path so the output contains
         # absolute paths matching the installed layout.
         if not _state.preview_mode and package_name in _state.package_shares:
@@ -2537,10 +2512,7 @@ def resolve_file(
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
         subst_ctx.preview_mode = _state.preview_mode
         subst_ctx.env = dict(_state.env)
-        try:
-            resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file_str])
-        except _PackageNotFetchedError as e:
-            _error(f"failed to fetch package: {e}")
+        resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file_str])
         return _tracked_to_parsed_launch_file(_state.tracked)
 
     # ── Python launch files ──────────────────────────────────────────────
@@ -2552,9 +2524,6 @@ def resolve_file(
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
-    except _PackageNotFetchedError as e:
-        _error(f"failed to fetch package during module load: {e}")
-        return _tracked_to_parsed_launch_file(_state.tracked)
     except Exception as e:
         _error(f"Error loading launch file: {e}")
         return _tracked_to_parsed_launch_file(_state.tracked)
@@ -2579,9 +2548,6 @@ def resolve_file(
 
     try:
         ld = mod.generate_launch_description()
-    except _PackageNotFetchedError as e:
-        _error(f"failed to fetch package during generate_launch_description: {e}")
-        return _tracked_to_parsed_launch_file(_state.tracked)
     except Exception as e:
         _error(f"generate_launch_description() failed: {e}")
         return _tracked_to_parsed_launch_file(_state.tracked)
@@ -2592,10 +2558,7 @@ def resolve_file(
         if isinstance(entity, _DeclaredArg):
             _apply_declared_arg(entity, ctx)
 
-    try:
-        _walk_actions(entities, ctx)
-    except _PackageNotFetchedError as e:
-        _error(f"failed to fetch package during action walking: {e}")
+    _walk_actions(entities, ctx)
 
     return _tracked_to_parsed_launch_file(_state.tracked)
 

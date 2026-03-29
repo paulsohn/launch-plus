@@ -6,7 +6,6 @@ import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.state import (
-    _PackageNotFetchedError,
     _warn,
 )
 from launch_plus.parsers.entity import Entity
@@ -66,8 +65,6 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
         try:
             if not arg.condition.evaluate(context):
                 return
-        except _PackageNotFetchedError:
-            raise
         except Exception as e:
             _warn(
                 f"condition on DeclareLaunchArgument '{arg.name}' failed to evaluate: {e}; "

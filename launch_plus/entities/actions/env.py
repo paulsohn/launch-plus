@@ -13,7 +13,6 @@ from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.state import (
     _error,
-    _PackageNotFetchedError,
     _warn,
 )
 from launch_plus.parsers.entity import Entity
@@ -45,8 +44,6 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
             try:
                 if not self._condition.evaluate(context):
                     return None
-            except _PackageNotFetchedError:
-                raise
             except Exception as e:
                 _warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
                 return None
@@ -79,8 +76,6 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
             try:
                 if not self._condition.evaluate(context):
                     return None
-            except _PackageNotFetchedError:
-                raise
             except Exception as e:
                 _warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
                 return None

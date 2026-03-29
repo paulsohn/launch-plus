@@ -30,7 +30,6 @@ class FindPackageShareSubstitution(Substitution):
 
     def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
         from launch_plus.resolver import (
-            _PackageNotFetchedError,
             _resolve_pkg_share,
             _track_package,
             resolve_substitutions_from_tokens,
@@ -42,8 +41,6 @@ class FindPackageShareSubstitution(Substitution):
             return f"$(find-pkg-share {pkg})"
         try:
             return _resolve_pkg_share(pkg)
-        except _PackageNotFetchedError:
-            raise
         except Exception:
             return f"$(find-pkg-share {pkg})"
 
@@ -97,12 +94,9 @@ class _TrackedFindPackageShare:
     def _try_ament_resolve(self, pkg: str) -> str:
         """Resolve to a real path, return portable form on failure."""
         import launch_plus.resolver as _R
-        from launch_plus.entities.state import _PackageNotFetchedError
 
         try:
             return _R._resolve_pkg_share(pkg)
-        except _PackageNotFetchedError:
-            raise
         except Exception as e:
             if not _R._state.preview_mode:
                 _R._error(f"$(find-pkg-share {pkg}): {e}")

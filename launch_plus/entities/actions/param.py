@@ -8,7 +8,7 @@ from __future__ import annotations
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.state import _PackageNotFetchedError, _StubLaunchContext
+from launch_plus.entities.state import _StubLaunchContext
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import _ActionParser
 
@@ -59,8 +59,6 @@ class _SetLaunchConfiguration(_TrackedAction):
             if hasattr(value, "perform"):
                 try:
                     value = value.perform(context)
-                except _PackageNotFetchedError:
-                    raise
                 except Exception:
                     pass
             resolved_value = str(value) if value is not None else ""
@@ -82,8 +80,6 @@ class _TrackedSetParameter(_TrackedAction):
         if hasattr(name, "perform") and context is not None:
             try:
                 name = name.perform(context)
-            except _PackageNotFetchedError:
-                raise
             except Exception:
                 name = str(name)
         else:
@@ -92,8 +88,6 @@ class _TrackedSetParameter(_TrackedAction):
             if hasattr(value, "perform"):
                 try:
                     value = value.perform(context)
-                except _PackageNotFetchedError:
-                    raise
                 except Exception:
                     pass
             if isinstance(value, str):

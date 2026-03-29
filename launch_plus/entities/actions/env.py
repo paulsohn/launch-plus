@@ -27,8 +27,8 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
     def parse(cls, entity: Entity, parser: _ActionParser):
         if not parser.evaluate_condition(entity):
             return None
-        name = parser.resolve(entity.get_attr("name", optional=True) or "")
-        value = parser.resolve(entity.get_attr("value", optional=True) or "")
+        name = parser.parse_substitution(entity.get_attr("name", optional=True) or "")
+        value = parser.parse_substitution(entity.get_attr("value", optional=True) or "")
         return cls(name=name, value=value)
 
     def __init__(self, name=None, value=None, **kwargs):
@@ -37,6 +37,8 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
         self._condition = kwargs.get("condition")
 
     def execute(self, context) -> list | None:
+        from launch_plus.entities.xml_resolver import resolve_value
+
         if self._condition is not None and context is not None:
             try:
                 if not self._condition.evaluate(context):
@@ -44,11 +46,11 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
             except Exception as e:
                 _warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
                 return None
-        name = _R._to_str(self._name, context)
+        name = resolve_value(self._name, context)
         if not name:
             _error("SetEnvironmentVariable: resolved name is empty or None — skipping")
             return None
-        value = _R._to_str(self._value, context) or ""
+        value = resolve_value(self._value, context) or ""
         _R._state.env[name] = value
         return None
 
@@ -61,7 +63,7 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
     def parse(cls, entity: Entity, parser: _ActionParser):
         if not parser.evaluate_condition(entity):
             return None
-        name = parser.resolve(entity.get_attr("name", optional=True) or "")
+        name = parser.parse_substitution(entity.get_attr("name", optional=True) or "")
         return cls(name=name)
 
     def __init__(self, name=None, **kwargs):
@@ -76,7 +78,9 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
             except Exception as e:
                 _warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
                 return None
-        name = _R._to_str(self._name, context)
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        name = resolve_value(self._name, context)
         if not name:
             _error("UnsetEnvironmentVariable: resolved name is empty or None — skipping")
             return None
@@ -101,18 +105,16 @@ class _TrackedPushRosNamespace(_TrackedAction):
     def parse(cls, entity: Entity, parser: _ActionParser):
         if not parser.evaluate_condition(entity):
             return None
-        ns = parser.resolve(entity.get_attr("namespace", optional=True) or "")
-        return cls(namespace=ns) if ns else None
+        ns_tokens = parser.parse_substitution(entity.get_attr("namespace", optional=True) or "")
+        return cls(namespace=ns_tokens)
 
     def __init__(self, namespace=None, **kwargs):
         self._namespace = namespace
 
     def execute(self, context) -> list | None:
-        ns = self._namespace
-        if ns is None:
-            return None
-        if hasattr(ns, "perform") and context is not None:
-            ns = _R._resolve_substitution(ns, context)
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        ns = resolve_value(self._namespace, context)
         if ns:
             _R._state.namespace_stack.append(ns)
         return None
@@ -124,8 +126,8 @@ class _SetRemap(_TrackedAction):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        src = parser.resolve(entity.get_attr("from", optional=True) or "")
-        dst = parser.resolve(entity.get_attr("to", optional=True) or "")
+        src = parser.parse_substitution(entity.get_attr("from", optional=True) or "")
+        dst = parser.parse_substitution(entity.get_attr("to", optional=True) or "")
         return cls(src=src, dst=dst)
 
     def __init__(self, src="", dst="", **kwargs):
@@ -133,5 +135,9 @@ class _SetRemap(_TrackedAction):
         self._dst = dst
 
     def execute(self, context) -> list | None:
-        _R._state.global_remaps.append((self._src, self._dst))
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        src = resolve_value(self._src, context) or ""
+        dst = resolve_value(self._dst, context) or ""
+        _R._state.global_remaps.append((src, dst))
         return None

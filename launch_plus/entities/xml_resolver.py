@@ -90,6 +90,40 @@ def resolve_substitutions(
     return resolve_substitutions_from_tokens(tokens, ctx, _depth=_depth)
 
 
+# ─── Value resolution helper ─────────────────────────────────────────────────
+
+
+def resolve_value(value: Any, ctx: _SubstitutionContext | None = None) -> str | None:
+    """Resolve a value to a string, handling all input types uniformly.
+
+    Supports:
+    - ``None`` → ``None``
+    - ``str`` → returned as-is
+    - ``list[Substitution]`` (from XML ``parse_substitution()``) → resolved via tokens
+    - object with ``.perform()`` (Python shim substitution) → ``sub.perform(ctx)``
+    - anything else → ``str(value)``
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        # list[Substitution] from XML parse
+        if not value:
+            return ""
+        if ctx is not None:
+            return resolve_substitutions_from_tokens(value, ctx)
+        return "".join(t.serialize() for t in value)
+    if hasattr(value, "perform"):
+        # Single substitution object (Python shim path)
+        try:
+            result = value.perform(ctx)
+            return str(result) if result is not None else None
+        except Exception:
+            return str(value)
+    return str(value)
+
+
 # ─── XML/YAML AST Walker ────────────────────────────────────────────────────
 #
 # Walks the element list produced by parse_xml_launch / parse_yaml_launch,
@@ -306,6 +340,17 @@ class _ActionParser:
         self.ctx = ctx
         self.include_stack = include_stack
         self.state = state if state is not None else _state
+
+    def parse_substitution(self, text: str) -> list:
+        """Parse ``$(...)`` substitutions in *text* into token objects.
+
+        Returns a list of :class:`Substitution` objects that can be resolved
+        later via ``resolve_substitutions_from_tokens()``.  This is the
+        official ROS 2 pattern — parse without resolving.
+        """
+        from launch_plus.parsers.parse_substitution import parse_substitution as _lark_parse
+
+        return _lark_parse(text)
 
     def resolve(self, text: str) -> str:
         """Resolve ``$(...)`` substitutions in *text*."""

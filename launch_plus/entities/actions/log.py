@@ -15,13 +15,16 @@ class _LogAction(_TrackedAction):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        msg = parser.resolve(entity.get_attr("message", optional=True) or "")
+        msg = parser.parse_substitution(entity.get_attr("message", optional=True) or "")
         return cls(message=msg)
 
     def __init__(self, message="", **kwargs):
         self._message = message
 
     def execute(self, context) -> list | None:
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        msg = resolve_value(self._message, context) or ""
         _R._track_node(
             {
                 "package": "",
@@ -36,7 +39,7 @@ class _LogAction(_TrackedAction):
                 "kind": "log",
                 "plugins": [],
                 "target": None,
-                "message": self._message,
+                "message": msg,
             }
         )
         return None

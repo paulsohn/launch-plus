@@ -20,39 +20,80 @@ class _EventHandlerAction(_TrackedAction):
     """Tracks <on_process_start>, <on_process_exit>, <on_state_transition>, <on_shutdown>."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
+    def parse(cls, entity: Entity, parser: _ActionParser):
         handler_kind = entity.type_name
-        target = parser.resolve_optional(entity.get_attr("target", optional=True))
-        target_node = parser.resolve_optional(entity.get_attr("target_node", optional=True))
-        handler_ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
-        start_state = parser.resolve_optional(entity.get_attr("start_state", optional=True))
-        goal_state = parser.resolve_optional(entity.get_attr("goal_state", optional=True))
-        eh_actions: list[dict] = []
+        target = entity.get_attr("target", optional=True)
+        target_node = entity.get_attr("target_node", optional=True)
+        handler_ns = entity.get_attr("namespace", optional=True)
+        start_state = entity.get_attr("start_state", optional=True)
+        goal_state = entity.get_attr("goal_state", optional=True)
+        # Collect child emit_event entities as raw attribute dicts
+        child_events = []
         for child in entity.children:
             if child.type_name == "emit_event":
-                event = parser.resolve(child.get_attr("event", optional=True) or "")
-                ee_target = parser.resolve_optional(child.get_attr("target_node", optional=True))
-                ee_ns = parser.resolve_optional(child.get_attr("namespace", optional=True))
-                eh_actions.append(
+                child_events.append(
                     {
-                        "event": event,
-                        "target_node": ee_target,
-                        "namespace_stack": [],
-                        "explicit_namespace": ee_ns,
+                        "event": child.get_attr("event", optional=True) or "",
+                        "target_node": child.get_attr("target_node", optional=True),
+                        "namespace": child.get_attr("namespace", optional=True),
                     }
                 )
-        parser.track_event_handler(
+        return cls(
+            handler_kind=handler_kind,
+            target=target,
+            target_node=target_node,
+            handler_ns=handler_ns,
+            start_state=start_state,
+            goal_state=goal_state,
+            child_events=child_events,
+        )
+
+    def __init__(
+        self,
+        *,
+        handler_kind="",
+        target=None,
+        target_node=None,
+        handler_ns=None,
+        start_state=None,
+        goal_state=None,
+        child_events=None,
+        **kwargs,
+    ):
+        self._handler_kind = handler_kind
+        self._target = target
+        self._target_node = target_node
+        self._handler_ns = handler_ns
+        self._start_state = start_state
+        self._goal_state = goal_state
+        self._child_events = child_events or []
+
+    def execute(self, context) -> list | None:
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        eh_actions: list[dict] = []
+        for ce in self._child_events:
+            eh_actions.append(
+                {
+                    "event": resolve_value(ce["event"], context) or "",
+                    "target_node": resolve_value(ce["target_node"], context),
+                    "namespace_stack": [],
+                    "explicit_namespace": resolve_value(ce["namespace"], context),
+                }
+            )
+        _R._track_event_handler(
             {
-                "handler_kind": handler_kind,
-                "target": target,
-                "target_node": target_node,
-                "start_state": start_state,
-                "goal_state": goal_state,
-                "namespace_stack": list(parser.state.namespace_stack),
-                "explicit_namespace": handler_ns,
+                "handler_kind": self._handler_kind,
+                "target": resolve_value(self._target, context),
+                "target_node": resolve_value(self._target_node, context),
+                "start_state": resolve_value(self._start_state, context),
+                "goal_state": resolve_value(self._goal_state, context),
+                "namespace_stack": list(_R._state.namespace_stack),
+                "explicit_namespace": resolve_value(self._handler_ns, context),
                 "actions": eh_actions,
             }
         )
+        return None
 
 
 @expose_action("emit_event")
@@ -60,29 +101,43 @@ class _EmitEventAction(_TrackedAction):
     """Tracks <emit_event> — records an event emission."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> None:
-        event = parser.resolve(entity.get_attr("event", optional=True) or "")
-        target_node = parser.resolve_optional(entity.get_attr("target_node", optional=True))
-        ee_ns = parser.resolve_optional(entity.get_attr("namespace", optional=True))
-        parser.track_event_handler(
+    def parse(cls, entity: Entity, parser: _ActionParser):
+        event = entity.get_attr("event", optional=True) or ""
+        target_node = entity.get_attr("target_node", optional=True)
+        ee_ns = entity.get_attr("namespace", optional=True)
+        return cls(event=event, target_node=target_node, namespace=ee_ns)
+
+    def __init__(self, *, event="", target_node=None, namespace=None, **kwargs):
+        self._event = event
+        self._target_node_attr = target_node
+        self._namespace = namespace
+
+    def execute(self, context) -> list | None:
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        event = resolve_value(self._event, context) or ""
+        target_node = resolve_value(self._target_node_attr, context)
+        ee_ns = resolve_value(self._namespace, context)
+        _R._track_event_handler(
             {
                 "handler_kind": "emit_event",
                 "target": None,
                 "target_node": target_node,
                 "start_state": None,
                 "goal_state": None,
-                "namespace_stack": list(parser.state.namespace_stack),
+                "namespace_stack": list(_R._state.namespace_stack),
                 "explicit_namespace": ee_ns,
                 "actions": [
                     {
                         "event": event,
                         "target_node": target_node,
-                        "namespace_stack": list(parser.state.namespace_stack),
+                        "namespace_stack": list(_R._state.namespace_stack),
                         "explicit_namespace": ee_ns,
                     }
                 ],
             }
         )
+        return None
 
 
 # ─── Python-shim actions ─────────────────────────────────────────────────────

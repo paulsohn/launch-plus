@@ -73,8 +73,8 @@ class _TrackedSetParameter(_TrackedAction):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        name = parser.resolve(entity.get_attr("name", optional=True) or "")
-        value = parser.resolve(entity.get_attr("value", optional=True) or "")
+        name = parser.parse_substitution(entity.get_attr("name", optional=True) or "")
+        value = parser.parse_substitution(entity.get_attr("value", optional=True) or "")
         return cls(name=name, value=value)
 
     def __init__(self, name=None, value=None, **kwargs):
@@ -82,22 +82,12 @@ class _TrackedSetParameter(_TrackedAction):
         self._value = value
 
     def execute(self, context) -> list | None:
-        name = self._name
-        value = self._value
-        if hasattr(name, "perform") and context is not None:
-            try:
-                name = name.perform(context)
-            except Exception:
-                name = str(name)
-        else:
-            name = str(name) if name is not None else ""
+        from launch_plus.entities.xml_resolver import resolve_value
+
+        name = resolve_value(self._name, context)
         if not name:
             return None
-        if hasattr(value, "perform") and context is not None:
-            try:
-                value = value.perform(context)
-            except Exception:
-                pass
+        value: object = resolve_value(self._value, context)
         if isinstance(value, str):
             try:
                 value = int(value)

@@ -64,6 +64,14 @@ class ResolverState:
     def __init__(self) -> None:
         self.reset()
 
+    def warn(self, msg: str) -> None:
+        """Append a warning message."""
+        self.tracked["warnings"].append(msg)
+
+    def error(self, msg: str) -> None:
+        """Append an error message."""
+        self.tracked["errors"].append(msg)
+
     def reset(self) -> None:
         """Reset all state to initial values."""
         self.tracked: dict[str, Any] = {
@@ -112,11 +120,11 @@ _state = ResolverState()
 
 
 def _warn(msg: str) -> None:
-    _state.tracked["warnings"].append(msg)
+    _state.warn(msg)
 
 
 def _error(msg: str) -> None:
-    _state.tracked["errors"].append(msg)
+    _state.error(msg)
 
 
 # ─── LaunchContext stub ───────────────────────────────────────────────────────

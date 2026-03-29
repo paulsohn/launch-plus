@@ -323,43 +323,28 @@ def _resolve_element(
 
 
 class _ActionParser:
-    """Provides resolver services to action handlers.
+    """Stateless parsing helper for action ``parse()`` classmethods.
 
-    Wraps the resolver state so action handlers can access substitution
-    resolution, condition evaluation, namespace management, and tracking
-    without importing resolver internals.  The ``state`` parameter carries
-    the :class:`ResolverState` — action ``parse()`` methods should access
-    all mutable state through ``parser.*`` properties.
+    Provides substitution token parsing and condition evaluation.
+    Does NOT resolve substitutions or access mutable state — ``parse()``
+    methods use this to build unresolved action instances.
     """
 
-    __slots__ = ("ctx", "include_stack", "state")
+    __slots__ = ("ctx", "include_stack")
 
-    def __init__(
-        self, ctx: _SubstitutionContext, include_stack: list[str], state: Any = None
-    ) -> None:
+    def __init__(self, ctx: _SubstitutionContext, include_stack: list[str]) -> None:
         self.ctx = ctx
         self.include_stack = include_stack
-        self.state = state if state is not None else _state
 
     def parse_substitution(self, text: str) -> list:
         """Parse ``$(...)`` substitutions in *text* into token objects.
 
         Returns a list of :class:`Substitution` objects that can be resolved
-        later via ``resolve_substitutions_from_tokens()``.  This is the
-        official ROS 2 pattern — parse without resolving.
+        later via ``resolve_substitutions_from_tokens()``.
         """
         from launch_plus.parsers.parse_substitution import parse_substitution as _lark_parse
 
         return _lark_parse(text)
-
-    def resolve(self, text: str) -> str:
-        """Resolve ``$(...)`` substitutions in *text*."""
-        return resolve_substitutions(text, self.ctx)
-
-    def resolve_optional(self, text: str | None) -> str | None:
-        if text is None:
-            return None
-        return resolve_substitutions(text, self.ctx)
 
     def evaluate_condition(self, entity: Entity) -> bool:
         """Evaluate if=/unless= on *entity*.  Returns True → element should execute."""
@@ -372,42 +357,7 @@ class _ActionParser:
             cond = {"kind": "Unless", "expr": unless_val}
         return _evaluate_condition(cond, self.ctx)
 
-    def resolve_children(self, entities: list[Entity]) -> None:
-        """Resolve child entities recursively for side-effects."""
-        for child in entities:
-            _resolve_element(child, self.ctx, self.include_stack)
-
-    def effective_namespace(self, ns: str | None = None) -> str | None:
-        return _effective_namespace(list(self.state.namespace_stack), ns)
-
-    # ── Tracking helpers (delegate to resolver) ─────────────────────
-
-    def track_node(self, node_dict: dict) -> int:
-        return _R._track_node(node_dict)
-
-    def track_event_handler(self, eh_dict: dict) -> int:
-        return _R._track_event_handler(eh_dict)
-
-    def track_package(self, pkg: str) -> None:
-        _R._track_package(pkg)
-
-    def track_include(self, path: str) -> int:
-        return int(_R._track_include(path))
-
-    def record_declared_arg(self, name: str, default: str, *, flat: bool = True) -> None:
-        _R._record_declared_arg(name, default, flat=flat)
-
-    def push_include_chain(self, file_path: str) -> None:
-        inc_dep = _R._extract_pkg_and_share_path(file_path)
-        if inc_dep:
-            self.state.include_chain.append(list(inc_dep))
-        else:
-            self.state.include_chain.append(["", file_path])
-
-    def pop_include_chain(self) -> None:
-        self.state.include_chain.pop()
-
-    # ── Unresolved extraction (new style — no resolution) ──────────
+    # ── Unresolved extraction from Entity children ───────────────────
 
     def parse_params(self, entity: Entity) -> list:
         """Extract <param> children as unresolved token structures.
@@ -489,155 +439,55 @@ class _ActionParser:
             )
         return plugins
 
-    # ── Param / remap / env resolution (legacy — to be removed) ──────
 
-    def resolve_params(self, entity: Entity) -> tuple[dict[str, str], list[dict]]:
-        """Resolve <param> children.  Returns (params_dict, param_files_list)."""
-        items = entity.get_attr("param", data_type=list, optional=True)
-        if not items:
-            return {}, []
-        resolved: dict[str, str] = {}
-        param_files: list[dict] = []
-        seen_paths: set[str] = set()
-        for p in items:
-            name = p.get_attr("name", optional=True)
-            value = p.get_attr("value", optional=True)
-            from_file = p.get_attr("from", optional=True)
-            if from_file:
-                path = self.resolve(from_file)
-                _R._track_param_file(path)
-                if path not in seen_paths:
-                    seen_paths.add(path)
-                    pf_entry: dict = {"path": path}
-                    if self.state.inline_params:
-                        expanded = _read_and_expand_param_file(path, self.ctx)
-                        if expanded is not None:
-                            pf_entry["params"] = expanded
-                    param_files.append(pf_entry)
-            elif name:
-                resolved[self.resolve(name)] = self.resolve(value or "")
-        return resolved, param_files
+# ── Include file resolution (execution-time) ─────────────────────────────────
 
-    def resolve_remaps(self, entity: Entity) -> list[list[str]]:
-        """Resolve <remap> children."""
-        items = entity.get_attr("remap", data_type=list, optional=True)
-        if not items:
-            return []
-        return [
-            [
-                self.resolve(r.get_attr("from", optional=True) or ""),
-                self.resolve(r.get_attr("to", optional=True) or ""),
-            ]
-            for r in items
-        ]
 
-    def resolve_envs(self, entity: Entity) -> dict[str, str]:
-        """Resolve <env> children into a dict."""
-        items = entity.get_attr("env", data_type=list, optional=True)
-        if not items:
-            return {}
-        return {
-            self.resolve(e.get_attr("name", optional=True) or ""): self.resolve(
-                e.get_attr("value", optional=True) or ""
-            )
-            for e in items
-        }
-
-    def resolve_composable_plugins(self, entity: Entity) -> list[dict]:
-        """Resolve <composable_node> children into plugin dicts."""
-        items = entity.get_attr("composable_node", data_type=list, optional=True)
-        if not items:
-            return []
-        plugins: list[dict] = []
-        for cn in items:
-            cond_if = cn.get_attr("if", optional=True)
-            cond_unless = cn.get_attr("unless", optional=True)
-            cond: dict[str, str] | None = None
-            if cond_if is not None:
-                cond = {"kind": "If", "expr": cond_if}
-            elif cond_unless is not None:
-                cond = {"kind": "Unless", "expr": cond_unless}
-            if not _evaluate_condition(cond, self.ctx):
-                continue
-            pkg = self.resolve(cn.get_attr("pkg", optional=True) or "")
-            plugin_name = self.resolve(cn.get_attr("plugin", optional=True) or "")
-            name = self.resolve_optional(cn.get_attr("name", optional=True))
-            _R._track_package(pkg)
-            sub = _ActionParser(self.ctx, self.include_stack)
-            params, param_files = sub.resolve_params(cn)
-            remaps = sub.resolve_remaps(cn)
-            plugins.append(
-                {
-                    "package": pkg,
-                    "plugin": plugin_name,
-                    "name": name,
-                    "parameters": params,
-                    "remappings": remaps,
-                    "param_files": param_files,
-                }
-            )
-        return plugins
-
-    # ── Include support ──────────────────────────────────────────────
-
-    def resolve_include_args(self, entity: Entity) -> dict[str, str]:
-        """Resolve <arg> children inside an <include>, sequentially."""
-        items = entity.get_attr("arg", data_type=list, optional=True)
-        if not items:
-            return {}
-        child_ctx_args: dict[str, str] = {}
-        for a in items:
-            arg_name = a.get_attr("name", optional=True) or ""
-            arg_value = a.get_attr("value", optional=True)
-            if arg_value is not None:
-                tmp_ctx = _SubstitutionContext()
-                tmp_ctx.args = {**self.ctx.args, **child_ctx_args}
-                tmp_ctx.vars = dict(self.ctx.vars)
-                tmp_ctx.env = dict(self.ctx.env)
-                tmp_ctx.launch_file_dir = self.ctx.launch_file_dir
-                tmp_ctx.preview_mode = self.ctx.preview_mode
-                child_ctx_args[arg_name] = resolve_substitutions(arg_value, tmp_ctx)
-        return child_ctx_args
-
-    def parse_and_resolve_included_file(
-        self, real_path: str, file_path: str, child_ctx_args: dict[str, str]
-    ) -> None:
-        """Parse an included launch file and resolve it recursively."""
-        self.push_include_chain(file_path)
-        new_stack = self.include_stack + [file_path]
-        try:
-            if real_path.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
-                with open(real_path) as f:
-                    content = f.read()
-                child_entities: list[Entity]
-                if real_path.endswith((".yaml", ".yml")):
-                    child_entities = list(_parse_yaml_launch_entity(content, real_path))
-                else:
-                    child_entities = list(_parse_xml_launch_entity(content, real_path))
-                child_ctx = _SubstitutionContext()
-                if self.state.global_arg_cascade:
-                    child_ctx.args = {**self.ctx.args, **child_ctx_args}
-                    child_ctx.vars = {**self.ctx.vars, **child_ctx_args}
-                else:
-                    child_ctx.args = dict(child_ctx_args)
-                    child_ctx.vars = dict(child_ctx_args)
-                child_ctx.env = dict(self.ctx.env)
-                child_ctx.launch_file_dir = os.path.dirname(real_path)
-                child_ctx.preview_mode = self.ctx.preview_mode
-                for child in child_entities:
-                    _resolve_element(child, child_ctx, new_stack)
-                self.ctx.args.update(child_ctx.args)
-                self.ctx.vars.update(child_ctx.vars)
-            elif real_path.endswith((".launch.py", ".py")):
-                parent_lc = _R._make_launch_context({**self.ctx.args, **self.ctx.vars})
-                if self.state.global_params:
-                    parent_lc._launch_configurations["global_params"] = list(
-                        self.state.global_params
-                    )
-                _R._inline_resolve_python_launch(file_path, parent_lc, child_ctx_args)
-                set_configs = self.state.tracked["set_launch_configurations"]
-                for k, v in parent_lc._launch_configurations.items():
-                    if (k in set_configs or k in child_ctx_args) and k != "global_params":
-                        self.ctx.vars[k] = str(v) if not isinstance(v, str) else v
-        finally:
-            self.pop_include_chain()
+def resolve_included_file(
+    ctx: _SubstitutionContext,
+    include_stack: list[str],
+    real_path: str,
+    file_path: str,
+    child_ctx_args: dict[str, str],
+) -> None:
+    """Parse an included launch file and resolve it recursively."""
+    inc_dep = _R._extract_pkg_and_share_path(file_path)
+    if inc_dep:
+        _state.include_chain.append(list(inc_dep))
+    else:
+        _state.include_chain.append(["", file_path])
+    new_stack = include_stack + [file_path]
+    try:
+        if real_path.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
+            with open(real_path) as f:
+                content = f.read()
+            child_entities: list[Entity]
+            if real_path.endswith((".yaml", ".yml")):
+                child_entities = list(_parse_yaml_launch_entity(content, real_path))
+            else:
+                child_entities = list(_parse_xml_launch_entity(content, real_path))
+            child_ctx = _SubstitutionContext()
+            if _state.global_arg_cascade:
+                child_ctx.args = {**ctx.args, **child_ctx_args}
+                child_ctx.vars = {**ctx.vars, **child_ctx_args}
+            else:
+                child_ctx.args = dict(child_ctx_args)
+                child_ctx.vars = dict(child_ctx_args)
+            child_ctx.env = dict(ctx.env)
+            child_ctx.launch_file_dir = os.path.dirname(real_path)
+            child_ctx.preview_mode = ctx.preview_mode
+            for child in child_entities:
+                _resolve_element(child, child_ctx, new_stack)
+            ctx.args.update(child_ctx.args)
+            ctx.vars.update(child_ctx.vars)
+        elif real_path.endswith((".launch.py", ".py")):
+            parent_lc = _R._make_launch_context({**ctx.args, **ctx.vars})
+            if _state.global_params:
+                parent_lc._launch_configurations["global_params"] = list(_state.global_params)
+            _R._inline_resolve_python_launch(file_path, parent_lc, child_ctx_args)
+            set_configs = _state.tracked["set_launch_configurations"]
+            for k, v in parent_lc._launch_configurations.items():
+                if (k in set_configs or k in child_ctx_args) and k != "global_params":
+                    ctx.vars[k] = str(v) if not isinstance(v, str) else v
+    finally:
+        _state.include_chain.pop()

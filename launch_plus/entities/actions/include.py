@@ -80,7 +80,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
 
     def _execute_xml(self, ctx) -> list | None:
         """Execute for XML path: resolve file, include args, process included file."""
-        from launch_plus.entities.xml_resolver import _ActionParser, resolve_value
+        from launch_plus.entities.xml_resolver import resolve_value
 
         file_path = resolve_value(self._xml_file_tokens, ctx) or ""
 
@@ -124,8 +124,9 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             except Exception:
                 return None
         if os.path.isfile(real_path):
-            parser = _ActionParser(ctx, include_stack)
-            parser.parse_and_resolve_included_file(real_path, file_path, child_ctx_args)
+            from launch_plus.entities.xml_resolver import resolve_included_file
+
+            resolve_included_file(ctx, include_stack, real_path, file_path, child_ctx_args)
         return None
 
     def _execute_shim(self, context) -> list | None:

@@ -52,6 +52,7 @@ from launch_plus.entities.actions.param import (
     _TrackedParameterFile,
     _TrackedSetParameter,
 )
+from launch_plus.entities.helpers import _to_str, _track_package
 from launch_plus.entities.state import _StubLaunchContext
 from launch_plus.entities.substitutions.find_pkg_share import _TrackedFindPackageShare
 from launch_plus.entities.substitutions.launch_config import _LaunchConfiguration
@@ -159,7 +160,7 @@ def _build_patched_launch_substitutions():
 
         def perform(self, context=None):
             state = context._state if context is not None and hasattr(context, "_state") else None
-            name = _R._to_str(self._name, context) or ""
+            name = _to_str(self._name, context) or ""
             # Look up in override env, then process env.
             if state is not None and name in state.env:
                 return state.env[name]
@@ -167,7 +168,7 @@ def _build_patched_launch_substitutions():
                 return os.environ[name]
             # No match — use default if provided, otherwise error.
             if self._default is not _SENTINEL:
-                return _R._to_str(self._default, context) or ""
+                return _to_str(self._default, context) or ""
             if state is not None:
                 state.error(f"EnvironmentVariable: '{name}' is not set and no default was provided")
             return ""
@@ -351,7 +352,7 @@ def _build_patched_ament_index_python_packages():
             f"get_package_share_directory('{package_name}') is non-idiomatic; "
             f"prefer FindPackageShare('{package_name}') from launch_ros.substitutions"
         )
-        _R._track_package(_R.get_state(), package_name)
+        _track_package(_R.get_state(), package_name)
         # Early fetch check using the actual package dir (before returning a portable path).
         # This ensures that if the package is in the lockfile but hasn't been fully fetched
         # yet (no package.xml), we fetch it inline — important for module-level callers

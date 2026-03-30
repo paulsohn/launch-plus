@@ -103,11 +103,12 @@ class _TrackedFindPackageShare:
 
     def perform(self, context):
         import launch_plus.resolver as _R
+        from launch_plus.entities.helpers import _track_package
 
         state = context._state if context is not None else _R.get_state()
         pkg, is_fallback = self._resolve_name(context)
         if not is_fallback:
-            _R._track_package(state, pkg)
+            _track_package(state, pkg)
         if not state.preview_mode:
             return self._try_ament_resolve(state, pkg)
         return f"$(find-pkg-share {pkg})"

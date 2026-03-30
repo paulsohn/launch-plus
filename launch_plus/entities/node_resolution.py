@@ -7,7 +7,6 @@ raw substitution objects to concrete strings.
 
 from __future__ import annotations
 
-import launch_plus.resolver as _R
 from launch_plus.entities.actions.node import _TrackedComposableNode
 from launch_plus.entities.helpers import (
     _is_substitution,
@@ -15,6 +14,7 @@ from launch_plus.entities.helpers import (
     _resolve_substitution_ex,
     _track_package,
 )
+from launch_plus.entities.xml_resolver import _read_and_expand_param_file
 
 # ─── Node detail resolution helpers ──────────────────────────────────────────
 
@@ -77,7 +77,7 @@ def _resolve_node_details(state, node, context):
                     seen_pf.add(path)
                     pf_entry: dict = {"path": path}
                     if state.inline_params:
-                        expanded = _R._read_and_expand_param_file(path)
+                        expanded = _read_and_expand_param_file(path)
                         if expanded is not None:
                             pf_entry["params"] = expanded
                     pf_list.append(pf_entry)
@@ -180,7 +180,7 @@ def _resolve_composable_plugins(state, descs, context):
                         seen_pf.add(path)
                         pf_entry: dict = {"path": path}
                         if state.inline_params:
-                            expanded = _R._read_and_expand_param_file(path)
+                            expanded = _read_and_expand_param_file(path)
                             if expanded is not None:
                                 pf_entry["params"] = expanded
                     pf_list.append(pf_entry)

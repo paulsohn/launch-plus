@@ -25,8 +25,10 @@ class _DeclaredArg(_TrackedAction):
         _ = entity.get_attr("description", optional=True)  # consume
         return cls(
             name=name,
-            default_value=parser.parse_substitution(default) if default else None,
-            _fixed_value=parser.parse_substitution(fixed_value) if fixed_value else None,
+            default_value=(parser.parse_substitution(default) if default is not None else None),
+            _fixed_value=(
+                parser.parse_substitution(fixed_value) if fixed_value is not None else None
+            ),
         )
 
     def __init__(self, name=None, *positional, default_value=None, condition=None, **kwargs):

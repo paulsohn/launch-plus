@@ -17,6 +17,7 @@ import yaml
 import launch_plus.resolver as _R
 from launch_plus.entities.expose import action_parse_methods
 from launch_plus.entities.helpers import _extract_pkg_and_share_path, _parse_portable_path
+from launch_plus.entities.state import LaunchContext as _SubstitutionContext
 from launch_plus.parsers.entity import Entity
 from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
 from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
@@ -33,35 +34,6 @@ if TYPE_CHECKING:
 # $(find-pkg-share pkg), $(var x), $(dirname), $(eval expr), $(command ...).
 # Used by the XML/YAML element walker — Python launch files use the
 # existing .perform() mechanism instead.
-
-
-class _SubstitutionContext:
-    """Context for resolving substitutions in XML/YAML launch files.
-
-    Carries a ``_state`` reference so that ``execute()`` methods receiving
-    this as their context can access resolver state uniformly.
-    """
-
-    __slots__ = (
-        "_state",
-        "args",
-        "vars",
-        "env",
-        "launch_file_dir",
-        "preview_mode",
-    )
-
-    def __init__(self, state=None) -> None:
-        if state is None:
-            from launch_plus.resolver import get_state
-
-            state = get_state()
-        self._state = state
-        self.args: dict[str, str] = {}
-        self.vars: dict[str, str] = {}
-        self.env: dict[str, str] = state.env  # share with ResolverState
-        self.launch_file_dir: str | None = None
-        self.preview_mode: bool = False
 
 
 def resolve_substitutions_from_tokens(

@@ -90,34 +90,55 @@ class ResolverState:
         self.walk_depth: int = 0
 
 
-# ─── LaunchContext stub ───────────────────────────────────────────────────────
+# ─── Launch Context ──────────────────────────────────────────────────────────
 
 
-class _StubLaunchContext:
-    """Minimal LaunchContext: holds launch_configurations for substitution resolution.
+class LaunchContext:
+    """Unified launch context for both XML/YAML and Python resolution.
 
-    Carries a :class:`ResolverState` reference so that ``execute()`` methods
-    can access resolver state via ``context._state``.  When *state* is not
-    supplied, a lazy import fetches the canonical instance from ``resolver.py``.
+    Combines the roles of the former ``_SubstitutionContext`` (XML path)
+    and ``_StubLaunchContext`` (Python shim path) into a single type
+    that matches the official ROS 2 ``LaunchContext`` interface.
+
+    Fields used by XML substitutions: ``args``, ``vars``, ``env``,
+    ``launch_file_dir``, ``preview_mode``.
+
+    Fields used by Python shim: ``_launch_configurations``.
+
+    Both paths share: ``_state``, ``perform_substitution()``.
     """
 
     def __init__(self, state: ResolverState | None = None):
-        self._launch_configurations: dict[str, object] = {}
         if state is None:
             from launch_plus.resolver import get_state
 
             state = get_state()
-        self._state = state
+        self._state: ResolverState = state
+        # ROS 2 compat (Python shim path)
+        self._launch_configurations: dict[str, object] = {}
+        # XML/YAML substitution context
+        self.args: dict[str, str] = {}
+        self.vars: dict[str, str] = {}
+        self.env: dict[str, str] = state.env  # shared reference
+        self.launch_file_dir: str | None = None
+        self.preview_mode: bool = False
 
     @property
-    def launch_configurations(self):
+    def launch_configurations(self) -> dict[str, object]:
         return self._launch_configurations
 
     @launch_configurations.setter
-    def launch_configurations(self, value):
+    def launch_configurations(self, value: dict[str, object]) -> None:
         self._launch_configurations = value
 
-    def perform_substitution(self, sub):
+    def perform_substitution(self, sub) -> str:
+        """Resolve a substitution object. Matches official ROS 2 API."""
         if hasattr(sub, "perform"):
-            return sub.perform(self)
+            result = sub.perform(self)
+            return str(result) if result is not None else ""
         return str(sub)
+
+
+# Backward compat aliases
+_StubLaunchContext = LaunchContext
+_SubstitutionContext = LaunchContext

@@ -286,45 +286,10 @@ def _build_patched_launch_launch_description_sources():
 
     class _PythonLaunchDescriptionSource:
         def __init__(self, location=None, **kwargs):
-            # Store the raw location for deferred resolution.
-            # Eager resolution with a stub context causes "undefined variable"
-            # errors for LaunchConfiguration references that aren't set yet.
+            # Store raw location — resolution deferred to execute() time
+            # when the proper LaunchContext is available.
             self._raw_location = location
-            self._location = None
-            # Only resolve immediately for plain strings (no substitutions)
-            if isinstance(location, str):
-                self._location = location
-
-        @property
-        def location(self):
-            if self._location is not None:
-                return self._location
-            # Deferred resolution with the active state
-            location = self._raw_location
-            if location is None:
-                return None
-            ctx = _StubLaunchContext()
-            if hasattr(location, "perform"):
-                try:
-                    result = location.perform(ctx)
-                    self._location = str(result) if result is not None else str(location)
-                except Exception:
-                    self._location = None
-            elif isinstance(location, list):
-                parts = []
-                for sub in location:
-                    if hasattr(sub, "perform"):
-                        try:
-                            result = sub.perform(ctx)
-                            parts.append(str(result) if result is not None else str(sub))
-                        except Exception:
-                            parts.append(str(sub))
-                    else:
-                        parts.append(str(sub))
-                self._location = "".join(parts)
-            else:
-                self._location = str(location)
-            return self._location
+            self._location = location if isinstance(location, str) else None
 
     class _AnyLaunchDescriptionSource(_PythonLaunchDescriptionSource):
         pass

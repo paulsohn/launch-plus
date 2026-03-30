@@ -58,17 +58,8 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
         self._xml_args = kwargs.get("_xml_args")
         self._xml_include_stack = kwargs.get("_xml_include_stack")
         self._xml_ctx = kwargs.get("_xml_ctx")
-        # Python shim path
-        path = None
-        if launch_description_source is not None:
-            if hasattr(launch_description_source, "_location"):
-                path = launch_description_source._location
-            elif hasattr(launch_description_source, "location"):
-                try:
-                    path = launch_description_source.location
-                except Exception:
-                    pass
-        self._path = path
+        # Python shim path — defer path resolution to execute() time
+        self._path = None
         self._dep_idx = -1
 
     def execute(self, context) -> list | None:
@@ -137,23 +128,51 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
         return None
 
     def _execute_shim(self, context) -> list | None:
-        # Deferred tracking from __init__ (path known at construction time)
-        if self._path and self._dep_idx < 0:
-            self._dep_idx = _track_include(context._state, self._path)
-            _resolve_include_args(self._path, self._raw_launch_arguments, context, self._dep_idx)
-
-        if self._path is None and context is not None:
+        # Resolve path from source using the actual context (not a stub)
+        if self._path is None and self._source is not None and context is not None:
             src = self._source
             path = None
-            if hasattr(src, "perform"):
+            if hasattr(src, "_raw_location") and src._raw_location is not None:
+                # Deferred PythonLaunchDescriptionSource — resolve with real context
+                loc = src._raw_location
+                if isinstance(loc, str):
+                    path = loc
+                elif hasattr(loc, "perform"):
+                    try:
+                        result = loc.perform(context)
+                        path = str(result) if result is not None else None
+                    except Exception:
+                        path = None
+                elif isinstance(loc, list):
+                    parts = []
+                    for sub in loc:
+                        if hasattr(sub, "perform"):
+                            try:
+                                result = sub.perform(context)
+                                parts.append(str(result) if result is not None else str(sub))
+                            except Exception:
+                                parts.append(str(sub))
+                        else:
+                            parts.append(str(sub))
+                    path = "".join(parts)
+            elif hasattr(src, "_location") and src._location:
+                path = src._location
+            elif hasattr(src, "location"):
+                try:
+                    path = src.location
+                except Exception:
+                    pass
+            elif hasattr(src, "perform"):
                 try:
                     path = src.perform(context)
                 except Exception as e:
                     logger.warning("failed to resolve IncludeLaunchDescription source: %s", e)
             if path:
                 self._path = path
-                dep_idx = _track_include(context._state, path)
-                _resolve_include_args(path, self._raw_launch_arguments, context, dep_idx)
+
+        if self._path and self._dep_idx < 0:
+            self._dep_idx = _track_include(context._state, self._path)
+            _resolve_include_args(self._path, self._raw_launch_arguments, context, self._dep_idx)
 
         if self._path and self._path.endswith(".py") and context is not None:
             child_args = {}

@@ -31,7 +31,7 @@ class FindPackageShareSubstitution(Substitution):
             raise ValueError("$(find-pkg-share ...) requires a package argument")
         return cls, {"package": args[0] if isinstance(args[0], list) else [args[0]]}
 
-    def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
+    def perform(self, ctx: _SubstitutionContext) -> str:
         from launch_plus.resolver import (
             _resolve_pkg_share,
             _track_package,
@@ -39,7 +39,7 @@ class FindPackageShareSubstitution(Substitution):
         )
 
         state = ctx._state
-        pkg = resolve_substitutions_from_tokens(self.package, ctx, _depth=_depth + 1)
+        pkg = resolve_substitutions_from_tokens(self.package, ctx)
         _track_package(state, pkg)
         if ctx.preview_mode:
             return f"$(find-pkg-share {pkg})"
@@ -101,7 +101,7 @@ class _TrackedFindPackageShare:
                 logger.error("$(find-pkg-share %s): %s", pkg, e)
             return f"$(find-pkg-share {pkg})"
 
-    def perform(self, context):
+    def perform(self, context, **kwargs):
         import launch_plus.resolver as _R
         from launch_plus.entities.helpers import _track_package
 

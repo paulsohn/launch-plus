@@ -397,7 +397,7 @@
       <group>
         <!-- arg name="converter_param_file" value="$(find-pkg-share autoware_launch)/config/system/command_mode/converter.param.yaml" -->
         <!-- arg name="graph_file" value="$(find-pkg-share autoware_launch)/config/system/diagnostics/autoware-main.yaml" -->
-        <!-- arg name="graph_vars" value="" -->
+        <!-- arg name="graph_vars" value="$(var diagnostic_graph_aggregator_graph_vars)" -->
         <!-- arg name="param_file" value="$(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml" -->
         <!-- arg name="~/availability" default="/system/command_mode/availability" -->
         <!-- arg name="~/diagnostics" value="/diagnostics" -->
@@ -416,7 +416,7 @@
           <!-- end params from: $(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml -->
           <param name="front_overhang" value="1.0"/>
           <param name="graph_file" value="$(find-pkg-share autoware_launch)/config/system/diagnostics/autoware-main.yaml"/>
-          <param name="graph_vars" value=""/>
+          <param name="graph_vars" value="$(var diagnostic_graph_aggregator_graph_vars)"/>
           <param name="left_overhang" value="0.128"/>
           <param name="max_steer_angle" value="0.7"/>
           <param name="rear_overhang" value="1.1"/>
@@ -743,13 +743,13 @@
               <!-- arg name="frame_id" value="velodyne_top" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_frame" -->
+              <!-- arg name="input_frame" default="base_link" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="250.0" -->
               <!-- arg name="min_range" value="0.5" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_frame" -->
+              <!-- arg name="output_frame" default="base_link" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
@@ -774,89 +774,6 @@
                 <param name="wheel_radius" value="0.383"/>
                 <param name="wheel_tread" value="1.64"/>
                 <param name="wheel_width" value="0.235"/>
-                <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
-                  <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
-                  <param name="cloud_max_angle" value="360"/>
-                  <param name="cloud_min_angle" value="0"/>
-                  <param name="data_port" value="2368"/>
-                  <param name="dual_return_distance_threshold" value="0.1"/>
-                  <param name="frame_id" value="velodyne_top"/>
-                  <param name="gnss_port" value="2380"/>
-                  <param name="host_ip" value="192.168.1.10"/>
-                  <param name="launch_hw" value="true"/>
-                  <param name="max_range" value="250.0"/>
-                  <param name="min_range" value="0.5"/>
-                  <param name="packet_mtu_size" value="1500"/>
-                  <param name="return_mode" value="SingleStrongest"/>
-                  <param name="rotation_speed" value="600"/>
-                  <param name="scan_phase" value="300.0"/>
-                  <param name="sensor_ip" value="192.168.1.201"/>
-                  <param name="sensor_model" value="VLS128"/>
-                  <param name="setup_sensor" value="True"/>
-                  <param name="udp_only" value="false"/>
-                  <remap from="velodyne_points" to="pointcloud_raw_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
-                  <param name="output_frame" value="base_link"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <remap from="input" to="pointcloud_raw_ex"/>
-                  <remap from="output" to="self_cropped/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
-                  <param name="output_frame" value="base_link"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <remap from="input" to="self_cropped/pointcloud_ex"/>
-                  <remap from="output" to="mirror_cropped/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::DistortionCorrectorComponent" name="distortion_corrector_node">
-                  <!-- params from: $(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml -->
-                  <param name="base_frame" value="base_link"/>
-                  <param name="use_imu" value="true"/>
-                  <param name="use_3d_distortion_correction" value="false"/>
-                  <param name="update_azimuth_and_distance" value="false"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <param name="timestamp_mismatch_fraction_threshold" value="0.01"/>
-                  <!-- end params from: $(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml -->
-                  <remap from="~/input/twist" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
-                  <remap from="~/input/imu" to="/sensing/imu/imu_data"/>
-                  <remap from="~/input/pointcloud" to="mirror_cropped/pointcloud_ex"/>
-                  <remap from="~/output/pointcloud" to="rectified/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::RingOutlierFilterComponent" name="ring_outlier_filter">
-                  <!-- params from: $(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml -->
-                  <param name="distance_ratio" value="1.03"/>
-                  <param name="object_length_threshold" value="0.05"/>
-                  <param name="max_rings_num" value="128"/>
-                  <param name="max_points_num_per_ring" value="4000"/>
-                  <param name="publish_outlier_pointcloud" value="false"/>
-                  <param name="min_azimuth_deg" value="0.0"/>
-                  <param name="max_azimuth_deg" value="360.0"/>
-                  <param name="max_distance" value="12.0"/>
-                  <param name="vertical_bins" value="128"/>
-                  <param name="horizontal_bins" value="36"/>
-                  <param name="noise_threshold" value="2"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <!-- end params from: $(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml -->
-                  <param name="output_frame" value="velodyne_top"/>
-                  <remap from="input" to="rectified/pointcloud_ex"/>
-                  <remap from="output" to="pointcloud_before_sync"/>
-                </composable_node>
               </node_container>
             </group>
             <!-- end: common_sensor_launch://launch/nebula_node_container.launch.py -->
@@ -921,13 +838,13 @@
               <!-- arg name="frame_id" value="velodyne_top" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_frame" -->
+              <!-- arg name="input_frame" default="base_link" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="250.0" -->
               <!-- arg name="min_range" value="0.5" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_frame" -->
+              <!-- arg name="output_frame" default="base_link" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
@@ -952,89 +869,6 @@
                 <param name="wheel_radius" value="0.383"/>
                 <param name="wheel_tread" value="1.64"/>
                 <param name="wheel_width" value="0.235"/>
-                <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
-                  <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
-                  <param name="cloud_max_angle" value="60"/>
-                  <param name="cloud_min_angle" value="300"/>
-                  <param name="data_port" value="2369"/>
-                  <param name="dual_return_distance_threshold" value="0.1"/>
-                  <param name="frame_id" value="velodyne_left"/>
-                  <param name="gnss_port" value="2380"/>
-                  <param name="host_ip" value="192.168.1.10"/>
-                  <param name="launch_hw" value="true"/>
-                  <param name="max_range" value="5.0"/>
-                  <param name="min_range" value="0.5"/>
-                  <param name="packet_mtu_size" value="1500"/>
-                  <param name="return_mode" value="SingleStrongest"/>
-                  <param name="rotation_speed" value="600"/>
-                  <param name="scan_phase" value="180.0"/>
-                  <param name="sensor_ip" value="192.168.1.202"/>
-                  <param name="sensor_model" value="VLS128"/>
-                  <param name="setup_sensor" value="True"/>
-                  <param name="udp_only" value="false"/>
-                  <remap from="velodyne_points" to="pointcloud_raw_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
-                  <param name="output_frame" value="base_link"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <remap from="input" to="pointcloud_raw_ex"/>
-                  <remap from="output" to="self_cropped/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
-                  <param name="output_frame" value="base_link"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <remap from="input" to="self_cropped/pointcloud_ex"/>
-                  <remap from="output" to="mirror_cropped/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::DistortionCorrectorComponent" name="distortion_corrector_node">
-                  <!-- params from: $(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml -->
-                  <param name="base_frame" value="base_link"/>
-                  <param name="use_imu" value="true"/>
-                  <param name="use_3d_distortion_correction" value="false"/>
-                  <param name="update_azimuth_and_distance" value="false"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <param name="timestamp_mismatch_fraction_threshold" value="0.01"/>
-                  <!-- end params from: $(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml -->
-                  <remap from="~/input/twist" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
-                  <remap from="~/input/imu" to="/sensing/imu/imu_data"/>
-                  <remap from="~/input/pointcloud" to="mirror_cropped/pointcloud_ex"/>
-                  <remap from="~/output/pointcloud" to="rectified/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::RingOutlierFilterComponent" name="ring_outlier_filter">
-                  <!-- params from: $(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml -->
-                  <param name="distance_ratio" value="1.03"/>
-                  <param name="object_length_threshold" value="0.05"/>
-                  <param name="max_rings_num" value="128"/>
-                  <param name="max_points_num_per_ring" value="4000"/>
-                  <param name="publish_outlier_pointcloud" value="false"/>
-                  <param name="min_azimuth_deg" value="0.0"/>
-                  <param name="max_azimuth_deg" value="360.0"/>
-                  <param name="max_distance" value="12.0"/>
-                  <param name="vertical_bins" value="128"/>
-                  <param name="horizontal_bins" value="36"/>
-                  <param name="noise_threshold" value="2"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <!-- end params from: $(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml -->
-                  <param name="output_frame" value="velodyne_left"/>
-                  <remap from="input" to="rectified/pointcloud_ex"/>
-                  <remap from="output" to="pointcloud_before_sync"/>
-                </composable_node>
               </node_container>
             </group>
             <!-- end: common_sensor_launch://launch/nebula_node_container.launch.py -->
@@ -1080,13 +914,13 @@
               <!-- arg name="frame_id" value="velodyne_top" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_frame" -->
+              <!-- arg name="input_frame" default="base_link" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="250.0" -->
               <!-- arg name="min_range" value="0.5" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_frame" -->
+              <!-- arg name="output_frame" default="base_link" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
@@ -1111,89 +945,6 @@
                 <param name="wheel_radius" value="0.383"/>
                 <param name="wheel_tread" value="1.64"/>
                 <param name="wheel_width" value="0.235"/>
-                <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
-                  <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
-                  <param name="cloud_max_angle" value="60"/>
-                  <param name="cloud_min_angle" value="300"/>
-                  <param name="data_port" value="2370"/>
-                  <param name="dual_return_distance_threshold" value="0.1"/>
-                  <param name="frame_id" value="velodyne_right"/>
-                  <param name="gnss_port" value="2380"/>
-                  <param name="host_ip" value="192.168.1.10"/>
-                  <param name="launch_hw" value="true"/>
-                  <param name="max_range" value="5.0"/>
-                  <param name="min_range" value="0.5"/>
-                  <param name="packet_mtu_size" value="1500"/>
-                  <param name="return_mode" value="SingleStrongest"/>
-                  <param name="rotation_speed" value="600"/>
-                  <param name="scan_phase" value="180.0"/>
-                  <param name="sensor_ip" value="192.168.1.203"/>
-                  <param name="sensor_model" value="VLS128"/>
-                  <param name="setup_sensor" value="True"/>
-                  <param name="udp_only" value="false"/>
-                  <remap from="velodyne_points" to="pointcloud_raw_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
-                  <param name="output_frame" value="base_link"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <remap from="input" to="pointcloud_raw_ex"/>
-                  <remap from="output" to="self_cropped/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
-                  <param name="output_frame" value="base_link"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <remap from="input" to="self_cropped/pointcloud_ex"/>
-                  <remap from="output" to="mirror_cropped/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::DistortionCorrectorComponent" name="distortion_corrector_node">
-                  <!-- params from: $(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml -->
-                  <param name="base_frame" value="base_link"/>
-                  <param name="use_imu" value="true"/>
-                  <param name="use_3d_distortion_correction" value="false"/>
-                  <param name="update_azimuth_and_distance" value="false"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <param name="timestamp_mismatch_fraction_threshold" value="0.01"/>
-                  <!-- end params from: $(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml -->
-                  <remap from="~/input/twist" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
-                  <remap from="~/input/imu" to="/sensing/imu/imu_data"/>
-                  <remap from="~/input/pointcloud" to="mirror_cropped/pointcloud_ex"/>
-                  <remap from="~/output/pointcloud" to="rectified/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::RingOutlierFilterComponent" name="ring_outlier_filter">
-                  <!-- params from: $(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml -->
-                  <param name="distance_ratio" value="1.03"/>
-                  <param name="object_length_threshold" value="0.05"/>
-                  <param name="max_rings_num" value="128"/>
-                  <param name="max_points_num_per_ring" value="4000"/>
-                  <param name="publish_outlier_pointcloud" value="false"/>
-                  <param name="min_azimuth_deg" value="0.0"/>
-                  <param name="max_azimuth_deg" value="360.0"/>
-                  <param name="max_distance" value="12.0"/>
-                  <param name="vertical_bins" value="128"/>
-                  <param name="horizontal_bins" value="36"/>
-                  <param name="noise_threshold" value="2"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <!-- end params from: $(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml -->
-                  <param name="output_frame" value="velodyne_right"/>
-                  <remap from="input" to="rectified/pointcloud_ex"/>
-                  <remap from="output" to="pointcloud_before_sync"/>
-                </composable_node>
               </node_container>
             </group>
             <!-- end: common_sensor_launch://launch/nebula_node_container.launch.py -->
@@ -1239,13 +990,13 @@
               <!-- arg name="frame_id" value="velodyne_top" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_frame" -->
+              <!-- arg name="input_frame" default="base_link" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="250.0" -->
               <!-- arg name="min_range" value="0.5" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_frame" -->
+              <!-- arg name="output_frame" default="base_link" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
@@ -1270,89 +1021,6 @@
                 <param name="wheel_radius" value="0.383"/>
                 <param name="wheel_tread" value="1.64"/>
                 <param name="wheel_width" value="0.235"/>
-                <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
-                  <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
-                  <param name="cloud_max_angle" value="60"/>
-                  <param name="cloud_min_angle" value="300"/>
-                  <param name="data_port" value="2371"/>
-                  <param name="dual_return_distance_threshold" value="0.1"/>
-                  <param name="frame_id" value="velodyne_rear"/>
-                  <param name="gnss_port" value="2380"/>
-                  <param name="host_ip" value="192.168.1.10"/>
-                  <param name="launch_hw" value="true"/>
-                  <param name="max_range" value="1.5"/>
-                  <param name="min_range" value="0.5"/>
-                  <param name="packet_mtu_size" value="1500"/>
-                  <param name="return_mode" value="SingleStrongest"/>
-                  <param name="rotation_speed" value="600"/>
-                  <param name="scan_phase" value="180.0"/>
-                  <param name="sensor_ip" value="192.168.1.204"/>
-                  <param name="sensor_model" value="VLS128"/>
-                  <param name="setup_sensor" value="True"/>
-                  <param name="udp_only" value="false"/>
-                  <remap from="velodyne_points" to="pointcloud_raw_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
-                  <param name="output_frame" value="base_link"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <remap from="input" to="pointcloud_raw_ex"/>
-                  <remap from="output" to="self_cropped/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
-                  <param name="output_frame" value="base_link"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <remap from="input" to="self_cropped/pointcloud_ex"/>
-                  <remap from="output" to="mirror_cropped/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::DistortionCorrectorComponent" name="distortion_corrector_node">
-                  <!-- params from: $(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml -->
-                  <param name="base_frame" value="base_link"/>
-                  <param name="use_imu" value="true"/>
-                  <param name="use_3d_distortion_correction" value="false"/>
-                  <param name="update_azimuth_and_distance" value="false"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <param name="timestamp_mismatch_fraction_threshold" value="0.01"/>
-                  <!-- end params from: $(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml -->
-                  <remap from="~/input/twist" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
-                  <remap from="~/input/imu" to="/sensing/imu/imu_data"/>
-                  <remap from="~/input/pointcloud" to="mirror_cropped/pointcloud_ex"/>
-                  <remap from="~/output/pointcloud" to="rectified/pointcloud_ex"/>
-                </composable_node>
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::RingOutlierFilterComponent" name="ring_outlier_filter">
-                  <!-- params from: $(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml -->
-                  <param name="distance_ratio" value="1.03"/>
-                  <param name="object_length_threshold" value="0.05"/>
-                  <param name="max_rings_num" value="128"/>
-                  <param name="max_points_num_per_ring" value="4000"/>
-                  <param name="publish_outlier_pointcloud" value="false"/>
-                  <param name="min_azimuth_deg" value="0.0"/>
-                  <param name="max_azimuth_deg" value="360.0"/>
-                  <param name="max_distance" value="12.0"/>
-                  <param name="vertical_bins" value="128"/>
-                  <param name="horizontal_bins" value="36"/>
-                  <param name="noise_threshold" value="2"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <!-- end params from: $(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml -->
-                  <param name="output_frame" value="velodyne_rear"/>
-                  <remap from="input" to="rectified/pointcloud_ex"/>
-                  <remap from="output" to="pointcloud_before_sync"/>
-                </composable_node>
               </node_container>
             </group>
             <!-- end: common_sensor_launch://launch/nebula_node_container.launch.py -->
@@ -1394,30 +1062,6 @@
             <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
             <!-- arg name="use_intra_process" value="true" -->
             <!-- arg name="use_multithread" value="true" -->
-            <load_composable_node target="pointcloud_container">
-              <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::PointCloudConcatenateDataSynchronizerComponent" name="concatenate_data">
-                <!-- params from: $(find-pkg-share sample_sensor_kit_launch)/config/concatenate_and_time_sync_node.param.yaml -->
-                <param name="debug_mode" value="false"/>
-                <param name="rosbag_length" value="10.0"/>
-                <param name="maximum_queue_size" value="5"/>
-                <param name="timeout_sec" value="0.2"/>
-                <param name="is_motion_compensated" value="true"/>
-                <param name="publish_synchronized_pointcloud" value="true"/>
-                <param name="keep_input_frame_in_synchronized_pointcloud" value="true"/>
-                <param name="publish_previous_but_late_pointcloud" value="false"/>
-                <param name="synchronized_pointcloud_postfix" value="pointcloud"/>
-                <param name="input_twist_topic_type" value="twist"/>
-                <param name="input_topics" value="[/sensing/lidar/right/pointcloud_before_sync, /sensing/lidar/top/pointcloud_before_sync, /sensing/lidar/left/pointcloud_before_sync]"/>
-                <param name="output_frame" value="base_link"/>
-                <param name="matching_strategy.type" value="advanced"/>
-                <param name="matching_strategy.lidar_timestamp_offsets" value="[0.0, 0.015, 0.016]"/>
-                <param name="matching_strategy.lidar_timestamp_noise_window" value="[0.01, 0.01, 0.01]"/>
-                <!-- end params from: $(find-pkg-share sample_sensor_kit_launch)/config/concatenate_and_time_sync_node.param.yaml -->
-                <remap from="~/input/twist" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
-                <remap from="output" to="concatenated/pointcloud"/>
-                <remap from="output_info" to="concatenated/pointcloud_info"/>
-              </composable_node>
-            </load_composable_node>
           </group>
           <!-- end: sample_sensor_kit_launch://launch/pointcloud_preprocessor.launch.py -->
         </group>
@@ -2367,172 +2011,8 @@
         <!-- arg name="use_multithread" value="true" -->
         <!-- arg name="use_single_frame_filter" value="false" -->
         <!-- arg name="use_time_series_filter" value="true" -->
-        <load_composable_node target="pointcloud_container">
-          <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter">
-            <param name="input_frame" value="base_link"/>
-            <param name="margin_max_z" value="0.0"/>
-            <param name="margin_min_z" value="-2.5"/>
-            <param name="max_x" value="150.0"/>
-            <param name="max_y" value="70.0"/>
-            <param name="max_z" value="2.5"/>
-            <param name="min_x" value="-100.0"/>
-            <param name="min_y" value="-70.0"/>
-            <param name="min_z" value="-2.5"/>
-            <param name="negative" value="False"/>
-            <param name="output_frame" value="base_link"/>
-            <param name="processing_time_threshold_sec" value="0.01"/>
-            <remap from="input" to="/sensing/lidar/concatenated/pointcloud"/>
-            <remap from="output" to="range_cropped/pointcloud"/>
-          </composable_node>
-          <composable_node pkg="autoware_ground_segmentation" plugin="autoware::ground_segmentation::ScanGroundFilterComponent" name="common_ground_filter">
-            <param name="center_pcl_shift" value="0.0"/>
-            <param name="detection_range_z_max" value="2.5"/>
-            <param name="elevation_grid_mode" value="True"/>
-            <param name="global_slope_max_angle_deg" value="10.0"/>
-            <param name="gnd_grid_buffer_size" value="4"/>
-            <param name="grid_size_m" value="0.5"/>
-            <param name="input_frame" value="base_link"/>
-            <param name="local_slope_max_angle_deg" value="13.0"/>
-            <param name="low_priority_region_x" value="-20.0"/>
-            <param name="max_height_offset" value="2.5"/>
-            <param name="max_lateral_offset" value="0.948"/>
-            <param name="max_longitudinal_offset" value="3.79"/>
-            <param name="min_height_offset" value="0.0"/>
-            <param name="min_lateral_offset" value="-0.948"/>
-            <param name="min_longitudinal_offset" value="-1.1"/>
-            <param name="non_ground_height_threshold" value="0.2"/>
-            <param name="output_frame" value="base_link"/>
-            <param name="publish_processing_time_detail" value="False"/>
-            <param name="radial_divider_angle_deg" value="1.0"/>
-            <param name="recheck_start_distance" value="20.0"/>
-            <param name="split_height_distance" value="0.2"/>
-            <param name="split_points_distance_tolerance" value="0.2"/>
-            <param name="use_lowest_point" value="True"/>
-            <param name="use_recheck_ground_cluster" value="True"/>
-            <param name="use_virtual_ground_point" value="True"/>
-            <param name="vehicle_length" value="4.890000000000001"/>
-            <param name="vehicle_width" value="1.896"/>
-            <remap from="input" to="range_cropped/pointcloud"/>
-            <remap from="output" to="/perception/obstacle_segmentation/single_frame/pointcloud"/>
-          </composable_node>
-          <composable_node pkg="autoware_occupancy_grid_map_outlier_filter" plugin="autoware::occupancy_grid_map_outlier_filter::OccupancyGridMapOutlierFilterComponent" name="occupancy_grid_based_outlier_filter">
-            <!-- params from: $(find-pkg-share autoware_occupancy_grid_map_outlier_filter)/config/occupancy_grid_map_outlier_filter.param.yaml -->
-            <param name="radius_search_2d_filter.search_radius" value="1.0"/>
-            <param name="radius_search_2d_filter.min_points_and_distance_ratio" value="400.0"/>
-            <param name="radius_search_2d_filter.min_points" value="4"/>
-            <param name="radius_search_2d_filter.max_points" value="70"/>
-            <param name="radius_search_2d_filter.max_filter_points_nb" value="15000"/>
-            <param name="map_frame" value="map"/>
-            <param name="base_link_frame" value="base_link"/>
-            <param name="cost_threshold" value="45"/>
-            <param name="use_radius_search_2d_filter" value="true"/>
-            <param name="enable_debugger" value="false"/>
-            <param name="publish_processing_time_detail" value="false"/>
-            <!-- end params from: $(find-pkg-share autoware_occupancy_grid_map_outlier_filter)/config/occupancy_grid_map_outlier_filter.param.yaml -->
-            <remap from="~/input/occupancy_grid_map" to="/perception/occupancy_grid_map/map"/>
-            <remap from="~/input/pointcloud" to="/perception/obstacle_segmentation/single_frame/pointcloud"/>
-            <remap from="~/output/pointcloud" to="/perception/obstacle_segmentation/pointcloud"/>
-          </composable_node>
-        </load_composable_node>
       </group>
       <!-- end: tier4_perception_launch://launch/obstacle_segmentation/ground_segmentation/ground_segmentation.launch.py -->
-      <!-- source: tier4_perception_launch://launch/occupancy_grid_map/probabilistic_occupancy_grid_map.launch.xml -->
-      <group>
-        <!-- arg name="input/obstacle_pointcloud" value="/perception/obstacle_segmentation/single_frame/pointcloud" -->
-        <!-- arg name="input/raw_pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
-        <!-- arg name="input_obstacle_and_raw_pointcloud" default="true" -->
-        <!-- arg name="input_obstacle_pointcloud" default="false" -->
-        <!-- arg name="occupancy_grid_map_method" value="pointcloud_based_occupancy_grid_map" -->
-        <!-- arg name="occupancy_grid_map_param_path" value="$(find-pkg-share autoware_launch)/config/perception/occupancy_grid_map/pointcloud_based_occupancy_grid_map.param.yaml" -->
-        <!-- arg name="occupancy_grid_map_updater" value="binary_bayes_filter" -->
-        <!-- arg name="occupancy_grid_map_updater_param_path" value="$(find-pkg-share autoware_launch)/config/perception/occupancy_grid_map/binary_bayes_filter_updater.param.yaml" -->
-        <!-- arg name="output" value="/perception/occupancy_grid_map/map" -->
-        <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
-        <!-- arg name="use_intra_process" value="true" -->
-        <!-- arg name="use_multithread" value="true" -->
-        <!-- arg name="use_pointcloud_container" default="true" -->
-        <!-- source: autoware_probabilistic_occupancy_grid_map://launch/pointcloud_based_occupancy_grid_map.launch.py -->
-        <group>
-          <!-- arg name="individual_container_name" default="occupancy_grid_map_container" -->
-          <!-- arg name="input/obstacle_pointcloud" value="/perception/obstacle_segmentation/single_frame/pointcloud" -->
-          <!-- arg name="input/raw_pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
-          <!-- arg name="output" value="/perception/occupancy_grid_map/map" -->
-          <!-- arg name="param_file" value="$(find-pkg-share autoware_launch)/config/perception/occupancy_grid_map/pointcloud_based_occupancy_grid_map.param.yaml" -->
-          <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
-          <!-- arg name="updater_param_file" value="$(find-pkg-share autoware_launch)/config/perception/occupancy_grid_map/binary_bayes_filter_updater.param.yaml" -->
-          <!-- arg name="updater_type" value="binary_bayes_filter" -->
-          <!-- arg name="use_intra_process" value="true" -->
-          <!-- arg name="use_multithread" value="true" -->
-          <!-- arg name="use_pointcloud_container" value="true" -->
-          <node_container pkg="rclcpp_components" exec="component_container_mt" name="occupancy_grid_map_container" namespace="/perception/occupancy_grid_map">
-            <param name="front_overhang" value="1.0"/>
-            <param name="left_overhang" value="0.128"/>
-            <param name="max_steer_angle" value="0.7"/>
-            <param name="rear_overhang" value="1.1"/>
-            <param name="right_overhang" value="0.128"/>
-            <param name="use_sim_time" value="false"/>
-            <param name="vehicle_height" value="2.5"/>
-            <param name="wheel_base" value="2.79"/>
-            <param name="wheel_radius" value="0.383"/>
-            <param name="wheel_tread" value="1.64"/>
-            <param name="wheel_width" value="0.235"/>
-            <composable_node pkg="autoware_probabilistic_occupancy_grid_map" plugin="autoware::occupancy_grid_map::PointcloudBasedOccupancyGridMapNode" name="occupancy_grid_map_node">
-              <param name="OccupancyGridMapFixedBlindSpot" value="{'distance_margin': 1.0}"/>
-              <param name="OccupancyGridMapProjectiveBlindSpot" value="{'projection_dz_threshold': 0.01, 'obstacle_separation_threshold': 1.0, 'pub_debug_grid': False}"/>
-              <param name="base_link_frame" value="base_link"/>
-              <param name="downsample_input_pointcloud" value="False"/>
-              <param name="downsample_voxel_size" value="0.125"/>
-              <param name="enable_single_frame_mode" value="False"/>
-              <param name="filter_obstacle_pointcloud_by_raw_pointcloud" value="False"/>
-              <param name="grid_map_type" value="OccupancyGridMapFixedBlindSpot"/>
-              <param name="gridmap_origin_frame" value="base_link"/>
-              <param name="height_filter" value="{'use_height_filter': True, 'min_height': -1.0, 'max_height': 2.0}"/>
-              <param name="map_frame" value="map"/>
-              <param name="map_length" value="150.0"/>
-              <param name="map_resolution" value="0.5"/>
-              <param name="probability_matrix" value="{'occupied_to_occupied': 0.95, 'occupied_to_free': 0.05, 'free_to_occupied': 0.2, 'free_to_free': 0.8}"/>
-              <param name="processing_time_consecutive_excess_tolerance_ms" value="1000.0"/>
-              <param name="processing_time_tolerance_ms" value="50.0"/>
-              <param name="publish_processing_time_detail" value="False"/>
-              <param name="scan_origin_frame" value="base_link"/>
-              <param name="updater_type" value="binary_bayes_filter"/>
-              <param name="v_ratio" value="10.0"/>
-              <remap from="~/input/obstacle_pointcloud" to="/perception/obstacle_segmentation/single_frame/pointcloud"/>
-              <remap from="~/input/raw_pointcloud" to="/sensing/lidar/concatenated/pointcloud"/>
-              <remap from="~/output/occupancy_grid_map" to="/perception/occupancy_grid_map/map"/>
-            </composable_node>
-          </node_container>
-          <load_composable_node target="pointcloud_container">
-            <composable_node pkg="autoware_probabilistic_occupancy_grid_map" plugin="autoware::occupancy_grid_map::PointcloudBasedOccupancyGridMapNode" name="occupancy_grid_map_node">
-              <param name="OccupancyGridMapFixedBlindSpot" value="{'distance_margin': 1.0}"/>
-              <param name="OccupancyGridMapProjectiveBlindSpot" value="{'projection_dz_threshold': 0.01, 'obstacle_separation_threshold': 1.0, 'pub_debug_grid': False}"/>
-              <param name="base_link_frame" value="base_link"/>
-              <param name="downsample_input_pointcloud" value="False"/>
-              <param name="downsample_voxel_size" value="0.125"/>
-              <param name="enable_single_frame_mode" value="False"/>
-              <param name="filter_obstacle_pointcloud_by_raw_pointcloud" value="False"/>
-              <param name="grid_map_type" value="OccupancyGridMapFixedBlindSpot"/>
-              <param name="gridmap_origin_frame" value="base_link"/>
-              <param name="height_filter" value="{'use_height_filter': True, 'min_height': -1.0, 'max_height': 2.0}"/>
-              <param name="map_frame" value="map"/>
-              <param name="map_length" value="150.0"/>
-              <param name="map_resolution" value="0.5"/>
-              <param name="probability_matrix" value="{'occupied_to_occupied': 0.95, 'occupied_to_free': 0.05, 'free_to_occupied': 0.2, 'free_to_free': 0.8}"/>
-              <param name="processing_time_consecutive_excess_tolerance_ms" value="1000.0"/>
-              <param name="processing_time_tolerance_ms" value="50.0"/>
-              <param name="publish_processing_time_detail" value="False"/>
-              <param name="scan_origin_frame" value="base_link"/>
-              <param name="updater_type" value="binary_bayes_filter"/>
-              <param name="v_ratio" value="10.0"/>
-              <remap from="~/input/obstacle_pointcloud" to="/perception/obstacle_segmentation/single_frame/pointcloud"/>
-              <remap from="~/input/raw_pointcloud" to="/sensing/lidar/concatenated/pointcloud"/>
-              <remap from="~/output/occupancy_grid_map" to="/perception/occupancy_grid_map/map"/>
-            </composable_node>
-          </load_composable_node>
-        </group>
-        <!-- end: autoware_probabilistic_occupancy_grid_map://launch/pointcloud_based_occupancy_grid_map.launch.py -->
-      </group>
-      <!-- end: tier4_perception_launch://launch/occupancy_grid_map/probabilistic_occupancy_grid_map.launch.xml -->
       <!-- source: tier4_perception_launch://launch/object_recognition/detection/detection.launch.xml -->
       <group>
         <!-- arg name="camera_2d_detector/color_map_path" value="{home}/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
@@ -3394,131 +2874,12 @@
             <param name="wheel_radius" value="0.383"/>
             <param name="wheel_tread" value="1.64"/>
             <param name="wheel_width" value="0.235"/>
-            <composable_node pkg="autoware_traffic_light_classifier" plugin="autoware::traffic_light::TrafficLightClassifierNodelet" name="car_traffic_light_classifier">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml -->
-              <param name="approximate_sync" value="false"/>
-              <param name="precision" value="fp16"/>
-              <param name="mean" value="[123.675, 116.28, 103.53]"/>
-              <param name="std" value="[58.395, 57.12, 57.375]"/>
-              <param name="over_exposure_threshold" value="0.85"/>
-              <param name="under_exposure_threshold" value="-0.83"/>
-              <param name="classifier_type" value="1"/>
-              <param name="traffic_light_type" value="0"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
-              <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
-              <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
-              <remap from="~/output/traffic_signals" to="car/traffic_signals"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_classifier" plugin="autoware::traffic_light::TrafficLightClassifierNodelet" name="pedestrian_traffic_light_classifier">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml -->
-              <param name="approximate_sync" value="false"/>
-              <param name="precision" value="fp16"/>
-              <param name="mean" value="[123.675, 116.28, 103.53]"/>
-              <param name="std" value="[58.395, 57.12, 57.375]"/>
-              <param name="over_exposure_threshold" value="0.85"/>
-              <param name="under_exposure_threshold" value="-0.83"/>
-              <param name="classifier_type" value="1"/>
-              <param name="traffic_light_type" value="1"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
-              <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
-              <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
-              <remap from="~/output/traffic_signals" to="pedestrian/traffic_signals"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_visualization" plugin="autoware::traffic_light::TrafficLightRoiVisualizerNode" name="traffic_light_roi_visualizer">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_visualization/traffic_light_roi_visualizer.param.yaml -->
-              <param name="use_image_transport" value="true"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_visualization/traffic_light_roi_visualizer.param.yaml -->
-              <param name="use_high_accuracy_detection" value="true"/>
-              <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
-              <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
-              <remap from="~/input/rough/rois" to="detection/rough/rois"/>
-              <remap from="~/input/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/traffic_signals"/>
-              <remap from="~/output/image" to="debug/rois"/>
-              <remap from="~/output/image/compressed" to="debug/rois/compressed"/>
-              <remap from="~/output/image/compressedDepth" to="debug/rois/compressedDepth"/>
-              <remap from="~/output/image/theora" to="debug/rois/theora"/>
-            </composable_node>
           </node_container>
           <load_composable_node target="traffic_light_node_container">
             <composable_node pkg="autoware_image_transport_decompressor" plugin="autoware::image_preprocessor::ImageTransportDecompressor" name="traffic_light_image_decompressor">
               <param name="encoding" value="rgb8"/>
               <remap from="~/input/compressed_image" to="/sensing/camera/camera6/image_raw/compressed"/>
               <remap from="~/output/raw_image" to="/sensing/camera/camera6/image_raw"/>
-            </composable_node>
-          </load_composable_node>
-          <load_composable_node target="traffic_light_node_container">
-            <composable_node pkg="autoware_traffic_light_fine_detector" plugin="autoware::traffic_light::TrafficLightFineDetectorNode" name="traffic_light_fine_detector">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml -->
-              <param name="precision" value="fp16"/>
-              <param name="score_thresh" value="0.3"/>
-              <param name="nms_thresh" value="0.65"/>
-              <param name="approximate_sync" value="false"/>
-              <param name="gpu_id" value="0"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx"/>
-              <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
-              <remap from="~/input/rois" to="rough/rois"/>
-              <remap from="~/expect/rois" to="expect/rois"/>
-              <remap from="~/output/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
-            </composable_node>
-          </load_composable_node>
-          <load_composable_node target="traffic_light_node_container">
-            <composable_node pkg="autoware_tensorrt_yolox" plugin="autoware::tensorrt_yolox::TrtYoloXNode" name="traffic_light_whole_image_detector">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
-              <param name="score_threshold" value="0.35"/>
-              <param name="nms_threshold" value="0.7"/>
-              <param name="precision" value="fp16"/>
-              <param name="calibration_algorithm" value="Entropy"/>
-              <param name="dla_core_id" value="-1"/>
-              <param name="quantize_first_layer" value="false"/>
-              <param name="quantize_last_layer" value="false"/>
-              <param name="profile_per_layer" value="false"/>
-              <param name="clip_value" value="6.0"/>
-              <param name="preprocess_on_gpu" value="true"/>
-              <param name="gpu_id" value="0"/>
-              <param name="calibration_image_list_path" value=""/>
-              <param name="is_roi_overlap_segment" value="false"/>
-              <param name="overlap_roi_score_threshold" value="0.3"/>
-              <param name="is_publish_color_mask" value="false"/>
-              <param name="roi_overlay_segment_label.UNKNOWN" value="false"/>
-              <param name="roi_overlay_segment_label.CAR" value="false"/>
-              <param name="roi_overlay_segment_label.TRUCK" value="false"/>
-              <param name="roi_overlay_segment_label.BUS" value="false"/>
-              <param name="roi_overlay_segment_label.MOTORCYCLE" value="false"/>
-              <param name="roi_overlay_segment_label.BICYCLE" value="false"/>
-              <param name="roi_overlay_segment_label.PEDESTRIAN" value="false"/>
-              <param name="roi_overlay_segment_label.ANIMAL" value="false"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="color_map_path" value=""/>
-              <param name="label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx"/>
-              <remap from="~/in/image" to="/sensing/camera/camera6/image_raw"/>
-              <remap from="~/out/objects" to="traffic_light_whole_image_detector/rois"/>
-              <remap from="~/out/image" to="traffic_light_whole_image_detector/debug/image"/>
-              <remap from="~/out/image/compressed" to="traffic_light_whole_image_detector/debug/image/compressed"/>
-              <remap from="~/out/image/compressedDepth" to="traffic_light_whole_image_detector/debug/image/compressedDepth"/>
-              <remap from="~/out/image/theora" to="traffic_light_whole_image_detector/debug/image/theora"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_selector" plugin="autoware::traffic_light::TrafficLightSelectorNode" name="traffic_light_selector">
-              <remap from="input/detected_rois" to="traffic_light_whole_image_detector/rois"/>
-              <remap from="input/rough_rois" to="rough/rois"/>
-              <remap from="input/expect_rois" to="expect/rois"/>
-              <remap from="input/camera_info" to="/sensing/camera/camera6/camera_info"/>
-              <remap from="output/traffic_rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_category_merger" plugin="autoware::traffic_light::TrafficLightCategoryMergerNode" name="traffic_light_category_merger">
-              <remap from="input/car_signals" to="car/traffic_signals"/>
-              <remap from="input/pedestrian_signals" to="pedestrian/traffic_signals"/>
-              <remap from="output/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/traffic_signals"/>
             </composable_node>
           </load_composable_node>
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera7">
@@ -3533,131 +2894,12 @@
             <param name="wheel_radius" value="0.383"/>
             <param name="wheel_tread" value="1.64"/>
             <param name="wheel_width" value="0.235"/>
-            <composable_node pkg="autoware_traffic_light_classifier" plugin="autoware::traffic_light::TrafficLightClassifierNodelet" name="car_traffic_light_classifier">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml -->
-              <param name="approximate_sync" value="false"/>
-              <param name="precision" value="fp16"/>
-              <param name="mean" value="[123.675, 116.28, 103.53]"/>
-              <param name="std" value="[58.395, 57.12, 57.375]"/>
-              <param name="over_exposure_threshold" value="0.85"/>
-              <param name="under_exposure_threshold" value="-0.83"/>
-              <param name="classifier_type" value="1"/>
-              <param name="traffic_light_type" value="0"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
-              <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
-              <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
-              <remap from="~/output/traffic_signals" to="car/traffic_signals"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_classifier" plugin="autoware::traffic_light::TrafficLightClassifierNodelet" name="pedestrian_traffic_light_classifier">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml -->
-              <param name="approximate_sync" value="false"/>
-              <param name="precision" value="fp16"/>
-              <param name="mean" value="[123.675, 116.28, 103.53]"/>
-              <param name="std" value="[58.395, 57.12, 57.375]"/>
-              <param name="over_exposure_threshold" value="0.85"/>
-              <param name="under_exposure_threshold" value="-0.83"/>
-              <param name="classifier_type" value="1"/>
-              <param name="traffic_light_type" value="1"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
-              <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
-              <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
-              <remap from="~/output/traffic_signals" to="pedestrian/traffic_signals"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_visualization" plugin="autoware::traffic_light::TrafficLightRoiVisualizerNode" name="traffic_light_roi_visualizer">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_visualization/traffic_light_roi_visualizer.param.yaml -->
-              <param name="use_image_transport" value="true"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_visualization/traffic_light_roi_visualizer.param.yaml -->
-              <param name="use_high_accuracy_detection" value="true"/>
-              <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
-              <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
-              <remap from="~/input/rough/rois" to="detection/rough/rois"/>
-              <remap from="~/input/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/traffic_signals"/>
-              <remap from="~/output/image" to="debug/rois"/>
-              <remap from="~/output/image/compressed" to="debug/rois/compressed"/>
-              <remap from="~/output/image/compressedDepth" to="debug/rois/compressedDepth"/>
-              <remap from="~/output/image/theora" to="debug/rois/theora"/>
-            </composable_node>
           </node_container>
           <load_composable_node target="traffic_light_node_container">
             <composable_node pkg="autoware_image_transport_decompressor" plugin="autoware::image_preprocessor::ImageTransportDecompressor" name="traffic_light_image_decompressor">
               <param name="encoding" value="rgb8"/>
               <remap from="~/input/compressed_image" to="/sensing/camera/camera7/image_raw/compressed"/>
               <remap from="~/output/raw_image" to="/sensing/camera/camera7/image_raw"/>
-            </composable_node>
-          </load_composable_node>
-          <load_composable_node target="traffic_light_node_container">
-            <composable_node pkg="autoware_traffic_light_fine_detector" plugin="autoware::traffic_light::TrafficLightFineDetectorNode" name="traffic_light_fine_detector">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml -->
-              <param name="precision" value="fp16"/>
-              <param name="score_thresh" value="0.3"/>
-              <param name="nms_thresh" value="0.65"/>
-              <param name="approximate_sync" value="false"/>
-              <param name="gpu_id" value="0"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx"/>
-              <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
-              <remap from="~/input/rois" to="rough/rois"/>
-              <remap from="~/expect/rois" to="expect/rois"/>
-              <remap from="~/output/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
-            </composable_node>
-          </load_composable_node>
-          <load_composable_node target="traffic_light_node_container">
-            <composable_node pkg="autoware_tensorrt_yolox" plugin="autoware::tensorrt_yolox::TrtYoloXNode" name="traffic_light_whole_image_detector">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
-              <param name="score_threshold" value="0.35"/>
-              <param name="nms_threshold" value="0.7"/>
-              <param name="precision" value="fp16"/>
-              <param name="calibration_algorithm" value="Entropy"/>
-              <param name="dla_core_id" value="-1"/>
-              <param name="quantize_first_layer" value="false"/>
-              <param name="quantize_last_layer" value="false"/>
-              <param name="profile_per_layer" value="false"/>
-              <param name="clip_value" value="6.0"/>
-              <param name="preprocess_on_gpu" value="true"/>
-              <param name="gpu_id" value="0"/>
-              <param name="calibration_image_list_path" value=""/>
-              <param name="is_roi_overlap_segment" value="false"/>
-              <param name="overlap_roi_score_threshold" value="0.3"/>
-              <param name="is_publish_color_mask" value="false"/>
-              <param name="roi_overlay_segment_label.UNKNOWN" value="false"/>
-              <param name="roi_overlay_segment_label.CAR" value="false"/>
-              <param name="roi_overlay_segment_label.TRUCK" value="false"/>
-              <param name="roi_overlay_segment_label.BUS" value="false"/>
-              <param name="roi_overlay_segment_label.MOTORCYCLE" value="false"/>
-              <param name="roi_overlay_segment_label.BICYCLE" value="false"/>
-              <param name="roi_overlay_segment_label.PEDESTRIAN" value="false"/>
-              <param name="roi_overlay_segment_label.ANIMAL" value="false"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="color_map_path" value=""/>
-              <param name="label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx"/>
-              <remap from="~/in/image" to="/sensing/camera/camera7/image_raw"/>
-              <remap from="~/out/objects" to="traffic_light_whole_image_detector/rois"/>
-              <remap from="~/out/image" to="traffic_light_whole_image_detector/debug/image"/>
-              <remap from="~/out/image/compressed" to="traffic_light_whole_image_detector/debug/image/compressed"/>
-              <remap from="~/out/image/compressedDepth" to="traffic_light_whole_image_detector/debug/image/compressedDepth"/>
-              <remap from="~/out/image/theora" to="traffic_light_whole_image_detector/debug/image/theora"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_selector" plugin="autoware::traffic_light::TrafficLightSelectorNode" name="traffic_light_selector">
-              <remap from="input/detected_rois" to="traffic_light_whole_image_detector/rois"/>
-              <remap from="input/rough_rois" to="rough/rois"/>
-              <remap from="input/expect_rois" to="expect/rois"/>
-              <remap from="input/camera_info" to="/sensing/camera/camera7/camera_info"/>
-              <remap from="output/traffic_rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_category_merger" plugin="autoware::traffic_light::TrafficLightCategoryMergerNode" name="traffic_light_category_merger">
-              <remap from="input/car_signals" to="car/traffic_signals"/>
-              <remap from="input/pedestrian_signals" to="pedestrian/traffic_signals"/>
-              <remap from="output/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/traffic_signals"/>
             </composable_node>
           </load_composable_node>
         </group>
@@ -3818,41 +3060,41 @@
     <!-- arg name="vehicle_model" value="sample_vehicle" -->
     <!-- source: tier4_planning_launch://launch/planning.launch.xml -->
     <group>
-      <!-- arg name="behavior_path_bidirectional_traffic_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_bidirectional_traffic_module/bidirectional_traffic.param.yaml" -->
+      <!-- arg name="behavior_path_bidirectional_traffic_module_param_path" value="$(var behavior_path_config_path)/autoware_behavior_path_bidirectional_traffic_module/bidirectional_traffic.param.yaml" -->
       <!-- arg name="behavior_path_config_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner" -->
-      <!-- arg name="behavior_path_planner_avoidance_by_lc_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/avoidance_by_lane_change/avoidance_by_lane_change.param.yaml" -->
-      <!-- arg name="behavior_path_planner_common_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/behavior_path_planner.param.yaml" -->
-      <!-- arg name="behavior_path_planner_drivable_area_expansion_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/drivable_area_expansion.param.yaml" -->
-      <!-- arg name="behavior_path_planner_dynamic_obstacle_avoidance_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_dynamic_obstacle_avoidance_module/dynamic_obstacle_avoidance.param.yaml" -->
-      <!-- arg name="behavior_path_planner_goal_planner_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/goal_planner/goal_planner.param.yaml" -->
-      <!-- arg name="behavior_path_planner_lane_change_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/lane_change/lane_change.param.yaml" -->
-      <!-- arg name="behavior_path_planner_sampling_planner_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/sampling_planner/sampling_planner.param.yaml" -->
-      <!-- arg name="behavior_path_planner_scene_module_manager_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/scene_module_manager.param.yaml" -->
-      <!-- arg name="behavior_path_planner_side_shift_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/side_shift/side_shift.param.yaml" -->
-      <!-- arg name="behavior_path_planner_start_planner_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/start_planner/start_planner.param.yaml" -->
-      <!-- arg name="behavior_path_planner_static_obstacle_avoidance_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_static_obstacle_avoidance_module/static_obstacle_avoidance.param.yaml" -->
+      <!-- arg name="behavior_path_planner_avoidance_by_lc_module_param_path" value="$(var behavior_path_config_path)/avoidance_by_lane_change/avoidance_by_lane_change.param.yaml" -->
+      <!-- arg name="behavior_path_planner_common_param_path" value="$(var behavior_path_config_path)/behavior_path_planner.param.yaml" -->
+      <!-- arg name="behavior_path_planner_drivable_area_expansion_param_path" value="$(var behavior_path_config_path)/drivable_area_expansion.param.yaml" -->
+      <!-- arg name="behavior_path_planner_dynamic_obstacle_avoidance_module_param_path" value="$(var behavior_path_config_path)/autoware_behavior_path_dynamic_obstacle_avoidance_module/dynamic_obstacle_avoidance.param.yaml" -->
+      <!-- arg name="behavior_path_planner_goal_planner_module_param_path" value="$(var behavior_path_config_path)/goal_planner/goal_planner.param.yaml" -->
+      <!-- arg name="behavior_path_planner_lane_change_module_param_path" value="$(var behavior_path_config_path)/lane_change/lane_change.param.yaml" -->
+      <!-- arg name="behavior_path_planner_sampling_planner_module_param_path" value="$(var behavior_path_config_path)/sampling_planner/sampling_planner.param.yaml" -->
+      <!-- arg name="behavior_path_planner_scene_module_manager_param_path" value="$(var behavior_path_config_path)/scene_module_manager.param.yaml" -->
+      <!-- arg name="behavior_path_planner_side_shift_module_param_path" value="$(var behavior_path_config_path)/side_shift/side_shift.param.yaml" -->
+      <!-- arg name="behavior_path_planner_start_planner_module_param_path" value="$(var behavior_path_config_path)/start_planner/start_planner.param.yaml" -->
+      <!-- arg name="behavior_path_planner_static_obstacle_avoidance_module_param_path" value="$(var behavior_path_config_path)/autoware_behavior_path_static_obstacle_avoidance_module/static_obstacle_avoidance.param.yaml" -->
       <!-- arg name="behavior_velocity_config_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner" -->
-      <!-- arg name="behavior_velocity_planner_blind_spot_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/blind_spot.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_common_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/behavior_velocity_planner_common.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_crosswalk_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/crosswalk.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_detection_area_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/detection_area.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_intersection_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/intersection.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_no_drivable_lane_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/no_drivable_lane.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_no_stopping_area_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/no_stopping_area.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_occlusion_spot_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/occlusion_spot.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/behavior_velocity_planner.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_roundabout_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/roundabout.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_speed_bump_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/speed_bump.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_stop_line_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/stop_line.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_traffic_light_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/traffic_light.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_virtual_traffic_light_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/virtual_traffic_light.param.yaml" -->
-      <!-- arg name="behavior_velocity_planner_walkway_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/walkway.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_blind_spot_module_param_path" value="$(var behavior_velocity_config_path)/blind_spot.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_common_param_path" value="$(var behavior_velocity_config_path)/behavior_velocity_planner_common.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_crosswalk_module_param_path" value="$(var behavior_velocity_config_path)/crosswalk.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_detection_area_module_param_path" value="$(var behavior_velocity_config_path)/detection_area.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_intersection_module_param_path" value="$(var behavior_velocity_config_path)/intersection.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_no_drivable_lane_module_param_path" value="$(var behavior_velocity_config_path)/no_drivable_lane.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_no_stopping_area_module_param_path" value="$(var behavior_velocity_config_path)/no_stopping_area.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_occlusion_spot_module_param_path" value="$(var behavior_velocity_config_path)/occlusion_spot.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_param_path" value="$(var behavior_velocity_config_path)/behavior_velocity_planner.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_roundabout_module_param_path" value="$(var behavior_velocity_config_path)/roundabout.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_speed_bump_module_param_path" value="$(var behavior_velocity_config_path)/speed_bump.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_stop_line_module_param_path" value="$(var behavior_velocity_config_path)/stop_line.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_traffic_light_module_param_path" value="$(var behavior_velocity_config_path)/traffic_light.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_virtual_traffic_light_module_param_path" value="$(var behavior_velocity_config_path)/virtual_traffic_light.param.yaml" -->
+      <!-- arg name="behavior_velocity_planner_walkway_module_param_path" value="$(var behavior_velocity_config_path)/walkway.param.yaml" -->
       <!-- arg name="behavior_velocity_smoother_type_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_velocity_smoother/Analytical.param.yaml" -->
       <!-- arg name="common_config_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common" -->
-      <!-- arg name="common_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/common.param.yaml" -->
+      <!-- arg name="common_param_path" value="$(var common_config_path)/common.param.yaml" -->
       <!-- arg name="compare_map_filter_param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/detection/pointcloud_filter/pointcloud_map_filter.param.yaml" -->
-      <!-- arg name="costmap_generator_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/costmap_generator.param.yaml" -->
-      <!-- arg name="elastic_band_smoother_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/path_smoother/elastic_band_smoother.param.yaml" -->
+      <!-- arg name="costmap_generator_param_path" value="$(var common_config_path)/costmap_generator.param.yaml" -->
+      <!-- arg name="elastic_band_smoother_param_path" value="$(var motion_config_path)/path_smoother/elastic_band_smoother.param.yaml" -->
       <!-- arg name="enable_all_modules_auto_mode" value="false" -->
       <!-- arg name="freespace_planner_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/parking/freespace_planner/freespace_planner.param.yaml" -->
       <!-- arg name="hazard_lights_selector_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_hazard_lights_selector/hazard_lights_selector.param.yaml" -->
@@ -3862,31 +3104,31 @@
       <!-- arg name="launch_remaining_distance_time_calculator" default="true" -->
       <!-- arg name="mission_planner_param_path" value="$(find-pkg-share autoware_launch)/config/planning/mission_planning/mission_planner/mission_planner.param.yaml" -->
       <!-- arg name="motion_config_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning" -->
-      <!-- arg name="motion_velocity_planner_boundary_departure_prevention_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/boundary_departure_prevention.param.yaml" -->
-      <!-- arg name="motion_velocity_planner_dynamic_obstacle_stop_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/dynamic_obstacle_stop.param.yaml" -->
-      <!-- arg name="motion_velocity_planner_obstacle_cruise_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/obstacle_cruise.param.yaml" -->
-      <!-- arg name="motion_velocity_planner_obstacle_slow_down_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/obstacle_slow_down.param.yaml" -->
-      <!-- arg name="motion_velocity_planner_obstacle_stop_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/obstacle_stop.param.yaml" -->
-      <!-- arg name="motion_velocity_planner_obstacle_velocity_limiter_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/obstacle_velocity_limiter.param.yaml" -->
-      <!-- arg name="motion_velocity_planner_out_of_lane_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/out_of_lane.param.yaml" -->
-      <!-- arg name="motion_velocity_planner_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/motion_velocity_planner.param.yaml" -->
-      <!-- arg name="motion_velocity_planner_road_user_stop_module_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/road_user_stop.param.yaml" -->
-      <!-- arg name="motion_velocity_planner_run_out_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/motion_velocity_planner/run_out.param.yaml" -->
+      <!-- arg name="motion_velocity_planner_boundary_departure_prevention_module_param_path" value="$(var motion_config_path)/motion_velocity_planner/boundary_departure_prevention.param.yaml" -->
+      <!-- arg name="motion_velocity_planner_dynamic_obstacle_stop_module_param_path" value="$(var motion_config_path)/motion_velocity_planner/dynamic_obstacle_stop.param.yaml" -->
+      <!-- arg name="motion_velocity_planner_obstacle_cruise_module_param_path" value="$(var motion_config_path)/motion_velocity_planner/obstacle_cruise.param.yaml" -->
+      <!-- arg name="motion_velocity_planner_obstacle_slow_down_module_param_path" value="$(var motion_config_path)/motion_velocity_planner/obstacle_slow_down.param.yaml" -->
+      <!-- arg name="motion_velocity_planner_obstacle_stop_module_param_path" value="$(var motion_config_path)/motion_velocity_planner/obstacle_stop.param.yaml" -->
+      <!-- arg name="motion_velocity_planner_obstacle_velocity_limiter_param_path" value="$(var motion_config_path)/motion_velocity_planner/obstacle_velocity_limiter.param.yaml" -->
+      <!-- arg name="motion_velocity_planner_out_of_lane_module_param_path" value="$(var motion_config_path)/motion_velocity_planner/out_of_lane.param.yaml" -->
+      <!-- arg name="motion_velocity_planner_param_path" value="$(var motion_config_path)/motion_velocity_planner/motion_velocity_planner.param.yaml" -->
+      <!-- arg name="motion_velocity_planner_road_user_stop_module_param_path" value="$(var motion_config_path)/motion_velocity_planner/road_user_stop.param.yaml" -->
+      <!-- arg name="motion_velocity_planner_run_out_param_path" value="$(var motion_config_path)/motion_velocity_planner/run_out.param.yaml" -->
       <!-- arg name="motion_velocity_planner_velocity_smoother_type_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_velocity_smoother/Analytical.param.yaml" -->
-      <!-- arg name="nearest_search_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/nearest_search.param.yaml" -->
+      <!-- arg name="nearest_search_param_path" value="$(var common_config_path)/nearest_search.param.yaml" -->
       <!-- arg name="path_generator_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/behavior_planning/path_generator/path_generator.param.yaml" -->
-      <!-- arg name="path_optimizer_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/autoware_path_optimizer/path_optimizer.param.yaml" -->
-      <!-- arg name="path_sampler_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/path_sampler/path_sampler.param.yaml" -->
-      <!-- arg name="planning_validator_intersection_collision_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/intersection_collision_checker.param.yaml" -->
-      <!-- arg name="planning_validator_latency_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/latency_checker.param.yaml" -->
-      <!-- arg name="planning_validator_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/planning_validator.param.yaml" -->
-      <!-- arg name="planning_validator_rear_collision_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/rear_collision_checker.param.yaml" -->
-      <!-- arg name="planning_validator_trajectory_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/planning_validator/trajectory_checker.param.yaml" -->
+      <!-- arg name="path_optimizer_param_path" value="$(var motion_config_path)/autoware_path_optimizer/path_optimizer.param.yaml" -->
+      <!-- arg name="path_sampler_param_path" value="$(var motion_config_path)/path_sampler/path_sampler.param.yaml" -->
+      <!-- arg name="planning_validator_intersection_collision_checker_param_path" value="$(var common_config_path)/planning_validator/intersection_collision_checker.param.yaml" -->
+      <!-- arg name="planning_validator_latency_checker_param_path" value="$(var common_config_path)/planning_validator/latency_checker.param.yaml" -->
+      <!-- arg name="planning_validator_param_path" value="$(var common_config_path)/planning_validator/planning_validator.param.yaml" -->
+      <!-- arg name="planning_validator_rear_collision_checker_param_path" value="$(var common_config_path)/planning_validator/rear_collision_checker.param.yaml" -->
+      <!-- arg name="planning_validator_trajectory_checker_param_path" value="$(var common_config_path)/planning_validator/trajectory_checker.param.yaml" -->
       <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
-      <!-- arg name="surround_obstacle_checker_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/lane_driving/motion_planning/surround_obstacle_checker/surround_obstacle_checker.param.yaml" -->
+      <!-- arg name="surround_obstacle_checker_param_path" value="$(var motion_config_path)/surround_obstacle_checker/surround_obstacle_checker.param.yaml" -->
       <!-- arg name="vehicle_param_file" value="$(find-pkg-share sample_vehicle_description)/config/vehicle_info.param.yaml" -->
-      <!-- arg name="velocity_smoother_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_velocity_smoother/velocity_smoother.param.yaml" -->
-      <!-- arg name="velocity_smoother_type_param_path" value="$(find-pkg-share autoware_launch)/config/planning/scenario_planning/common/autoware_velocity_smoother/JerkFiltered.param.yaml" -->
+      <!-- arg name="velocity_smoother_param_path" value="$(var common_config_path)/autoware_velocity_smoother/velocity_smoother.param.yaml" -->
+      <!-- arg name="velocity_smoother_type_param_path" value="$(var common_config_path)/autoware_velocity_smoother/JerkFiltered.param.yaml" -->
       <!-- source: autoware_manual_lane_change_handler://launch/manual_lane_change_handler.launch.xml -->
       <group>
         <!-- arg name="manual_lane_change_handler_param_path" default="$(find-pkg-share autoware_manual_lane_change_handler)/config/manual_lane_change_handler.param.yaml" -->
@@ -7564,443 +6806,6 @@
           <param name="wheel_radius" value="0.383"/>
           <param name="wheel_tread" value="1.64"/>
           <param name="wheel_width" value="0.235"/>
-          <composable_node pkg="autoware_default_adapi" plugin="autoware::default_adapi::InterfaceNode" name="interface">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi" plugin="autoware::default_adapi::LocalizationNode" name="localization">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi" plugin="autoware::default_adapi::RoutingNode" name="routing">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::AutowareStateNode" name="autoware_state">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::DiagnosticsNode" name="diagnostics">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::FailSafeNode" name="fail_safe">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::HeartbeatNode" name="heartbeat">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::ManualControlNode" name="local">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::ManualControlNode" name="remote">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::MotionNode" name="motion">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::MrmRequestNode" name="mrm_request">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::OperationModeNode" name="operation_mode">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::PerceptionNode" name="perception">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::PlanningNode" name="planning">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::VehicleStatusNode" name="vehicle_status">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::VehicleCommandNode" name="vehicle_command">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::VehicleMetricsNode" name="vehicle_metrics">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::VehicleInfoNode" name="vehicle_info">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
-          <composable_node pkg="autoware_default_adapi_universe" plugin="autoware::default_adapi::VehicleDoorNode" name="vehicle_door">
-            <!-- params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-            <param name="diagnostic_updater.period" value="1.0"/>
-            <param name="diagnostic_updater.use_fqn" value="true"/>
-            <param name="update_rate" value="10.0"/>
-            <param name="require_accept_start" value="false"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="stop_check_duration" value="1.0"/>
-            <param name="update_rate" value="0.1"/>
-            <param name="max_energy_level" value="1.0"/>
-            <param name="check_autoware_control" value="true"/>
-            <param name="mode" value="local"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mode" value="remote"/>
-            <param name="diag_timeout_warn_duration" value="1.0"/>
-            <param name="diag_timeout_error_duration" value="2.0"/>
-            <param name="mrm_descriptions.emergency_stop.behavior" value="2"/>
-            <param name="mrm_descriptions.emergency_stop.description" value="Emergency stop"/>
-            <param name="mrm_descriptions.comfortable_stop.behavior" value="3"/>
-            <param name="mrm_descriptions.comfortable_stop.description" value="Comfortable stop"/>
-            <!-- end params from: $(find-pkg-share autoware_default_adapi_universe)/config/default_adapi.param.yaml -->
-          </composable_node>
         </node_container>
       </group>
       <!-- end: autoware_default_adapi_universe://launch/default_adapi.launch.py -->

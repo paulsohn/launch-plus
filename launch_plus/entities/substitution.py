@@ -13,7 +13,7 @@ class Substitution(ABC):
     """A single substitution token (e.g. ``$(arg name)``, ``$(find-pkg-share pkg)``)."""
 
     @abstractmethod
-    def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
+    def perform(self, ctx: _SubstitutionContext) -> str:
         """Resolve this substitution to a concrete string.
 
         In preview mode the result should be portable (e.g. ``$(find-pkg-share pkg)``).
@@ -33,7 +33,7 @@ class TextSubstitution(Substitution):
     def __init__(self, *, text: str) -> None:
         self.text = text
 
-    def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
+    def perform(self, ctx: _SubstitutionContext) -> str:
         return self.text
 
     def serialize(self) -> str:

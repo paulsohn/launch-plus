@@ -27,15 +27,15 @@ class ArgSubstitution(Substitution):
             raise ValueError("$(arg ...) requires a name argument")
         return cls, {"name": args[0] if isinstance(args[0], list) else [args[0]]}
 
-    def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
+    def perform(self, ctx: _SubstitutionContext) -> str:
         from launch_plus.resolver import resolve_substitutions_from_tokens
 
-        name = resolve_substitutions_from_tokens(self.name, ctx, _depth=_depth + 1)
+        name = resolve_substitutions_from_tokens(self.name, ctx)
         value = ctx.args.get(name)
         if value is None:
             logger.error("undefined argument: %s", name)
             return f"$(arg {name})"
-        return resolve_substitutions_from_tokens(parse_to_tokens(value), ctx, _depth=_depth + 1)
+        return resolve_substitutions_from_tokens(parse_to_tokens(value), ctx)
 
     def serialize(self) -> str:
         return f"$(arg {_serialize_tokens(self.name)})"

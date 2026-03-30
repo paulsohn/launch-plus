@@ -27,11 +27,11 @@ class VarSubstitution(Substitution):
             raise ValueError("$(var ...) requires a name argument")
         return cls, {"name": args[0] if isinstance(args[0], list) else [args[0]]}
 
-    def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
+    def perform(self, ctx: _SubstitutionContext) -> str:
         from launch_plus.entities.substitutions.arg import parse_to_tokens
         from launch_plus.resolver import resolve_substitutions_from_tokens
 
-        name = resolve_substitutions_from_tokens(self.name, ctx, _depth=_depth + 1)
+        name = resolve_substitutions_from_tokens(self.name, ctx)
         if name in ctx.vars:
             value = ctx.vars[name]
         elif name in ctx.args:
@@ -41,7 +41,7 @@ class VarSubstitution(Substitution):
         if value is None:
             logger.error("undefined variable: %s", name)
             return f"$(var {name})"
-        return resolve_substitutions_from_tokens(parse_to_tokens(value), ctx, _depth=_depth + 1)
+        return resolve_substitutions_from_tokens(parse_to_tokens(value), ctx)
 
     def serialize(self) -> str:
         return f"$(var {''.join(t.serialize() for t in self.name)})"

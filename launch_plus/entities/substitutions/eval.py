@@ -40,10 +40,10 @@ class EvalSubstitution(Substitution):
                 parts.append(arg)
         return cls, {"expression": parts}
 
-    def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
+    def perform(self, ctx: _SubstitutionContext) -> str:
         from launch_plus.resolver import resolve_substitutions_from_tokens
 
-        expr = resolve_substitutions_from_tokens(self.expression, ctx, _depth=_depth + 1)
+        expr = resolve_substitutions_from_tokens(self.expression, ctx)
         # Unescape \' and \" that may come from XML entity values.
         expr = expr.replace("\\'", "'").replace('\\"', '"')
         try:

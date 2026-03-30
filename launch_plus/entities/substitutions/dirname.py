@@ -19,7 +19,7 @@ class DirnameSubstitution(Substitution):
     def parse(cls, args: list[Any]) -> tuple[type[DirnameSubstitution], dict[str, Any]]:
         return cls, {}
 
-    def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
+    def perform(self, ctx: _SubstitutionContext) -> str:
         if ctx.launch_file_dir:
             return ctx.launch_file_dir
         return "$(dirname)"

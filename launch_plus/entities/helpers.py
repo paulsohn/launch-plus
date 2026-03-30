@@ -345,26 +345,18 @@ def _track_node_from_action(state, package, executable, name=None):
 def resolve_substitutions_from_tokens(
     tokens: list[_SubstitutionType],
     ctx: _SubstitutionContext,
-    *,
-    _depth: int = 0,
 ) -> str:
     """Resolve a pre-parsed list of :class:`Substitution` objects to a string.
 
     Each token's ``.perform(ctx)`` is called in order and the results
-    are concatenated.  This is the low-level entry point used by
-    individual substitution implementations when they need to recursively
-    resolve nested tokens.
+    are concatenated.
     """
-    if _depth > 50:
-        logger.error("substitution recursion limit exceeded")
-        return "".join(t.serialize() for t in tokens)
-    return "".join(t.perform(ctx, _depth=_depth) for t in tokens)
+    return "".join(t.perform(ctx) for t in tokens)
 
 
 def resolve_substitutions(
     text: str,
     ctx: _SubstitutionContext,
-    _depth: int = 0,
 ) -> str:
     """Resolve all substitutions in a string using the given context.
 
@@ -372,13 +364,10 @@ def resolve_substitutions(
     objects, then calls ``.perform()`` on each to produce the resolved
     string.
     """
-    if _depth > 50:
-        logger.error("substitution recursion limit exceeded: %s", text[:100])
-        return text
     from launch_plus.parsers.parse_substitution import parse_substitution as _lark_parse
 
     tokens = _lark_parse(text)
-    return resolve_substitutions_from_tokens(tokens, ctx, _depth=_depth)
+    return resolve_substitutions_from_tokens(tokens, ctx)
 
 
 # ─── Value resolution helper ─────────────────────────────────────────────────

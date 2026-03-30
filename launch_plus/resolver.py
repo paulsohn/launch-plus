@@ -410,16 +410,9 @@ from launch_plus.entities.substitutions.launch_config import (  # noqa: E402, F4
 
 def _make_launch_context(args_dict):
     """Create a LaunchContext pre-populated with provided args."""
-    try:
-        from launch import LaunchContext
-
-        ctx = LaunchContext()
-        ctx._launch_configurations = dict(args_dict)
-        return ctx
-    except Exception:
-        ctx = _StubLaunchContext()
-        ctx._launch_configurations = dict(args_dict)
-        return ctx
+    ctx = _StubLaunchContext()
+    ctx._launch_configurations = dict(args_dict)
+    return ctx
 
 
 # ─── Node detail resolution (extracted to entities/node_resolution.py) ────────

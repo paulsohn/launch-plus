@@ -55,12 +55,12 @@ class CommandSubstitution(Substitution):
                 arguments.append([arg])
         return cls, {"arguments": arguments}
 
-    def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
+    def perform(self, ctx: _SubstitutionContext) -> str:
         from launch_plus.resolver import resolve_substitutions_from_tokens
 
         resolved_args: list[str] = []
         for arg_tokens in self.arguments:
-            resolved = resolve_substitutions_from_tokens(arg_tokens, ctx, _depth=_depth + 1)
+            resolved = resolve_substitutions_from_tokens(arg_tokens, ctx)
             resolved_args.append(resolved)
 
         # Quote arguments that contain spaces (to preserve argument boundaries).

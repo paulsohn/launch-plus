@@ -38,16 +38,16 @@ class EnvSubstitution(Substitution):
             default = args[1] if isinstance(args[1], list) else [args[1]]
         return cls, {"name": name, "default": default}
 
-    def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
+    def perform(self, ctx: _SubstitutionContext) -> str:
         from launch_plus.resolver import resolve_substitutions_from_tokens
 
-        name = resolve_substitutions_from_tokens(self.name, ctx, _depth=_depth + 1)
+        name = resolve_substitutions_from_tokens(self.name, ctx)
         # Check overrides → process env → default
         value = ctx.env.get(name)
         if value is None:
             value = os.environ.get(name)
         if value is None and self.default is not None:
-            value = resolve_substitutions_from_tokens(self.default, ctx, _depth=_depth + 1)
+            value = resolve_substitutions_from_tokens(self.default, ctx)
         if value is None:
             logger.error("environment variable not set: %s", name)
             return f"$(env {name})"

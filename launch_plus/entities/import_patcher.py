@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib
 import importlib.abc
 import importlib.machinery
+import logging
 import os
 import sys
 import types
@@ -58,6 +59,7 @@ from launch_plus.entities.substitutions.find_pkg_share import _TrackedFindPackag
 from launch_plus.entities.substitutions.launch_config import _LaunchConfiguration
 from launch_plus.entities.substitutions.path_join import _TrackedPathJoinSubstitution
 
+logger = logging.getLogger("launch_plus")
 _ROS_DISTRO = os.environ.get("ROS_DISTRO", "")
 _ROS_DISTRO_PREFIX = f"/opt/ros/{_ROS_DISTRO}" if _ROS_DISTRO else ""
 
@@ -170,7 +172,7 @@ def _build_patched_launch_substitutions():
             if self._default is not _SENTINEL:
                 return _to_str(self._default, context) or ""
             if state is not None:
-                state.error(f"EnvironmentVariable: '{name}' is not set and no default was provided")
+                logger.error("EnvironmentVariable: '%s' is not set and no default", name)
             return ""
 
         def __str__(self):
@@ -348,7 +350,7 @@ def _build_patched_ament_index_python_packages():
     mod = types.ModuleType("ament_index_python.packages")
 
     def get_package_share_directory(package_name):
-        _R.get_state().warn(
+        logger.warning(
             f"get_package_share_directory('{package_name}') is non-idiomatic; "
             f"prefer FindPackageShare('{package_name}') from launch_ros.substitutions"
         )
@@ -362,10 +364,10 @@ def _build_patched_ament_index_python_packages():
             if not os.path.isfile(os.path.join(pkg_dir, "package.xml")) and not _R._ensure_fetched(
                 _R.get_state(), package_name
             ):
-                _R.get_state().error(f"failed to fetch package '{package_name}' from lockfile")
+                logger.error(f"failed to fetch package '{package_name}' from lockfile")
         elif package_name in _R.get_state().lockfile_data:
             if not _R._ensure_fetched(_R.get_state(), package_name):
-                _R.get_state().error(f"failed to fetch package '{package_name}' from lockfile")
+                logger.error(f"failed to fetch package '{package_name}' from lockfile")
         # In non-preview mode, return the real install path so the output contains
         # absolute paths matching the installed layout.
         if not _R.get_state().preview_mode and package_name in _R.get_state().package_shares:

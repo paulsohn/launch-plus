@@ -75,7 +75,7 @@ def _resolve_node_details(state, node, context):
                     seen_pf.add(path)
                     pf_entry: dict = {"path": path}
                     if state.inline_params:
-                        expanded = _read_and_expand_param_file(path)
+                        expanded = _read_and_expand_param_file(path, state=state)
                         if expanded is not None:
                             pf_entry["params"] = expanded
                     pf_list.append(pf_entry)
@@ -176,7 +176,7 @@ def _resolve_composable_plugins(state, descs, context):
                         seen_pf.add(path)
                         pf_entry: dict = {"path": path}
                         if state.inline_params:
-                            expanded = _read_and_expand_param_file(path)
+                            expanded = _read_and_expand_param_file(path, state=state)
                             if expanded is not None:
                                 pf_entry["params"] = expanded
                     pf_list.append(pf_entry)

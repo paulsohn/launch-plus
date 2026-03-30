@@ -164,26 +164,18 @@ def _transition_name(transition_id):
     return str(transition_id) if transition_id else ""
 
 
-def _action_name(action):
-    """Extract the node name from a tracked action for event handler targeting.
-
-    Called at Python shim construction time (during ``execute()`` of the walker),
-    so ``_R.get_state()`` is always the active resolver state.
-    """
-    if action is not None and hasattr(action, "_idx"):
-        return _R.get_state().tracked["nodes"][action._idx].get("name", "")
+def _action_name(action, state):
+    """Extract the node name from a tracked action for event handler targeting."""
+    if action is not None and hasattr(action, "_idx") and action._idx >= 0:
+        return state.tracked["nodes"][action._idx].get("name", "")
     return ""
 
 
-def _action_namespace_info(action):
-    """Extract namespace_stack and explicit_namespace for a tracked node action.
-
-    Called at Python shim construction time (during ``execute()`` of the walker),
-    so ``_R.get_state()`` is always the active resolver state.
-    """
-    if action is None or not hasattr(action, "_idx"):
+def _action_namespace_info(action, state):
+    """Extract namespace_stack and explicit_namespace for a tracked node action."""
+    if action is None or not hasattr(action, "_idx") or action._idx < 0:
         return [], None
-    entry = _R.get_state().tracked["nodes"][action._idx]
+    entry = state.tracked["nodes"][action._idx]
     return entry.get("namespace_stack", []), entry.get("explicit_namespace")
 
 
@@ -217,13 +209,24 @@ class _TrackedChangeState(_TrackedAction):
 
     def __init__(self, lifecycle_node_matcher=None, transition_id=None, **kwargs):
         self._event_name = _transition_name(transition_id)
+        self._matcher = lifecycle_node_matcher
         self._target_node = None
         self._namespace_stack = []
         self._explicit_namespace = None
-        if lifecycle_node_matcher is not None and hasattr(lifecycle_node_matcher, "_node_name"):
-            self._target_node = lifecycle_node_matcher._node_name
-            self._namespace_stack = getattr(lifecycle_node_matcher, "_namespace_stack", [])
-            self._explicit_namespace = getattr(lifecycle_node_matcher, "_explicit_namespace", None)
+
+    def _resolve_matcher(self, state):
+        """Resolve matcher to target node info using state."""
+        matcher = self._matcher
+        if matcher is not None:
+            if hasattr(matcher, "_resolve"):
+                matcher._resolve(state)
+                self._target_node = matcher._node_name
+                self._namespace_stack = matcher._namespace_stack
+                self._explicit_namespace = matcher._explicit_namespace
+            elif hasattr(matcher, "_node_name"):
+                self._target_node = matcher._node_name
+                self._namespace_stack = getattr(matcher, "_namespace_stack", [])
+                self._explicit_namespace = getattr(matcher, "_explicit_namespace", None)
 
 
 class _TrackedShutdown(_TrackedAction):
@@ -248,11 +251,21 @@ class _TrackedShutdown(_TrackedAction):
 
 
 class _TrackedMatchesAction(_TrackedAction):
-    """Wraps ``matches_action(node)`` — carries the node name for ChangeState targeting."""
+    """Wraps ``matches_action(node)`` — carries the raw action for deferred name resolution."""
 
     def __init__(self, action):
-        self._node_name = _action_name(action)
-        self._namespace_stack, self._explicit_namespace = _action_namespace_info(action)
+        self._action = action
+        # Cached after first resolve
+        self._node_name = None
+        self._namespace_stack = []
+        self._explicit_namespace = None
+
+    def _resolve(self, state):
+        if self._node_name is None:
+            self._node_name = _action_name(self._action, state)
+            self._namespace_stack, self._explicit_namespace = _action_namespace_info(
+                self._action, state
+            )
 
     def __call__(self, *args, **kwargs):
         return True
@@ -262,19 +275,22 @@ class _TrackedOnProcessStart(_TrackedAction):
     """Tracked OnProcessStart event handler."""
 
     def __init__(self, target_action=None, on_start=None, **kwargs):
-        self._target_name = _action_name(target_action)
-        self._namespace_stack, self._explicit_namespace = _action_namespace_info(target_action)
+        self._target_action = target_action
         self._actions = on_start or []
 
-    def to_event_handler(self):
+    def to_event_handler(self, state=None):
+        if state is None:
+            state = _R.get_state()
+        target_name = _action_name(self._target_action, state)
+        ns_stack, explicit_ns = _action_namespace_info(self._target_action, state)
         return {
             "handler_kind": "on_process_start",
-            "target": self._target_name,
+            "target": target_name,
             "target_node": None,
             "start_state": None,
             "goal_state": None,
-            "namespace_stack": self._namespace_stack,
-            "explicit_namespace": self._explicit_namespace,
+            "namespace_stack": ns_stack,
+            "explicit_namespace": explicit_ns,
             "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
         }
 
@@ -283,19 +299,22 @@ class _TrackedOnProcessExit(_TrackedAction):
     """Tracked OnProcessExit event handler."""
 
     def __init__(self, target_action=None, on_exit=None, **kwargs):
-        self._target_name = _action_name(target_action)
-        self._namespace_stack, self._explicit_namespace = _action_namespace_info(target_action)
+        self._target_action = target_action
         self._actions = on_exit or []
 
-    def to_event_handler(self):
+    def to_event_handler(self, state=None):
+        if state is None:
+            state = _R.get_state()
+        target_name = _action_name(self._target_action, state)
+        ns_stack, explicit_ns = _action_namespace_info(self._target_action, state)
         return {
             "handler_kind": "on_process_exit",
-            "target": self._target_name,
+            "target": target_name,
             "target_node": None,
             "start_state": None,
             "goal_state": None,
-            "namespace_stack": self._namespace_stack,
-            "explicit_namespace": self._explicit_namespace,
+            "namespace_stack": ns_stack,
+            "explicit_namespace": explicit_ns,
             "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
         }
 
@@ -306,23 +325,24 @@ class _TrackedOnStateTransition(_TrackedAction):
     def __init__(
         self, target_lifecycle_node=None, start_state=None, goal_state=None, entities=None, **kwargs
     ):
-        self._target_node = _action_name(target_lifecycle_node)
-        self._namespace_stack, self._explicit_namespace = _action_namespace_info(
-            target_lifecycle_node
-        )
+        self._target_lifecycle_node = target_lifecycle_node
         self._start_state = str(start_state) if start_state else None
         self._goal_state = str(goal_state) if goal_state else None
         self._actions = entities or []
 
-    def to_event_handler(self):
+    def to_event_handler(self, state=None):
+        if state is None:
+            state = _R.get_state()
+        target_node = _action_name(self._target_lifecycle_node, state)
+        ns_stack, explicit_ns = _action_namespace_info(self._target_lifecycle_node, state)
         return {
             "handler_kind": "on_state_transition",
             "target": None,
-            "target_node": self._target_node or None,
+            "target_node": target_node or None,
             "start_state": self._start_state,
             "goal_state": self._goal_state,
-            "namespace_stack": self._namespace_stack,
-            "explicit_namespace": self._explicit_namespace,
+            "namespace_stack": ns_stack,
+            "explicit_namespace": explicit_ns,
             "actions": [a.to_dict() for a in self._actions if hasattr(a, "to_dict")],
         }
 

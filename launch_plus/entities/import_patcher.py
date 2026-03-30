@@ -158,19 +158,18 @@ def _build_patched_launch_substitutions():
             self._default = kw.get("default_value", _SENTINEL)
 
         def perform(self, context=None):
-            # Resolve name to a concrete string via _to_str.
+            state = context._state if context is not None and hasattr(context, "_state") else None
             name = _R._to_str(self._name, context) or ""
             # Look up in override env, then process env.
-            if name in _R.get_state().env:
-                return _R.get_state().env[name]
+            if state is not None and name in state.env:
+                return state.env[name]
             if name in os.environ:
                 return os.environ[name]
             # No match — use default if provided, otherwise error.
             if self._default is not _SENTINEL:
                 return _R._to_str(self._default, context) or ""
-            _R.get_state().error(
-                f"EnvironmentVariable: '{name}' is not set and no default was provided"
-            )
+            if state is not None:
+                state.error(f"EnvironmentVariable: '{name}' is not set and no default was provided")
             return ""
 
         def __str__(self):

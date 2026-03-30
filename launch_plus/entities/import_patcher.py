@@ -286,10 +286,35 @@ def _build_patched_launch_launch_description_sources():
 
     class _PythonLaunchDescriptionSource:
         def __init__(self, location=None, **kwargs):
-            # Store raw location — resolution deferred to execute() time
-            # when the proper LaunchContext is available.
-            self._raw_location = location
-            self._location = location if isinstance(location, str) else None
+            # Resolve to a string path.  Location may be:
+            #   - None
+            #   - A substitution object with .perform()  (e.g. PathJoinSubstitution)
+            #   - A list of strings/substitutions to concatenate
+            #     (e.g. [FindPackageShare("pkg"), "/launch/file.py"])
+            #   - A plain string
+            if location is None:
+                self._location = None
+            elif hasattr(location, "perform"):
+                try:
+                    result = location.perform(_StubLaunchContext())
+                    self._location = str(result) if result is not None else str(location)
+                except Exception:
+                    self._location = None
+            elif isinstance(location, list):
+                stub_ctx = _StubLaunchContext()
+                parts = []
+                for sub in location:
+                    if hasattr(sub, "perform"):
+                        try:
+                            result = sub.perform(stub_ctx)
+                            parts.append(str(result) if result is not None else str(sub))
+                        except Exception:
+                            parts.append(str(sub))
+                    else:
+                        parts.append(str(sub))
+                self._location = "".join(parts)
+            else:
+                self._location = str(location)
 
     class _AnyLaunchDescriptionSource(_PythonLaunchDescriptionSource):
         pass

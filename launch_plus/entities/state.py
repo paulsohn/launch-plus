@@ -11,22 +11,6 @@ from __future__ import annotations
 
 from typing import Any
 
-# ─── Exception ────────────────────────────────────────────────────────────────
-
-
-class _PackageNotFetchedError(RuntimeError):
-    """Deprecated — no longer raised.
-
-    Previously used as a control flow exception for package fetching.
-    Now ``_ensure_fetched()`` handles inline fetching and callers log errors
-    + return fallbacks on failure.  Retained for backward compatibility.
-    """
-
-    def __init__(self, pkg_name: str):
-        super().__init__(f"package '{pkg_name}' source not on disk; fetch failed")
-        self.pkg_name = pkg_name
-
-
 # ─── Resolver State ──────────────────────────────────────────────────────────
 
 

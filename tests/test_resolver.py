@@ -35,10 +35,10 @@ class TestLaunchConfiguration:
         ctx = _make_context({"my_var": "hello"})
         assert lc.perform(ctx) == "hello"
 
-    def test_perform_returns_none_when_unset(self):
+    def test_perform_returns_fallback_when_unset(self):
         lc = R._LaunchConfiguration("missing_var")
         ctx = _make_context({})
-        assert lc.perform(ctx) is None
+        assert lc.perform(ctx) == "$(var missing_var)"
 
     def test_perform_returns_default_when_unset_but_default_given(self):
         lc = R._LaunchConfiguration("missing_var", default="fallback")
@@ -50,9 +50,9 @@ class TestLaunchConfiguration:
         ctx = _make_context({"my_var": "from_context"})
         assert lc.perform(ctx) == "from_context"
 
-    def test_perform_returns_none_without_context(self):
+    def test_perform_returns_fallback_without_context(self):
         lc = R._LaunchConfiguration("x")
-        assert lc.perform(None) is None
+        assert lc.perform(None) == "$(var x)"
 
     def test_str_returns_variable_name(self):
         lc = R._LaunchConfiguration("pkg_name")
@@ -126,11 +126,10 @@ class TestResolveSubstitution:
         ctx = _make_context({"my_var": "resolved_value"})
         assert R._resolve_substitution(lc, ctx) == "resolved_value"
 
-    def test_unresolved_falls_back_to_str(self):
+    def test_unresolved_falls_back_to_portable(self):
         lc = R._LaunchConfiguration("missing")
         ctx = _make_context({})
-        # perform() returns None → _resolve_substitution falls back to str(lc)
-        assert R._resolve_substitution(lc, ctx) == "missing"
+        assert R._resolve_substitution(lc, ctx) == "$(var missing)"
 
     def test_plain_string_passthrough(self):
         assert R._resolve_substitution("hello", None) == "hello"
@@ -154,8 +153,8 @@ class TestResolveSubstitution:
             R._LaunchConfiguration("unresolved_var"),
         ]
         ctx = _make_context({"resolved_var": "abc"})
-        # Unresolved element falls back to str(lc) = variable name
-        assert R._resolve_substitution(parts, ctx) == "abc/unresolved_var"
+        # Unresolved element returns portable fallback
+        assert R._resolve_substitution(parts, ctx) == "abc/$(var unresolved_var)"
 
     def test_ex_returns_not_fallback_when_resolved(self):
         lc = R._LaunchConfiguration("my_var")
@@ -164,19 +163,20 @@ class TestResolveSubstitution:
         assert value == "resolved_value"
         assert is_fallback is False
 
-    def test_ex_returns_fallback_when_unresolved(self):
+    def test_ex_returns_portable_when_unresolved(self):
         lc = R._LaunchConfiguration("missing")
         ctx = _make_context({})
         value, is_fallback = R._resolve_substitution_ex(lc, ctx)
-        assert value == "missing"
-        assert is_fallback is True
+        assert value == "$(var missing)"
+        # perform() returns a string (not None), so is_fallback is False
+        assert is_fallback is False
 
-    def test_ex_list_fallback_when_any_unresolved(self):
+    def test_ex_list_with_unresolved_element(self):
         parts = [R._LaunchConfiguration("a"), "_", R._LaunchConfiguration("b")]
         ctx = _make_context({"a": "resolved"})
         value, is_fallback = R._resolve_substitution_ex(parts, ctx)
-        assert value == "resolved_b"
-        assert is_fallback is True
+        assert value == "resolved_$(var b)"
+        assert is_fallback is False
 
     def test_ex_list_not_fallback_when_all_resolved(self):
         parts = [R._LaunchConfiguration("a"), "_", R._LaunchConfiguration("b")]
@@ -197,15 +197,15 @@ class TestResolveSubstitution:
         assert value == "foo_bar"
         assert is_fallback is False
 
-    def test_ex_tuple_fallback_when_unresolved(self):
+    def test_ex_tuple_with_unresolved(self):
         parts = (R._LaunchConfiguration("a"), "_suffix")
         ctx = _make_context({})
         value, is_fallback = R._resolve_substitution_ex(parts, ctx)
-        assert value == "a_suffix"
-        assert is_fallback is True
+        assert value == "$(var a)_suffix"
+        assert is_fallback is False
 
-    def test_ex_list_fallback_when_no_context(self):
-        """When context is None, substitutions with perform() should be fallback."""
+    def test_ex_list_no_context(self):
+        """When context is None, substitutions fall back to str(sub)."""
         parts = [R._LaunchConfiguration("x"), "_literal"]
         value, is_fallback = R._resolve_substitution_ex(parts, None)
         assert value == "x_literal"
@@ -242,10 +242,11 @@ class TestNodeDeferredResolution:
         )
         node.execute(ctx)
 
-        # The entry shows the variable name (display fallback from str(lc))
-        assert R.get_state().tracked["nodes"][node._idx]["package"] == "unknown_pkg"
-        # But it must NOT be tracked as a real package dependency
+        # The entry shows the portable fallback
+        assert R.get_state().tracked["nodes"][node._idx]["package"] == "$(var unknown_pkg)"
+        # Must NOT be tracked as a real package dependency
         assert "unknown_pkg" not in R.get_state().tracked["packages"]
+        assert "$(var unknown_pkg)" not in R.get_state().tracked["packages"]
 
     def test_tracked_container_resolves_all_fields(self):
         ctx = _make_context(
@@ -302,7 +303,7 @@ class TestComposablePluginResolution:
             plugin="foo::Bar",
         )
         plugins = R._resolve_composable_plugins(ctx._state, [desc], ctx)
-        assert plugins[0]["package"] == "unknown"  # display fallback
+        assert plugins[0]["package"] == "$(var unknown)"  # portable fallback
         assert "unknown" not in R.get_state().tracked["packages"]
 
     def test_composable_node_empty_string_remapping_preserved(self):
@@ -1043,7 +1044,8 @@ class TestResolveSubstitutions:
         ctx = _fresh_subst_ctx(
             args={"vehicle": "sample"},
             vars={
-                "config_path": "$(find-pkg-share $(arg vehicle)_description)/config",
+                # In the new system, <let> resolves $(arg vehicle) before storing
+                "config_path": "$(find-pkg-share sample_description)/config",
             },
             preview_mode=True,
         )

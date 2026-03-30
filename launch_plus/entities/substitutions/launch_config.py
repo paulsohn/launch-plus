@@ -1,10 +1,18 @@
-"""LaunchConfiguration and DeferredDefault — Python-shim substitutions.
+"""LaunchConfiguration — unified ``$(var name)`` / ``LaunchConfiguration("name")``.
 
-These are NOT actions.  They implement ``perform(context)`` for value
-resolution, not ``execute()``.
+In official ROS 2, both ``$(var x)`` in XML and ``LaunchConfiguration("x")``
+in Python read from ``context.launch_configurations[x]``.  This module
+provides the single implementation for both paths.
 """
 
 from __future__ import annotations
+
+import logging
+from typing import Any
+
+from launch_plus.entities.expose import expose_substitution
+
+logger = logging.getLogger("launch_plus")
 
 
 class _DeferredDefault:
@@ -12,9 +20,7 @@ class _DeferredDefault:
 
     Stored in ``_launch_configurations`` instead of a resolved string.
     Resolution is deferred until the value is actually read via
-    ``_LaunchConfiguration.perform()``.  This avoids eagerly calling
-    ``FindPackageShare.perform()`` for packages that may not be installed
-    when the arg is never actually used (e.g. gated by a false condition).
+    ``_LaunchConfiguration.perform()``.
     """
 
     def __init__(self, default_value):
@@ -38,26 +44,82 @@ class _DeferredDefault:
         return str(dv)
 
 
+@expose_substitution("var")
 class _LaunchConfiguration:
-    """Substitution that resolves to a launch configuration value at runtime."""
+    """Unified substitution: ``$(var name)`` (XML) and ``LaunchConfiguration("name")`` (Python).
 
-    def __init__(self, variable_name, default=None, **kwargs):
+    Reads from ``context.launch_configurations[name]`` at resolution time,
+    matching the official ROS 2 ``LaunchConfiguration`` semantics.
+
+    Construction:
+    - Python shim: ``_LaunchConfiguration("variable_name", default=...)``
+    - XML parse: ``_LaunchConfiguration.parse(args)`` → ``cls(variable_name=name_tokens)``
+    """
+
+    def __init__(self, variable_name=None, default=None, **kwargs):
+        # variable_name can be:
+        #   - str: from Python shim (e.g., LaunchConfiguration("my_var"))
+        #   - list[Substitution]: from XML parse (e.g., [TextSubstitution("my_var")])
         self._name = variable_name
         self._default = default
 
-    def perform(self, context):
-        if context and hasattr(context, "_launch_configurations"):
-            if self._name in context._launch_configurations:
-                value = context._launch_configurations[self._name]
-                # Resolve deferred defaults on first read.
+    @classmethod
+    def parse(cls, args: list[Any]) -> tuple[type[_LaunchConfiguration], dict[str, Any]]:
+        """Parse ``$(var name)`` from XML substitution syntax."""
+        if not args:
+            raise ValueError("$(var ...) requires a name argument")
+        return cls, {"variable_name": args[0] if isinstance(args[0], list) else [args[0]]}
+
+    def _resolve_name(self, context) -> str:
+        """Resolve the variable name to a string."""
+        name = self._name
+        if isinstance(name, str):
+            return name
+        if isinstance(name, list):
+            # list[Substitution] from XML parse — resolve tokens
+            parts = []
+            for t in name:
+                if hasattr(t, "perform"):
+                    result = t.perform(context)
+                    parts.append(str(result) if result is not None else str(t))
+                else:
+                    parts.append(str(t))
+            return "".join(parts)
+        return str(name) if name is not None else ""
+
+    def perform(self, context, **kwargs):
+        """Resolve to the launch configuration value."""
+        name = self._resolve_name(context)
+        if context is not None:
+            value = None
+            # Primary: launch_configurations (official ROS 2 storage)
+            lc = getattr(context, "_launch_configurations", {})
+            if name in lc:
+                value = lc[name]
                 if isinstance(value, _DeferredDefault):
                     resolved = value.resolve(context)
-                    context._launch_configurations[self._name] = resolved
+                    lc[name] = resolved
                     return resolved
-                return value
-            if self._default is not None:
-                return str(self._default)
-        return None
+            # Fallback: vars (from <let>), args (from <arg>)
+            elif hasattr(context, "vars") and name in context.vars:
+                value = context.vars[name]
+            elif hasattr(context, "args") and name in context.args:
+                value = context.args[name]
+            if value is not None:
+                return str(value)
+        if self._default is not None:
+            return str(self._default)
+        # Not found
+        logger.error("undefined variable: %s", name)
+        return f"$(var {name})"
+
+    def serialize(self) -> str:
+        """Return the portable ``$(var name)`` form."""
+        if isinstance(self._name, list):
+            return f"$(var {''.join(t.serialize() for t in self._name)})"
+        return f"$(var {self._name})"
 
     def __str__(self):
-        return self._name
+        if isinstance(self._name, str):
+            return self._name
+        return self.serialize()

@@ -206,7 +206,7 @@ def _track_package(state, pkg):
     if _is_substitution(pkg):
         return
     pkg = str(pkg)
-    if pkg and pkg not in state.tracked["packages"]:
+    if pkg and not pkg.startswith("$(") and pkg not in state.tracked["packages"]:
         state.tracked["packages"].append(pkg)
 
 

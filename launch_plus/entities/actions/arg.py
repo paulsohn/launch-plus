@@ -61,6 +61,7 @@ class _DeclaredArg(_TrackedAction):
             # <arg name="x" value="v"/> — fixed value, set immediately
             resolved = resolve_value(self._fixed_value, context) or ""
             context.args[name] = resolved
+            context.vars[name] = resolved
             context._launch_configurations[name] = resolved
             _record_and_track(name, resolved, context)
             return None
@@ -89,9 +90,9 @@ class _DeclaredArg(_TrackedAction):
         dv = self.default_value
         display = resolve_value(dv, context) or ""
         _record_and_track(name, display, context)
-        # Store as deferred for Python shim path (LaunchConfiguration reads it later)
         context._launch_configurations[name] = _DeferredDefault(dv)
         context.args[name] = display
+        context.vars[name] = display
         return None
 
 

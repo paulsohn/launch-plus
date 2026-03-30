@@ -11,6 +11,7 @@ The main entry point is :func:`resolve_file`, which returns a
 :class:`~launch_plus.types.ParsedLaunchFile`.
 """
 
+import contextvars
 import importlib
 import importlib.abc
 import importlib.machinery
@@ -30,7 +31,23 @@ from launch_plus.entities.state import (  # noqa: E402
     _StubLaunchContext,
 )
 
-_state = ResolverState()
+# ─── Scoped state via contextvars ────────────────────────────────────────────
+#
+# resolve_file() creates a fresh ResolverState and sets _current_state for the
+# duration of resolution.  All code that needs state uses get_state().
+# This is thread-safe and supports concurrent resolution.
+
+_current_state: contextvars.ContextVar[ResolverState] = contextvars.ContextVar(
+    "_current_state",
+)
+# Set a default state for test/REPL use before resolve_file() is called.
+_current_state.set(ResolverState())
+
+
+def get_state() -> ResolverState:
+    """Return the active ResolverState for the current execution context."""
+    return _current_state.get()
+
 
 # ─── Capture real ament_index_python BEFORE installing the import patcher ────
 # This allows FindPackageShare.perform() to return real installed paths when
@@ -1025,60 +1042,86 @@ def resolve_file(
     ParsedLaunchFile
         The resolver result as a structured object (imported from types module).
     """
-    # ── Set up globals ─────────────────────────────────────────────────────
+    # ── Create scoped state ───────────────────────────────────────────────
+    state = ResolverState()
+    token = _current_state.set(state)
+    try:
+        return _resolve_file_impl(
+            state,
+            launch_file,
+            args,
+            package_shares,
+            workflow_options,
+            lockfile,
+            fetch_dir,
+            global_params,
+        )
+    finally:
+        _current_state.reset(token)
 
+
+def _resolve_file_impl(
+    state: ResolverState,
+    launch_file: "Path",
+    args: dict[str, str],
+    package_shares: dict[str, str],
+    workflow_options: Any = None,
+    lockfile: Any = None,
+    fetch_dir: "Path | None" = None,
+    global_params: list | None = None,
+) -> Any:
     launch_file_str = str(launch_file)
 
-    _state.namespace_stack = []
+    state.namespace_stack = []
     root_dep = _extract_pkg_and_share_path(launch_file_str)
-    _state.root_source_key = f"{root_dep[0]}://{root_dep[1]}" if root_dep else launch_file_str
+    state.root_source_key = f"{root_dep[0]}://{root_dep[1]}" if root_dep else launch_file_str
 
-    _state.env.clear()
-    _state.global_params.clear()
-    _state.global_remaps.clear()
-    _state.global_param_files.clear()
-    _state.fetched_packages.clear()
-    _state.declared_arg_names.clear()
-    _state.include_chain.clear()
-    _state.package_shares = dict(package_shares)
+    state.env.clear()
+    state.global_params.clear()
+    state.global_remaps.clear()
+    state.global_param_files.clear()
+    state.fetched_packages.clear()
+    state.declared_arg_names.clear()
+    state.include_chain.clear()
+    state.package_shares = dict(package_shares)
 
-    # Reset _state.tracked
-    _state.tracked["packages"] = []
-    _state.tracked["includes"] = []
-    _state.tracked["nodes"] = []
-    _state.tracked["warnings"] = []
-    _state.tracked["errors"] = []
-    _state.tracked["declared_args"] = []
-    _state.tracked["declared_args_by_file"] = {}
-    _state.tracked["global_params"] = []
-    _state.tracked["include_args"] = {}
-    _state.tracked["param_files"] = []
-    _state.tracked["set_launch_configurations"] = {}
-    _state.tracked["include_deps"] = []
-    _state.tracked["param_file_deps"] = []
-    _state.tracked["event_handlers"] = []
+    # Reset state.tracked
+    state.tracked["packages"] = []
+    state.tracked["includes"] = []
+    state.tracked["nodes"] = []
+    state.tracked["warnings"] = []
+    state.tracked["errors"] = []
+    state.tracked["declared_args"] = []
+    state.tracked["declared_args_by_file"] = {}
+    state.tracked["global_params"] = []
+    state.tracked["include_args"] = {}
+    state.tracked["param_files"] = []
+    state.tracked["set_launch_configurations"] = {}
+    state.tracked["include_deps"] = []
+    state.tracked["param_file_deps"] = []
+    state.tracked["event_handlers"] = []
 
     # Workflow flags
     if workflow_options is not None:
-        _state.apply_opaque_file_access = bool(
+        state.apply_opaque_file_access = bool(
             getattr(workflow_options, "apply_opaque_file_access", False)
         )
-        _state.preview_mode = bool(getattr(workflow_options, "preview", True))
-        _state.inline_params = bool(getattr(workflow_options, "inline_params", False))
-        _state.rosdep_fallback = bool(getattr(workflow_options, "rosdep_fallback", False))
-        _state.apply_arg_defaults = bool(getattr(workflow_options, "apply_arg_defaults", False))
-        _state.global_arg_cascade = bool(getattr(workflow_options, "global_arg_cascade", False))
-        _state.allow_unportable_paths = bool(
+        state.preview_mode = bool(getattr(workflow_options, "preview", True))
+        state.inline_params = bool(getattr(workflow_options, "inline_params", False))
+        state.rosdep_fallback = bool(getattr(workflow_options, "rosdep_fallback", False))
+        state.apply_arg_defaults = bool(getattr(workflow_options, "apply_arg_defaults", False))
+        state.global_arg_cascade = bool(getattr(workflow_options, "global_arg_cascade", False))
+        state.allow_unportable_paths = bool(
             getattr(workflow_options, "allow_unportable_paths", False)
         )
     else:
-        _state.apply_opaque_file_access = False
-        _state.preview_mode = True
-        _state.inline_params = False
-        _state.rosdep_fallback = False
-        _state.apply_arg_defaults = False
-        _state.global_arg_cascade = False
-        _state.allow_unportable_paths = False
+        state.apply_opaque_file_access = False
+        state.preview_mode = True
+        state.inline_params = False
+        state.rosdep_fallback = False
+        state.apply_arg_defaults = False
+        state.global_arg_cascade = False
+        state.allow_unportable_paths = False
 
     # Build lockfile data from the Lockfile dataclass
     if lockfile is not None:
@@ -1092,11 +1135,11 @@ def resolve_file(
                     "url": repo_lock.url,
                     "version": repo_lock.version,
                 }
-        _state.lockfile_data = lf_data
+        state.lockfile_data = lf_data
     else:
-        _state.lockfile_data = {}
+        state.lockfile_data = {}
 
-    _state.fetch_dir = str(fetch_dir) if fetch_dir else ""
+    state.fetch_dir = str(fetch_dir) if fetch_dir else ""
 
     args_dict = dict(args)
 
@@ -1116,37 +1159,37 @@ def resolve_file(
             with open(launch_file_str) as f:
                 content = f.read()
         except Exception as e:
-            _state.error(f"cannot read {launch_file_str}: {e}")
-            return _tracked_to_parsed_launch_file(_state.tracked)
+            state.error(f"cannot read {launch_file_str}: {e}")
+            return _tracked_to_parsed_launch_file(state.tracked)
 
         if launch_file_str.endswith((".yaml", ".yml")):
             elements = parse_yaml_launch(content, launch_file_str)
         else:
             elements = parse_xml_launch(content, launch_file_str)
-        subst_ctx = _SubstitutionContext(_state)
+        subst_ctx = _SubstitutionContext(state)
         subst_ctx.args = dict(args_dict)
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
-        subst_ctx.preview_mode = _state.preview_mode
-        subst_ctx.env = _state.env
+        subst_ctx.preview_mode = state.preview_mode
+        subst_ctx.env = state.env
         resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file_str])
-        return _tracked_to_parsed_launch_file(_state.tracked)
+        return _tracked_to_parsed_launch_file(state.tracked)
 
     # ── Python launch files ──────────────────────────────────────────────
     spec = importlib.util.spec_from_file_location("_target_launch", launch_file_str)
     if spec is None or spec.loader is None:
-        _state.error(f"cannot load {launch_file_str}")
-        return _tracked_to_parsed_launch_file(_state.tracked)
+        state.error(f"cannot load {launch_file_str}")
+        return _tracked_to_parsed_launch_file(state.tracked)
 
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
     except Exception as e:
-        _state.error(f"Error loading launch file: {e}")
-        return _tracked_to_parsed_launch_file(_state.tracked)
+        state.error(f"Error loading launch file: {e}")
+        return _tracked_to_parsed_launch_file(state.tracked)
 
     if not hasattr(mod, "generate_launch_description"):
-        _state.error("No generate_launch_description() function found")
-        return _tracked_to_parsed_launch_file(_state.tracked)
+        state.error("No generate_launch_description() function found")
+        return _tracked_to_parsed_launch_file(state.tracked)
 
     # Inject persisted global params
     if "__global_params__" in args_dict:
@@ -1160,13 +1203,13 @@ def resolve_file(
     if persisted_global_params:
         gp_tuples = [(entry[0], entry[1]) for entry in persisted_global_params if len(entry) == 2]
         ctx._launch_configurations["global_params"] = list(gp_tuples)
-        _state.global_params.extend(gp_tuples)
+        state.global_params.extend(gp_tuples)
 
     try:
         ld = mod.generate_launch_description()
     except Exception as e:
-        _state.error(f"generate_launch_description() failed: {e}")
-        return _tracked_to_parsed_launch_file(_state.tracked)
+        state.error(f"generate_launch_description() failed: {e}")
+        return _tracked_to_parsed_launch_file(state.tracked)
 
     entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
@@ -1174,9 +1217,9 @@ def resolve_file(
         if isinstance(entity, _DeclaredArg):
             _apply_declared_arg(entity, ctx)
 
-    _walk_actions(_state, entities, ctx)
+    _walk_actions(state, entities, ctx)
 
-    return _tracked_to_parsed_launch_file(_state.tracked)
+    return _tracked_to_parsed_launch_file(state.tracked)
 
 
 def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:

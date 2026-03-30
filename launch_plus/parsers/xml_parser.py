@@ -125,7 +125,7 @@ def parse_xml_launch(content: str, file_path: str) -> list[XmlEntity]:
     """Parse an XML launch file and return a list of root-level :class:`XmlEntity` objects."""
     root = ET.fromstring(content)  # noqa: S314
     if root.tag != "launch":
-        from launch_plus.resolver import _state
+        from launch_plus.resolver import get_state
 
-        _state.warn(f"XML launch file '{file_path}' has unexpected root tag <{root.tag}>")
+        get_state().warn(f"XML launch file '{file_path}' has unexpected root tag <{root.tag}>")
     return [XmlEntity(child) for child in root]

@@ -114,9 +114,9 @@ class _StubLaunchContext:
     def __init__(self, state: ResolverState | None = None):
         self._launch_configurations: dict[str, object] = {}
         if state is None:
-            from launch_plus.resolver import _state
+            from launch_plus.resolver import get_state
 
-            state = _state
+            state = get_state()
         self._state = state
 
     @property

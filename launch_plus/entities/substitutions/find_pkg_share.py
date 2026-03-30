@@ -88,12 +88,12 @@ class _TrackedFindPackageShare:
         return str(subs), False
 
     def _get_state(self, context=None):
-        """Get state from context, falling back to _R._state."""
+        """Get state from context, falling back to _R.get_state()."""
         import launch_plus.resolver as _R
 
         if context is not None and hasattr(context, "_state"):
             return context._state
-        return _R._state
+        return _R.get_state()
 
     def _try_ament_resolve(self, state, pkg: str) -> str:
         """Resolve to a real path, return portable form on failure."""

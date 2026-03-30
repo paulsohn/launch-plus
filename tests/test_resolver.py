@@ -91,29 +91,29 @@ class TestIsSubstitution:
 
 class TestTrackPackage:
     def test_tracks_plain_string(self):
-        R._track_package(R._state, "my_pkg")
-        assert "my_pkg" in R._state.tracked["packages"]
+        R._track_package(R.get_state(), "my_pkg")
+        assert "my_pkg" in R.get_state().tracked["packages"]
 
     def test_skips_substitution_object(self):
         lc = R._LaunchConfiguration("container_pkg")
-        R._track_package(R._state, lc)
-        assert "container_pkg" not in R._state.tracked["packages"]
-        assert len(R._state.tracked["packages"]) == 0
+        R._track_package(R.get_state(), lc)
+        assert "container_pkg" not in R.get_state().tracked["packages"]
+        assert len(R.get_state().tracked["packages"]) == 0
 
     def test_skips_empty_and_none(self):
-        R._track_package(R._state, None)
-        R._track_package(R._state, "")
-        assert len(R._state.tracked["packages"]) == 0
+        R._track_package(R.get_state(), None)
+        R._track_package(R.get_state(), "")
+        assert len(R.get_state().tracked["packages"]) == 0
 
     def test_deduplicates(self):
-        R._track_package(R._state, "pkg_a")
-        R._track_package(R._state, "pkg_a")
-        assert R._state.tracked["packages"].count("pkg_a") == 1
+        R._track_package(R.get_state(), "pkg_a")
+        R._track_package(R.get_state(), "pkg_a")
+        assert R.get_state().tracked["packages"].count("pkg_a") == 1
 
     def test_skips_list_of_substitutions(self):
         parts = [R._LaunchConfiguration("pkg_var"), "_suffix"]
-        R._track_package(R._state, parts)
-        assert len(R._state.tracked["packages"]) == 0
+        R._track_package(R.get_state(), parts)
+        assert len(R.get_state().tracked["packages"]) == 0
 
 
 # ─── _resolve_substitution ───────────────────────────────────────────────────
@@ -228,8 +228,8 @@ class TestNodeDeferredResolution:
 
         node.execute(ctx)
 
-        assert R._state.tracked["nodes"][node._idx]["package"] == "actual_package"
-        assert "actual_package" in R._state.tracked["packages"]
+        assert R.get_state().tracked["nodes"][node._idx]["package"] == "actual_package"
+        assert "actual_package" in R.get_state().tracked["packages"]
 
     def test_tracked_node_unresolved_package_stays_as_name(self):
         """When the LaunchConfiguration cannot be resolved (not in context),
@@ -242,9 +242,9 @@ class TestNodeDeferredResolution:
         node.execute(ctx)
 
         # The entry shows the variable name (display fallback from str(lc))
-        assert R._state.tracked["nodes"][node._idx]["package"] == "unknown_pkg"
+        assert R.get_state().tracked["nodes"][node._idx]["package"] == "unknown_pkg"
         # But it must NOT be tracked as a real package dependency
-        assert "unknown_pkg" not in R._state.tracked["packages"]
+        assert "unknown_pkg" not in R.get_state().tracked["packages"]
 
     def test_tracked_container_resolves_all_fields(self):
         ctx = _make_context(
@@ -262,11 +262,11 @@ class TestNodeDeferredResolution:
         container._ensure_tracked(ctx._state)
         R._resolve_node_details(ctx._state, container, ctx)
 
-        entry = R._state.tracked["nodes"][container._idx]
+        entry = R.get_state().tracked["nodes"][container._idx]
         assert entry["package"] == "rclcpp_components"
         assert entry["executable"] == "component_container_mt"
         assert entry["name"] == "my_container"
-        assert "rclcpp_components" in R._state.tracked["packages"]
+        assert "rclcpp_components" in R.get_state().tracked["packages"]
 
     def test_plain_string_package_tracked_on_execute(self):
         """When package is a plain string, it should be tracked after execute()."""
@@ -275,7 +275,7 @@ class TestNodeDeferredResolution:
         assert node._idx == -1  # not yet tracked
         node.execute(ctx)
         assert node._idx >= 0
-        assert "my_real_pkg" in R._state.tracked["packages"]
+        assert "my_real_pkg" in R.get_state().tracked["packages"]
 
 
 # ─── Composable plugin deferred resolution ────────────────────────────────────
@@ -292,7 +292,7 @@ class TestComposablePluginResolution:
         plugins = R._resolve_composable_plugins(ctx._state, [desc], ctx)
         assert len(plugins) == 1
         assert plugins[0]["package"] == "sensor_driver"
-        assert "sensor_driver" in R._state.tracked["packages"]
+        assert "sensor_driver" in R.get_state().tracked["packages"]
 
     def test_composable_node_unresolved_package_not_tracked(self):
         ctx = _make_context({})
@@ -302,7 +302,7 @@ class TestComposablePluginResolution:
         )
         plugins = R._resolve_composable_plugins(ctx._state, [desc], ctx)
         assert plugins[0]["package"] == "unknown"  # display fallback
-        assert "unknown" not in R._state.tracked["packages"]
+        assert "unknown" not in R.get_state().tracked["packages"]
 
     def test_composable_node_empty_string_remapping_preserved(self):
         """Remapping resolved to empty string should be preserved, not
@@ -342,7 +342,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({"parent_var": "parent_value"})
-            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
+            R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
 
             assert ctx._launch_configurations["child_var"] == "child_value"
             assert ctx._launch_configurations["parent_var"] == "parent_value"
@@ -368,7 +368,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
+            R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
 
             assert "child_only_arg" not in ctx._launch_configurations
             assert ctx._launch_configurations["sticky_var"] == "persists"
@@ -396,7 +396,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            R._inline_resolve_python_launch(R._state, child_path, ctx, {"mode": "custom"})
+            R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {"mode": "custom"})
 
             assert ctx._launch_configurations["resolved_mode"] == "custom"
 
@@ -415,16 +415,16 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            R._state.walk_depth = 21  # Simulate deep nesting
-            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
+            R.get_state().walk_depth = 21  # Simulate deep nesting
+            R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
             # Should not raise; just warns
-            assert any("depth" in w.lower() for w in R._state.tracked["warnings"])
-            R._state.walk_depth = 0  # Reset
+            assert any("depth" in w.lower() for w in R.get_state().tracked["warnings"])
+            R.get_state().walk_depth = 0  # Reset
 
     def test_missing_file_silently_skipped(self):
         """A non-existent include file should not raise."""
         ctx = _make_context({})
-        R._inline_resolve_python_launch(R._state, "/nonexistent/path.py", ctx, {})
+        R._inline_resolve_python_launch(R.get_state(), "/nonexistent/path.py", ctx, {})
         # No error, no crash
 
     def test_inline_include_keeps_tracked_nodes(self):
@@ -445,12 +445,12 @@ class TestInlinePythonInclude:
             """,
             )
 
-            nodes_before = len(R._state.tracked["nodes"])
+            nodes_before = len(R.get_state().tracked["nodes"])
             ctx = _make_context({})
-            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
+            R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
 
             # Inline include adds nodes to tracked state
-            assert len(R._state.tracked["nodes"]) > nodes_before
+            assert len(R.get_state().tracked["nodes"]) > nodes_before
 
     def test_inline_include_keeps_global_params(self):
         """SetParameter inside an inline-included child MUST create
@@ -471,12 +471,12 @@ class TestInlinePythonInclude:
             """,
             )
 
-            gp_before = len(R._state.tracked["global_params"])
+            gp_before = len(R.get_state().tracked["global_params"])
             ctx = _make_context({})
-            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
+            R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
 
             # Global params from inline include are kept
-            assert len(R._state.tracked["global_params"]) > gp_before
+            assert len(R.get_state().tracked["global_params"]) > gp_before
             # Context should also have them
             gp_list = ctx._launch_configurations.get("global_params", [])
             assert any(name == "wheel_radius" for name, _ in gp_list)
@@ -519,12 +519,12 @@ class TestInlinePythonInclude:
             """,
             )
 
-            deps_before = len(R._state.tracked["include_deps"])
+            deps_before = len(R.get_state().tracked["include_deps"])
             ctx = _make_context({})
-            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
+            R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
 
             # No new include deps
-            assert len(R._state.tracked["include_deps"]) == deps_before
+            assert len(R.get_state().tracked["include_deps"]) == deps_before
 
 
 # ─── Environment Variable Stack ──────────────────────────────────────────────
@@ -541,7 +541,7 @@ class TestEnvStack:
         node = R._TrackedNode(package="p", executable="e", name="n")
         set_env.execute(ctx)
         node.execute(ctx)
-        entry = R._state.tracked["nodes"][node._idx]
+        entry = R.get_state().tracked["nodes"][node._idx]
         assert entry["env"]["FOO"] == "bar"
 
     def test_unset_env_nonexistent_errors(self):
@@ -552,7 +552,7 @@ class TestEnvStack:
         assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
         R._TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
-        errors = R._state.tracked.get("errors", [])
+        errors = R.get_state().tracked.get("errors", [])
         assert any(name in e and "not set" in e for e in errors)
 
     def test_unset_env_override_only_accepted(self):
@@ -563,10 +563,10 @@ class TestEnvStack:
         assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
         R._TrackedSetEnvironmentVariable(name=name, value="val").execute(ctx)
-        assert name in R._state.env
+        assert name in R.get_state().env
         R._TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
-        assert name not in R._state.env
-        errors = R._state.tracked.get("errors", [])
+        assert name not in R.get_state().env
+        errors = R.get_state().tracked.get("errors", [])
         assert not any(name in e for e in errors)
 
     def test_group_scoped_env_does_not_leak(self):
@@ -579,7 +579,7 @@ class TestEnvStack:
         group.execute(ctx)
         node = R._TrackedNode(package="p", executable="e", name="n")
         node.execute(ctx)
-        entry = R._state.tracked["nodes"][node._idx]
+        entry = R.get_state().tracked["nodes"][node._idx]
         assert "SCOPED_VAR" not in entry["env"]
 
     def test_group_unscoped_env_leaks(self):
@@ -592,7 +592,7 @@ class TestEnvStack:
         group.execute(ctx)
         node = R._TrackedNode(package="p", executable="e", name="n")
         node.execute(ctx)
-        entry = R._state.tracked["nodes"][node._idx]
+        entry = R.get_state().tracked["nodes"][node._idx]
         assert entry["env"]["LEAKED_VAR"] == "val"
 
     def test_node_local_env_overrides_inherited(self):
@@ -606,7 +606,7 @@ class TestEnvStack:
             env=[("FOO", "local")],
         )
         node.execute(ctx)
-        entry = R._state.tracked["nodes"][node._idx]
+        entry = R.get_state().tracked["nodes"][node._idx]
         assert entry["env"]["FOO"] == "local"
 
     def test_inline_include_env_rollback(self):
@@ -628,13 +628,13 @@ class TestEnvStack:
                 """)
                 )
             ctx = _make_context()
-            R._inline_resolve_python_launch(R._state, child_path, ctx, {})
-            assert "CHILD_VAR" not in R._state.env
+            R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
+            assert "CHILD_VAR" not in R.get_state().env
 
     def test_env_overrides_returns_only_overrides(self):
         """_env_overrides() returns only explicitly set vars, not process env."""
-        R._state.env["NEW_VAR"] = "new_val"
-        overrides = R._env_overrides(R._state)
+        R.get_state().env["NEW_VAR"] = "new_val"
+        overrides = R._env_overrides(R.get_state())
         assert overrides["NEW_VAR"] == "new_val"
         # Process env vars must NOT appear in overrides.
         import os
@@ -644,14 +644,14 @@ class TestEnvStack:
 
     def test_env_overrides_empty_when_no_overrides(self):
         """Empty overrides when nothing has been set."""
-        assert R._env_overrides(R._state) == {}
+        assert R._env_overrides(R.get_state()) == {}
 
     def test_net_zero_error_includes_value(self):
         """Net-zero leak error includes the override value (safe, user-set)."""
-        R._state.env["MY_KEY"] = "my_value"
+        R.get_state().env["MY_KEY"] = "my_value"
         # Simulate the net-zero check inline (same logic as main())
         errors = []
-        for k, v in R._state.env.items():
+        for k, v in R.get_state().env.items():
             errors.append(
                 f"env var '{k}' was set to '{v}' but not restored (leaked from file scope)"
             )
@@ -665,7 +665,7 @@ class TestEnvStack:
         R._TrackedSetEnvironmentVariable(name="MY_OVERRIDE", value="val").execute(ctx)
         node = R._TrackedNode(package="p", executable="e", name="n")
         node.execute(ctx)
-        entry = R._state.tracked["nodes"][node._idx]
+        entry = R.get_state().tracked["nodes"][node._idx]
         # Only the explicit override should appear.
         assert entry["env"] == {"MY_OVERRIDE": "val"}
         # Process env vars like PATH must never leak.
@@ -958,11 +958,11 @@ class TestParseYamlLaunch:
 def _fresh_subst_ctx(**kwargs):
     """Create a _SubstitutionContext and reset module-level state for clean tests."""
     # Reset tracked state so _error/_warn/_track_package don't leak between tests
-    for key in R._state.tracked:
-        if isinstance(R._state.tracked[key], list):
-            R._state.tracked[key] = []
-        elif isinstance(R._state.tracked[key], dict):
-            R._state.tracked[key] = {}
+    for key in R.get_state().tracked:
+        if isinstance(R.get_state().tracked[key], list):
+            R.get_state().tracked[key] = []
+        elif isinstance(R.get_state().tracked[key], dict):
+            R.get_state().tracked[key] = {}
     ctx = R._SubstitutionContext()
     for k, v in kwargs.items():
         setattr(ctx, k, v)
@@ -1004,7 +1004,7 @@ class TestResolveSubstitutions:
         assert var not in os.environ, f"precondition: {var} must not be set"
         ctx = _fresh_subst_ctx()
         R.resolve_substitutions(f"$(env {var})", ctx)
-        assert any("not set" in e for e in R._state.tracked["errors"])
+        assert any("not set" in e for e in R.get_state().tracked["errors"])
 
     def test_resolve_dirname(self):
         ctx = _fresh_subst_ctx(launch_file_dir="/path/to/launch")
@@ -1020,13 +1020,13 @@ class TestResolveSubstitutions:
         ctx = _fresh_subst_ctx(preview_mode=True)
         result = R.resolve_substitutions("$(find-pkg-share my_pkg)/config", ctx)
         assert result == "$(find-pkg-share my_pkg)/config"
-        assert "my_pkg" in R._state.tracked["packages"]
+        assert "my_pkg" in R.get_state().tracked["packages"]
 
     def test_resolve_find_pkg_prefix(self):
         ctx = _fresh_subst_ctx()
         result = R.resolve_substitutions("$(find-pkg-prefix my_pkg)/lib", ctx)
         assert result == "$(find-pkg-prefix my_pkg)/lib"
-        assert "my_pkg" in R._state.tracked["packages"]
+        assert "my_pkg" in R.get_state().tracked["packages"]
 
     def test_resolve_nested_substitution(self):
         ctx = _fresh_subst_ctx(
@@ -1051,13 +1051,13 @@ class TestResolveSubstitutions:
         ctx = _fresh_subst_ctx()
         result = R.resolve_substitutions("$(arg undefined)", ctx)
         assert "$(arg undefined)" in result
-        assert any("undefined argument" in e for e in R._state.tracked["errors"])
+        assert any("undefined argument" in e for e in R.get_state().tracked["errors"])
 
     def test_resolve_error_undefined_var(self):
         ctx = _fresh_subst_ctx()
         result = R.resolve_substitutions("$(var undefined)", ctx)
         assert "$(var undefined)" in result
-        assert any("undefined variable" in e for e in R._state.tracked["errors"])
+        assert any("undefined variable" in e for e in R.get_state().tracked["errors"])
 
     def test_resolve_eval_string_equality(self):
         # After XML entity decoding, &quot; becomes " — the == is inside a
@@ -1140,8 +1140,8 @@ class TestResolveSubstitutions:
     def test_resolve_multiple_packages_tracked(self):
         ctx = _fresh_subst_ctx(preview_mode=True)
         R.resolve_substitutions("$(find-pkg-share pkg1)/$(find-pkg-share pkg2)", ctx)
-        assert "pkg1" in R._state.tracked["packages"]
-        assert "pkg2" in R._state.tracked["packages"]
+        assert "pkg1" in R.get_state().tracked["packages"]
+        assert "pkg2" in R.get_state().tracked["packages"]
 
 
 # ─── AST Walker (resolve_xml_elements) ───────────────────────────────────────
@@ -1150,15 +1150,15 @@ class TestResolveSubstitutions:
 def _fresh_walker_ctx(**kwargs):
     """Create a fresh _SubstitutionContext and reset ALL module-level state for walker tests."""
     # Reset tracked state
-    for key in R._state.tracked:
-        if isinstance(R._state.tracked[key], list):
-            R._state.tracked[key] = []
-        elif isinstance(R._state.tracked[key], dict):
-            R._state.tracked[key] = {}
+    for key in R.get_state().tracked:
+        if isinstance(R.get_state().tracked[key], list):
+            R.get_state().tracked[key] = []
+        elif isinstance(R.get_state().tracked[key], dict):
+            R.get_state().tracked[key] = {}
     # Reset module-level state
-    R._state.namespace_stack.clear()
-    R._state.env.clear()
-    R._state.declared_arg_names.clear()
+    R.get_state().namespace_stack.clear()
+    R.get_state().env.clear()
+    R.get_state().declared_arg_names.clear()
     ctx = R._SubstitutionContext()
     for k, v in kwargs.items():
         setattr(ctx, k, v)
@@ -1171,7 +1171,7 @@ def _parse_and_walk(xml_str, ctx=None, **ctx_kwargs):
         ctx = _fresh_walker_ctx(**ctx_kwargs)
     elements = R.parse_xml_launch(xml_str, "test.launch.xml")
     R.resolve_xml_elements(elements, ctx)
-    return ctx, R._state.tracked
+    return ctx, R.get_state().tracked
 
 
 class TestResolveXmlElements:
@@ -1749,7 +1749,7 @@ class TestResolveXmlElements:
                 f'<launch><include file="{self_path}"/></launch>', "test.launch.xml"
             )
             R.resolve_xml_elements(elements, ctx)
-            assert any("circular" in e for e in R._state.tracked["errors"])
+            assert any("circular" in e for e in R.get_state().tracked["errors"])
 
     # ── Unknown element ──
 
@@ -1801,8 +1801,8 @@ class TestResolveXmlElements:
         ctx = _fresh_walker_ctx()
         elements = R.parse_yaml_launch(yaml_content, "test.yaml")
         R.resolve_xml_elements(elements, ctx)
-        assert len(R._state.tracked["nodes"]) == 1
-        assert R._state.tracked["nodes"][0]["package"] == "default_model_pkg"
+        assert len(R.get_state().tracked["nodes"]) == 1
+        assert R.get_state().tracked["nodes"][0]["package"] == "default_model_pkg"
 
     def test_set_parameter_merged_into_node(self):
         """<set_parameter> values should be merged into subsequent nodes."""
@@ -1817,8 +1817,8 @@ class TestResolveXmlElements:
             "test.xml",
         )
         R.resolve_xml_elements(elements, ctx)
-        assert len(R._state.tracked["nodes"]) == 1
-        node = R._state.tracked["nodes"][0]
+        assert len(R.get_state().tracked["nodes"]) == 1
+        node = R.get_state().tracked["nodes"][0]
         assert node["parameters"].get("use_sim_time") == "true"
 
     def test_set_parameter_scoped_in_group(self):
@@ -1837,7 +1837,7 @@ class TestResolveXmlElements:
             "test.xml",
         )
         R.resolve_xml_elements(elements, ctx)
-        nodes = R._state.tracked["nodes"]
+        nodes = R.get_state().tracked["nodes"]
         assert len(nodes) == 2
         inner = next(n for n in nodes if n["package"] == "inner_pkg")
         outer = next(n for n in nodes if n["package"] == "outer_pkg")
@@ -1853,7 +1853,7 @@ def _parse_to_tracked(xml_str, **ctx_kwargs):
     ctx = _fresh_walker_ctx(**ctx_kwargs)
     elements = R.parse_xml_launch(xml_str, "test.launch.xml")
     R.resolve_xml_elements(elements, ctx)
-    return R._state.tracked
+    return R.get_state().tracked
 
 
 def _tracked_nodes(tracked):
@@ -2128,7 +2128,7 @@ class TestApplyDeclaredArgLazy:
 
     def test_default_not_resolved_when_arg_already_set(self):
         """FindPackageShare in default must not be perform()'d if arg is set."""
-        R._state.preview_mode = False
+        R.get_state().preview_mode = False
         # No package in AMENT — perform() would error if called.
         ctx = _make_context({"my_arg": "already_set_value"})
         arg = R._DeclaredArg(
@@ -2142,11 +2142,11 @@ class TestApplyDeclaredArgLazy:
         # Arg value unchanged (caller's value preserved).
         assert ctx._launch_configurations["my_arg"] == "already_set_value"
         # No error — default was not resolved.
-        assert not any("nonexistent_pkg" in e for e in R._state.tracked["errors"])
+        assert not any("nonexistent_pkg" in e for e in R.get_state().tracked["errors"])
 
     def test_default_deferred_when_arg_not_set(self):
         """Default is stored as _DeferredDefault, resolved on read."""
-        R._state.preview_mode = True
+        R.get_state().preview_mode = True
         ctx = _make_context({})
         arg = R._DeclaredArg(
             "my_arg",
@@ -2163,7 +2163,7 @@ class TestApplyDeclaredArgLazy:
 
     def test_deferred_default_not_resolved_if_never_read(self):
         """FindPackageShare for uninstalled pkg causes no error if arg is never read."""
-        R._state.preview_mode = False
+        R.get_state().preview_mode = False
         ctx = _make_context({})
         arg = R._DeclaredArg(
             "cuda_param",
@@ -2175,11 +2175,11 @@ class TestApplyDeclaredArgLazy:
         R._apply_declared_arg(arg, ctx)
         # Default is deferred — no resolution happened, no error.
         assert isinstance(ctx._launch_configurations["cuda_param"], R._DeferredDefault)
-        assert not any("uninstalled_cuda_pkg" in e for e in R._state.tracked["errors"])
+        assert not any("uninstalled_cuda_pkg" in e for e in R.get_state().tracked["errors"])
 
     def test_unresolved_default_recorded_for_show_args(self):
         """When arg is already set, the raw default string is recorded for --show-args."""
-        R._state.preview_mode = False
+        R.get_state().preview_mode = False
         ctx = _make_context({"my_arg": "caller_value"})
         arg = R._DeclaredArg(
             "my_arg",
@@ -2190,7 +2190,7 @@ class TestApplyDeclaredArgLazy:
         )
         R._apply_declared_arg(arg, ctx)
         # declared_args records the unresolved default (str() form).
-        recorded = R._state.tracked["declared_args"]
+        recorded = R.get_state().tracked["declared_args"]
         assert len(recorded) == 1
         assert "$(find-pkg-share some_pkg)" in recorded[0]["default"]
         assert "/config/file.yaml" in recorded[0]["default"]
@@ -2203,7 +2203,7 @@ class TestStrictnessFlags:
     """Tests for apply_arg_defaults, global_arg_cascade, allow_unportable_paths."""
 
     def test_apply_arg_defaults_true_applies_default(self):
-        R._state.apply_arg_defaults = True
+        R.get_state().apply_arg_defaults = True
         ctx = R._SubstitutionContext()
         elements = R.parse_xml_launch(
             '<launch><arg name="x" default="hello"/></launch>', "test.xml"
@@ -2212,7 +2212,7 @@ class TestStrictnessFlags:
         assert ctx.args["x"] == "hello"
 
     def test_apply_arg_defaults_false_skips_default(self):
-        R._state.apply_arg_defaults = False
+        R.get_state().apply_arg_defaults = False
         ctx = R._SubstitutionContext()
         elements = R.parse_xml_launch(
             '<launch><arg name="x" default="hello"/></launch>', "test.xml"
@@ -2222,7 +2222,7 @@ class TestStrictnessFlags:
         assert "x" not in ctx.args
 
     def test_apply_arg_defaults_false_undefined_ref_errors(self):
-        R._state.apply_arg_defaults = False
+        R.get_state().apply_arg_defaults = False
         ctx = R._SubstitutionContext()
         elements = R.parse_xml_launch(
             """<launch>
@@ -2232,12 +2232,12 @@ class TestStrictnessFlags:
             "test.xml",
         )
         R.resolve_xml_elements(elements, ctx)
-        assert any("undefined" in e for e in R._state.tracked["errors"])
+        assert any("undefined" in e for e in R.get_state().tracked["errors"])
 
     def test_global_arg_cascade_true_inherits_parent_args(self):
-        R._state.global_arg_cascade = True
+        R.get_state().global_arg_cascade = True
         with tempfile.TemporaryDirectory() as child_share:
-            R._state.package_shares["child_pkg"] = child_share
+            R.get_state().package_shares["child_pkg"] = child_share
             launch_dir = os.path.join(child_share, "launch")
             os.makedirs(launch_dir, exist_ok=True)
             with open(os.path.join(launch_dir, "child.launch.xml"), "w") as f:
@@ -2253,13 +2253,13 @@ class TestStrictnessFlags:
             )
             R.resolve_xml_elements(elements, ctx)
             # Child sees parent arg — no error
-            assert not R._state.tracked["errors"]
+            assert not R.get_state().tracked["errors"]
 
     def test_global_arg_cascade_false_no_parent_args(self):
-        R._state.global_arg_cascade = False
-        R._state.apply_arg_defaults = False
+        R.get_state().global_arg_cascade = False
+        R.get_state().apply_arg_defaults = False
         with tempfile.TemporaryDirectory() as child_share:
-            R._state.package_shares["child_pkg"] = child_share
+            R.get_state().package_shares["child_pkg"] = child_share
             launch_dir = os.path.join(child_share, "launch")
             os.makedirs(launch_dir, exist_ok=True)
             with open(os.path.join(launch_dir, "child.launch.xml"), "w") as f:
@@ -2275,30 +2275,30 @@ class TestStrictnessFlags:
             )
             R.resolve_xml_elements(elements, ctx)
             # Child can't see parent arg — undefined error
-            assert any("undefined" in e for e in R._state.tracked["errors"])
+            assert any("undefined" in e for e in R.get_state().tracked["errors"])
 
     def test_allow_unportable_paths_false_errors(self):
-        R._state.allow_unportable_paths = False
-        R._state.preview_mode = True
+        R.get_state().allow_unportable_paths = False
+        R.get_state().preview_mode = True
         ctx = R._SubstitutionContext()
         elements = R.parse_xml_launch(
             '<launch><include file="/absolute/path/to/file.launch.xml"/></launch>',
             "test.xml",
         )
         R.resolve_xml_elements(elements, ctx)
-        assert any("unportable" in e for e in R._state.tracked["errors"])
+        assert any("unportable" in e for e in R.get_state().tracked["errors"])
 
     def test_allow_unportable_paths_true_warns(self):
-        R._state.allow_unportable_paths = True
-        R._state.preview_mode = True
+        R.get_state().allow_unportable_paths = True
+        R.get_state().preview_mode = True
         ctx = R._SubstitutionContext()
         elements = R.parse_xml_launch(
             '<launch><include file="/absolute/path/to/file.launch.xml"/></launch>',
             "test.xml",
         )
         R.resolve_xml_elements(elements, ctx)
-        assert any("unportable" in w for w in R._state.tracked["warnings"])
-        assert not any("unportable" in e for e in R._state.tracked["errors"])
+        assert any("unportable" in w for w in R.get_state().tracked["warnings"])
+        assert not any("unportable" in e for e in R.get_state().tracked["errors"])
 
 
 # ─── _resolve_pkg_share and _TrackedFindPackageShare ─────────────────────────
@@ -2308,31 +2308,31 @@ class TestResolvePkgShare:
     """Tests for _resolve_pkg_share mode-dependent behavior."""
 
     def test_preview_returns_source_path_from_package_shares(self):
-        R._state.preview_mode = True
-        R._state.package_shares["my_pkg"] = "/ws/src/my_pkg"
-        assert R._resolve_pkg_share(R._state, "my_pkg") == "/ws/src/my_pkg"
+        R.get_state().preview_mode = True
+        R.get_state().package_shares["my_pkg"] = "/ws/src/my_pkg"
+        assert R._resolve_pkg_share(R.get_state(), "my_pkg") == "/ws/src/my_pkg"
 
     def test_preview_unknown_pkg_returns_portable(self):
-        R._state.preview_mode = True
-        result = R._resolve_pkg_share(R._state, "unknown_pkg")
+        R.get_state().preview_mode = True
+        result = R._resolve_pkg_share(R.get_state(), "unknown_pkg")
         assert result == "$(find-pkg-share unknown_pkg)"
 
     def test_postbuild_returns_install_path_from_package_shares(self):
-        R._state.preview_mode = False
-        R._state.package_shares["my_pkg"] = "/ws/install/my_pkg/share/my_pkg"
-        assert R._resolve_pkg_share(R._state, "my_pkg") == "/ws/install/my_pkg/share/my_pkg"
+        R.get_state().preview_mode = False
+        R.get_state().package_shares["my_pkg"] = "/ws/install/my_pkg/share/my_pkg"
+        assert R._resolve_pkg_share(R.get_state(), "my_pkg") == "/ws/install/my_pkg/share/my_pkg"
 
     def test_postbuild_unknown_pkg_raises(self):
-        R._state.preview_mode = False
+        R.get_state().preview_mode = False
         import pytest
 
         with pytest.raises(LookupError, match="not found in AMENT_PREFIX_PATH"):
-            R._resolve_pkg_share(R._state, "unknown_pkg")
+            R._resolve_pkg_share(R.get_state(), "unknown_pkg")
 
     def test_postbuild_skips_lockfile_fetch(self):
         """In postbuild mode, lockfile packages not in _package_shares are not fetched."""
-        R._state.preview_mode = False
-        R._state.lockfile_data = {
+        R.get_state().preview_mode = False
+        R.get_state().lockfile_data = {
             "lockfile_pkg": {
                 "repo": "org/repo",
                 "path": "pkg",
@@ -2344,32 +2344,32 @@ class TestResolvePkgShare:
 
         # Should raise, not attempt to fetch
         with pytest.raises(LookupError, match="not found in AMENT_PREFIX_PATH"):
-            R._resolve_pkg_share(R._state, "lockfile_pkg")
+            R._resolve_pkg_share(R.get_state(), "lockfile_pkg")
 
 
 class TestTrackedFindPackageShare:
     """Tests for _TrackedFindPackageShare mode-dependent perform()/str()."""
 
     def test_preview_returns_portable(self):
-        R._state.preview_mode = True
+        R.get_state().preview_mode = True
         fps = R._TrackedFindPackageShare("my_pkg")
         assert fps.perform(None) == "$(find-pkg-share my_pkg)"
         assert str(fps) == "$(find-pkg-share my_pkg)"
 
     def test_postbuild_returns_install_path(self):
-        R._state.preview_mode = False
-        R._state.package_shares["my_pkg"] = "/install/share/my_pkg"
+        R.get_state().preview_mode = False
+        R.get_state().package_shares["my_pkg"] = "/install/share/my_pkg"
         fps = R._TrackedFindPackageShare("my_pkg")
         assert fps.perform(None) == "/install/share/my_pkg"
         assert str(fps) == "/install/share/my_pkg"
 
     def test_postbuild_unresolvable_reports_error(self):
-        R._state.preview_mode = False
+        R.get_state().preview_mode = False
         fps = R._TrackedFindPackageShare("missing_pkg")
         result = fps.perform(None)
         # Returns portable fallback but records an error
         assert result == "$(find-pkg-share missing_pkg)"
-        assert any("missing_pkg" in e for e in R._state.tracked["errors"])
+        assert any("missing_pkg" in e for e in R.get_state().tracked["errors"])
 
 
 class TestParseRosdepResolve:

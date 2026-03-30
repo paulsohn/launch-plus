@@ -26,10 +26,10 @@ _install_import_patching()
 @pytest.fixture(autouse=True)
 def _reset_resolver_state():
     """Reset resolver module-level state before every test."""
-    R._state.reset()
+    R.get_state().reset()
     # Test defaults differ from production defaults:
-    R._state.preview_mode = True
-    R._state.apply_arg_defaults = True
-    R._state.global_arg_cascade = True
+    R.get_state().preview_mode = True
+    R.get_state().apply_arg_defaults = True
+    R.get_state().global_arg_cascade = True
     yield
     # No teardown needed — next invocation resets again.

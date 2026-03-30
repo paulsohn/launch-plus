@@ -168,10 +168,10 @@ def _action_name(action):
     """Extract the node name from a tracked action for event handler targeting.
 
     Called at Python shim construction time (during ``execute()`` of the walker),
-    so ``_R._state`` is always the active resolver state.
+    so ``_R.get_state()`` is always the active resolver state.
     """
     if action is not None and hasattr(action, "_idx"):
-        return _R._state.tracked["nodes"][action._idx].get("name", "")
+        return _R.get_state().tracked["nodes"][action._idx].get("name", "")
     return ""
 
 
@@ -179,11 +179,11 @@ def _action_namespace_info(action):
     """Extract namespace_stack and explicit_namespace for a tracked node action.
 
     Called at Python shim construction time (during ``execute()`` of the walker),
-    so ``_R._state`` is always the active resolver state.
+    so ``_R.get_state()`` is always the active resolver state.
     """
     if action is None or not hasattr(action, "_idx"):
         return [], None
-    entry = _R._state.tracked["nodes"][action._idx]
+    entry = _R.get_state().tracked["nodes"][action._idx]
     return entry.get("namespace_stack", []), entry.get("explicit_namespace")
 
 
@@ -233,7 +233,7 @@ class _TrackedShutdown(_TrackedAction):
 
     def __init__(self, **kwargs):
         if kwargs:
-            _R._state.error(
+            _R.get_state().error(
                 f"Shutdown event arguments are not yet supported: "
                 f"{', '.join(f'{k}={v!r}' for k, v in kwargs.items())}"
             )

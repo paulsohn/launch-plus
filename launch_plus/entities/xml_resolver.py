@@ -49,9 +49,9 @@ class _SubstitutionContext:
 
     def __init__(self, state=None) -> None:
         if state is None:
-            from launch_plus.resolver import _state
+            from launch_plus.resolver import get_state
 
-            state = _state
+            state = get_state()
         self._state = state
         self.args: dict[str, str] = {}
         self.vars: dict[str, str] = {}

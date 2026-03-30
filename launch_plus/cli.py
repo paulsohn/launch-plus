@@ -920,6 +920,7 @@ def _cmd_resolve(
 ) -> None:
     """Shared resolve/check implementation."""
     from launch_plus.fetcher import FetchOptions
+    from launch_plus.log import DiagnosticCollector
     from launch_plus.orchestrator import resolve_launch_recursive
     from launch_plus.renderer import render_resolved_xml
 
@@ -931,15 +932,20 @@ def _cmd_resolve(
         workspace_state=workspace_state,
     )
 
-    result = resolve_launch_recursive(
-        parsed_lockfile,
-        package,
-        launcher,
-        fetch_path,
-        options=options,
-        initial_args=initial_args,
-        workflow_options=workflow_options,
-    )
+    collector = DiagnosticCollector()
+    logging.getLogger("launch_plus").addHandler(collector)
+    try:
+        result = resolve_launch_recursive(
+            parsed_lockfile,
+            package,
+            launcher,
+            fetch_path,
+            options=options,
+            initial_args=initial_args,
+            workflow_options=workflow_options,
+        )
+    finally:
+        logging.getLogger("launch_plus").removeHandler(collector)
 
     # Render XML to stdout
     if not suppress_xml:
@@ -958,8 +964,8 @@ def _cmd_resolve(
         click.echo(xml)
 
     # Diagnostics to stderr
-    all_errors = result.errors
-    has_diagnostics = bool(all_errors) or bool(result.warnings)
+    all_errors = collector.errors
+    has_diagnostics = bool(all_errors) or bool(collector.warnings)
 
     if all_errors:
         click.echo(err=True)
@@ -998,30 +1004,17 @@ def _cmd_resolve(
                 err=True,
             )
 
-    if result.warnings:
+    if collector.warnings:
         click.echo(err=True)
-        for w in result.warnings:
+        for w in collector.warnings:
             click.echo(f"[warning] {w}", err=True)
 
-    info_count = len(result.infos)
-    if warn_all and result.infos:
+    if has_diagnostics:
         click.echo(err=True)
-        for info in result.infos:
-            click.echo(f"[info] {info}", err=True)
-
-    if has_diagnostics or info_count > 0:
-        click.echo(err=True)
-        if info_count > 0 and not warn_all:
-            click.echo(
-                f"{len(all_errors)} error(s), {len(result.warnings)} warning(s), "
-                f"{info_count} info(s) suppressed (use --warn-all to show).",
-                err=True,
-            )
-        else:
-            click.echo(
-                f"{len(all_errors)} error(s), {len(result.warnings)} warning(s).",
-                err=True,
-            )
+        click.echo(
+            f"{len(all_errors)} error(s), {len(collector.warnings)} warning(s).",
+            err=True,
+        )
 
     if report:
         click.echo(err=True)
@@ -1044,7 +1037,7 @@ def _cmd_resolve(
 
     # Exit policy
     has_errors = bool(all_errors)
-    has_warnings = bool(result.warnings)
+    has_warnings = bool(collector.warnings)
     should_fail = has_errors or (strict and has_warnings) if suppress_xml else has_errors
 
     if should_fail:
@@ -1072,6 +1065,7 @@ def _run_build(
     """Shared build/test implementation."""
     from launch_plus.builder import BuildOptions, execute_build, plan_build_from_packages
     from launch_plus.fetcher import FetchOptions
+    from launch_plus.log import DiagnosticCollector
     from launch_plus.orchestrator import resolve_launch_recursive
     from launch_plus.rosdep import rosdep_install
 
@@ -1083,18 +1077,23 @@ def _run_build(
         workspace_state=workspace_state,
     )
 
-    result = resolve_launch_recursive(
-        parsed_lockfile,
-        package,
-        launcher,
-        fetch_path,
-        options=fetch_options,
-        initial_args=initial_args,
-        workflow_options=workflow_options,
-    )
+    collector = DiagnosticCollector()
+    logging.getLogger("launch_plus").addHandler(collector)
+    try:
+        result = resolve_launch_recursive(
+            parsed_lockfile,
+            package,
+            launcher,
+            fetch_path,
+            options=fetch_options,
+            initial_args=initial_args,
+            workflow_options=workflow_options,
+        )
+    finally:
+        logging.getLogger("launch_plus").removeHandler(collector)
 
-    if result.errors:
-        for e in result.errors:
+    if collector.errors:
+        for e in collector.errors:
             click.echo(f"[error] {e}", err=True)
         raise click.ClickException("resolve step produced errors; aborting build")
 

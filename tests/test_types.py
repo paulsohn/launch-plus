@@ -171,7 +171,6 @@ class TestDataclassConstruction:
         plf = ParsedLaunchFile()
         assert plf.nodes == []
         assert plf.launch_includes == []
-        assert plf.warnings == []
 
     def test_event_handler_kind_tag_name(self) -> None:
         assert EventHandlerKind.ON_PROCESS_START.tag_name == "on_process_start"

@@ -78,9 +78,6 @@ class ResolveResult:
     parsed_files: list[Path] = field(default_factory=list)
     nodes: list[ResolvedNode] = field(default_factory=list)
     include_args: dict[tuple[str, Path], IncludeArgContext] = field(default_factory=dict)
-    errors: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    infos: list[str] = field(default_factory=list)
     declared_args_by_file: dict[tuple[str, Path], dict[str, str]] = field(default_factory=dict)
     global_params: list[list] = field(default_factory=list)
     initial_args: dict[str, str] = field(default_factory=dict)
@@ -117,7 +114,7 @@ def _ensure_package_fetched(
 
     pkg_lock = lockfile.packages.get(package)
     if pkg_lock is None:
-        result.errors.append(f"package '{package}' not found in lockfile")
+        logger.error("package '%s' not found in lockfile", package)
         return False
 
     if pkg_lock.repo in failed_repos:
@@ -144,12 +141,12 @@ def _ensure_package_fetched(
         fetched_packages.add(package)
         return True
     except LaunchPlusError as e:
-        result.errors.append(f"failed to fetch package '{package}': {e}")
+        logger.error("failed to fetch package '%s': %s", package, e)
         failed_repos.add(pkg_lock.repo)
         return False
 
 
-def _try_rosdep_install(package: str, result: ResolveResult) -> bool:
+def _try_rosdep_install(package: str) -> bool:
     """Attempt to install a missing ROS package via rosdep."""
     try:
         from launch_plus.rosdep import rosdep_install
@@ -157,7 +154,7 @@ def _try_rosdep_install(package: str, result: ResolveResult) -> bool:
         rosdep_install([package])
         return True
     except Exception as e:
-        result.errors.append(str(e))
+        logger.error("%s", e)
         return False
 
 
@@ -190,9 +187,6 @@ def _process_parsed_file(
             result.other_files.append(dep)
             existing_other.add((dep.package, dep.share_path))
 
-    result.warnings.extend(parsed.warnings)
-    result.errors.extend(parsed.errors)
-    result.infos.extend(parsed.infos)
     result.global_params.extend(parsed.global_params)
     result.parsed_files.append(file_path)
 
@@ -282,35 +276,38 @@ def _resolve_python_file_recursive(
                 return
             file_path = locator.resolve_share_file(package, share_path)
             if file_path is None:
-                result.errors.append(
-                    f"could not locate launch file '{share_path}' in package '{package}'"
+                logger.error(
+                    "could not locate launch file '%s' in package '%s'", share_path, package
                 )
                 return
         else:
             file_path = locator.resolve_install_file(package, share_path)
             if file_path is None:
                 if workflow_options.rosdep_fallback:
-                    if _try_rosdep_install(package, result):
+                    if _try_rosdep_install(package):
                         file_path = locator.resolve_install_file(package, share_path)
                         if file_path is None:
-                            result.errors.append(
-                                f"package '{package}' not found even after rosdep install"
+                            logger.error(
+                                "package '%s' not found even after rosdep install", package
                             )
                             return
                     else:
                         return
                 else:
-                    result.errors.append(
-                        f"package '{package}' not found in lockfile or AMENT_PREFIX_PATH; "
-                        "use --rosdep to install missing packages automatically"
+                    logger.error(
+                        "package '%s' not found in lockfile or AMENT_PREFIX_PATH; "
+                        "use --rosdep to install missing packages automatically",
+                        package,
                     )
                     return
     else:
         file_path = locator.resolve_install_file(package, share_path)
         if file_path is None:
-            result.errors.append(
-                f"{package}://{share_path} not found in AMENT_PREFIX_PATH; "
-                "run 'colcon build' first, or use --preview to resolve from source workspace"
+            logger.error(
+                "%s://%s not found in AMENT_PREFIX_PATH; "
+                "run 'colcon build' first, or use --preview to resolve from source workspace",
+                package,
+                share_path,
             )
             return
 
@@ -336,24 +333,12 @@ def _resolve_python_file_recursive(
             global_params=current_global_params,
         )
     except Exception as e:
-        result.errors.append(f"failed to resolve launch file {file_path}: {e}")
+        logger.error("failed to resolve launch file %s: %s", file_path, e)
         return
 
     # Build include chain
     current_chain = list(parent_chain)
     current_chain.append((package, share_path))
-
-    # Promote warnings/errors
-    for warning in parsed.warnings:
-        logger.warning("py_resolver [%s]: %s", file_path, warning)
-        result.warnings.append(f"{package}://{share_path}: {warning}")
-    for error in parsed.errors:
-        logger.warning("py_resolver error [%s]: %s", file_path, error)
-        result.errors.append(f"{package}://{share_path}: {error}")
-
-    # Clear warnings/errors from parsed (already promoted)
-    parsed.warnings = []
-    parsed.errors = []
 
     _process_parsed_file(parsed, package, share_path, file_path, current_chain, result)
 
@@ -392,7 +377,7 @@ def resolve_launch_recursive(
     # Warn if ROS_DISTRO is not set
     ros_distro = os.environ.get("ROS_DISTRO", "")
     if not ros_distro:
-        result.warnings.append(
+        logger.warning(
             "ROS_DISTRO is not set; source /opt/ros/<distro>/setup.bash for full functionality. "
             "Packages not in the lockfile will not be found via AMENT_PREFIX_PATH."
         )
@@ -414,11 +399,9 @@ def resolve_launch_recursive(
     )
 
     logger.info(
-        "Resolution complete: %d direct packages, %d packages fetched, %d errors, %d warnings",
+        "Resolution complete: %d direct packages, %d packages fetched",
         len(result.direct_packages),
         len(result.fetched_packages),
-        len(result.errors),
-        len(result.warnings),
     )
 
     return result

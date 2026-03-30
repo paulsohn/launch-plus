@@ -9,7 +9,31 @@ singleton from this module.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+_logger = logging.getLogger("launch_plus")
+
+
+class _TrackedLogHandler(logging.Handler):
+    """Handler that appends log messages to ``tracked["warnings"]``/``tracked["errors"]``.
+
+    Attached to the ``launch_plus`` logger for the lifetime of a
+    :class:`ResolverState` so that ``logger.warning()``/``logger.error()``
+    calls automatically populate the tracked diagnostic lists.
+    """
+
+    def __init__(self, tracked: dict[str, Any]) -> None:
+        super().__init__()
+        self.tracked = tracked
+
+    def emit(self, record: logging.LogRecord) -> None:
+        msg = self.format(record)
+        if record.levelno >= logging.ERROR:
+            self.tracked["errors"].append(msg)
+        elif record.levelno >= logging.WARNING:
+            self.tracked["warnings"].append(msg)
+
 
 # ─── Resolver State ──────────────────────────────────────────────────────────
 
@@ -25,6 +49,7 @@ class ResolverState:
 
     __slots__ = (
         "tracked",
+        "_log_handler",
         "declared_arg_names",
         "namespace_stack",
         "include_chain",
@@ -49,18 +74,22 @@ class ResolverState:
     )
 
     def __init__(self) -> None:
+        self._log_handler: _TrackedLogHandler | None = None
         self.reset()
 
     def warn(self, msg: str) -> None:
-        """Append a warning message."""
-        self.tracked["warnings"].append(msg)
+        """Log a warning via the project logger."""
+        _logger.warning("%s", msg)
 
     def error(self, msg: str) -> None:
-        """Append an error message."""
-        self.tracked["errors"].append(msg)
+        """Log an error via the project logger."""
+        _logger.error("%s", msg)
 
     def reset(self) -> None:
         """Reset all state to initial values."""
+        # Detach previous log handler if any.
+        if hasattr(self, "_log_handler") and self._log_handler is not None:
+            _logger.removeHandler(self._log_handler)
         self.tracked: dict[str, Any] = {
             "packages": [],
             "includes": [],
@@ -98,6 +127,9 @@ class ResolverState:
         self.rosdep_attempted: set = set()
         self.root_source_key: str = ""
         self.walk_depth: int = 0
+        # Attach a log handler that populates tracked["warnings"]/["errors"].
+        self._log_handler = _TrackedLogHandler(self.tracked)
+        _logger.addHandler(self._log_handler)
 
 
 # ─── LaunchContext stub ───────────────────────────────────────────────────────

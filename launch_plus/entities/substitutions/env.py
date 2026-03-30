@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import TYPE_CHECKING, Any
 
 from launch_plus.entities.expose import expose_substitution
 from launch_plus.entities.substitution import Substitution
+
+logger = logging.getLogger("launch_plus")
 
 if TYPE_CHECKING:
     from launch_plus.resolver import _SubstitutionContext
@@ -46,7 +49,7 @@ class EnvSubstitution(Substitution):
         if value is None and self.default is not None:
             value = resolve_substitutions_from_tokens(self.default, ctx, _depth=_depth + 1)
         if value is None:
-            ctx._state.error(f"environment variable not set: {name}")
+            logger.error("environment variable not set: %s", name)
             return f"$(env {name})"
         return str(value)
 

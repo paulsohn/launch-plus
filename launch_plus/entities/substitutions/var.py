@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from launch_plus.entities.expose import expose_substitution
 from launch_plus.entities.substitution import Substitution
+
+logger = logging.getLogger("launch_plus")
 
 if TYPE_CHECKING:
     from launch_plus.resolver import _SubstitutionContext
@@ -36,7 +39,7 @@ class VarSubstitution(Substitution):
         else:
             value = None
         if value is None:
-            ctx._state.error(f"undefined variable: {name}")
+            logger.error("undefined variable: %s", name)
             return f"$(var {name})"
         return resolve_substitutions_from_tokens(parse_to_tokens(value), ctx, _depth=_depth + 1)
 

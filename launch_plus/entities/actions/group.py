@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
+
+logger = logging.getLogger("launch_plus")
 
 
 @expose_action("group")
@@ -46,7 +50,7 @@ class _TrackedGroupAction(_TrackedAction):
                 if not self._condition.evaluate(context):
                     return None
             except Exception as e:
-                context._state.warn(f"GroupAction condition evaluation failed: {e}")
+                logger.warning("GroupAction condition evaluation failed: %s", e)
                 return None
         if self._xml_children is not None:
             self._execute_xml(context)
@@ -105,7 +109,7 @@ class _TrackedOpaqueFunction(_TrackedAction):
                 result = _R._call_opaque_with_stubs(state, fn, context)
                 return result if result else None
             except Exception as e:
-                state.error(f"OpaqueFunction failed: {e}")
+                logger.error("OpaqueFunction failed: %s", e)
         return None
 
 

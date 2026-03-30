@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 
 import launch_plus.resolver as _R
@@ -13,6 +14,8 @@ from launch_plus.resolver import (
     _parse_portable_path,
     _resolve_pkg_share,
 )
+
+logger = logging.getLogger("launch_plus")
 
 
 @expose_action("include")
@@ -83,16 +86,16 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             and "$(dirname)" not in (self._xml_raw_file or "")
         ):
             if ctx._state.allow_unportable_paths:
-                ctx._state.warn(f"unportable absolute path in include: {file_path}")
+                logger.warning("unportable absolute path in include: %s", file_path)
             else:
-                ctx._state.error(f"unportable absolute path in include: {file_path}")
+                logger.error("unportable absolute path in include: %s", file_path)
 
         include_stack = self._xml_include_stack or []
         if file_path in include_stack:
-            ctx._state.error(f"circular include detected: {file_path}")
+            logger.error("circular include detected: %s", file_path)
             return None
         if len(include_stack) > 20:
-            ctx._state.warn(f"max include depth exceeded for {file_path}")
+            logger.warning("max include depth exceeded for %s", file_path)
             return None
 
         dep_idx = _R._track_include(ctx._state, file_path)
@@ -133,7 +136,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
                 try:
                     path = src.perform(context)
                 except Exception as e:
-                    context._state.warn(f"failed to resolve IncludeLaunchDescription source: {e}")
+                    logger.warning("failed to resolve IncludeLaunchDescription source: %s", e)
             if path:
                 self._path = path
                 dep_idx = _R._track_include(context._state, path)
@@ -201,4 +204,4 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
             else:
                 state.tracked["include_args"][path] = captured
     except Exception as e:
-        state.warn(f"failed to resolve include args for '{path}': {e}")
+        logger.warning("failed to resolve include args for '%s': %s", path, e)

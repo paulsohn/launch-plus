@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from launch_plus.entities.expose import expose_substitution
 from launch_plus.entities.substitution import Substitution
+
+logger = logging.getLogger("launch_plus")
 
 if TYPE_CHECKING:
     from launch_plus.resolver import _SubstitutionContext
@@ -47,7 +50,7 @@ class EvalSubstitution(Substitution):
             result = eval(expr)  # noqa: S307
             return str(result)
         except Exception as e:
-            ctx._state.error(f"$(eval {expr}) failed: {e}")
+            logger.error("$(eval %s) failed: %s", expr, e)
             if ctx.preview_mode:
                 return f"$(eval {expr})"
             return ""

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from launch_plus.entities.expose import expose_substitution
 from launch_plus.entities.substitution import Substitution
+
+logger = logging.getLogger("launch_plus")
 
 if TYPE_CHECKING:
     from launch_plus.resolver import _SubstitutionContext
@@ -95,7 +98,7 @@ class _TrackedFindPackageShare:
             return _R._resolve_pkg_share(state, pkg)
         except Exception as e:
             if not state.preview_mode:
-                state.error(f"$(find-pkg-share {pkg}): {e}")
+                logger.error("$(find-pkg-share %s): %s", pkg, e)
             return f"$(find-pkg-share {pkg})"
 
     def perform(self, context):

@@ -5,10 +5,13 @@ Adapted from ROS 2 ``launch_xml.entity`` and ``launch_xml.parser``.
 
 from __future__ import annotations
 
+import logging
 import xml.etree.ElementTree as ET
 from typing import Any
 
 from launch_plus.parsers.entity import Entity
+
+logger = logging.getLogger("launch_plus")
 
 # ── Type coercion helpers ────────────────────────────────────────────────────
 
@@ -125,7 +128,5 @@ def parse_xml_launch(content: str, file_path: str) -> list[XmlEntity]:
     """Parse an XML launch file and return a list of root-level :class:`XmlEntity` objects."""
     root = ET.fromstring(content)  # noqa: S314
     if root.tag != "launch":
-        from launch_plus.resolver import get_state
-
-        get_state().warn(f"XML launch file '{file_path}' has unexpected root tag <{root.tag}>")
+        logger.warning("XML launch file '%s' has unexpected root tag <%s>", file_path, root.tag)
     return [XmlEntity(child) for child in root]

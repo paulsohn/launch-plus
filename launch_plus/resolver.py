@@ -17,12 +17,15 @@ import importlib.abc
 import importlib.machinery
 import importlib.util
 import json
+import logging
 import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger("launch_plus")
 
 # Ensure substitution entity classes are registered before any parsing occurs.
 import launch_plus.entities  # noqa: F401
@@ -212,14 +215,14 @@ def _ensure_fetched(state, package: str) -> bool:
             state.package_shares[package] = pkg_dir
             return True
         else:
-            state.warn(f"fetched package '{package}' but package.xml not found at {pkg_dir}")
+            logger.warning("fetched package '%s' but package.xml not found at %s", package, pkg_dir)
             return False
 
     except subprocess.CalledProcessError as e:
-        state.warn(f"git fetch failed for package '{package}': {e.stderr or e}")
+        logger.warning("git fetch failed for package '%s': %s", package, e.stderr or e)
         return False
     except Exception as e:
-        state.warn(f"failed to fetch package '{package}': {e}")
+        logger.warning("failed to fetch package '%s': %s", package, e)
         return False
 
 
@@ -284,14 +287,14 @@ def _resolve_pkg_share(state, package: str) -> str:
         ):
             if _ensure_fetched(state, package):
                 return str(state.package_shares[package])
-            state.error(f"failed to fetch package '{package}' from lockfile")
+            logger.error("failed to fetch package '%s' from lockfile", package)
             return f"$(find-pkg-share {package})"
         return pkg_path
     # 2. Lockfile package not yet in state.package_shares — fetch (preview only).
     if state.preview_mode and state.lockfile_data and package in state.lockfile_data:
         if _ensure_fetched(state, package):
             return str(state.package_shares[package])
-        state.error(f"failed to fetch package '{package}' from lockfile")
+        logger.error("failed to fetch package '%s' from lockfile", package)
         return f"$(find-pkg-share {package})"
     # 3. Non-lockfile packages (system / rosdep): use AMENT_PREFIX_PATH.
     if _real_get_package_share_directory is not None:
@@ -759,12 +762,12 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
             f"_inline_launch_{state.walk_depth}", real_path
         )
         if spec is None or spec.loader is None:
-            state.warn(f"cannot load included launch file: {real_path}")
+            logger.warning("cannot load included launch file: %s", real_path)
             return
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
     except Exception as e:
-        state.warn(f"failed to load included launch file {real_path}: {e}")
+        logger.warning("failed to load included launch file %s: %s", real_path, e)
         return
 
     if not hasattr(mod, "generate_launch_description"):
@@ -794,7 +797,7 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
         try:
             ld = mod.generate_launch_description()
         except Exception as e:
-            state.warn(f"generate_launch_description() failed in {launch_file}: {e}")
+            logger.warning("generate_launch_description() failed in %s: %s", launch_file, e)
             return
 
         entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
@@ -852,7 +855,7 @@ def _walk_actions(state, actions, context):
     state.walk_depth += 1
     if state.walk_depth > 20:
         state.walk_depth -= 1
-        state.warn("Max include depth reached while walking Python launch description")
+        logger.warning("Max include depth reached while walking Python launch description")
         return
     try:
         for action in actions:
@@ -866,7 +869,7 @@ def _walk_actions(state, actions, context):
                 else:
                     _walk_untracked_action(state, action, context)
             except Exception as e:
-                state.error(f"Error walking action {type(action).__name__}: {e}")
+                logger.error("Error walking action %s: %s", type(action).__name__, e)
     finally:
         state.walk_depth -= 1
 
@@ -890,7 +893,7 @@ def _walk_untracked_action(state, action, context):
                 if result:
                     _walk_actions(state, result, context)
             except Exception as e:
-                state.error(f"OpaqueFunction failed: {e}")
+                logger.error("OpaqueFunction failed: %s", e)
         return
 
     # Walk nested actions/entities from generic action objects
@@ -898,12 +901,12 @@ def _walk_untracked_action(state, action, context):
         try:
             _walk_actions(state, action.entities, context)
         except Exception as e:
-            state.warn(f"failed to walk {cls_name}.entities: {e}")
+            logger.warning("failed to walk %s.entities: %s", cls_name, e)
     if hasattr(action, "_actions"):
         try:
             _walk_actions(state, action._actions, context)
         except Exception as e:
-            state.warn(f"failed to walk {cls_name}._actions: {e}")
+            logger.warning("failed to walk %s._actions: %s", cls_name, e)
 
     # Real Node/LifecycleNode from launch_ros (unpatched, e.g. from OpaqueFunction return)
     if cls_name in ("Node", "LifecycleNode") and hasattr(action, "_package"):
@@ -962,9 +965,10 @@ def _walk_untracked_action(state, action, context):
 
     # Warn about action classes we do not recognise.
     if cls_name not in _KNOWN_UNTRACKED_CLASSES:
-        state.warn(
-            f"Unrecognised action type '{cls_name}' — any nodes or includes it "
-            f"declares may not appear in the resolved output"
+        logger.warning(
+            "Unrecognised action type '%s' — any nodes or includes it "
+            "declares may not appear in the resolved output",
+            cls_name,
         )
 
 
@@ -1159,7 +1163,7 @@ def _resolve_file_impl(
             with open(launch_file_str) as f:
                 content = f.read()
         except Exception as e:
-            state.error(f"cannot read {launch_file_str}: {e}")
+            logger.error("cannot read %s: %s", launch_file_str, e)
             return _tracked_to_parsed_launch_file(state.tracked)
 
         if launch_file_str.endswith((".yaml", ".yml")):
@@ -1177,18 +1181,18 @@ def _resolve_file_impl(
     # ── Python launch files ──────────────────────────────────────────────
     spec = importlib.util.spec_from_file_location("_target_launch", launch_file_str)
     if spec is None or spec.loader is None:
-        state.error(f"cannot load {launch_file_str}")
+        logger.error("cannot load %s", launch_file_str)
         return _tracked_to_parsed_launch_file(state.tracked)
 
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
     except Exception as e:
-        state.error(f"Error loading launch file: {e}")
+        logger.error("Error loading launch file: %s", e)
         return _tracked_to_parsed_launch_file(state.tracked)
 
     if not hasattr(mod, "generate_launch_description"):
-        state.error("No generate_launch_description() function found")
+        logger.error("No generate_launch_description() function found")
         return _tracked_to_parsed_launch_file(state.tracked)
 
     # Inject persisted global params
@@ -1208,7 +1212,7 @@ def _resolve_file_impl(
     try:
         ld = mod.generate_launch_description()
     except Exception as e:
-        state.error(f"generate_launch_description() failed: {e}")
+        logger.error("generate_launch_description() failed: %s", e)
         return _tracked_to_parsed_launch_file(state.tracked)
 
     entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []

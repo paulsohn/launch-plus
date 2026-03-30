@@ -5,9 +5,12 @@ Adapted from ROS 2 ``launch_yaml.entity`` and ``launch_yaml.parser``.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from launch_plus.parsers.entity import Entity
+
+logger = logging.getLogger("launch_plus")
 
 # ── Tag normalization ────────────────────────────────────────────────────────
 
@@ -143,16 +146,12 @@ def parse_yaml_launch(content: str, file_path: str) -> list[YamlEntity]:
 
     data = yaml.safe_load(content)
     if not isinstance(data, dict) or "launch" not in data:
-        from launch_plus.resolver import get_state
-
-        get_state().warn(f"YAML launch file '{file_path}' missing 'launch' root key")
+        logger.warning("YAML launch file '%s' missing 'launch' root key", file_path)
         return []
 
     launch_list = data["launch"]
     if not isinstance(launch_list, list):
-        from launch_plus.resolver import get_state
-
-        get_state().warn(f"YAML 'launch' key in '{file_path}' is not a list")
+        logger.warning("YAML 'launch' key in '%s' is not a list", file_path)
         return []
 
     entities: list[YamlEntity] = []

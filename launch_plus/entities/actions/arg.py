@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
+
+logger = logging.getLogger("launch_plus")
 
 
 @expose_action("arg")
@@ -93,10 +97,11 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
             if not arg.condition.evaluate(context):
                 return
         except Exception as e:
-            st = context._state
-            st.warn(
-                f"condition on DeclareLaunchArgument '{arg.name}' failed to evaluate: {e}; "
-                f"assuming condition is satisfied"
+            logger.warning(
+                "condition on DeclareLaunchArgument '%s' failed to evaluate: %s; "
+                "assuming condition is satisfied",
+                arg.name,
+                e,
             )
 
     if arg.default_value is None:

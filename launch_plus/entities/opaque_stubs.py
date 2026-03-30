@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import builtins as _builtins
 import io as _io
+import logging
 import os
 import pathlib as _pathlib
 
 import launch_plus.resolver as _R
+
+logger = logging.getLogger("launch_plus")
 
 _STUB_ROS_PARAM_YAML = "/**:\n  ros__parameters: {}\n"
 
@@ -82,7 +85,7 @@ def _call_opaque_with_stubs(state, fn, context):
                 if _R._ensure_fetched(state, pkg):
                     pkg_dir = state.package_shares[pkg]
                 else:
-                    state.error(f"failed to fetch package '{pkg}' from lockfile")
+                    logger.error("failed to fetch package '%s' from lockfile", pkg)
                     return None
             return os.path.join(pkg_dir, rest) if rest else pkg_dir
         # Try fetching if it's a lockfile package.
@@ -104,9 +107,10 @@ def _call_opaque_with_stubs(state, fn, context):
         # Handle portable paths.
         if _R._parse_portable_path(path_str) is not None:
             if not state.apply_opaque_file_access:
-                state.error(
-                    f"OpaqueFunction opened a portable path without --apply-opaque-file-access "
-                    f"(stub returned): {path}"
+                logger.error(
+                    "OpaqueFunction opened a portable path without --apply-opaque-file-access "
+                    "(stub returned): %s",
+                    path,
                 )
                 return _io.StringIO(_STUB_ROS_PARAM_YAML)
             actual = _resolve_portable(path_str)
@@ -114,12 +118,13 @@ def _call_opaque_with_stubs(state, fn, context):
                 try:
                     return _orig_open(actual, mode, *args, **kwargs)
                 except (FileNotFoundError, OSError):
-                    state.error(
-                        f"param file not found: '{actual}' "
-                        f"(resolved from '{path}') — stub defaults used"
+                    logger.error(
+                        "param file not found: '%s' (resolved from '%s') — stub defaults used",
+                        actual,
+                        path,
                     )
                     return _io.StringIO(_STUB_ROS_PARAM_YAML)
-            state.error(f"param file not found: '{path}' — stub defaults used")
+            logger.error("param file not found: '%s' — stub defaults used", path)
             return _io.StringIO(_STUB_ROS_PARAM_YAML)
         # Regular (non-portable) path.
         try:
@@ -140,19 +145,20 @@ def _call_opaque_with_stubs(state, fn, context):
                             except (FileNotFoundError, OSError):
                                 pass  # File still missing after fetch → fall through to error
                         else:
-                            state.error(f"failed to fetch package '{pkg_name}' from lockfile")
+                            logger.error("failed to fetch package '%s' from lockfile", pkg_name)
                             break
                     break  # package is fully fetched; file genuinely missing → error
-            state.error(f"param file not found: '{path}' — stub defaults used")
+            logger.error("param file not found: '%s' — stub defaults used", path)
             return _io.StringIO(_STUB_ROS_PARAM_YAML)
 
     def _stub_path_exists(path):
         path_str = str(path)
         if _R._parse_portable_path(path_str) is not None:
             if not state.apply_opaque_file_access:
-                state.error(
-                    f"OpaqueFunction called os.path.exists on a portable path without "
-                    f"--apply-opaque-file-access (returning False): {path}"
+                logger.error(
+                    "OpaqueFunction called os.path.exists on a portable path without "
+                    "--apply-opaque-file-access (returning False): %s",
+                    path,
                 )
                 return False
             actual = _resolve_portable(path_str)
@@ -165,9 +171,10 @@ def _call_opaque_with_stubs(state, fn, context):
         path_str = str(path)
         if _R._parse_portable_path(path_str) is not None:
             if not state.apply_opaque_file_access:
-                state.error(
-                    f"OpaqueFunction called os.path.isfile on a portable path without "
-                    f"--apply-opaque-file-access (returning False): {path}"
+                logger.error(
+                    "OpaqueFunction called os.path.isfile on a portable path without "
+                    "--apply-opaque-file-access (returning False): %s",
+                    path,
                 )
                 return False
             actual = _resolve_portable(path_str)
@@ -180,9 +187,10 @@ def _call_opaque_with_stubs(state, fn, context):
         path_str = str(path)
         if _R._parse_portable_path(path_str) is not None:
             if not state.apply_opaque_file_access:
-                state.error(
-                    f"OpaqueFunction called os.path.isdir on a portable path without "
-                    f"--apply-opaque-file-access (returning False): {path}"
+                logger.error(
+                    "OpaqueFunction called os.path.isdir on a portable path without "
+                    "--apply-opaque-file-access (returning False): %s",
+                    path,
                 )
                 return False
             actual = _resolve_portable(path_str)
@@ -203,9 +211,10 @@ def _call_opaque_with_stubs(state, fn, context):
         path_str = str(path_self)
         if _R._parse_portable_path(path_str) is not None:
             if not state.apply_opaque_file_access:
-                state.error(
-                    f"OpaqueFunction called Path.open on a portable path without "
-                    f"--apply-opaque-file-access (stub returned): {path_str}"
+                logger.error(
+                    "OpaqueFunction called Path.open on a portable path without "
+                    "--apply-opaque-file-access (stub returned): %s",
+                    path_str,
                 )
                 return _io.StringIO(_STUB_ROS_PARAM_YAML)
             actual = _resolve_portable(path_str)
@@ -215,12 +224,13 @@ def _call_opaque_with_stubs(state, fn, context):
                         _pathlib.Path(actual), mode, buffering, encoding, errors, newline
                     )
                 except (FileNotFoundError, OSError):
-                    state.error(
-                        f"param file not found: '{actual}' "
-                        f"(resolved from '{path_str}') — stub defaults used"
+                    logger.error(
+                        "param file not found: '%s' (resolved from '%s') — stub defaults used",
+                        actual,
+                        path_str,
                     )
                     return _io.StringIO(_STUB_ROS_PARAM_YAML)
-            state.error(f"param file not found: '{path_str}' — stub defaults used")
+            logger.error("param file not found: '%s' — stub defaults used", path_str)
             return _io.StringIO(_STUB_ROS_PARAM_YAML)
         return _orig_pathlib_open(path_self, mode, buffering, encoding, errors, newline)
 

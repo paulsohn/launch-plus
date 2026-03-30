@@ -19,7 +19,6 @@ import importlib.util
 import json
 import logging
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -315,15 +314,6 @@ def _resolve_pkg_share(state, package: str) -> str:
         return f"$(find-pkg-share {package})"
     # Postbuild: package not installed — this is an error.
     raise LookupError(f"package '{package}' not found in AMENT_PREFIX_PATH")
-
-
-def _resolve_ros_substitutions(state, value: str) -> str:
-    """Replace $(find-pkg-share X) patterns in a string with real paths."""
-    return re.sub(
-        r"\$\(find-pkg-share ([^)]+)\)",
-        lambda m: _resolve_pkg_share(state, m.group(1).strip()),
-        value,
-    )
 
 
 # ─── XML/YAML Launch File Parser ──────────────────────────────────────────────

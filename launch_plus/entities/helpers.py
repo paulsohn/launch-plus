@@ -388,12 +388,23 @@ def resolve_value(value: Any, ctx: _SubstitutionContext | None = None) -> str | 
     if isinstance(value, str):
         return value
     if isinstance(value, list):
-        # list[Substitution] from XML parse
+        # list[Substitution] from XML parse, or mixed list from Python shim
         if not value:
             return ""
-        if ctx is not None:
+        if ctx is not None and all(hasattr(t, "perform") for t in value):
             return resolve_substitutions_from_tokens(value, ctx)
-        return "".join(t.serialize() for t in value)
+        # Mixed list: resolve each element individually
+        parts = []
+        for t in value:
+            if hasattr(t, "perform") and ctx is not None:
+                try:
+                    result = t.perform(ctx)
+                    parts.append(str(result) if result is not None else str(t))
+                except Exception:
+                    parts.append(str(t))
+            else:
+                parts.append(str(t))
+        return "".join(parts)
     if hasattr(value, "perform"):
         # Single substitution object (Python shim path)
         try:

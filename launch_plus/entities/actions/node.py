@@ -13,7 +13,7 @@ from launch_plus.entities.helpers import (
     _track_package,
     _track_param_file,
 )
-from launch_plus.entities.xml_resolver import _ActionParser
+from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 
@@ -29,7 +29,7 @@ def _resolve_xml_composable_plugins(
     context,
 ) -> list[dict]:
     """Resolve XML-parsed composable plugin token dicts into final form."""
-    from launch_plus.entities.xml_resolver import (
+    from launch_plus.entities.helpers import (
         _read_and_expand_param_file,
         resolve_value,
     )
@@ -183,7 +183,7 @@ class _TrackedNode(_TrackedAction):
 
     def _resolve_xml_details(self, context) -> None:
         """Resolve XML-parsed token structures into the tracked node entry."""
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         entry = context._state.tracked["nodes"][self._idx]
         # Package / executable / name
@@ -207,7 +207,7 @@ class _TrackedNode(_TrackedAction):
                 _track_param_file(context._state, path)
                 pf_entry: dict = {"path": path}
                 if context._state.inline_params:
-                    from launch_plus.entities.xml_resolver import _read_and_expand_param_file
+                    from launch_plus.entities.helpers import _read_and_expand_param_file
 
                     expanded = _read_and_expand_param_file(path, context)
                     if expanded is not None:
@@ -375,7 +375,7 @@ class _TrackedComposableNodeContainer(_TrackedAction):
 
     def _resolve_xml_details(self, context) -> None:
         """Resolve XML-parsed token structures into the tracked node entry."""
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         entry = context._state.tracked["nodes"][self._idx]
         # Package / executable / name
@@ -483,7 +483,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
 
     def _resolve_xml_details(self, context) -> None:
         """Resolve XML-parsed token structures into the tracked node entry."""
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         entry = context._state.tracked["nodes"][self._idx]
         target = resolve_value(self._raw_target, context) or ""

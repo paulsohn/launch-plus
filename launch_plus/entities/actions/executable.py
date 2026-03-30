@@ -5,7 +5,7 @@ from __future__ import annotations
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import _track_node
-from launch_plus.entities.xml_resolver import _ActionParser
+from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 
@@ -115,7 +115,7 @@ class _TrackedExecutable(_TrackedAction):
 
     def _resolve_xml_details(self, context) -> None:
         """Resolve XML-parsed token structures into the tracked node entry."""
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         entry = context._state.tracked["nodes"][self._idx]
         cmd = resolve_value(self._cmd, context) or ""

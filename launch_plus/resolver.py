@@ -379,6 +379,15 @@ from launch_plus.entities.actions.node import (  # noqa: E402, F401
     _TrackedComposableNodeContainer,
     _TrackedNode,
 )
+from launch_plus.entities.helpers import (  # noqa: E402, F401
+    _effective_namespace,
+    _evaluate_condition,
+    _is_truthy,
+    _read_and_expand_param_file,
+    resolve_substitutions,
+    resolve_substitutions_from_tokens,
+    resolve_value,
+)
 
 # ─── OpaqueFunction stubs (extracted to entities/opaque_stubs.py) ─────────────
 from launch_plus.entities.opaque_stubs import (  # noqa: E402, F401
@@ -386,24 +395,14 @@ from launch_plus.entities.opaque_stubs import (  # noqa: E402, F401
     _call_opaque_with_stubs,
     _DefaultParamDict,
 )
+from launch_plus.entities.parsing import _ActionParser  # noqa: E402, F401
+from launch_plus.entities.state import LaunchContext as _SubstitutionContext  # noqa: E402, F401
 from launch_plus.entities.substitutions.find_pkg_share import (
     _TrackedFindPackageShare,  # noqa: E402, F401
 )
 from launch_plus.entities.substitutions.launch_config import (  # noqa: E402, F401
     _DeferredDefault,
     _LaunchConfiguration,
-)
-from launch_plus.entities.xml_resolver import (  # noqa: E402, F401
-    _ActionParser,
-    _effective_namespace,
-    _evaluate_condition,
-    _is_truthy,
-    _read_and_expand_param_file,
-    _resolve_element,
-    _SubstitutionContext,
-    resolve_substitutions,
-    resolve_substitutions_from_tokens,
-    resolve_xml_elements,
 )
 
 # ─── LaunchContext factory ────────────────────────────────────────────────────
@@ -536,6 +535,112 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
     for k in list(parent_context._launch_configurations):
         if k not in saved_configs and k not in set_configs and k != "global_params":
             del parent_context._launch_configurations[k]
+
+
+# ─── XML/YAML AST Walker ────────────────────────────────────────────────────
+#
+# Walks the element list produced by parse_xml_launch / parse_yaml_launch,
+# resolves substitutions, evaluates conditions, and populates _state.tracked.
+# This is the XML/YAML counterpart of the Python _walk_actions mechanism.
+
+
+def resolve_xml_elements(
+    elements: list,
+    ctx,
+    *,
+    include_stack: list[str] | None = None,
+) -> None:
+    """Walk parsed XML/YAML elements, resolve substitutions, populate _state.tracked.
+
+    This is the XML/YAML counterpart of the Python ``_walk_actions`` mechanism.
+    All output goes into the module-level ``_state.tracked`` dict, ``_state.namespace_stack``,
+    and ``_state.env``.
+
+    Dispatches each element through the action registry via :func:`_resolve_element`.
+    """
+    if include_stack is None:
+        include_stack = []
+    for elem in elements:
+        _resolve_element(elem, ctx, include_stack)
+
+
+def _resolve_element(
+    elem,
+    ctx,
+    include_stack: list[str],
+) -> None:
+    """Resolve a single parsed element via the action registry.
+
+    The registered parse method may return an action instance (new style)
+    or None (legacy — side effects already executed in parse).  When an
+    action is returned, ``execute()`` is called to perform side effects.
+    """
+    from launch_plus.entities.expose import action_parse_methods
+
+    tag = elem.type_name
+    if tag in action_parse_methods:
+        parser = _ActionParser(ctx, include_stack)
+        action = action_parse_methods[tag](elem, parser)
+        if action is not None and hasattr(action, "execute"):
+            action.execute(ctx)
+        return
+    logger.warning("unknown element: <%s>", tag)
+
+
+def resolve_included_file(
+    ctx,
+    include_stack: list[str],
+    real_path: str,
+    file_path: str,
+    child_ctx_args: dict[str, str],
+) -> None:
+    """Parse an included launch file and resolve it recursively."""
+    from launch_plus.entities.helpers import _extract_pkg_and_share_path
+    from launch_plus.entities.state import LaunchContext as _SubstitutionContext
+    from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
+    from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
+
+    state = ctx._state
+    inc_dep = _extract_pkg_and_share_path(file_path)
+    if inc_dep:
+        state.include_chain.append(list(inc_dep))
+    else:
+        state.include_chain.append(["", file_path])
+    new_stack = include_stack + [file_path]
+    try:
+        if real_path.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
+            with open(real_path) as f:
+                content = f.read()
+            child_entities: list
+            if real_path.endswith((".yaml", ".yml")):
+                child_entities = list(_parse_yaml_launch_entity(content, real_path))
+            else:
+                child_entities = list(_parse_xml_launch_entity(content, real_path))
+            child_ctx = _SubstitutionContext(state)
+            if state.global_arg_cascade:
+                child_ctx.args = {**ctx.args, **child_ctx_args}
+                child_ctx.vars = {**ctx.vars, **child_ctx_args}
+            else:
+                child_ctx.args = dict(child_ctx_args)
+                child_ctx.vars = dict(child_ctx_args)
+            child_ctx.env = dict(ctx.env)
+            child_ctx.launch_file_dir = os.path.dirname(real_path)
+            child_ctx.preview_mode = ctx.preview_mode
+            for child in child_entities:
+                _resolve_element(child, child_ctx, new_stack)
+            ctx.args.update(child_ctx.args)
+            ctx.vars.update(child_ctx.vars)
+        elif real_path.endswith((".launch.py", ".py")):
+            parent_lc = _make_launch_context({**ctx.args, **ctx.vars})
+            if state.global_params:
+                parent_lc._launch_configurations["global_params"] = list(state.global_params)
+            _inline_resolve_python_launch(state, file_path, parent_lc, child_ctx_args)
+            set_configs = state.tracked["set_launch_configurations"]
+            for k, v in parent_lc._launch_configurations.items():
+                if (k in set_configs or k in child_ctx_args) and k != "global_params":
+                    ctx.vars[k] = str(v) if not isinstance(v, str) else v
+    finally:
+        state.include_chain.pop()
 
 
 # ─── Action walker ────────────────────────────────────────────────────────────

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.xml_resolver import _ActionParser
+from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 
@@ -69,7 +69,7 @@ class _EventHandlerAction(_TrackedAction):
         self._child_events = child_events or []
 
     def execute(self, context) -> list | None:
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         eh_actions: list[dict] = []
         for ce in self._child_events:
@@ -114,7 +114,7 @@ class _EmitEventAction(_TrackedAction):
         self._namespace = namespace
 
     def execute(self, context) -> list | None:
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         event = resolve_value(self._event, context) or ""
         target_node = resolve_value(self._target_node_attr, context)

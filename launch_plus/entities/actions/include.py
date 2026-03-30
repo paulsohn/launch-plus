@@ -12,7 +12,7 @@ from launch_plus.entities.helpers import (
     _extract_pkg_and_share_path,
     _track_include,
 )
-from launch_plus.entities.xml_resolver import _ActionParser
+from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
     _parse_portable_path,
@@ -78,7 +78,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
 
     def _execute_xml(self, ctx) -> list | None:
         """Execute for XML path: resolve file, include args, process included file."""
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         file_path = resolve_value(self._xml_file_tokens, ctx) or ""
 
@@ -122,7 +122,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             except Exception:
                 return None
         if os.path.isfile(real_path):
-            from launch_plus.entities.xml_resolver import resolve_included_file
+            from launch_plus.resolver import resolve_included_file
 
             resolve_included_file(ctx, include_stack, real_path, file_path, child_ctx_args)
         return None

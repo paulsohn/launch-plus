@@ -5,7 +5,7 @@ from __future__ import annotations
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import _track_node
-from launch_plus.entities.xml_resolver import _ActionParser
+from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 
@@ -22,7 +22,7 @@ class _LogAction(_TrackedAction):
         self._message = message
 
     def execute(self, context) -> list | None:
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         msg = resolve_value(self._message, context) or ""
         _track_node(

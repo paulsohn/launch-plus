@@ -7,7 +7,7 @@ import logging
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.xml_resolver import _ActionParser
+from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 logger = logging.getLogger("launch_plus")
@@ -60,7 +60,7 @@ class _TrackedGroupAction(_TrackedAction):
 
     def _execute_xml(self, ctx) -> None:
         """Execute for XML path: resolve child entities with scoping."""
-        from launch_plus.entities.xml_resolver import _resolve_element
+        from launch_plus.resolver import _resolve_element
 
         if self._scoped:
             saved_args = dict(ctx.args)

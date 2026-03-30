@@ -11,9 +11,17 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+import yaml
+
+import launch_plus.resolver as _R
+from launch_plus.entities.state import LaunchContext as _SubstitutionContext
 
 logger = logging.getLogger("launch_plus")
+
+if TYPE_CHECKING:
+    from launch_plus.entities.substitution import Substitution as _SubstitutionType
 
 # ─── Portable path support ────────────────────────────────────────────────────
 
@@ -324,3 +332,244 @@ def _track_node_from_action(state, package, executable, name=None):
             "target": None,
         },
     )
+
+
+# ─── Substitution Engine (for XML/YAML resolution) ───────────────────────────
+#
+# Parses and resolves ROS 2 substitution syntax: $(arg x), $(env Y default),
+# $(find-pkg-share pkg), $(var x), $(dirname), $(eval expr), $(command ...).
+# Used by the XML/YAML element walker — Python launch files use the
+# existing .perform() mechanism instead.
+
+
+def resolve_substitutions_from_tokens(
+    tokens: list[_SubstitutionType],
+    ctx: _SubstitutionContext,
+    *,
+    _depth: int = 0,
+) -> str:
+    """Resolve a pre-parsed list of :class:`Substitution` objects to a string.
+
+    Each token's ``.perform(ctx)`` is called in order and the results
+    are concatenated.  This is the low-level entry point used by
+    individual substitution implementations when they need to recursively
+    resolve nested tokens.
+    """
+    if _depth > 50:
+        logger.error("substitution recursion limit exceeded")
+        return "".join(t.serialize() for t in tokens)
+    return "".join(t.perform(ctx, _depth=_depth) for t in tokens)
+
+
+def resolve_substitutions(
+    text: str,
+    ctx: _SubstitutionContext,
+    _depth: int = 0,
+) -> str:
+    """Resolve all substitutions in a string using the given context.
+
+    Parses *text* via the Lark grammar into typed :class:`Substitution`
+    objects, then calls ``.perform()`` on each to produce the resolved
+    string.
+    """
+    if _depth > 50:
+        logger.error("substitution recursion limit exceeded: %s", text[:100])
+        return text
+    from launch_plus.parsers.parse_substitution import parse_substitution as _lark_parse
+
+    tokens = _lark_parse(text)
+    return resolve_substitutions_from_tokens(tokens, ctx, _depth=_depth)
+
+
+# ─── Value resolution helper ─────────────────────────────────────────────────
+
+
+def resolve_value(value: Any, ctx: _SubstitutionContext | None = None) -> str | None:
+    """Resolve a value to a string, handling all input types uniformly.
+
+    Supports:
+    - ``None`` → ``None``
+    - ``str`` → returned as-is
+    - ``list[Substitution]`` (from XML ``parse_substitution()``) → resolved via tokens
+    - object with ``.perform()`` (Python shim substitution) → ``sub.perform(ctx)``
+    - anything else → ``str(value)``
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        # list[Substitution] from XML parse
+        if not value:
+            return ""
+        if ctx is not None:
+            return resolve_substitutions_from_tokens(value, ctx)
+        return "".join(t.serialize() for t in value)
+    if hasattr(value, "perform"):
+        # Single substitution object (Python shim path)
+        try:
+            result = value.perform(ctx)
+            return str(result) if result is not None else None
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+# ─── Condition evaluation ─────────────────────────────────────────────────────
+
+
+def _is_truthy(value: str) -> bool:
+    """Check if a resolved condition value is truthy (ROS 2 convention)."""
+    return value.strip().lower() in ("true", "1", "yes", "on")
+
+
+def _evaluate_condition(
+    condition: dict[str, str] | None,
+    ctx: _SubstitutionContext,
+) -> bool:
+    """Evaluate an if/unless condition dict.  Returns True if the element should execute."""
+    if condition is None:
+        return True
+    kind = condition["kind"]
+    expr = condition["expr"]
+    resolved = resolve_substitutions(expr, ctx)
+    truthy = _is_truthy(resolved)
+    if kind == "If":
+        return truthy
+    # Unless
+    return not truthy
+
+
+# ─── Namespace helpers ────────────────────────────────────────────────────────
+
+
+def _ros2_namespace_join(base: str | None, next_ns: str) -> str | None:
+    """Join two ROS 2 namespace components."""
+    next_ns = next_ns.rstrip("/")
+    if not next_ns:
+        return base
+    if next_ns.startswith("/"):
+        # Absolute — resets
+        return next_ns
+    if not base or base in ("", "/"):
+        return f"/{next_ns}"
+    return f"{base.rstrip('/')}/{next_ns}"
+
+
+def _effective_namespace(
+    stack: list[str],
+    explicit_ns: str | None = None,
+) -> str | None:
+    """Compute effective namespace from stack + optional node-level namespace."""
+    current: str | None = None
+    for component in stack:
+        current = _ros2_namespace_join(current, component)
+    if explicit_ns:
+        current = _ros2_namespace_join(current, explicit_ns)
+    return current
+
+
+# ─── Parameter YAML expansion ────────────────────────────────────────────────
+
+
+def _expand_ros_params_yaml(content: str) -> list[tuple[str, str]]:
+    """Parse ROS 2 parameter YAML and flatten into (key, value) pairs.
+
+    Supports all standard ROS 2 layouts:
+      - bare ``ros__parameters: ...``
+      - ``/**:\\n  ros__parameters: ...`` (Autoware wildcard convention)
+      - ``/ns:\\n  node_name:\\n    ros__parameters: ...`` (general ROS 2)
+    """
+    data = yaml.safe_load(content)
+    if not isinstance(data, dict):
+        return []
+    out: list[tuple[str, str]] = []
+    _collect_ros_params(data, 0, out)
+    return out
+
+
+def _collect_ros_params(value: object, depth: int, out: list[tuple[str, str]]) -> None:
+    if depth > 3 or not isinstance(value, dict):
+        return
+    if "ros__parameters" in value:
+        _flatten_yaml_value(value["ros__parameters"], "", out)
+    else:
+        for child in value.values():
+            if isinstance(child, dict):
+                _collect_ros_params(child, depth + 1, out)
+
+
+def _flatten_yaml_value(value: object, prefix: str, out: list[tuple[str, str]]) -> None:
+    if isinstance(value, dict):
+        for k, v in value.items():
+            full_key = f"{prefix}.{k}" if prefix else str(k)
+            _flatten_yaml_value(v, full_key, out)
+    elif isinstance(value, list):
+        items = ", ".join(_yaml_value_to_str(v) for v in value)
+        out.append((prefix, f"[{items}]"))
+    else:
+        out.append((prefix, _yaml_value_to_str(value)))
+
+
+def _yaml_value_to_str(v: object) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return str(v).lower()
+    if isinstance(v, list):
+        items = ", ".join(_yaml_value_to_str(x) for x in v)
+        return f"[{items}]"
+    return str(v)
+
+
+def _read_and_expand_param_file(
+    path: str,
+    ctx: _SubstitutionContext | None = None,
+    *,
+    state=None,
+) -> list[tuple[str, str]] | None:
+    """Read a param file and expand ros__parameters. Returns None on failure."""
+    if state is None and ctx is not None:
+        state = ctx._state
+    real_path = path
+    parsed = _parse_portable_path(path)
+    if parsed:
+        pkg, rest = parsed
+        pkg_share = state.package_shares.get(pkg)
+        if not pkg_share:
+            # Try fetching the package if it's in the lockfile.
+            if _R._ensure_fetched(state, pkg):
+                pkg_share = state.package_shares.get(pkg)
+            if not pkg_share:
+                try:
+                    pkg_share = _R._resolve_pkg_share(state, pkg)
+                except Exception:
+                    logger.error("param file not found: '%s' (package not available)", path)
+                    return None
+        real_path = os.path.join(pkg_share, rest)
+    if not os.path.isfile(real_path):
+        # Package share was known but file missing — try full fetch.
+        if parsed and _R._ensure_fetched(state, parsed[0]):
+            pkg_share = state.package_shares.get(parsed[0])
+            if pkg_share:
+                real_path = os.path.join(pkg_share, parsed[1])
+        if not os.path.isfile(real_path):
+            logger.error("param file not found: '%s' (resolved from '%s')", real_path, path)
+            return None
+    try:
+        with open(real_path) as f:
+            content = f.read()
+        pairs = _expand_ros_params_yaml(content)
+        if pairs and ctx is not None:
+            resolved_pairs: list[tuple[str, str]] = []
+            for key, val in pairs:
+                try:
+                    resolved_val = resolve_substitutions(val, ctx)
+                except Exception:
+                    resolved_val = val
+                resolved_pairs.append((key, resolved_val))
+            return resolved_pairs
+        return pairs
+    except Exception as e:
+        logger.error("--inline-params: failed to read '%s': %s", path, e)
+        return None

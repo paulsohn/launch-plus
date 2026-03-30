@@ -11,7 +11,7 @@ import os
 
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.xml_resolver import _ActionParser
+from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 logger = logging.getLogger("launch_plus")
@@ -35,7 +35,7 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
         self._condition = kwargs.get("condition")
 
     def execute(self, context) -> list | None:
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         if self._condition is not None and context is not None:
             try:
@@ -76,7 +76,7 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
             except Exception as e:
                 logger.warning("UnsetEnvironmentVariable condition evaluation failed: %s", e)
                 return None
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         name = resolve_value(self._name, context)
         if not name:
@@ -112,7 +112,7 @@ class _TrackedPushRosNamespace(_TrackedAction):
         self._namespace = namespace
 
     def execute(self, context) -> list | None:
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         ns = resolve_value(self._namespace, context)
         if ns:
@@ -135,7 +135,7 @@ class _SetRemap(_TrackedAction):
         self._dst = dst
 
     def execute(self, context) -> list | None:
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         src = resolve_value(self._src, context) or ""
         dst = resolve_value(self._dst, context) or ""

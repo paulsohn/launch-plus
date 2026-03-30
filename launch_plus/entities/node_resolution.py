@@ -10,9 +10,9 @@ from __future__ import annotations
 from launch_plus.entities.actions.node import _TrackedComposableNode
 from launch_plus.entities.helpers import (
     _is_substitution,
+    _read_and_expand_param_file,
     _track_package,
 )
-from launch_plus.entities.xml_resolver import _read_and_expand_param_file
 
 # ─── Node detail resolution helpers ──────────────────────────────────────────
 

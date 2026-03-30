@@ -7,7 +7,7 @@ import logging
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import _portable_display, _record_declared_arg
-from launch_plus.entities.xml_resolver import _ActionParser
+from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 logger = logging.getLogger("launch_plus")
@@ -36,7 +36,7 @@ class _DeclaredArg(_TrackedAction):
         self._fixed_value = kwargs.get("_fixed_value")
 
     def execute(self, context) -> list | None:
-        from launch_plus.entities.xml_resolver import resolve_value
+        from launch_plus.entities.helpers import resolve_value
 
         if self._fixed_value is not None:
             # <arg name="x" value="v"/> — fixed value, set immediately
@@ -66,7 +66,7 @@ def _record_and_track(name: str, resolved: str, context=None) -> None:
 
 def _execute_xml_arg(arg: _DeclaredArg, context) -> None:
     """Execute <arg> for the XML path — context is a _SubstitutionContext."""
-    from launch_plus.entities.xml_resolver import resolve_value
+    from launch_plus.entities.helpers import resolve_value
 
     name = arg.name or ""
     if not name:

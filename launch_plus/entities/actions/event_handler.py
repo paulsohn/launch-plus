@@ -165,14 +165,22 @@ def _transition_name(transition_id):
 
 
 def _action_name(action):
-    """Extract the node name from a tracked action for event handler targeting."""
+    """Extract the node name from a tracked action for event handler targeting.
+
+    Called at Python shim construction time (during ``execute()`` of the walker),
+    so ``_R._state`` is always the active resolver state.
+    """
     if action is not None and hasattr(action, "_idx"):
         return _R._state.tracked["nodes"][action._idx].get("name", "")
     return ""
 
 
 def _action_namespace_info(action):
-    """Extract namespace_stack and explicit_namespace for a tracked node action."""
+    """Extract namespace_stack and explicit_namespace for a tracked node action.
+
+    Called at Python shim construction time (during ``execute()`` of the walker),
+    so ``_R._state`` is always the active resolver state.
+    """
     if action is None or not hasattr(action, "_idx"):
         return [], None
     entry = _R._state.tracked["nodes"][action._idx]

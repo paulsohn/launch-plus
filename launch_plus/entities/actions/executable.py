@@ -79,7 +79,7 @@ class _TrackedExecutable(_TrackedAction):
         return int(self._idx)
 
     def execute(self, context) -> list | None:
-        state = context._state if context is not None and hasattr(context, "_state") else _R._state
+        state = context._state
         self._ensure_tracked(state)
         if not self._detailed:
             self._detailed = True

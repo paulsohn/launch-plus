@@ -245,8 +245,8 @@ def _read_and_expand_param_file(
     state=None,
 ) -> list[tuple[str, str]] | None:
     """Read a param file and expand ros__parameters. Returns None on failure."""
-    if state is None:
-        state = ctx._state if ctx is not None and hasattr(ctx, "_state") else _R._state
+    if state is None and ctx is not None:
+        state = ctx._state
     real_path = path
     parsed = _R._parse_portable_path(path)
     if parsed:

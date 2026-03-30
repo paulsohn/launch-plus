@@ -164,7 +164,7 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
     """Capture launch_arguments for an include site."""
     if not launch_arguments or not path:
         return
-    state = context._state if context is not None and hasattr(context, "_state") else _R._state
+    state = context._state
     path = str(path)
     if dep_idx >= 0 and state.tracked["include_deps"][dep_idx].get("include_args"):
         return

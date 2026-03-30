@@ -53,7 +53,7 @@ def _record_and_track(name: str, resolved: str, context=None) -> None:
     """Record a declared arg in tracked state."""
     if not name:
         return
-    state = context._state if context is not None and hasattr(context, "_state") else _R._state
+    state = context._state
     already_seen = name in state.declared_arg_names
     if not already_seen:
         state.declared_arg_names.add(name)
@@ -93,7 +93,7 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
             if not arg.condition.evaluate(context):
                 return
         except Exception as e:
-            st = context._state if context is not None and hasattr(context, "_state") else _R._state
+            st = context._state
             st.warn(
                 f"condition on DeclareLaunchArgument '{arg.name}' failed to evaluate: {e}; "
                 f"assuming condition is satisfied"

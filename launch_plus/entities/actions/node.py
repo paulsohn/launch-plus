@@ -36,7 +36,7 @@ def _resolve_xml_composable_plugins(
         plugin_name = resolve_value(p["plugin"], context) or ""
         name_raw = p.get("name")
         name = resolve_value(_parse_optional_raw(name_raw), context) if name_raw else None
-        state = context._state if context is not None and hasattr(context, "_state") else _R._state
+        state = context._state
         if pkg:
             _R._track_package(state, pkg)
         # Resolve params
@@ -165,7 +165,7 @@ class _TrackedNode(_TrackedAction):
         return int(self._idx)
 
     def execute(self, context) -> list | None:
-        state = context._state if context is not None and hasattr(context, "_state") else _R._state
+        state = context._state
         self._ensure_tracked(state)
         if not self._detailed:
             self._detailed = True
@@ -232,9 +232,7 @@ class _TrackedNode(_TrackedAction):
         entry["respawn_delay"] = resolve_value(self._raw_respawn_delay, context)
 
     def __repr__(self):
-        if self._idx >= 0:
-            return f"TrackedNode(package={_R._state.tracked['nodes'][self._idx]['package']!r})"
-        return f"TrackedNode(package={self._raw_package!r}, untracked)"
+        return f"TrackedNode(package={self._raw_package!r})"
 
 
 class _TrackedLifecycleNode(_TrackedNode):
@@ -351,7 +349,7 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         return int(self._idx)
 
     def execute(self, context) -> list | None:
-        state = context._state if context is not None and hasattr(context, "_state") else _R._state
+        state = context._state
         self._ensure_tracked(state)
         if not self._detailed:
             self._detailed = True
@@ -449,7 +447,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
         return int(self._idx)
 
     def execute(self, context) -> list | None:
-        state = context._state if context is not None and hasattr(context, "_state") else _R._state
+        state = context._state
         self._ensure_tracked(state)
         if not self._detailed:
             self._detailed = True

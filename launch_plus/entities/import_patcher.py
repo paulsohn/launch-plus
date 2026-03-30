@@ -52,7 +52,7 @@ from launch_plus.entities.actions.param import (
     _TrackedParameterFile,
     _TrackedSetParameter,
 )
-from launch_plus.entities.state import _error, _state, _StubLaunchContext, _warn
+from launch_plus.entities.state import _StubLaunchContext
 from launch_plus.entities.substitutions.find_pkg_share import _TrackedFindPackageShare
 from launch_plus.entities.substitutions.launch_config import _LaunchConfiguration
 from launch_plus.entities.substitutions.path_join import _TrackedPathJoinSubstitution
@@ -161,14 +161,14 @@ def _build_patched_launch_substitutions():
             # Resolve name to a concrete string via _to_str.
             name = _R._to_str(self._name, context) or ""
             # Look up in override env, then process env.
-            if name in _state.env:
-                return _state.env[name]
+            if name in _R._state.env:
+                return _R._state.env[name]
             if name in os.environ:
                 return os.environ[name]
             # No match — use default if provided, otherwise error.
             if self._default is not _SENTINEL:
                 return _R._to_str(self._default, context) or ""
-            _error(f"EnvironmentVariable: '{name}' is not set and no default was provided")
+            _R._state.error(f"EnvironmentVariable: '{name}' is not set and no default was provided")
             return ""
 
         def __str__(self):
@@ -346,7 +346,7 @@ def _build_patched_ament_index_python_packages():
     mod = types.ModuleType("ament_index_python.packages")
 
     def get_package_share_directory(package_name):
-        _warn(
+        _R._state.warn(
             f"get_package_share_directory('{package_name}') is non-idiomatic; "
             f"prefer FindPackageShare('{package_name}') from launch_ros.substitutions"
         )
@@ -355,19 +355,19 @@ def _build_patched_ament_index_python_packages():
         # This ensures that if the package is in the lockfile but hasn't been fully fetched
         # yet (no package.xml), we fetch it inline — important for module-level callers
         # where os.path stubs may not be active.
-        if package_name in _state.package_shares:
-            pkg_dir = _state.package_shares[package_name]
+        if package_name in _R._state.package_shares:
+            pkg_dir = _R._state.package_shares[package_name]
             if not os.path.isfile(os.path.join(pkg_dir, "package.xml")) and not _R._ensure_fetched(
                 _R._state, package_name
             ):
-                _error(f"failed to fetch package '{package_name}' from lockfile")
-        elif package_name in _state.lockfile_data:
+                _R._state.error(f"failed to fetch package '{package_name}' from lockfile")
+        elif package_name in _R._state.lockfile_data:
             if not _R._ensure_fetched(_R._state, package_name):
-                _error(f"failed to fetch package '{package_name}' from lockfile")
+                _R._state.error(f"failed to fetch package '{package_name}' from lockfile")
         # In non-preview mode, return the real install path so the output contains
         # absolute paths matching the installed layout.
-        if not _state.preview_mode and package_name in _state.package_shares:
-            return _state.package_shares[package_name]
+        if not _R._state.preview_mode and package_name in _R._state.package_shares:
+            return _R._state.package_shares[package_name]
         # In preview mode, return a portable path so that derived paths (e.g.
         # os.path.join(share_dir, "calib/")) stay portable.  Inside
         # _call_opaque_with_stubs the os.path.* stubs intercept any filesystem

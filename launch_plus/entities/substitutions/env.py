@@ -46,9 +46,7 @@ class EnvSubstitution(Substitution):
         if value is None and self.default is not None:
             value = resolve_substitutions_from_tokens(self.default, ctx, _depth=_depth + 1)
         if value is None:
-            from launch_plus.resolver import _error
-
-            _error(f"environment variable not set: {name}")
+            ctx._state.error(f"environment variable not set: {name}")
             return f"$(env {name})"
         return str(value)
 

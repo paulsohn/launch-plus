@@ -30,9 +30,7 @@ class ArgSubstitution(Substitution):
         name = resolve_substitutions_from_tokens(self.name, ctx, _depth=_depth + 1)
         value = ctx.args.get(name)
         if value is None:
-            from launch_plus.resolver import _error
-
-            _error(f"undefined argument: {name}")
+            ctx._state.error(f"undefined argument: {name}")
             return f"$(arg {name})"
         return resolve_substitutions_from_tokens(parse_to_tokens(value), ctx, _depth=_depth + 1)
 

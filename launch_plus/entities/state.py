@@ -1,8 +1,10 @@
-"""Resolver state: shared mutable state, logging, and common exceptions.
+"""Resolver state: shared mutable state and common exceptions.
 
-This module is the foundation layer with no imports from ``resolver.py``,
-breaking the circular dependency chain.  Both ``resolver.py`` and the
-entity/action files import from here.
+This module defines ``ResolverState`` (the mutable state bundle) and
+``_StubLaunchContext`` (minimal launch context for substitution resolution).
+The canonical ``_state`` instance lives in ``resolver.py``; entity modules
+receive state via function/method parameters and never import a global
+singleton from this module.
 """
 
 from __future__ import annotations
@@ -29,11 +31,12 @@ class _PackageNotFetchedError(RuntimeError):
 
 
 class ResolverState:
-    """Bundles all mutable module-level resolver state.
+    """Bundles all mutable resolver state.
 
-    A single ``_state`` instance is created at module level.  All resolver
-    functions access state through ``_state.X`` instead of bare globals.
-    The test fixture resets state by calling ``_state.reset()``.
+    The entry point (``resolver.py``) owns the canonical ``_state`` instance.
+    Entity modules receive state via function/method parameters — they never
+    import a global singleton.  The test fixture resets state by calling
+    ``_state.reset()``.
     """
 
     __slots__ = (
@@ -113,33 +116,24 @@ class ResolverState:
         self.walk_depth: int = 0
 
 
-_state = ResolverState()
-
-
-# ─── Logging ──────────────────────────────────────────────────────────────────
-
-
-def _warn(msg: str) -> None:
-    _state.warn(msg)
-
-
-def _error(msg: str) -> None:
-    _state.error(msg)
-
-
 # ─── LaunchContext stub ───────────────────────────────────────────────────────
 
 
 class _StubLaunchContext:
     """Minimal LaunchContext: holds launch_configurations for substitution resolution.
 
-    Optionally carries a :class:`ResolverState` reference so that
-    ``execute()`` methods can access resolver state via ``context._state``.
+    Carries a :class:`ResolverState` reference so that ``execute()`` methods
+    can access resolver state via ``context._state``.  When *state* is not
+    supplied, a lazy import fetches the canonical instance from ``resolver.py``.
     """
 
     def __init__(self, state: ResolverState | None = None):
         self._launch_configurations: dict[str, object] = {}
-        self._state = state if state is not None else _state
+        if state is None:
+            from launch_plus.resolver import _state
+
+            state = _state
+        self._state = state
 
     @property
     def launch_configurations(self):

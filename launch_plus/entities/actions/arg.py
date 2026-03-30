@@ -5,9 +5,6 @@ from __future__ import annotations
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.state import (
-    _warn,
-)
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 
@@ -96,7 +93,8 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
             if not arg.condition.evaluate(context):
                 return
         except Exception as e:
-            _warn(
+            st = context._state if context is not None and hasattr(context, "_state") else _R._state
+            st.warn(
                 f"condition on DeclareLaunchArgument '{arg.name}' failed to evaluate: {e}; "
                 f"assuming condition is satisfied"
             )

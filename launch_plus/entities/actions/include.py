@@ -7,7 +7,6 @@ import os
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.state import _warn
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
@@ -134,7 +133,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
                 try:
                     path = src.perform(context)
                 except Exception as e:
-                    _warn(f"failed to resolve IncludeLaunchDescription source: {e}")
+                    context._state.warn(f"failed to resolve IncludeLaunchDescription source: {e}")
             if path:
                 self._path = path
                 dep_idx = _R._track_include(context._state, path)
@@ -202,4 +201,4 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
             else:
                 state.tracked["include_args"][path] = captured
     except Exception as e:
-        _warn(f"failed to resolve include args for '{path}': {e}")
+        state.warn(f"failed to resolve include args for '{path}': {e}")

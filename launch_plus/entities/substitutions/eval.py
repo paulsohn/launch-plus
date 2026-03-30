@@ -38,7 +38,7 @@ class EvalSubstitution(Substitution):
         return cls, {"expression": parts}
 
     def perform(self, ctx: _SubstitutionContext, *, _depth: int = 0) -> str:
-        from launch_plus.resolver import _error, resolve_substitutions_from_tokens
+        from launch_plus.resolver import resolve_substitutions_from_tokens
 
         expr = resolve_substitutions_from_tokens(self.expression, ctx, _depth=_depth + 1)
         # Unescape \' and \" that may come from XML entity values.
@@ -47,7 +47,7 @@ class EvalSubstitution(Substitution):
             result = eval(expr)  # noqa: S307
             return str(result)
         except Exception as e:
-            _error(f"$(eval {expr}) failed: {e}")
+            ctx._state.error(f"$(eval {expr}) failed: {e}")
             if ctx.preview_mode:
                 return f"$(eval {expr})"
             return ""

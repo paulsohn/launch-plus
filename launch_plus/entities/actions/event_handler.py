@@ -146,7 +146,6 @@ class _EmitEventAction(_TrackedAction):
 
 import launch_plus.resolver as _R  # noqa: E402
 from launch_plus.entities.actions.base import _TrackedAction  # noqa: E402
-from launch_plus.entities.state import _error  # noqa: E402
 
 
 def _transition_name(transition_id):
@@ -226,7 +225,7 @@ class _TrackedShutdown(_TrackedAction):
 
     def __init__(self, **kwargs):
         if kwargs:
-            _error(
+            _R._state.error(
                 f"Shutdown event arguments are not yet supported: "
                 f"{', '.join(f'{k}={v!r}' for k, v in kwargs.items())}"
             )

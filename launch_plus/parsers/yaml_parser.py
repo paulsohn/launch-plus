@@ -143,16 +143,16 @@ def parse_yaml_launch(content: str, file_path: str) -> list[YamlEntity]:
 
     data = yaml.safe_load(content)
     if not isinstance(data, dict) or "launch" not in data:
-        from launch_plus.resolver import _warn
+        from launch_plus.resolver import _state
 
-        _warn(f"YAML launch file '{file_path}' missing 'launch' root key")
+        _state.warn(f"YAML launch file '{file_path}' missing 'launch' root key")
         return []
 
     launch_list = data["launch"]
     if not isinstance(launch_list, list):
-        from launch_plus.resolver import _warn
+        from launch_plus.resolver import _state
 
-        _warn(f"YAML 'launch' key in '{file_path}' is not a list")
+        _state.warn(f"YAML 'launch' key in '{file_path}' is not a list")
         return []
 
     entities: list[YamlEntity] = []

@@ -10,10 +10,6 @@ import os
 
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.state import (
-    _error,
-    _warn,
-)
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 
@@ -43,11 +39,13 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
                 if not self._condition.evaluate(context):
                     return None
             except Exception as e:
-                _warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
+                context._state.warn(f"SetEnvironmentVariable condition evaluation failed: {e}")
                 return None
         name = resolve_value(self._name, context)
         if not name:
-            _error("SetEnvironmentVariable: resolved name is empty or None — skipping")
+            context._state.error(
+                "SetEnvironmentVariable: resolved name is empty or None — skipping"
+            )
             return None
         value = resolve_value(self._value, context) or ""
         context._state.env[name] = value
@@ -75,16 +73,18 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
                 if not self._condition.evaluate(context):
                     return None
             except Exception as e:
-                _warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
+                context._state.warn(f"UnsetEnvironmentVariable condition evaluation failed: {e}")
                 return None
         from launch_plus.entities.xml_resolver import resolve_value
 
         name = resolve_value(self._name, context)
         if not name:
-            _error("UnsetEnvironmentVariable: resolved name is empty or None — skipping")
+            context._state.error(
+                "UnsetEnvironmentVariable: resolved name is empty or None — skipping"
+            )
             return None
         if name in os.environ:
-            _error(
+            context._state.error(
                 f"unset_env: '{name}' exists in the process env and cannot be unset. "
                 f'Use SetEnvironmentVariable(name="{name}", value="") '
                 "or a scoped group instead"
@@ -92,7 +92,7 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
         elif name in context._state.env:
             del context._state.env[name]
         else:
-            _error(f"unset_env: environment variable '{name}' is not set")
+            context._state.error(f"unset_env: environment variable '{name}' is not set")
         return None
 
 

@@ -103,7 +103,7 @@ class _TrackedFindPackageShare:
             return _R._resolve_pkg_share(state, pkg)
         except Exception as e:
             if not state.preview_mode:
-                _R._error(f"$(find-pkg-share {pkg}): {e}")
+                state.error(f"$(find-pkg-share {pkg}): {e}")
             return f"$(find-pkg-share {pkg})"
 
     def perform(self, context):

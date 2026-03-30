@@ -15,7 +15,6 @@ import yaml
 
 import launch_plus.resolver as _R
 from launch_plus.entities.expose import action_parse_methods
-from launch_plus.entities.state import _error, _warn
 from launch_plus.parsers.entity import Entity
 from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
 from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
@@ -50,7 +49,7 @@ class _SubstitutionContext:
 
     def __init__(self, state=None) -> None:
         if state is None:
-            from launch_plus.entities.state import _state
+            from launch_plus.resolver import _state
 
             state = _state
         self._state = state
@@ -75,7 +74,7 @@ def resolve_substitutions_from_tokens(
     resolve nested tokens.
     """
     if _depth > 50:
-        _error("substitution recursion limit exceeded")
+        ctx._state.error("substitution recursion limit exceeded")
         return "".join(t.serialize() for t in tokens)
     return "".join(t.perform(ctx, _depth=_depth) for t in tokens)
 
@@ -92,7 +91,7 @@ def resolve_substitutions(
     string.
     """
     if _depth > 50:
-        _error(f"substitution recursion limit exceeded: {text[:100]}")
+        ctx._state.error(f"substitution recursion limit exceeded: {text[:100]}")
         return text
     from launch_plus.parsers.parse_substitution import parse_substitution as _lark_parse
 
@@ -261,7 +260,7 @@ def _read_and_expand_param_file(
                 try:
                     pkg_share = _R._resolve_pkg_share(state, pkg)
                 except Exception:
-                    _error(f"param file not found: '{path}' (package not available)")
+                    state.error(f"param file not found: '{path}' (package not available)")
                     return None
         real_path = os.path.join(pkg_share, rest)
     if not os.path.isfile(real_path):
@@ -271,7 +270,7 @@ def _read_and_expand_param_file(
             if pkg_share:
                 real_path = os.path.join(pkg_share, parsed[1])
         if not os.path.isfile(real_path):
-            _error(f"param file not found: '{real_path}' (resolved from '{path}')")
+            state.error(f"param file not found: '{real_path}' (resolved from '{path}')")
             return None
     try:
         with open(real_path) as f:
@@ -288,7 +287,7 @@ def _read_and_expand_param_file(
             return resolved_pairs
         return pairs
     except Exception as e:
-        _error(f"--inline-params: failed to read '{path}': {e}")
+        state.error(f"--inline-params: failed to read '{path}': {e}")
         return None
 
 
@@ -330,7 +329,7 @@ def _resolve_element(
         if action is not None and hasattr(action, "execute"):
             action.execute(ctx)
         return
-    _warn(f"unknown element: <{tag}>")
+    ctx._state.warn(f"unknown element: <{tag}>")
 
 
 # ── ActionParser — resolver services for action handlers ─────────────────────

@@ -36,9 +36,7 @@ class VarSubstitution(Substitution):
         else:
             value = None
         if value is None:
-            from launch_plus.resolver import _error
-
-            _error(f"undefined variable: {name}")
+            ctx._state.error(f"undefined variable: {name}")
             return f"$(var {name})"
         return resolve_substitutions_from_tokens(parse_to_tokens(value), ctx, _depth=_depth + 1)
 

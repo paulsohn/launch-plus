@@ -103,10 +103,16 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             return None
 
         dep_idx = _track_include(ctx._state, file_path)
-        # Resolve include args
+        # Resolve include args sequentially — each arg can reference previous ones
         child_ctx_args: dict[str, str] = {}
         for arg_name, value_tokens in self._xml_args or []:
+            # Temporarily set previous args in ctx so $(var x) works
+            for k, v in child_ctx_args.items():
+                ctx._launch_configurations[k] = v
             child_ctx_args[arg_name] = resolve_value(value_tokens, ctx) or ""
+        # Clean up temporary entries (they belong in the child context, not parent)
+        for k in child_ctx_args:
+            ctx._launch_configurations.pop(k, None)
         if dep_idx >= 0 and child_ctx_args:
             ctx._state.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
         if child_ctx_args:

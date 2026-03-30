@@ -480,7 +480,6 @@ def fetch(
 @click.option("--apply-opaque-file-access", is_flag=True)
 @click.option("--inline-params", is_flag=True)
 @click.option("--rosdep", is_flag=True, help="Install missing packages via rosdep")
-@click.option("--warn-all", is_flag=True, help="Show all warnings")
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
@@ -502,7 +501,6 @@ def resolve(
     apply_opaque_file_access: bool,
     inline_params: bool,
     rosdep: bool,
-    warn_all: bool,
     clean: bool,
     dirty: bool,
     shallow: bool,
@@ -535,7 +533,6 @@ def resolve(
         show_args=show_args,
         suppress_xml=False,
         strict=False,
-        warn_all=warn_all,
         workspace_state=workspace_state,
         workflow_options=workflow_options,
         shallow=shallow,
@@ -560,7 +557,6 @@ def resolve(
 @click.option("--apply-opaque-file-access", is_flag=True)
 @click.option("--rosdep", is_flag=True)
 @click.option("--strict", is_flag=True, help="Treat warnings as errors")
-@click.option("--warn-all", is_flag=True)
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
@@ -579,7 +575,6 @@ def check(
     apply_opaque_file_access: bool,
     rosdep: bool,
     strict: bool,
-    warn_all: bool,
     clean: bool,
     dirty: bool,
     shallow: bool,
@@ -612,7 +607,6 @@ def check(
         show_args=False,
         suppress_xml=True,
         strict=strict,
-        warn_all=warn_all,
         workspace_state=workspace_state,
         workflow_options=workflow_options,
         shallow=shallow,
@@ -913,7 +907,6 @@ def _cmd_resolve(
     show_args: bool,
     suppress_xml: bool,
     strict: bool,
-    warn_all: bool,
     workspace_state: WorkspaceState,
     workflow_options: ResolveWorkflowOptions,
     shallow: bool,

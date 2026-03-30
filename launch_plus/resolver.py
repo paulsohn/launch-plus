@@ -1046,11 +1046,15 @@ def resolve_file(
     ParsedLaunchFile
         The resolver result as a structured object (imported from types module).
     """
-    # ── Create scoped state ───────────────────────────────────────────────
+    # ── Create scoped state + diagnostic collector ─────────────────────
+    from launch_plus.log import DiagnosticCollector
+
     state = ResolverState()
+    collector = DiagnosticCollector()
+    logging.getLogger("launch_plus").addHandler(collector)
     token = _current_state.set(state)
     try:
-        return _resolve_file_impl(
+        result = _resolve_file_impl(
             state,
             launch_file,
             args,
@@ -1060,8 +1064,13 @@ def resolve_file(
             fetch_dir,
             global_params,
         )
+        # Populate ParsedLaunchFile diagnostics from the collector
+        result.warnings.extend(collector.warnings)
+        result.errors.extend(collector.errors)
+        return result
     finally:
         _current_state.reset(token)
+        logging.getLogger("launch_plus").removeHandler(collector)
 
 
 def _resolve_file_impl(
@@ -1093,8 +1102,6 @@ def _resolve_file_impl(
     state.tracked["packages"] = []
     state.tracked["includes"] = []
     state.tracked["nodes"] = []
-    state.tracked["warnings"] = []
-    state.tracked["errors"] = []
     state.tracked["declared_args"] = []
     state.tracked["declared_args_by_file"] = {}
     state.tracked["global_params"] = []
@@ -1482,8 +1489,8 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
         declared_arg_defaults=declared_arg_defaults,
         declared_args_by_file=declared_args_by_file,
         global_params=list(tracked.get("global_params", [])),
-        warnings=list(tracked.get("warnings", [])),
-        errors=list(tracked.get("errors", [])),
+        warnings=[],  # populated by DiagnosticCollector in resolve_file()
+        errors=[],  # populated by DiagnosticCollector in resolve_file()
         infos=list(tracked.get("infos", [])) if "infos" in tracked else [],
     )
 

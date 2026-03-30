@@ -1,6 +1,7 @@
 """Tests for resolver internals — substitution handling, node tracking,
 and inline Python include resolution."""
 
+import logging
 import os
 import tempfile
 import textwrap
@@ -400,7 +401,7 @@ class TestInlinePythonInclude:
 
             assert ctx._launch_configurations["resolved_mode"] == "custom"
 
-    def test_depth_limit_prevents_infinite_recursion(self):
+    def test_depth_limit_prevents_infinite_recursion(self, caplog):
         """Exceeding the depth limit should warn, not crash."""
         with tempfile.TemporaryDirectory() as tmpdir:
             child_path = _write_launch_py(
@@ -416,9 +417,10 @@ class TestInlinePythonInclude:
 
             ctx = _make_context({})
             R.get_state().walk_depth = 21  # Simulate deep nesting
-            R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
+            with caplog.at_level(logging.WARNING):
+                R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
             # Should not raise; just warns
-            assert any("depth" in w.lower() for w in R.get_state().tracked["warnings"])
+            assert "depth" in caplog.text.lower()
             R.get_state().walk_depth = 0  # Reset
 
     def test_missing_file_silently_skipped(self):
@@ -544,16 +546,16 @@ class TestEnvStack:
         entry = R.get_state().tracked["nodes"][node._idx]
         assert entry["env"]["FOO"] == "bar"
 
-    def test_unset_env_nonexistent_errors(self):
+    def test_unset_env_nonexistent_errors(self, caplog):
         """UnsetEnvironmentVariable on a var that doesn't exist → 'not set' error."""
         import uuid
 
         name = f"NONEXISTENT_VAR_{uuid.uuid4().hex[:8]}"
         assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
-        R._TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
-        errors = R.get_state().tracked.get("errors", [])
-        assert any(name in e and "not set" in e for e in errors)
+        with caplog.at_level(logging.WARNING):
+            R._TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
+        assert name in caplog.text and "not set" in caplog.text
 
     def test_unset_env_override_only_accepted(self):
         """UnsetEnv on an override-only var (not in process env) → accepted."""
@@ -999,12 +1001,13 @@ class TestResolveSubstitutions:
         result = R.resolve_substitutions(f"$(env {var} fallback)", ctx)
         assert result == "fallback"
 
-    def test_resolve_env_unset_without_default_errors(self):
+    def test_resolve_env_unset_without_default_errors(self, caplog):
         var = "LAUNCH_PLUS_TEST_UNSET_d4e5f6"
         assert var not in os.environ, f"precondition: {var} must not be set"
         ctx = _fresh_subst_ctx()
-        R.resolve_substitutions(f"$(env {var})", ctx)
-        assert any("not set" in e for e in R.get_state().tracked["errors"])
+        with caplog.at_level(logging.WARNING):
+            R.resolve_substitutions(f"$(env {var})", ctx)
+        assert "not set" in caplog.text
 
     def test_resolve_dirname(self):
         ctx = _fresh_subst_ctx(launch_file_dir="/path/to/launch")
@@ -1047,17 +1050,19 @@ class TestResolveSubstitutions:
         result = R.resolve_substitutions("$(var config_path)/params.yaml", ctx)
         assert result == "$(find-pkg-share sample_description)/config/params.yaml"
 
-    def test_resolve_error_undefined_arg(self):
+    def test_resolve_error_undefined_arg(self, caplog):
         ctx = _fresh_subst_ctx()
-        result = R.resolve_substitutions("$(arg undefined)", ctx)
+        with caplog.at_level(logging.WARNING):
+            result = R.resolve_substitutions("$(arg undefined)", ctx)
         assert "$(arg undefined)" in result
-        assert any("undefined argument" in e for e in R.get_state().tracked["errors"])
+        assert "undefined argument" in caplog.text
 
-    def test_resolve_error_undefined_var(self):
+    def test_resolve_error_undefined_var(self, caplog):
         ctx = _fresh_subst_ctx()
-        result = R.resolve_substitutions("$(var undefined)", ctx)
+        with caplog.at_level(logging.WARNING):
+            result = R.resolve_substitutions("$(var undefined)", ctx)
         assert "$(var undefined)" in result
-        assert any("undefined variable" in e for e in R.get_state().tracked["errors"])
+        assert "undefined variable" in caplog.text
 
     def test_resolve_eval_string_equality(self):
         # After XML entity decoding, &quot; becomes " — the == is inside a
@@ -1286,7 +1291,7 @@ class TestResolveXmlElements:
         assert len(tracked["nodes"]) == 1
         assert tracked["nodes"][0]["package"] == "sim_pkg"
 
-    def test_let_with_condition(self):
+    def test_let_with_condition(self, caplog):
         xml = textwrap.dedent("""\
             <launch>
               <arg name="flag" default="false"/>
@@ -1294,9 +1299,10 @@ class TestResolveXmlElements:
               <node pkg="$(var x)" exec="e" name="n"/>
             </launch>
         """)
-        _, tracked = _parse_and_walk(xml)
+        with caplog.at_level(logging.WARNING):
+            _parse_and_walk(xml)
         # $(var x) is undefined → error recorded, placeholder kept
-        assert any("undefined variable" in e for e in tracked["errors"])
+        assert "undefined variable" in caplog.text
 
     # ── Group scoping ──
 
@@ -1737,7 +1743,7 @@ class TestResolveXmlElements:
             # Explicit arg overrides the leaked value
             assert nodes[1]["remappings"] == [["out", "/explicit/topic"]]
 
-    def test_circular_include_detected(self):
+    def test_circular_include_detected(self, caplog):
         with tempfile.TemporaryDirectory() as tmpdir:
             # File includes itself
             self_path = os.path.join(tmpdir, "self.launch.xml")
@@ -1748,15 +1754,17 @@ class TestResolveXmlElements:
             elements = R.parse_xml_launch(
                 f'<launch><include file="{self_path}"/></launch>', "test.launch.xml"
             )
-            R.resolve_xml_elements(elements, ctx)
-            assert any("circular" in e for e in R.get_state().tracked["errors"])
+            with caplog.at_level(logging.WARNING):
+                R.resolve_xml_elements(elements, ctx)
+            assert "circular" in caplog.text
 
     # ── Unknown element ──
 
-    def test_unknown_element_warns(self):
+    def test_unknown_element_warns(self, caplog):
         xml = '<launch><foobar attr="val"/></launch>'
-        _, tracked = _parse_and_walk(xml)
-        assert any("unknown element" in w for w in tracked["warnings"])
+        with caplog.at_level(logging.WARNING):
+            _parse_and_walk(xml)
+        assert "unknown element" in caplog.text
 
     # ── Namespace helper functions ──
 
@@ -2034,16 +2042,17 @@ class TestActionRegistry:
             nodes = _tracked_nodes(tracked)
             assert any(n["package"] == "p" for n in nodes)
 
-    def test_errors_and_warnings(self):
+    def test_errors_and_warnings(self, caplog):
         xml = textwrap.dedent("""\
             <launch>
               <node pkg="$(arg undefined)" exec="e" name="n"/>
               <foobar/>
             </launch>
         """)
-        tracked = _parse_to_tracked(xml)
-        assert any("undefined" in e for e in tracked["errors"])
-        assert any("unknown" in w for w in tracked["warnings"])
+        with caplog.at_level(logging.WARNING):
+            _parse_to_tracked(xml)
+        assert "undefined" in caplog.text
+        assert "unknown" in caplog.text
 
     def test_env_effective(self):
         xml = textwrap.dedent("""\
@@ -2126,7 +2135,7 @@ class TestActionRegistry:
 class TestApplyDeclaredArgLazy:
     """Default is NOT resolved when the arg is already set by the caller."""
 
-    def test_default_not_resolved_when_arg_already_set(self):
+    def test_default_not_resolved_when_arg_already_set(self, caplog):
         """FindPackageShare in default must not be perform()'d if arg is set."""
         R.get_state().preview_mode = False
         # No package in AMENT — perform() would error if called.
@@ -2138,11 +2147,12 @@ class TestApplyDeclaredArgLazy:
                 "/config/file.yaml",
             ],
         )
-        R._apply_declared_arg(arg, ctx)
+        with caplog.at_level(logging.WARNING):
+            R._apply_declared_arg(arg, ctx)
         # Arg value unchanged (caller's value preserved).
         assert ctx._launch_configurations["my_arg"] == "already_set_value"
         # No error — default was not resolved.
-        assert not any("nonexistent_pkg" in e for e in R.get_state().tracked["errors"])
+        assert "nonexistent_pkg" not in caplog.text
 
     def test_default_deferred_when_arg_not_set(self):
         """Default is stored as _DeferredDefault, resolved on read."""
@@ -2161,7 +2171,7 @@ class TestApplyDeclaredArgLazy:
         # Now it's resolved in the context.
         assert ctx._launch_configurations["my_arg"] == "simple_default"
 
-    def test_deferred_default_not_resolved_if_never_read(self):
+    def test_deferred_default_not_resolved_if_never_read(self, caplog):
         """FindPackageShare for uninstalled pkg causes no error if arg is never read."""
         R.get_state().preview_mode = False
         ctx = _make_context({})
@@ -2172,10 +2182,11 @@ class TestApplyDeclaredArgLazy:
                 "/config/file.yaml",
             ],
         )
-        R._apply_declared_arg(arg, ctx)
+        with caplog.at_level(logging.WARNING):
+            R._apply_declared_arg(arg, ctx)
         # Default is deferred — no resolution happened, no error.
         assert isinstance(ctx._launch_configurations["cuda_param"], R._DeferredDefault)
-        assert not any("uninstalled_cuda_pkg" in e for e in R.get_state().tracked["errors"])
+        assert "uninstalled_cuda_pkg" not in caplog.text
 
     def test_unresolved_default_recorded_for_show_args(self):
         """When arg is already set, the raw default string is recorded for --show-args."""
@@ -2221,7 +2232,7 @@ class TestStrictnessFlags:
         # Default not applied — arg stays absent
         assert "x" not in ctx.args
 
-    def test_apply_arg_defaults_false_undefined_ref_errors(self):
+    def test_apply_arg_defaults_false_undefined_ref_errors(self, caplog):
         R.get_state().apply_arg_defaults = False
         ctx = R._SubstitutionContext()
         elements = R.parse_xml_launch(
@@ -2231,10 +2242,11 @@ class TestStrictnessFlags:
             </launch>""",
             "test.xml",
         )
-        R.resolve_xml_elements(elements, ctx)
-        assert any("undefined" in e for e in R.get_state().tracked["errors"])
+        with caplog.at_level(logging.WARNING):
+            R.resolve_xml_elements(elements, ctx)
+        assert "undefined" in caplog.text
 
-    def test_global_arg_cascade_true_inherits_parent_args(self):
+    def test_global_arg_cascade_true_inherits_parent_args(self, caplog):
         R.get_state().global_arg_cascade = True
         with tempfile.TemporaryDirectory() as child_share:
             R.get_state().package_shares["child_pkg"] = child_share
@@ -2251,11 +2263,12 @@ class TestStrictnessFlags:
                 "</launch>",
                 "test.xml",
             )
-            R.resolve_xml_elements(elements, ctx)
+            with caplog.at_level(logging.WARNING):
+                R.resolve_xml_elements(elements, ctx)
             # Child sees parent arg — no error
-            assert not R.get_state().tracked["errors"]
+            assert not any(r.levelno >= logging.ERROR for r in caplog.records)
 
-    def test_global_arg_cascade_false_no_parent_args(self):
+    def test_global_arg_cascade_false_no_parent_args(self, caplog):
         R.get_state().global_arg_cascade = False
         R.get_state().apply_arg_defaults = False
         with tempfile.TemporaryDirectory() as child_share:
@@ -2273,11 +2286,12 @@ class TestStrictnessFlags:
                 "</launch>",
                 "test.xml",
             )
-            R.resolve_xml_elements(elements, ctx)
+            with caplog.at_level(logging.WARNING):
+                R.resolve_xml_elements(elements, ctx)
             # Child can't see parent arg — undefined error
-            assert any("undefined" in e for e in R.get_state().tracked["errors"])
+            assert "undefined" in caplog.text
 
-    def test_allow_unportable_paths_false_errors(self):
+    def test_allow_unportable_paths_false_errors(self, caplog):
         R.get_state().allow_unportable_paths = False
         R.get_state().preview_mode = True
         ctx = R._SubstitutionContext()
@@ -2285,10 +2299,11 @@ class TestStrictnessFlags:
             '<launch><include file="/absolute/path/to/file.launch.xml"/></launch>',
             "test.xml",
         )
-        R.resolve_xml_elements(elements, ctx)
-        assert any("unportable" in e for e in R.get_state().tracked["errors"])
+        with caplog.at_level(logging.WARNING):
+            R.resolve_xml_elements(elements, ctx)
+        assert any("unportable" in r.message and r.levelno >= logging.ERROR for r in caplog.records)
 
-    def test_allow_unportable_paths_true_warns(self):
+    def test_allow_unportable_paths_true_warns(self, caplog):
         R.get_state().allow_unportable_paths = True
         R.get_state().preview_mode = True
         ctx = R._SubstitutionContext()
@@ -2296,9 +2311,14 @@ class TestStrictnessFlags:
             '<launch><include file="/absolute/path/to/file.launch.xml"/></launch>',
             "test.xml",
         )
-        R.resolve_xml_elements(elements, ctx)
-        assert any("unportable" in w for w in R.get_state().tracked["warnings"])
-        assert not any("unportable" in e for e in R.get_state().tracked["errors"])
+        with caplog.at_level(logging.WARNING):
+            R.resolve_xml_elements(elements, ctx)
+        assert any(
+            "unportable" in r.message and r.levelno == logging.WARNING for r in caplog.records
+        )
+        assert not any(
+            "unportable" in r.message and r.levelno >= logging.ERROR for r in caplog.records
+        )
 
 
 # ─── _resolve_pkg_share and _TrackedFindPackageShare ─────────────────────────
@@ -2363,13 +2383,14 @@ class TestTrackedFindPackageShare:
         assert fps.perform(None) == "/install/share/my_pkg"
         assert str(fps) == "/install/share/my_pkg"
 
-    def test_postbuild_unresolvable_reports_error(self):
+    def test_postbuild_unresolvable_reports_error(self, caplog):
         R.get_state().preview_mode = False
         fps = R._TrackedFindPackageShare("missing_pkg")
-        result = fps.perform(None)
+        with caplog.at_level(logging.WARNING):
+            result = fps.perform(None)
         # Returns portable fallback but records an error
         assert result == "$(find-pkg-share missing_pkg)"
-        assert any("missing_pkg" in e for e in R.get_state().tracked["errors"])
+        assert "missing_pkg" in caplog.text
 
 
 class TestParseRosdepResolve:

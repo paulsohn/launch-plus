@@ -37,19 +37,61 @@ class _DeclaredArg(_TrackedAction):
 
     def execute(self, context) -> list | None:
         from launch_plus.entities.helpers import resolve_value
+        from launch_plus.entities.substitutions.launch_config import _DeferredDefault
+
+        name = self.name
+        if not name:
+            return None
+
+        # Evaluate condition (Python shim path only)
+        if self.condition is not None and hasattr(self.condition, "evaluate"):
+            try:
+                if not self.condition.evaluate(context):
+                    return None
+            except Exception as e:
+                logger.warning(
+                    "condition on DeclareLaunchArgument '%s' failed: %s; assuming satisfied",
+                    name,
+                    e,
+                )
+
+        state = context._state
 
         if self._fixed_value is not None:
             # <arg name="x" value="v"/> — fixed value, set immediately
             resolved = resolve_value(self._fixed_value, context) or ""
-            if context is not None and hasattr(context, "args"):
-                context.args[self.name] = resolved
-            _record_and_track(self.name, resolved, context)
-        elif hasattr(context, "args"):
-            # XML path: resolve default and record
-            _execute_xml_arg(self, context)
-        elif hasattr(context, "_launch_configurations"):
-            # Python shim path
-            _apply_declared_arg(self, context)
+            context.args[name] = resolved
+            context._launch_configurations[name] = resolved
+            _record_and_track(name, resolved, context)
+            return None
+
+        # Default value handling
+        already_set = name in context.args or name in context._launch_configurations
+        if already_set:
+            # Arg already provided — record the default display for --show-args
+            dv = self.default_value
+            if dv is not None:
+                display = resolve_value(dv, context) or ""
+            else:
+                display = context.args.get(name, "")
+            _record_and_track(name, display, context)
+            return None
+
+        if self.default_value is None:
+            _record_and_track(name, "", context)
+            return None
+
+        if not state.apply_arg_defaults:
+            _record_and_track(name, "", context)
+            return None
+
+        # Apply default
+        dv = self.default_value
+        display = resolve_value(dv, context) or ""
+        _record_and_track(name, display, context)
+        # Store as deferred for Python shim path (LaunchConfiguration reads it later)
+        context._launch_configurations[name] = _DeferredDefault(dv)
+        context.args[name] = display
         return None
 
 

@@ -73,7 +73,8 @@ class _TrackedGroupAction(_TrackedAction):
             _resolve_element(child, ctx, self._xml_include_stack or [])
         if self._scoped:
             new_lc = {k: v for k, v in ctx._launch_configurations.items() if k not in saved_lc}
-            ctx._launch_configurations = saved_lc
+            ctx._launch_configurations.clear()
+            ctx._launch_configurations.update(saved_lc)
             ctx._launch_configurations.update(new_lc)
             ctx._state.env.clear()
             ctx._state.env.update(saved_env)

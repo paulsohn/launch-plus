@@ -111,8 +111,11 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
         for arg_name, value_tokens in self._xml_args or []:
             child_ctx_args[arg_name] = resolve_value(value_tokens, ctx) or ""
             ctx._launch_configurations[arg_name] = child_ctx_args[arg_name]
-        # Restore parent context — child args don't leak into parent scope
-        ctx._launch_configurations = saved_lc
+        # Restore parent context — child args don't leak into parent scope.
+        # Use clear+update (not assignment) to preserve dict identity, since
+        # outer scopes (e.g., <group>) may hold references to the same dict.
+        ctx._launch_configurations.clear()
+        ctx._launch_configurations.update(saved_lc)
         if dep_idx >= 0 and child_ctx_args:
             ctx._state.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
         if child_ctx_args:

@@ -87,14 +87,6 @@ class _TrackedFindPackageShare:
             return str(subs), True
         return str(subs), False
 
-    def _get_state(self, context=None):
-        """Get state from context, falling back to _R.get_state()."""
-        import launch_plus.resolver as _R
-
-        if context is not None and hasattr(context, "_state"):
-            return context._state
-        return _R.get_state()
-
     def _try_ament_resolve(self, state, pkg: str) -> str:
         """Resolve to a real path, return portable form on failure."""
         import launch_plus.resolver as _R
@@ -109,7 +101,7 @@ class _TrackedFindPackageShare:
     def perform(self, context):
         import launch_plus.resolver as _R
 
-        state = self._get_state(context)
+        state = context._state if context is not None else _R.get_state()
         pkg, is_fallback = self._resolve_name(context)
         if not is_fallback:
             _R._track_package(state, pkg)
@@ -118,8 +110,10 @@ class _TrackedFindPackageShare:
         return f"$(find-pkg-share {pkg})"
 
     def __str__(self):
-        state = self._get_state(None)
-        pkg, is_fallback = self._resolve_name(None)
+        import launch_plus.resolver as _R
+
+        state = _R.get_state()
+        pkg, _ = self._resolve_name(None)
         if not state.preview_mode:
             return self._try_ament_resolve(state, pkg)
         return f"$(find-pkg-share {pkg})"

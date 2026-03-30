@@ -236,9 +236,11 @@ class _TrackedShutdown(_TrackedAction):
 
     def __init__(self, **kwargs):
         if kwargs:
-            _R.get_state().error(
-                f"Shutdown event arguments are not yet supported: "
-                f"{', '.join(f'{k}={v!r}' for k, v in kwargs.items())}"
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Shutdown event arguments are not yet supported: %s",
+                ", ".join(f"{k}={v!r}" for k, v in kwargs.items()),
             )
 
     def to_dict(self):
@@ -278,9 +280,7 @@ class _TrackedOnProcessStart(_TrackedAction):
         self._target_action = target_action
         self._actions = on_start or []
 
-    def to_event_handler(self, state=None):
-        if state is None:
-            state = _R.get_state()
+    def to_event_handler(self, state):
         target_name = _action_name(self._target_action, state)
         ns_stack, explicit_ns = _action_namespace_info(self._target_action, state)
         return {
@@ -302,9 +302,7 @@ class _TrackedOnProcessExit(_TrackedAction):
         self._target_action = target_action
         self._actions = on_exit or []
 
-    def to_event_handler(self, state=None):
-        if state is None:
-            state = _R.get_state()
+    def to_event_handler(self, state):
         target_name = _action_name(self._target_action, state)
         ns_stack, explicit_ns = _action_namespace_info(self._target_action, state)
         return {
@@ -330,9 +328,7 @@ class _TrackedOnStateTransition(_TrackedAction):
         self._goal_state = str(goal_state) if goal_state else None
         self._actions = entities or []
 
-    def to_event_handler(self, state=None):
-        if state is None:
-            state = _R.get_state()
+    def to_event_handler(self, state):
         target_node = _action_name(self._target_lifecycle_node, state)
         ns_stack, explicit_ns = _action_namespace_info(self._target_lifecycle_node, state)
         return {
@@ -353,7 +349,7 @@ class _TrackedOnShutdown(_TrackedAction):
     def __init__(self, on_shutdown=None, **kwargs):
         self._actions = on_shutdown or []
 
-    def to_event_handler(self):
+    def to_event_handler(self, state=None):
         return {
             "handler_kind": "on_shutdown",
             "target": None,
@@ -375,5 +371,6 @@ class _TrackedRegisterEventHandler(_TrackedAction):
     def execute(self, context) -> list | None:
         eh = self._event_handler
         if eh is not None and hasattr(eh, "to_event_handler"):
-            _R._track_event_handler(context._state, eh.to_event_handler())
+            state = context._state
+            _R._track_event_handler(state, eh.to_event_handler(state))
         return None

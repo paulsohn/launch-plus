@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 
-import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
+from launch_plus.entities.helpers import _portable_display, _record_declared_arg
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 
@@ -61,7 +61,7 @@ def _record_and_track(name: str, resolved: str, context=None) -> None:
     already_seen = name in state.declared_arg_names
     if not already_seen:
         state.declared_arg_names.add(name)
-    _R._record_declared_arg(state, name, resolved, flat=not already_seen)
+    _record_declared_arg(state, name, resolved, flat=not already_seen)
 
 
 def _execute_xml_arg(arg: _DeclaredArg, context) -> None:
@@ -112,9 +112,9 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
     if already_set:
         dv = arg.default_value
         if isinstance(dv, list):
-            raw = "".join(_R._portable_display(s) for s in dv)
+            raw = "".join(_portable_display(s) for s in dv)
         else:
-            raw = _R._portable_display(dv)
+            raw = _portable_display(dv)
         _record_and_track(arg.name, raw, context)
         return
 
@@ -124,9 +124,9 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
 
     dv = arg.default_value
     if isinstance(dv, list):
-        display = "".join(_R._portable_display(s) for s in dv)
+        display = "".join(_portable_display(s) for s in dv)
     else:
-        display = _R._portable_display(dv)
+        display = _portable_display(dv)
 
     _record_and_track(arg.name, display, context)
 

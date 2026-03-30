@@ -81,7 +81,7 @@ class _EventHandlerAction(_TrackedAction):
                     "explicit_namespace": resolve_value(ce["namespace"], context),
                 }
             )
-        _R._track_event_handler(
+        _track_event_handler(
             context._state,
             {
                 "handler_kind": self._handler_kind,
@@ -119,7 +119,7 @@ class _EmitEventAction(_TrackedAction):
         event = resolve_value(self._event, context) or ""
         target_node = resolve_value(self._target_node_attr, context)
         ee_ns = resolve_value(self._namespace, context)
-        _R._track_event_handler(
+        _track_event_handler(
             context._state,
             {
                 "handler_kind": "emit_event",
@@ -144,8 +144,8 @@ class _EmitEventAction(_TrackedAction):
 
 # ─── Python-shim actions ─────────────────────────────────────────────────────
 
-import launch_plus.resolver as _R  # noqa: E402
 from launch_plus.entities.actions.base import _TrackedAction  # noqa: E402
+from launch_plus.entities.helpers import _track_event_handler  # noqa: E402
 
 
 def _transition_name(transition_id):
@@ -372,5 +372,5 @@ class _TrackedRegisterEventHandler(_TrackedAction):
         eh = self._event_handler
         if eh is not None and hasattr(eh, "to_event_handler"):
             state = context._state
-            _R._track_event_handler(state, eh.to_event_handler(state))
+            _track_event_handler(state, eh.to_event_handler(state))
         return None

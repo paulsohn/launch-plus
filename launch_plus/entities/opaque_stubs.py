@@ -14,6 +14,7 @@ import os
 import pathlib as _pathlib
 
 import launch_plus.resolver as _R
+from launch_plus.entities.helpers import _parse_portable_path
 
 logger = logging.getLogger("launch_plus")
 
@@ -75,7 +76,7 @@ def _call_opaque_with_stubs(state, fn, context):
         portable path.  Fetches the package inline if needed via _ensure_fetched().
         Returns ``None`` if the package cannot be resolved.
         """
-        parsed = _R._parse_portable_path(path_str)
+        parsed = _parse_portable_path(path_str)
         if parsed is None:
             return None
         pkg, rest = parsed
@@ -105,7 +106,7 @@ def _call_opaque_with_stubs(state, fn, context):
     def _stub_open(path, mode="r", *args, **kwargs):
         path_str = str(path)
         # Handle portable paths.
-        if _R._parse_portable_path(path_str) is not None:
+        if _parse_portable_path(path_str) is not None:
             if not state.apply_opaque_file_access:
                 logger.error(
                     "OpaqueFunction opened a portable path without --apply-opaque-file-access "
@@ -153,7 +154,7 @@ def _call_opaque_with_stubs(state, fn, context):
 
     def _stub_path_exists(path):
         path_str = str(path)
-        if _R._parse_portable_path(path_str) is not None:
+        if _parse_portable_path(path_str) is not None:
             if not state.apply_opaque_file_access:
                 logger.error(
                     "OpaqueFunction called os.path.exists on a portable path without "
@@ -169,7 +170,7 @@ def _call_opaque_with_stubs(state, fn, context):
 
     def _stub_path_isfile(path):
         path_str = str(path)
-        if _R._parse_portable_path(path_str) is not None:
+        if _parse_portable_path(path_str) is not None:
             if not state.apply_opaque_file_access:
                 logger.error(
                     "OpaqueFunction called os.path.isfile on a portable path without "
@@ -185,7 +186,7 @@ def _call_opaque_with_stubs(state, fn, context):
 
     def _stub_path_isdir(path):
         path_str = str(path)
-        if _R._parse_portable_path(path_str) is not None:
+        if _parse_portable_path(path_str) is not None:
             if not state.apply_opaque_file_access:
                 logger.error(
                     "OpaqueFunction called os.path.isdir on a portable path without "
@@ -209,7 +210,7 @@ def _call_opaque_with_stubs(state, fn, context):
         holds a portable $(find-pkg-share ...) string.
         """
         path_str = str(path_self)
-        if _R._parse_portable_path(path_str) is not None:
+        if _parse_portable_path(path_str) is not None:
             if not state.apply_opaque_file_access:
                 logger.error(
                     "OpaqueFunction called Path.open on a portable path without "

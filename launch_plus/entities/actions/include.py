@@ -8,6 +8,11 @@ import os
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
+from launch_plus.entities.helpers import (
+    _extract_pkg_and_share_path,
+    _resolve_substitution,
+    _track_include,
+)
 from launch_plus.entities.xml_resolver import _ActionParser
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
@@ -98,7 +103,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             logger.warning("max include depth exceeded for %s", file_path)
             return None
 
-        dep_idx = _R._track_include(ctx._state, file_path)
+        dep_idx = _track_include(ctx._state, file_path)
         # Resolve include args
         child_ctx_args: dict[str, str] = {}
         for arg_name, value_tokens in self._xml_args or []:
@@ -126,7 +131,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
     def _execute_shim(self, context) -> list | None:
         # Deferred tracking from __init__ (path known at construction time)
         if self._path and self._dep_idx < 0:
-            self._dep_idx = _R._track_include(context._state, self._path)
+            self._dep_idx = _track_include(context._state, self._path)
             _resolve_include_args(self._path, self._raw_launch_arguments, context, self._dep_idx)
 
         if self._path is None and context is not None:
@@ -139,7 +144,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
                     logger.warning("failed to resolve IncludeLaunchDescription source: %s", e)
             if path:
                 self._path = path
-                dep_idx = _R._track_include(context._state, path)
+                dep_idx = _track_include(context._state, path)
                 _resolve_include_args(path, self._raw_launch_arguments, context, dep_idx)
 
         if self._path and self._path.endswith(".py") and context is not None:
@@ -147,10 +152,10 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             if self._raw_launch_arguments:
                 for k, v in self._raw_launch_arguments:
                     k_str = str(k)
-                    resolved = _R._resolve_substitution(v, context)
+                    resolved = _resolve_substitution(v, context)
                     v_str = resolved if resolved is not None else str(v)
                     child_args[k_str] = v_str
-            inc_dep = _R._extract_pkg_and_share_path(self._path)
+            inc_dep = _extract_pkg_and_share_path(self._path)
             if inc_dep:
                 context._state.include_chain.append(list(inc_dep))
             else:

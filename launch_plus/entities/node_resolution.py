@@ -9,6 +9,12 @@ from __future__ import annotations
 
 import launch_plus.resolver as _R
 from launch_plus.entities.actions.node import _TrackedComposableNode
+from launch_plus.entities.helpers import (
+    _is_substitution,
+    _resolve_substitution,
+    _resolve_substitution_ex,
+    _track_package,
+)
 
 # ─── Node detail resolution helpers ──────────────────────────────────────────
 
@@ -30,16 +36,16 @@ def _resolve_node_details(state, node, context):
     # that could not be resolved at construction time.
     for field_name in ("package", "executable", "name"):
         raw = getattr(node, f"_raw_{field_name}", None)
-        if _R._is_substitution(raw):
-            resolved, is_fallback = _R._resolve_substitution_ex(raw, context)
+        if _is_substitution(raw):
+            resolved, is_fallback = _resolve_substitution_ex(raw, context)
             if resolved is not None:
                 entry[field_name] = resolved
                 if field_name == "package" and not is_fallback:
-                    _R._track_package(state, resolved)
+                    _track_package(state, resolved)
 
     # Namespace: emit raw inputs — effective_namespace is computed downstream
     ns = (
-        _R._resolve_substitution(node._raw_namespace, context)
+        _resolve_substitution(node._raw_namespace, context)
         if node._raw_namespace is not None
         else None
     )
@@ -77,7 +83,7 @@ def _resolve_node_details(state, node, context):
                     pf_list.append(pf_entry)
         elif isinstance(p, dict):
             for k, v in p.items():
-                resolved_v = _R._resolve_substitution(v, context)
+                resolved_v = _resolve_substitution(v, context)
                 params[str(k)] = resolved_v if resolved_v is not None else ""
     # Merge global params from the launch context (global first, node-local overrides).
     # In ROS 2, Node.execute() reads global_params from context._launch_configurations.
@@ -92,8 +98,8 @@ def _resolve_node_details(state, node, context):
     remaps = list(state.global_remaps)
     for r in node._raw_remappings:
         if isinstance(r, (tuple, list)) and len(r) == 2:
-            src = _R._resolve_substitution(r[0], context)
-            dst = _R._resolve_substitution(r[1], context)
+            src = _resolve_substitution(r[0], context)
+            dst = _resolve_substitution(r[1], context)
             remaps.append([src or str(r[0]), dst or str(r[1])])
     entry["remappings"] = remaps
 
@@ -102,14 +108,14 @@ def _resolve_node_details(state, node, context):
     raw_env = node._raw_env
     if isinstance(raw_env, dict):
         for k, v in raw_env.items():
-            env[_R._resolve_substitution(k, context) or str(k)] = (
-                _R._resolve_substitution(v, context) or ""
+            env[_resolve_substitution(k, context) or str(k)] = (
+                _resolve_substitution(v, context) or ""
             )
     elif isinstance(raw_env, (list, tuple)):
         for item in raw_env:
             if isinstance(item, (tuple, list)) and len(item) == 2:
-                k_str = _R._resolve_substitution(item[0], context) or str(item[0])
-                v_str = _R._resolve_substitution(item[1], context) or ""
+                k_str = _resolve_substitution(item[0], context) or str(item[0])
+                v_str = _resolve_substitution(item[1], context) or ""
                 env[k_str] = v_str
     entry["env"] = env
 
@@ -122,7 +128,7 @@ def _resolve_node_details(state, node, context):
     ):
         raw = getattr(node, attr, None)
         if raw is not None:
-            resolved = _R._resolve_substitution(raw, context)
+            resolved = _resolve_substitution(raw, context)
             if resolved is not None:
                 entry[key] = resolved
             elif isinstance(raw, str):
@@ -180,13 +186,13 @@ def _resolve_composable_plugins(state, descs, context):
                     pf_list.append(pf_entry)
             elif isinstance(p, dict):
                 for k, v in p.items():
-                    resolved_v = _R._resolve_substitution(v, context)
+                    resolved_v = _resolve_substitution(v, context)
                     params[str(k)] = resolved_v if resolved_v is not None else ""
         remaps = []
         for r in desc._raw_remappings:
             if isinstance(r, (tuple, list)) and len(r) == 2:
-                src = _R._resolve_substitution(r[0], context)
-                dst = _R._resolve_substitution(r[1], context)
+                src = _resolve_substitution(r[0], context)
+                dst = _resolve_substitution(r[1], context)
                 remaps.append(
                     [
                         src if src is not None else str(r[0]),
@@ -195,20 +201,20 @@ def _resolve_composable_plugins(state, descs, context):
                 )
         # Resolve package/plugin/name substitutions with the live context
         pkg = desc._package
-        if _R._is_substitution(desc._raw_package):
-            resolved_pkg, is_fallback = _R._resolve_substitution_ex(desc._raw_package, context)
+        if _is_substitution(desc._raw_package):
+            resolved_pkg, is_fallback = _resolve_substitution_ex(desc._raw_package, context)
             if resolved_pkg is not None:
                 pkg = resolved_pkg
                 if not is_fallback:
-                    _R._track_package(state, resolved_pkg)
+                    _track_package(state, resolved_pkg)
         plg = desc._plugin
-        if _R._is_substitution(desc._raw_plugin):
-            resolved_plg = _R._resolve_substitution(desc._raw_plugin, context)
+        if _is_substitution(desc._raw_plugin):
+            resolved_plg = _resolve_substitution(desc._raw_plugin, context)
             if resolved_plg is not None:
                 plg = resolved_plg
         nm = desc._name
-        if _R._is_substitution(desc._raw_name):
-            resolved_nm = _R._resolve_substitution(desc._raw_name, context)
+        if _is_substitution(desc._raw_name):
+            resolved_nm = _resolve_substitution(desc._raw_name, context)
             if resolved_nm is not None:
                 nm = resolved_nm
         plugins.append(

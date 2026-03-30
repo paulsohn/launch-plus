@@ -16,6 +16,7 @@ import yaml
 
 import launch_plus.resolver as _R
 from launch_plus.entities.expose import action_parse_methods
+from launch_plus.entities.helpers import _extract_pkg_and_share_path, _parse_portable_path
 from launch_plus.parsers.entity import Entity
 from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
 from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
@@ -251,7 +252,7 @@ def _read_and_expand_param_file(
     if state is None and ctx is not None:
         state = ctx._state
     real_path = path
-    parsed = _R._parse_portable_path(path)
+    parsed = _parse_portable_path(path)
     if parsed:
         pkg, rest = parsed
         pkg_share = state.package_shares.get(pkg)
@@ -468,7 +469,7 @@ def resolve_included_file(
 ) -> None:
     """Parse an included launch file and resolve it recursively."""
     state = ctx._state
-    inc_dep = _R._extract_pkg_and_share_path(file_path)
+    inc_dep = _extract_pkg_and_share_path(file_path)
     if inc_dep:
         state.include_chain.append(list(inc_dep))
     else:

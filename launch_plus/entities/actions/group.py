@@ -63,8 +63,7 @@ class _TrackedGroupAction(_TrackedAction):
         from launch_plus.resolver import _resolve_element
 
         if self._scoped:
-            saved_args = dict(ctx.args)
-            saved_vars = dict(ctx.vars)
+            saved_lc = dict(ctx._launch_configurations)
             saved_env = dict(ctx._state.env)
             saved_ns_depth = len(ctx._state.namespace_stack)
             saved_gp = list(ctx._state.global_params)
@@ -73,10 +72,9 @@ class _TrackedGroupAction(_TrackedAction):
         for child in self._xml_children:
             _resolve_element(child, ctx, self._xml_include_stack or [])
         if self._scoped:
-            new_args = {k: v for k, v in ctx.args.items() if k not in saved_args}
-            ctx.args = saved_args
-            ctx.args.update(new_args)
-            ctx.vars = saved_vars
+            new_lc = {k: v for k, v in ctx._launch_configurations.items() if k not in saved_lc}
+            ctx._launch_configurations = saved_lc
+            ctx._launch_configurations.update(new_lc)
             ctx._state.env.clear()
             ctx._state.env.update(saved_env)
             del ctx._state.namespace_stack[saved_ns_depth:]

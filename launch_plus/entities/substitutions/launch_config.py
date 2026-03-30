@@ -92,7 +92,7 @@ class _LaunchConfiguration:
         name = self._resolve_name(context)
         if context is not None:
             value = None
-            # Primary: launch_configurations (official ROS 2 storage)
+            # launch_configurations is the single source of truth
             lc = getattr(context, "_launch_configurations", {})
             if name in lc:
                 value = lc[name]
@@ -100,11 +100,6 @@ class _LaunchConfiguration:
                     resolved = value.resolve(context)
                     lc[name] = resolved
                     return resolved
-            # Fallback: vars (from <let>), args (from <arg>)
-            elif hasattr(context, "vars") and name in context.vars:
-                value = context.vars[name]
-            elif hasattr(context, "args") and name in context.args:
-                value = context.args[name]
             if value is not None:
                 return str(value)
         if self._default is not None:

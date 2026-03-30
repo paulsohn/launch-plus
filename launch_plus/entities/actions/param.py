@@ -59,10 +59,7 @@ class _SetLaunchConfiguration(_TrackedAction):
             return None
         value = resolve_value(self._value, context)
         resolved_value = str(value) if value is not None else ""
-        # XML path: set ctx.vars for subsequent substitution resolution
-        if context is not None and hasattr(context, "vars"):
-            context.vars[name] = resolved_value
-        # Python shim path: set _launch_configurations
+        # Set _launch_configurations (single source of truth)
         if context is not None and hasattr(context, "_launch_configurations"):
             context._launch_configurations[name] = resolved_value
         context._state.tracked["set_launch_configurations"][name] = resolved_value

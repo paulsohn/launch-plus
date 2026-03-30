@@ -100,12 +100,11 @@ class LaunchContext:
     and ``_StubLaunchContext`` (Python shim path) into a single type
     that matches the official ROS 2 ``LaunchContext`` interface.
 
-    Fields used by XML substitutions: ``args``, ``vars``, ``env``,
-    ``launch_file_dir``, ``preview_mode``.
+    All arg/var lookups go through ``_launch_configurations``.
 
-    Fields used by Python shim: ``_launch_configurations``.
-
-    Both paths share: ``_state``, ``perform_substitution()``.
+    Fields: ``_launch_configurations``, ``env``,
+    ``launch_file_dir``, ``preview_mode``, ``_state``,
+    ``perform_substitution()``.
     """
 
     def __init__(self, state: ResolverState | None = None):
@@ -114,11 +113,8 @@ class LaunchContext:
 
             state = get_state()
         self._state: ResolverState = state
-        # ROS 2 compat (Python shim path)
+        # ROS 2 compat — single source of truth for all arg/var lookups
         self._launch_configurations: dict[str, object] = {}
-        # XML/YAML substitution context
-        self.args: dict[str, str] = {}
-        self.vars: dict[str, str] = {}
         self.env: dict[str, str] = state.env  # shared reference
         self.launch_file_dir: str | None = None
         self.preview_mode: bool = False

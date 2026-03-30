@@ -28,13 +28,19 @@ class ArgSubstitution(Substitution):
         return cls, {"name": args[0] if isinstance(args[0], list) else [args[0]]}
 
     def perform(self, ctx: _SubstitutionContext) -> str:
+        from launch_plus.entities.substitutions.launch_config import _DeferredDefault
         from launch_plus.resolver import resolve_substitutions_from_tokens
 
         name = resolve_substitutions_from_tokens(self.name, ctx)
-        value = ctx.args.get(name)
+        lc = getattr(ctx, "_launch_configurations", {})
+        value = lc.get(name)
         if value is None:
             logger.error("undefined argument: %s", name)
             return f"$(arg {name})"
+        if isinstance(value, _DeferredDefault):
+            resolved = value.resolve(ctx)
+            lc[name] = resolved
+            value = resolved
         return resolve_substitutions_from_tokens(parse_to_tokens(value), ctx)
 
     def serialize(self) -> str:

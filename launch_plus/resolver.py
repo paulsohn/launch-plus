@@ -611,27 +611,24 @@ def resolve_included_file(
                 child_entities = list(_parse_xml_launch_entity(content, real_path))
             child_ctx = _SubstitutionContext(state)
             if state.global_arg_cascade:
-                child_ctx.args = {**ctx.args, **child_ctx_args}
-                child_ctx.vars = {**ctx.vars, **child_ctx_args}
+                child_ctx._launch_configurations = {**ctx._launch_configurations, **child_ctx_args}
             else:
-                child_ctx.args = dict(child_ctx_args)
-                child_ctx.vars = dict(child_ctx_args)
+                child_ctx._launch_configurations = dict(child_ctx_args)
             child_ctx.env = dict(ctx.env)
             child_ctx.launch_file_dir = os.path.dirname(real_path)
             child_ctx.preview_mode = ctx.preview_mode
             for child in child_entities:
                 _resolve_element(child, child_ctx, new_stack)
-            ctx.args.update(child_ctx.args)
-            ctx.vars.update(child_ctx.vars)
+            ctx._launch_configurations.update(child_ctx._launch_configurations)
         elif real_path.endswith((".launch.py", ".py")):
-            parent_lc = _make_launch_context({**ctx.args, **ctx.vars})
+            parent_lc = _make_launch_context(dict(ctx._launch_configurations))
             if state.global_params:
                 parent_lc._launch_configurations["global_params"] = list(state.global_params)
             _inline_resolve_python_launch(state, file_path, parent_lc, child_ctx_args)
             set_configs = state.tracked["set_launch_configurations"]
             for k, v in parent_lc._launch_configurations.items():
                 if (k in set_configs or k in child_ctx_args) and k != "global_params":
-                    ctx.vars[k] = str(v) if not isinstance(v, str) else v
+                    ctx._launch_configurations[k] = str(v) if not isinstance(v, str) else v
     finally:
         state.include_chain.pop()
 
@@ -964,7 +961,7 @@ def _resolve_file_impl(
         else:
             elements = parse_xml_launch(content, launch_file_str)
         subst_ctx = _SubstitutionContext(state)
-        subst_ctx.args = dict(args_dict)
+        subst_ctx._launch_configurations = dict(args_dict)
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
         subst_ctx.preview_mode = state.preview_mode
         subst_ctx.env = state.env

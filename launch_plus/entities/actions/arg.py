@@ -60,21 +60,19 @@ class _DeclaredArg(_TrackedAction):
         if self._fixed_value is not None:
             # <arg name="x" value="v"/> — fixed value, set immediately
             resolved = resolve_value(self._fixed_value, context) or ""
-            context.args[name] = resolved
-            context.vars[name] = resolved
             context._launch_configurations[name] = resolved
             _record_and_track(name, resolved, context)
             return None
 
         # Default value handling
-        already_set = name in context.args or name in context._launch_configurations
+        already_set = name in context._launch_configurations
         if already_set:
             # Arg already provided — record the default display for --show-args
             dv = self.default_value
             if dv is not None:
                 display = resolve_value(dv, context) or ""
             else:
-                display = context.args.get(name, "")
+                display = context._launch_configurations.get(name, "")
             _record_and_track(name, display, context)
             return None
 
@@ -91,8 +89,6 @@ class _DeclaredArg(_TrackedAction):
         display = resolve_value(dv, context) or ""
         _record_and_track(name, display, context)
         context._launch_configurations[name] = _DeferredDefault(dv)
-        context.args[name] = display
-        context.vars[name] = display
         return None
 
 
@@ -115,16 +111,16 @@ def _execute_xml_arg(arg: _DeclaredArg, context) -> None:
     if not name:
         return
     if arg.default_value is not None:
-        if name not in context.args:
+        if name not in context._launch_configurations:
             if context._state.apply_arg_defaults:
                 resolved = resolve_value(arg.default_value, context) or ""
-                context.args[name] = resolved
+                context._launch_configurations[name] = resolved
             else:
                 resolved = ""
         else:
-            resolved = context.args.get(name, "")
+            resolved = str(context._launch_configurations.get(name, ""))
     else:
-        resolved = context.args.get(name, "")
+        resolved = str(context._launch_configurations.get(name, ""))
     _record_and_track(name, resolved, context)
 
 

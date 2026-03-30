@@ -967,8 +967,15 @@ def _fresh_subst_ctx(**kwargs):
         elif isinstance(R.get_state().tracked[key], dict):
             R.get_state().tracked[key] = {}
     ctx = R._SubstitutionContext()
+    # Translate legacy args/vars kwargs to _launch_configurations
+    lc_updates: dict = {}
     for k, v in kwargs.items():
-        setattr(ctx, k, v)
+        if k in ("args", "vars"):
+            lc_updates.update(v)
+        else:
+            setattr(ctx, k, v)
+    if lc_updates:
+        ctx._launch_configurations.update(lc_updates)
     return ctx
 
 
@@ -1167,8 +1174,15 @@ def _fresh_walker_ctx(**kwargs):
     R.get_state().env.clear()
     R.get_state().declared_arg_names.clear()
     ctx = R._SubstitutionContext()
+    # Translate legacy args/vars kwargs to _launch_configurations
+    lc_updates: dict = {}
     for k, v in kwargs.items():
-        setattr(ctx, k, v)
+        if k in ("args", "vars"):
+            lc_updates.update(v)
+        else:
+            setattr(ctx, k, v)
+    if lc_updates:
+        ctx._launch_configurations.update(lc_updates)
     return ctx
 
 
@@ -2222,7 +2236,8 @@ class TestStrictnessFlags:
             '<launch><arg name="x" default="hello"/></launch>', "test.xml"
         )
         R.resolve_xml_elements(elements, ctx)
-        assert ctx.args["x"] == "hello"
+        # Default is stored as _DeferredDefault; resolve via $(arg x)
+        assert R.resolve_substitutions("$(arg x)", ctx) == "hello"
 
     def test_apply_arg_defaults_false_skips_default(self):
         R.get_state().apply_arg_defaults = False
@@ -2232,7 +2247,7 @@ class TestStrictnessFlags:
         )
         R.resolve_xml_elements(elements, ctx)
         # Default not applied — arg stays absent
-        assert "x" not in ctx.args
+        assert "x" not in ctx._launch_configurations
 
     def test_apply_arg_defaults_false_undefined_ref_errors(self, caplog):
         R.get_state().apply_arg_defaults = False
@@ -2257,7 +2272,7 @@ class TestStrictnessFlags:
             with open(os.path.join(launch_dir, "child.launch.xml"), "w") as f:
                 f.write('<launch><arg name="x" default="fallback"/></launch>')
             ctx = R._SubstitutionContext()
-            ctx.args = {"x": "from_parent"}
+            ctx._launch_configurations = {"x": "from_parent"}
             elements = R.parse_xml_launch(
                 "<launch>"
                 '<include file="$(find-pkg-share child_pkg)'
@@ -2280,7 +2295,7 @@ class TestStrictnessFlags:
             with open(os.path.join(launch_dir, "child.launch.xml"), "w") as f:
                 f.write('<launch><arg name="x"/><let name="y" value="$(arg x)"/></launch>')
             ctx = R._SubstitutionContext()
-            ctx.args = {"x": "from_parent"}
+            ctx._launch_configurations = {"x": "from_parent"}
             elements = R.parse_xml_launch(
                 "<launch>"
                 '<include file="$(find-pkg-share child_pkg)'

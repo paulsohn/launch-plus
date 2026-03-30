@@ -8,7 +8,6 @@ from __future__ import annotations
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
-from launch_plus.entities.state import _StubLaunchContext
 from launch_plus.parsers.entity import Entity
 
 
@@ -18,21 +17,9 @@ class _TrackedParameterFile(_TrackedAction):
     def __init__(self, param_file=None, *args, allow_substs=False, **kwargs):
         if param_file is None and args:
             param_file = args[0]
-        self._param_file = None
+        # Store raw — resolve lazily (matches official: no eager resolution)
+        self._param_file = param_file if isinstance(param_file, str) else None
         self._raw_param_file = param_file
-        if param_file is not None:
-            if isinstance(param_file, str):
-                path = param_file
-            elif hasattr(param_file, "perform"):
-                try:
-                    result = param_file.perform(_StubLaunchContext())
-                    path = str(result) if result is not None else None
-                except Exception:
-                    path = None
-            else:
-                path = str(param_file) if param_file is not None else None
-            if path:
-                self._param_file = path
 
 
 @expose_action("let")

@@ -50,6 +50,7 @@ packages = ["launch_plus"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+exclude = ["example/autoware/src", "example/autoware/core", "example/autoware/launcher", "example/autoware/universe"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]

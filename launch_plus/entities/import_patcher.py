@@ -285,36 +285,51 @@ def _build_patched_launch_launch_description_sources():
     mod = types.ModuleType("launch.launch_description_sources")
 
     class _PythonLaunchDescriptionSource:
+        """Matches official LaunchDescriptionSource: stores raw location,
+        resolves lazily via get_launch_description(context)."""
+
         def __init__(self, location=None, **kwargs):
-            # Resolve to a string path.  Location may be:
-            #   - None
-            #   - A substitution object with .perform()  (e.g. PathJoinSubstitution)
-            #   - A list of strings/substitutions to concatenate
-            #     (e.g. [FindPackageShare("pkg"), "/launch/file.py"])
-            #   - A plain string
+            # Store raw location (list of substitutions or string)
+            # Matches official: __init__ does NOT resolve substitutions
             if location is None:
+                self._location_subs = None
                 self._location = None
-            elif hasattr(location, "perform"):
-                try:
-                    result = location.perform(_StubLaunchContext())
-                    self._location = str(result) if result is not None else str(location)
-                except Exception:
-                    self._location = None
-            elif isinstance(location, list):
-                stub_ctx = _StubLaunchContext()
-                parts = []
-                for sub in location:
-                    if hasattr(sub, "perform"):
-                        try:
-                            result = sub.perform(stub_ctx)
-                            parts.append(str(result) if result is not None else str(sub))
-                        except Exception:
-                            parts.append(str(sub))
-                    else:
-                        parts.append(str(sub))
-                self._location = "".join(parts)
+            elif isinstance(location, str):
+                self._location_subs = None
+                self._location = location
             else:
-                self._location = str(location)
+                # list of subs or single sub — store for deferred resolution
+                self._location_subs = location if isinstance(location, list) else [location]
+                self._location = None
+
+        def _resolve_location(self, context):
+            """Resolve location substitutions with a real context."""
+            if self._location is not None:
+                return self._location
+            if self._location_subs is None:
+                return None
+            parts = []
+            for sub in self._location_subs:
+                if hasattr(sub, "perform"):
+                    try:
+                        result = sub.perform(context)
+                        parts.append(str(result) if result is not None else str(sub))
+                    except Exception:
+                        parts.append(str(sub))
+                else:
+                    parts.append(str(sub))
+            self._location = "".join(parts)
+            return self._location
+
+        @property
+        def location(self):
+            """Return location string (unresolved display if not yet resolved)."""
+            if self._location is not None:
+                return self._location
+            if self._location_subs is None:
+                return None
+            # Not yet resolved — return display form (like official ROS 2)
+            return " + ".join(str(sub) for sub in self._location_subs)
 
     class _AnyLaunchDescriptionSource(_PythonLaunchDescriptionSource):
         pass

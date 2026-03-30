@@ -58,17 +58,13 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
         self._xml_args = kwargs.get("_xml_args")
         self._xml_include_stack = kwargs.get("_xml_include_stack")
         self._xml_ctx = kwargs.get("_xml_ctx")
-        # Python shim path
-        path = None
+        # Python shim path — path resolved lazily in _execute_shim()
+        # Only set if it's a plain string (no substitutions to resolve)
+        self._path = None
         if launch_description_source is not None:
-            if hasattr(launch_description_source, "_location"):
-                path = launch_description_source._location
-            elif hasattr(launch_description_source, "location"):
-                try:
-                    path = launch_description_source.location
-                except Exception:
-                    pass
-        self._path = path
+            loc = getattr(launch_description_source, "_location", None)
+            if isinstance(loc, str):
+                self._path = loc
         self._dep_idx = -1
 
     def execute(self, context) -> list | None:
@@ -137,23 +133,22 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
         return None
 
     def _execute_shim(self, context) -> list | None:
-        # Deferred tracking from __init__ (path known at construction time)
+        # Resolve path lazily using the real context (matches official ROS 2
+        # LaunchDescriptionSource.get_launch_description(context) pattern)
+        if self._path is None and self._source is not None and context is not None:
+            src = self._source
+            if hasattr(src, "_resolve_location"):
+                # Our deferred source — resolve with real context
+                self._path = src._resolve_location(context)
+            elif hasattr(src, "perform"):
+                try:
+                    self._path = src.perform(context)
+                except Exception as e:
+                    logger.warning("failed to resolve IncludeLaunchDescription source: %s", e)
+
         if self._path and self._dep_idx < 0:
             self._dep_idx = _track_include(context._state, self._path)
             _resolve_include_args(self._path, self._raw_launch_arguments, context, self._dep_idx)
-
-        if self._path is None and context is not None:
-            src = self._source
-            path = None
-            if hasattr(src, "perform"):
-                try:
-                    path = src.perform(context)
-                except Exception as e:
-                    logger.warning("failed to resolve IncludeLaunchDescription source: %s", e)
-            if path:
-                self._path = path
-                dep_idx = _track_include(context._state, path)
-                _resolve_include_args(path, self._raw_launch_arguments, context, dep_idx)
 
         if self._path and self._path.endswith(".py") and context is not None:
             child_args = {}

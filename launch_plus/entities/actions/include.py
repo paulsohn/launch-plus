@@ -10,7 +10,6 @@ from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import (
     _extract_pkg_and_share_path,
-    _resolve_substitution,
     _track_include,
 )
 from launch_plus.entities.xml_resolver import _ActionParser
@@ -152,7 +151,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             if self._raw_launch_arguments:
                 for k, v in self._raw_launch_arguments:
                     k_str = str(k)
-                    resolved = _resolve_substitution(v, context)
+                    resolved = context.perform_substitution(v)
                     v_str = resolved if resolved is not None else str(v)
                     child_args[k_str] = v_str
             inc_dep = _extract_pkg_and_share_path(self._path)

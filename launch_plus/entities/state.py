@@ -131,12 +131,68 @@ class LaunchContext:
     def launch_configurations(self, value: dict[str, object]) -> None:
         self._launch_configurations = value
 
-    def perform_substitution(self, sub) -> str:
-        """Resolve a substitution object. Matches official ROS 2 API."""
+    def perform_substitution(self, sub) -> str | None:
+        """Resolve a substitution to a string. Matches official ROS 2 API.
+
+        Handles: None, str, list[Substitution], single .perform() object.
+        """
+        if sub is None:
+            return None
+        if isinstance(sub, str):
+            return sub
+        if isinstance(sub, (list, tuple)):
+            parts = []
+            for s in sub:
+                if hasattr(s, "perform"):
+                    try:
+                        result = s.perform(self)
+                        parts.append(str(result) if result is not None else str(s))
+                    except Exception:
+                        parts.append(str(s))
+                else:
+                    parts.append(str(s))
+            return "".join(parts)
         if hasattr(sub, "perform"):
-            result = sub.perform(self)
-            return str(result) if result is not None else ""
+            try:
+                result = sub.perform(self)
+                return str(result) if result is not None else None
+            except Exception:
+                return str(sub)
         return str(sub)
+
+    def perform_substitution_ex(self, sub) -> tuple[str | None, bool]:
+        """Resolve with fallback tracking. Returns (value, is_fallback)."""
+        if sub is None:
+            return None, False
+        if isinstance(sub, str):
+            return sub, False
+        if isinstance(sub, (list, tuple)):
+            parts = []
+            any_fallback = False
+            for s in sub:
+                if hasattr(s, "perform"):
+                    try:
+                        result = s.perform(self)
+                        if result is not None:
+                            parts.append(str(result))
+                        else:
+                            parts.append(str(s))
+                            any_fallback = True
+                    except Exception:
+                        parts.append(str(s))
+                        any_fallback = True
+                else:
+                    parts.append(str(s))
+            return "".join(parts), any_fallback
+        if hasattr(sub, "perform"):
+            try:
+                result = sub.perform(self)
+                if result is None:
+                    return str(sub), True
+                return str(result), False
+            except Exception:
+                return str(sub), True
+        return str(sub), True
 
 
 # Backward compat aliases

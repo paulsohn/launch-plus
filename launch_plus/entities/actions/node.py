@@ -9,7 +9,6 @@ from __future__ import annotations
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import (
-    _resolve_substitution,
     _track_node,
     _track_package,
     _track_param_file,
@@ -474,7 +473,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
                             "name"
                         ) or entry.get("target", "")
                     else:
-                        target = _resolve_substitution(self._raw_target, context)
+                        target = context.perform_substitution(self._raw_target)
                     if target:
                         entry["target"] = target
                 from launch_plus.entities.node_resolution import _resolve_composable_plugins

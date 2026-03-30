@@ -86,11 +86,11 @@ class _DeclaredArg(_TrackedAction):
             _record_and_track(name, "", context)
             return None
 
-        # Apply default
+        # Apply default — set in _launch_configurations so $(var name) can find it
         dv = self.default_value
+        context._launch_configurations[name] = _DeferredDefault(dv)
         display = resolve_value(dv, context) or ""
         _record_and_track(name, display, context)
-        context._launch_configurations[name] = _DeferredDefault(dv)
         return None
 
 

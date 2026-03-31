@@ -578,8 +578,3 @@ class LaunchContext:
             return str(result), False
         except Exception:
             return str(sub), True
-
-
-# Backward compat aliases
-_StubLaunchContext = LaunchContext
-_SubstitutionContext = LaunchContext

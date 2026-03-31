@@ -11,7 +11,7 @@ from launch_plus.entities.substitution import Substitution
 logger = logging.getLogger("launch_plus")
 
 if TYPE_CHECKING:
-    from launch_plus.resolver import _SubstitutionContext
+    from launch_plus.entities.state import LaunchContext
 
 
 @expose_substitution("eval")
@@ -40,7 +40,7 @@ class EvalSubstitution(Substitution):
                 parts.append(arg)
         return cls, {"expression": parts}
 
-    def perform(self, ctx: _SubstitutionContext) -> str:
+    def perform(self, ctx: LaunchContext) -> str:
         from launch_plus.resolver import resolve_substitutions_from_tokens
 
         expr = resolve_substitutions_from_tokens(self.expression, ctx)

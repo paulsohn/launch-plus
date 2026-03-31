@@ -106,7 +106,7 @@ def _record_and_track(name: str, resolved: str, context=None) -> None:
 
 
 def _execute_xml_arg(arg: _DeclaredArg, context) -> None:
-    """Execute <arg> for the XML path — context is a _SubstitutionContext."""
+    """Execute <arg> for the XML path — context is a LaunchContext."""
     from launch_plus.entities.helpers import resolve_value
 
     name = arg.name or ""

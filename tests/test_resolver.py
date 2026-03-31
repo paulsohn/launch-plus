@@ -14,7 +14,7 @@ from launch_plus.entities.state import _parse_rosdep_resolve
 
 def _make_context(configs=None):
     """Build a _StubLaunchContext with the given launch configurations."""
-    ctx = R._StubLaunchContext()
+    ctx = R.LaunchContext()
     ctx._launch_configurations = dict(configs or {})
     return ctx
 
@@ -931,7 +931,7 @@ def _fresh_subst_ctx(**kwargs):
             R.get_state().tracked[key] = []
         elif isinstance(R.get_state().tracked[key], dict):
             R.get_state().tracked[key] = {}
-    ctx = R._SubstitutionContext()
+    ctx = R.LaunchContext()
     # Translate legacy args/vars kwargs to _launch_configurations
     lc_updates: dict = {}
     for k, v in kwargs.items():
@@ -1138,7 +1138,7 @@ def _fresh_walker_ctx(**kwargs):
             R.get_state().tracked[key] = {}
     # Reset module-level state
     R.get_state().declared_arg_names.clear()
-    ctx = R._SubstitutionContext()
+    ctx = R.LaunchContext()
     # Translate legacy args/vars kwargs to _launch_configurations
     lc_updates: dict = {}
     for k, v in kwargs.items():
@@ -2200,7 +2200,7 @@ class TestStrictnessFlags:
 
     def test_apply_arg_defaults_true_applies_default(self):
         R.get_state().apply_arg_defaults = True
-        ctx = R._SubstitutionContext()
+        ctx = R.LaunchContext()
         elements = R.parse_xml_launch(
             '<launch><arg name="x" default="hello"/></launch>', "test.xml"
         )
@@ -2210,7 +2210,7 @@ class TestStrictnessFlags:
 
     def test_apply_arg_defaults_false_skips_default(self):
         R.get_state().apply_arg_defaults = False
-        ctx = R._SubstitutionContext()
+        ctx = R.LaunchContext()
         elements = R.parse_xml_launch(
             '<launch><arg name="x" default="hello"/></launch>', "test.xml"
         )
@@ -2220,7 +2220,7 @@ class TestStrictnessFlags:
 
     def test_apply_arg_defaults_false_undefined_ref_errors(self, caplog):
         R.get_state().apply_arg_defaults = False
-        ctx = R._SubstitutionContext()
+        ctx = R.LaunchContext()
         elements = R.parse_xml_launch(
             """<launch>
                 <arg name="x" default="hello"/>
@@ -2235,7 +2235,7 @@ class TestStrictnessFlags:
     def test_allow_unportable_paths_false_errors(self, caplog):
         R.get_state().allow_unportable_paths = False
         R.get_state().preview_mode = True
-        ctx = R._SubstitutionContext()
+        ctx = R.LaunchContext()
         elements = R.parse_xml_launch(
             '<launch><include file="/absolute/path/to/file.launch.xml"/></launch>',
             "test.xml",
@@ -2247,7 +2247,7 @@ class TestStrictnessFlags:
     def test_allow_unportable_paths_true_warns(self, caplog):
         R.get_state().allow_unportable_paths = True
         R.get_state().preview_mode = True
-        ctx = R._SubstitutionContext()
+        ctx = R.LaunchContext()
         elements = R.parse_xml_launch(
             '<launch><include file="/absolute/path/to/file.launch.xml"/></launch>',
             "test.xml",

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
-from launch_plus.entities.state import LaunchContext as _SubstitutionContext
+from launch_plus.entities.state import LaunchContext
 
 logger = logging.getLogger("launch_plus")
 
@@ -143,7 +143,7 @@ def _to_str(value: object, context: Any = None) -> str | None:
 
 def resolve_substitutions_from_tokens(
     tokens: list[_SubstitutionType],
-    ctx: _SubstitutionContext,
+    ctx: LaunchContext,
 ) -> str:
     """Resolve a pre-parsed list of :class:`Substitution` objects to a string.
 
@@ -155,7 +155,7 @@ def resolve_substitutions_from_tokens(
 
 def resolve_substitutions(
     text: str,
-    ctx: _SubstitutionContext,
+    ctx: LaunchContext,
 ) -> str:
     """Resolve all substitutions in a string using the given context.
 
@@ -172,7 +172,7 @@ def resolve_substitutions(
 # ─── Value resolution helper ─────────────────────────────────────────────────
 
 
-def resolve_value(value: Any, ctx: _SubstitutionContext | None = None) -> str | None:
+def resolve_value(value: Any, ctx: LaunchContext | None = None) -> str | None:
     """Resolve a value to a string using context.perform_substitution().
 
     Supports: None, str, list[Substitution], single Substitution, anything else.
@@ -207,7 +207,7 @@ def _is_truthy(value: str) -> bool:
 
 def _evaluate_condition(
     condition: dict[str, str] | None,
-    ctx: _SubstitutionContext,
+    ctx: LaunchContext,
 ) -> bool:
     """Evaluate an if/unless condition dict.  Returns True if the element should execute."""
     if condition is None:
@@ -310,7 +310,7 @@ def _yaml_value_to_str(v: object) -> str:
 
 def _read_and_expand_param_file(
     path: str,
-    ctx: _SubstitutionContext | None = None,
+    ctx: LaunchContext | None = None,
     *,
     state=None,
 ) -> list[tuple[str, str]] | None:

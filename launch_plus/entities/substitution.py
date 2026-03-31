@@ -6,14 +6,14 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from launch_plus.resolver import _SubstitutionContext
+    from launch_plus.entities.state import LaunchContext
 
 
 class Substitution(ABC):
     """A single substitution token (e.g. ``$(arg name)``, ``$(find-pkg-share pkg)``)."""
 
     @abstractmethod
-    def perform(self, ctx: _SubstitutionContext) -> str:
+    def perform(self, ctx: LaunchContext) -> str:
         """Resolve this substitution to a concrete string.
 
         In preview mode the result should be portable (e.g. ``$(find-pkg-share pkg)``).
@@ -33,7 +33,7 @@ class TextSubstitution(Substitution):
     def __init__(self, *, text: str) -> None:
         self.text = text
 
-    def perform(self, ctx: _SubstitutionContext) -> str:
+    def perform(self, ctx: LaunchContext) -> str:
         return self.text
 
     def serialize(self) -> str:

@@ -9,12 +9,9 @@ from launch_plus.entities.expose import expose_substitution
 from launch_plus.entities.substitution import Substitution
 
 if TYPE_CHECKING:
-    from launch_plus.entities.state import ResolverState
+    from launch_plus.entities.state import LaunchContext, ResolverState
 
 logger = logging.getLogger("launch_plus")
-
-if TYPE_CHECKING:
-    from launch_plus.resolver import _SubstitutionContext
 
 
 @expose_substitution("find-pkg-share")
@@ -34,7 +31,7 @@ class FindPackageShareSubstitution(Substitution):
             raise ValueError("$(find-pkg-share ...) requires a package argument")
         return cls, {"package": args[0] if isinstance(args[0], list) else [args[0]]}
 
-    def perform(self, ctx: _SubstitutionContext) -> str:
+    def perform(self, ctx: LaunchContext) -> str:
         from launch_plus.resolver import (
             resolve_substitutions_from_tokens,
         )

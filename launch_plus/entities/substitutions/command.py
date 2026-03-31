@@ -8,7 +8,7 @@ from launch_plus.entities.expose import expose_substitution
 from launch_plus.entities.substitution import Substitution
 
 if TYPE_CHECKING:
-    from launch_plus.resolver import _SubstitutionContext
+    from launch_plus.entities.state import LaunchContext
 
 
 def _needs_quoting(tokens: list[Substitution]) -> bool:
@@ -55,7 +55,7 @@ class CommandSubstitution(Substitution):
                 arguments.append([arg])
         return cls, {"arguments": arguments}
 
-    def perform(self, ctx: _SubstitutionContext) -> str:
+    def perform(self, ctx: LaunchContext) -> str:
         from launch_plus.resolver import resolve_substitutions_from_tokens
 
         resolved_args: list[str] = []

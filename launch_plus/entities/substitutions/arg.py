@@ -11,7 +11,7 @@ from launch_plus.entities.substitution import Substitution
 logger = logging.getLogger("launch_plus")
 
 if TYPE_CHECKING:
-    from launch_plus.resolver import _SubstitutionContext
+    from launch_plus.entities.state import LaunchContext
 
 
 @expose_substitution("arg")
@@ -27,7 +27,7 @@ class ArgSubstitution(Substitution):
             raise ValueError("$(arg ...) requires a name argument")
         return cls, {"name": args[0] if isinstance(args[0], list) else [args[0]]}
 
-    def perform(self, ctx: _SubstitutionContext) -> str:
+    def perform(self, ctx: LaunchContext) -> str:
         from launch_plus.entities.substitutions.launch_config import _DeferredDefault
         from launch_plus.resolver import resolve_substitutions_from_tokens
 

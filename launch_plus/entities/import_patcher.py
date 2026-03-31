@@ -54,7 +54,7 @@ from launch_plus.entities.actions.param import (
     _TrackedSetParameter,
 )
 from launch_plus.entities.helpers import _to_str
-from launch_plus.entities.state import _StubLaunchContext
+from launch_plus.entities.state import LaunchContext
 from launch_plus.entities.substitution import Substitution
 from launch_plus.entities.substitutions.find_pkg_share import _TrackedFindPackageShare
 from launch_plus.entities.substitutions.launch_config import _LaunchConfiguration
@@ -84,7 +84,7 @@ def _build_patched_launch():
             self.entities.append(action)
 
     mod.LaunchDescription = _LaunchDescription
-    mod.LaunchContext = _StubLaunchContext
+    mod.LaunchContext = LaunchContext
     return mod
 
 

@@ -28,8 +28,8 @@ logger = logging.getLogger("launch_plus")
 # Ensure substitution entity classes are registered before any parsing occurs.
 import launch_plus.entities  # noqa: F401
 from launch_plus.entities.state import (  # noqa: E402
+    LaunchContext,
     ResolverState,
-    _StubLaunchContext,
 )
 
 # ─── Scoped state via contextvars ────────────────────────────────────────────
@@ -154,7 +154,6 @@ from launch_plus.entities.opaque_stubs import (  # noqa: E402, F401
     _DefaultParamDict,
 )
 from launch_plus.entities.parsing import _ActionParser  # noqa: E402, F401
-from launch_plus.entities.state import LaunchContext as _SubstitutionContext  # noqa: E402, F401
 from launch_plus.entities.substitutions.find_pkg_share import (
     _TrackedFindPackageShare,  # noqa: E402, F401
 )
@@ -168,7 +167,7 @@ from launch_plus.entities.substitutions.launch_config import (  # noqa: E402, F4
 
 def _make_launch_context(args_dict):
     """Create a LaunchContext pre-populated with provided args."""
-    ctx = _StubLaunchContext()
+    ctx = LaunchContext()
     ctx._launch_configurations = dict(args_dict)
     return ctx
 
@@ -661,7 +660,7 @@ def _resolve_file_impl(
             elements = parse_yaml_launch(content, launch_file_str)
         else:
             elements = parse_xml_launch(content, launch_file_str)
-        subst_ctx = _SubstitutionContext(state)
+        subst_ctx = LaunchContext(state)
         subst_ctx._launch_configurations = dict(args_dict)
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
         subst_ctx.preview_mode = state.preview_mode

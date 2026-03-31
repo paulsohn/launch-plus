@@ -12,7 +12,7 @@ from launch_plus.entities.substitution import Substitution
 logger = logging.getLogger("launch_plus")
 
 if TYPE_CHECKING:
-    from launch_plus.resolver import _SubstitutionContext
+    from launch_plus.entities.state import LaunchContext
 
 
 @expose_substitution("env")
@@ -38,7 +38,7 @@ class EnvSubstitution(Substitution):
             default = args[1] if isinstance(args[1], list) else [args[1]]
         return cls, {"name": name, "default": default}
 
-    def perform(self, ctx: _SubstitutionContext) -> str:
+    def perform(self, ctx: LaunchContext) -> str:
         from launch_plus.resolver import resolve_substitutions_from_tokens
 
         name = resolve_substitutions_from_tokens(self.name, ctx)

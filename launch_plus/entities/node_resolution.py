@@ -11,7 +11,6 @@ from launch_plus.entities.actions.node import _TrackedComposableNode
 from launch_plus.entities.helpers import (
     _is_substitution,
     _read_and_expand_param_file,
-    _track_package,
 )
 
 # ─── Node detail resolution helpers ──────────────────────────────────────────
@@ -48,7 +47,7 @@ def _resolve_node_details(state, node, context):
             if resolved is not None:
                 entry[field_name] = resolved
                 if field_name == "package" and not is_fallback:
-                    _track_package(state, resolved)
+                    state.track_package(resolved)
 
     # Namespace: emit raw inputs — effective_namespace is computed downstream
     ns = (
@@ -212,7 +211,7 @@ def _resolve_composable_plugins(state, descs, context):
             if resolved_pkg is not None:
                 pkg = resolved_pkg
                 if not is_fallback:
-                    _track_package(state, resolved_pkg)
+                    state.track_package(resolved_pkg)
         plg = desc._plugin
         if _is_substitution(desc._raw_plugin):
             resolved_plg = context.perform_substitution(desc._raw_plugin)

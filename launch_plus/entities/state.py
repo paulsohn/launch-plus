@@ -80,6 +80,208 @@ class ResolverState:
         self.root_source_key: str = ""
         self.walk_depth: int = 0
 
+    # ─── Package tracking and resolution ──────────────────────────────────
+
+    def track_package(self, pkg) -> None:
+        """Record a package reference for dependency tracking."""
+        if not pkg:
+            return
+        if hasattr(pkg, "perform"):
+            return  # Skip unresolved substitution objects
+        pkg = str(pkg)
+        if pkg and not pkg.startswith("$(") and pkg not in self.tracked["packages"]:
+            self.tracked["packages"].append(pkg)
+
+    def resolve_pkg_share(self, package: str) -> str:
+        """Resolve a package share directory path.
+
+        Preview mode + lockfile: source directory (fetch inline if needed).
+        Preview mode + no lockfile: AMENT_PREFIX_PATH, else portable fallback.
+        Non-preview mode: AMENT_PREFIX_PATH only.
+
+        Returns absolute path or portable syntax ``$(find-pkg-share pkg)``.
+        Raises ``LookupError`` in non-preview mode if package not found.
+        """
+        # 1. Fast path: cached in package_shares.
+        if package in self.package_shares:
+            pkg_path: str = self.package_shares[package]
+            # In preview mode, lockfile packages may need full fetch.
+            if (
+                self.preview_mode
+                and self.lockfile_data
+                and package in self.lockfile_data
+                and not os.path.isfile(os.path.join(pkg_path, "package.xml"))
+            ):
+                if self._ensure_fetched(package):
+                    return str(self.package_shares[package])
+                logger.error("failed to fetch package '%s' from lockfile", package)
+                return f"$(find-pkg-share {package})"
+            return pkg_path
+
+        # 2. Lockfile package not yet cached — fetch (preview only).
+        if self.preview_mode and self.lockfile_data and package in self.lockfile_data:
+            if self._ensure_fetched(package):
+                return str(self.package_shares[package])
+            logger.error("failed to fetch package '%s' from lockfile", package)
+            return f"$(find-pkg-share {package})"
+
+        # 3. Non-lockfile packages: use AMENT_PREFIX_PATH.
+        real_gps = _get_real_get_package_share_directory()
+        if real_gps is not None:
+            try:
+                return str(real_gps(package))
+            except Exception:
+                pass
+
+        # 4. Try rosdep install if enabled.
+        if self.rosdep_fallback and self._try_rosdep_install(package) and real_gps is not None:
+            try:
+                return str(real_gps(package))
+            except Exception:
+                pass
+
+        # 5. Fallback.
+        if self.preview_mode:
+            return f"$(find-pkg-share {package})"
+        raise LookupError(f"package '{package}' not found in AMENT_PREFIX_PATH")
+
+    def _ensure_fetched(self, package: str) -> bool:
+        """Ensure a lockfile package is fully fetched (has package.xml on disk).
+
+        Performs inline git sparse-checkout if needed.  Updates
+        ``self.package_shares`` after successful fetch.
+        """
+        import subprocess
+
+        if package in self.fetched_packages:
+            return True
+
+        pkg_info = self.lockfile_data.get(package)
+        if not pkg_info or not self.fetch_dir:
+            return False
+
+        repo_workspace_path = pkg_info["repo"]
+        pkg_path_in_repo = pkg_info["path"]
+        repo_url = pkg_info["url"]
+        repo_sha = pkg_info["version"]
+
+        repo_dir = os.path.join(self.fetch_dir, repo_workspace_path)
+        pkg_dir = os.path.join(repo_dir, pkg_path_in_repo)
+
+        # Already fully fetched?
+        if os.path.isfile(os.path.join(pkg_dir, "package.xml")):
+            self.fetched_packages.add(package)
+            self.package_shares[package] = pkg_dir
+            return True
+
+        # Fetch via git sparse-checkout.
+        try:
+            sparse_path = "/**" if pkg_path_in_repo in (".", "") else pkg_path_in_repo
+            if not os.path.isdir(os.path.join(repo_dir, ".git")):
+                os.makedirs(repo_dir, exist_ok=True)
+                subprocess.run(
+                    [
+                        "git",
+                        "clone",
+                        "--filter=blob:none",
+                        "--sparse",
+                        "--single-branch",
+                        "--depth=1",
+                        repo_url,
+                        repo_dir,
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                subprocess.run(
+                    ["git", "sparse-checkout", "set", "--no-cone", sparse_path],
+                    cwd=repo_dir,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                subprocess.run(
+                    ["git", "checkout", repo_sha],
+                    cwd=repo_dir,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            else:
+                subprocess.run(
+                    ["git", "sparse-checkout", "add", sparse_path],
+                    cwd=repo_dir,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+
+            if os.path.isfile(os.path.join(pkg_dir, "package.xml")):
+                self.fetched_packages.add(package)
+                self.package_shares[package] = pkg_dir
+                return True
+            logger.warning("fetched '%s' but package.xml not found at %s", package, pkg_dir)
+            return False
+        except subprocess.CalledProcessError as e:
+            logger.warning("git fetch failed for '%s': %s", package, e.stderr or e)
+            return False
+        except Exception as e:
+            logger.warning("failed to fetch '%s': %s", package, e)
+            return False
+
+    def _try_rosdep_install(self, package: str) -> bool:
+        """Try installing a package via rosdep (apt backend)."""
+        import subprocess
+
+        if package in self.rosdep_attempted:
+            return False
+        self.rosdep_attempted.add(package)
+        ros_distro = os.environ.get("ROS_DISTRO", "")
+        if not ros_distro:
+            return False
+        try:
+            resolve = subprocess.run(
+                ["rosdep", "resolve", "--rosdistro", ros_distro, package],
+                capture_output=True,
+                text=True,
+            )
+            if resolve.returncode != 0:
+                return False
+            apt_pkgs = _parse_rosdep_resolve(resolve.stdout)
+            if not apt_pkgs:
+                return False
+            install = subprocess.run(
+                ["sudo", "-n", "apt-get", "install", "-y", "--no-install-recommends", *apt_pkgs],
+                capture_output=True,
+                text=True,
+            )
+            return install.returncode == 0
+        except Exception:
+            return False
+
+
+def _parse_rosdep_resolve(stdout: str) -> list[str]:
+    """Parse ``rosdep resolve`` stdout into a list of apt package names."""
+    apt_pkgs: list[str] = []
+    installer = ""
+    for line in stdout.strip().splitlines():
+        if line.startswith("#"):
+            installer = line.lstrip("#").strip()
+        elif installer == "apt" and line.strip():
+            apt_pkgs.extend(line.strip().split())
+    return apt_pkgs
+
+
+def _get_real_get_package_share_directory():
+    """Lazy-import ament_index_python for package share directory lookup."""
+    try:
+        from ament_index_python.packages import get_package_share_directory
+
+        return get_package_share_directory
+    except Exception:
+        return None
+
 
 # ─── Launch Context ──────────────────────────────────────────────────────────
 

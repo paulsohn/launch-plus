@@ -13,7 +13,6 @@ import logging
 import os
 import pathlib as _pathlib
 
-import launch_plus.resolver as _R
 from launch_plus.entities.helpers import _parse_portable_path
 
 logger = logging.getLogger("launch_plus")
@@ -80,28 +79,13 @@ def _call_opaque_with_stubs(state, fn, context):
         if parsed is None:
             return None
         pkg, rest = parsed
-        if pkg in state.package_shares:
-            pkg_dir = state.package_shares[pkg]
-            if not _orig_path_isfile(os.path.join(pkg_dir, "package.xml")):
-                if _R._ensure_fetched(state, pkg):
-                    pkg_dir = state.package_shares[pkg]
-                else:
-                    logger.error("failed to fetch package '%s' from lockfile", pkg)
-                    return None
-            return os.path.join(pkg_dir, rest) if rest else pkg_dir
-        # Try fetching if it's a lockfile package.
-        if pkg in state.lockfile_data and _R._ensure_fetched(state, pkg):
-            pkg_dir = state.package_shares[pkg]
-            return os.path.join(pkg_dir, rest) if rest else pkg_dir
-        # Try AMENT_PREFIX_PATH for packages not in the lockfile.
-        if _R._real_get_package_share_directory is not None:
-            try:
-                share = _R._real_get_package_share_directory(pkg)
-                return os.path.join(share, rest) if rest else share
-            except Exception:
-                pass
-        # Package not found anywhere that we know about — can't resolve.
-        return None
+        try:
+            share = state.resolve_pkg_share(pkg)
+        except LookupError:
+            return None
+        if share.startswith("$("):
+            return None
+        return os.path.join(share, rest) if rest else share
 
     def _stub_open(path, mode="r", *args, **kwargs):
         path_str = str(path)
@@ -139,7 +123,7 @@ def _call_opaque_with_stubs(state, fn, context):
                     pkg_dir_norm + os.sep
                 ):
                     if not _orig_path_isfile(os.path.join(pkg_dir_norm, "package.xml")):
-                        if _R._ensure_fetched(state, pkg_name):
+                        if state._ensure_fetched(pkg_name):
                             # Retry open after fetching.
                             try:
                                 return _orig_open(path, mode, *args, **kwargs)

@@ -16,7 +16,6 @@ from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 from launch_plus.resolver import (
     _parse_portable_path,
-    _resolve_pkg_share,
 )
 
 logger = logging.getLogger("launch_plus")
@@ -126,7 +125,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
         if parsed_path:
             pkg, rest = parsed_path
             try:
-                pkg_share = _resolve_pkg_share(ctx._state, pkg)
+                pkg_share = ctx._state.resolve_pkg_share(pkg)
                 real_path = os.path.join(pkg_share, rest)
             except Exception:
                 return None

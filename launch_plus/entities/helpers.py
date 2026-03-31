@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
-import launch_plus.resolver as _R
 from launch_plus.entities.state import LaunchContext as _SubstitutionContext
 
 logger = logging.getLogger("launch_plus")
@@ -309,9 +308,9 @@ def _record_declared_arg(state, name: str, default: str, *, flat: bool = True) -
 
 def _track_node_from_action(state, package, executable, name=None):
     """Track a node from an unpatched ROS 2 action (e.g. from OpaqueFunction return)."""
-    # Pass raw package to _track_package BEFORE stringifying — _track_package
+    # Pass raw package to track_package BEFORE stringifying — track_package
     # has an _is_substitution guard that filters out substitution objects.
-    _track_package(state, package)
+    state.track_package(package)
     package = str(package) if package else ""
     executable = str(executable) if executable else ""
     name = str(name) if name else ""
@@ -552,18 +551,18 @@ def _read_and_expand_param_file(
         pkg_share = state.package_shares.get(pkg)
         if not pkg_share:
             # Try fetching the package if it's in the lockfile.
-            if _R._ensure_fetched(state, pkg):
+            if state._ensure_fetched(pkg):
                 pkg_share = state.package_shares.get(pkg)
             if not pkg_share:
                 try:
-                    pkg_share = _R._resolve_pkg_share(state, pkg)
+                    pkg_share = state.resolve_pkg_share(pkg)
                 except Exception:
                     logger.error("param file not found: '%s' (package not available)", path)
                     return None
         real_path = os.path.join(pkg_share, rest)
     if not os.path.isfile(real_path):
         # Package share was known but file missing — try full fetch.
-        if parsed and _R._ensure_fetched(state, parsed[0]):
+        if parsed and state._ensure_fetched(parsed[0]):
             pkg_share = state.package_shares.get(parsed[0])
             if pkg_share:
                 real_path = os.path.join(pkg_share, parsed[1])

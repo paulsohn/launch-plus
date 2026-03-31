@@ -10,7 +10,6 @@ from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import (
     _track_node,
-    _track_package,
     _track_param_file,
 )
 from launch_plus.entities.parsing import _ActionParser
@@ -42,7 +41,7 @@ def _resolve_xml_composable_plugins(
         name = resolve_value(_parse_optional_raw(name_raw), context) if name_raw else None
         state = context._state
         if pkg:
-            _track_package(state, pkg)
+            state.track_package(pkg)
         # Resolve params
         params: dict[str, str] = {}
         param_files: list[dict] = []
@@ -145,7 +144,7 @@ class _TrackedNode(_TrackedAction):
         """Create the tracked node entry on first call, return index."""
         if self._idx >= 0:
             return int(self._idx)
-        _track_package(state, self._raw_package)
+        state.track_package(self._raw_package)
         for p in self._raw_parameters:
             if hasattr(p, "_param_file") and p._param_file:
                 _track_param_file(state, p._param_file)
@@ -192,7 +191,7 @@ class _TrackedNode(_TrackedAction):
         name = resolve_value(self._raw_name, context) or ""
         ns = resolve_value(self._raw_namespace, context)
         if pkg:
-            _track_package(context._state, pkg)
+            context._state.track_package(pkg)
         entry["package"] = pkg
         entry["executable"] = exe
         entry["name"] = name
@@ -337,11 +336,11 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         """Create the tracked container entry on first call, return index."""
         if self._idx >= 0:
             return int(self._idx)
-        _track_package(state, self._raw_package)
+        state.track_package(self._raw_package)
         for desc in self._descs:
             raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
             if raw_pkg:
-                _track_package(state, raw_pkg)
+                state.track_package(raw_pkg)
         self._idx = _track_node(
             state,
             {
@@ -391,7 +390,7 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         name = resolve_value(self._raw_name, context) or ""
         ns = resolve_value(self._raw_namespace, context)
         if pkg:
-            _track_package(context._state, pkg)
+            context._state.track_package(pkg)
         entry["package"] = pkg
         entry["executable"] = exe
         entry["name"] = name
@@ -449,7 +448,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
         for desc in self._descs:
             raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
             if raw_pkg:
-                _track_package(state, raw_pkg)
+                state.track_package(raw_pkg)
         self._idx = _track_node(
             state,
             {

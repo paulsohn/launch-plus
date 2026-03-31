@@ -8,6 +8,9 @@ from typing import TYPE_CHECKING, Any
 from launch_plus.entities.expose import expose_substitution
 from launch_plus.entities.substitution import Substitution
 
+if TYPE_CHECKING:
+    from launch_plus.entities.state import ResolverState
+
 logger = logging.getLogger("launch_plus")
 
 if TYPE_CHECKING:
@@ -33,18 +36,16 @@ class FindPackageShareSubstitution(Substitution):
 
     def perform(self, ctx: _SubstitutionContext) -> str:
         from launch_plus.resolver import (
-            _resolve_pkg_share,
-            _track_package,
             resolve_substitutions_from_tokens,
         )
 
         state = ctx._state
         pkg = resolve_substitutions_from_tokens(self.package, ctx)
-        _track_package(state, pkg)
+        state.track_package(pkg)
         if ctx.preview_mode:
             return f"$(find-pkg-share {pkg})"
         try:
-            return _resolve_pkg_share(state, pkg)
+            return state.resolve_pkg_share(pkg)
         except Exception:
             return f"$(find-pkg-share {pkg})"
 
@@ -90,12 +91,10 @@ class _TrackedFindPackageShare:
             return str(subs), True
         return str(subs), False
 
-    def _try_ament_resolve(self, state, pkg: str) -> str:
+    def _try_ament_resolve(self, state: ResolverState, pkg: str) -> str:
         """Resolve to a real path, return portable form on failure."""
-        import launch_plus.resolver as _R
-
         try:
-            return _R._resolve_pkg_share(state, pkg)
+            return state.resolve_pkg_share(pkg)
         except Exception as e:
             if not state.preview_mode:
                 logger.error("$(find-pkg-share %s): %s", pkg, e)
@@ -103,12 +102,11 @@ class _TrackedFindPackageShare:
 
     def perform(self, context, **kwargs):
         import launch_plus.resolver as _R
-        from launch_plus.entities.helpers import _track_package
 
         state = context._state if context is not None else _R.get_state()
         pkg, is_fallback = self._resolve_name(context)
         if not is_fallback:
-            _track_package(state, pkg)
+            state.track_package(pkg)
         if not state.preview_mode:
             return self._try_ament_resolve(state, pkg)
         return f"$(find-pkg-share {pkg})"

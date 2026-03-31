@@ -440,7 +440,7 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
     if parsed:
         pkg, rest = parsed
         try:
-            pkg_share = _resolve_pkg_share(state, pkg)
+            pkg_share = state.resolve_pkg_share(pkg)
         except Exception:
             return  # Package not available
         real_path = os.path.join(pkg_share, rest)

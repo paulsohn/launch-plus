@@ -53,7 +53,7 @@ from launch_plus.entities.actions.param import (
     _TrackedParameterFile,
     _TrackedSetParameter,
 )
-from launch_plus.entities.helpers import _to_str, _track_package
+from launch_plus.entities.helpers import _to_str
 from launch_plus.entities.state import _StubLaunchContext
 from launch_plus.entities.substitutions.find_pkg_share import _TrackedFindPackageShare
 from launch_plus.entities.substitutions.launch_config import _LaunchConfiguration
@@ -365,38 +365,20 @@ def _build_patched_ament_index_python_packages():
 
     def get_package_share_directory(package_name):
         logger.warning(
-            f"get_package_share_directory('{package_name}') is non-idiomatic; "
-            f"prefer FindPackageShare('{package_name}') from launch_ros.substitutions"
+            "get_package_share_directory('%s') is non-idiomatic; "
+            "prefer FindPackageShare('%s') from launch_ros.substitutions",
+            package_name,
+            package_name,
         )
-        _track_package(_R.get_state(), package_name)
-        # Early fetch check using the actual package dir (before returning a portable path).
-        # This ensures that if the package is in the lockfile but hasn't been fully fetched
-        # yet (no package.xml), we fetch it inline — important for module-level callers
-        # where os.path stubs may not be active.
-        if package_name in _R.get_state().package_shares:
-            pkg_dir = _R.get_state().package_shares[package_name]
-            if not os.path.isfile(os.path.join(pkg_dir, "package.xml")) and not _R._ensure_fetched(
-                _R.get_state(), package_name
-            ):
-                logger.error(f"failed to fetch package '{package_name}' from lockfile")
-        elif package_name in _R.get_state().lockfile_data:
-            if not _R._ensure_fetched(_R.get_state(), package_name):
-                logger.error(f"failed to fetch package '{package_name}' from lockfile")
-        # In non-preview mode, return the real install path so the output contains
-        # absolute paths matching the installed layout.
-        if not _R.get_state().preview_mode and package_name in _R.get_state().package_shares:
-            return _R.get_state().package_shares[package_name]
-        # In preview mode, return a portable path so that derived paths (e.g.
-        # os.path.join(share_dir, "calib/")) stay portable.  Inside
-        # _call_opaque_with_stubs the os.path.* stubs intercept any filesystem
-        # access and resolve the portable path lazily.
-        return f"$(find-pkg-share {package_name})"
+        state = _R.get_state()
+        state.track_package(package_name)
+        return state.resolve_pkg_share(package_name)
 
     def get_package_prefix(package_name):
         # Return the parent of the share directory as a best-effort prefix.
         # For unresolved packages the share path is portable syntax like
         # "$(find-pkg-share pkg)" — fall back to the ROS distro prefix.
-        share = _R._resolve_pkg_share(_R.get_state(), package_name)
+        share = _R.get_state().resolve_pkg_share(package_name)
         if share.startswith("$("):
             return _ROS_DISTRO_PREFIX
         p = Path(share)

@@ -24,6 +24,7 @@ class LogInfo(Action):
         from launch_plus.entities.helpers import resolve_value
 
         msg = resolve_value(self._message, context) or ""
+        self._resolved_message = msg
         context._state.track_node(
             {
                 "package": "",
@@ -42,3 +43,9 @@ class LogInfo(Action):
             },
         )
         return None
+
+    def serialize_resolved(self, indent: str = "  ") -> str | None:
+        msg = getattr(self, "_resolved_message", None)
+        if msg is None:
+            return None
+        return f'{indent}<log message="{self._esc(msg)}"/>\n'

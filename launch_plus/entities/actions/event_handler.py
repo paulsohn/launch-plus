@@ -81,19 +81,62 @@ class EventHandler(Action):
                     "explicit_namespace": resolve_value(ce["namespace"], context),
                 }
             )
+        self._resolved_handler_kind = self._handler_kind
+        self._resolved_target = resolve_value(self._target, context)
+        self._resolved_target_node = resolve_value(self._target_node, context)
+        self._resolved_start_state = resolve_value(self._start_state, context)
+        self._resolved_goal_state = resolve_value(self._goal_state, context)
+        self._resolved_namespace = resolve_value(self._handler_ns, context)
+        self._resolved_actions = eh_actions
+
         context._state.track_event_handler(
             {
                 "handler_kind": self._handler_kind,
-                "target": resolve_value(self._target, context),
-                "target_node": resolve_value(self._target_node, context),
-                "start_state": resolve_value(self._start_state, context),
-                "goal_state": resolve_value(self._goal_state, context),
+                "target": self._resolved_target,
+                "target_node": self._resolved_target_node,
+                "start_state": self._resolved_start_state,
+                "goal_state": self._resolved_goal_state,
                 "ros_namespace": context._launch_configurations.get("ros_namespace"),
-                "explicit_namespace": resolve_value(self._handler_ns, context),
+                "explicit_namespace": self._resolved_namespace,
                 "actions": eh_actions,
             },
         )
         return None
+
+    def serialize_resolved(self, indent: str = "  ") -> str | None:
+        kind = getattr(self, "_resolved_handler_kind", None)
+        if kind is None:
+            return None
+        esc = self._esc
+        child_ind = indent + "  "
+        tag_name = kind
+
+        tag = f"{indent}<{tag_name}"
+        if self._resolved_target is not None:
+            tag += f' target="{esc(self._resolved_target)}"'
+        if self._resolved_target_node is not None:
+            tag += f' target_node="{esc(self._resolved_target_node)}"'
+        if self._resolved_namespace is not None:
+            tag += f' namespace="{esc(self._resolved_namespace)}"'
+        if self._resolved_start_state is not None:
+            tag += f' start_state="{esc(self._resolved_start_state)}"'
+        if self._resolved_goal_state is not None:
+            tag += f' goal_state="{esc(self._resolved_goal_state)}"'
+
+        actions = getattr(self, "_resolved_actions", [])
+        if not actions:
+            return f"{tag}/>\n"
+
+        out = [f"{tag}>\n"]
+        for a in actions:
+            event = esc(a.get("event", ""))
+            tn = a.get("target_node")
+            ns = a.get("explicit_namespace")
+            tn_attr = f' target_node="{esc(tn)}"' if tn else ""
+            ns_attr = f' namespace="{esc(ns)}"' if ns else ""
+            out.append(f'{child_ind}<emit_event event="{event}"{tn_attr}{ns_attr}/>\n')
+        out.append(f"{indent}</{tag_name}>\n")
+        return "".join(out)
 
 
 @expose_action("emit_event")
@@ -118,6 +161,9 @@ class EmitEvent(Action):
         event = resolve_value(self._event, context) or ""
         target_node = resolve_value(self._target_node_attr, context)
         ee_ns = resolve_value(self._namespace, context)
+        self._resolved_event = event
+        self._resolved_target_node = target_node
+        self._resolved_namespace = ee_ns
         context._state.track_event_handler(
             {
                 "handler_kind": "emit_event",
@@ -138,6 +184,17 @@ class EmitEvent(Action):
             },
         )
         return None
+
+    def serialize_resolved(self, indent: str = "  ") -> str | None:
+        event = getattr(self, "_resolved_event", None)
+        if event is None:
+            return None
+        esc = self._esc
+        tn = getattr(self, "_resolved_target_node", None)
+        ns = getattr(self, "_resolved_namespace", None)
+        tn_attr = f' target_node="{esc(tn)}"' if tn else ""
+        ns_attr = f' namespace="{esc(ns)}"' if ns else ""
+        return f'{indent}<emit_event event="{esc(event)}"{tn_attr}{ns_attr}/>\n'
 
 
 # ─── Python-shim actions ─────────────────────────────────────────────────────

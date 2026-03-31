@@ -38,13 +38,9 @@ def _pad(depth: int) -> str:
     return "  " * (depth + 1)
 
 
-def _visual_src_depth(open_src_len: int, flatten: bool) -> int:
-    """Visual source depth — drives indentation.
-
-    In flat mode source groups carry no ``<group>`` tag, so they contribute 0.
-    In nested mode each source group adds one indent level.
-    """
-    return 0 if flatten else open_src_len
+def _visual_src_depth(open_src_len: int) -> int:
+    """Visual source depth — drives indentation."""
+    return open_src_len
 
 
 def _format_source_label(pkg: str, path: Path) -> str:
@@ -334,7 +330,6 @@ def render_resolved_xml(
     launcher: str,
     nodes: list[ResolvedNode],
     *,
-    flatten: bool = False,
     include_args: dict[tuple[str, Path], IncludeArgContext] | None = None,
     show_args: bool = False,
     initial_args: dict[str, str] | None = None,
@@ -342,16 +337,9 @@ def render_resolved_xml(
 ) -> str:
     """Render resolved nodes as a ``<launch>`` XML document.
 
-    **Nested grouping (default):** Each source file boundary produces a nested
-    ``<group>`` element.
-
-    **Flatten groups (``flatten=True``):** Source-boundary ``<group>`` wrappers
-    are suppressed; ``<!-- source: pkg://path -->`` / ``<!-- end: ... -->``
-    comments mark sections.
-
-    Namespaces are always flattened: ``<push-ros-namespace>`` inner groups are
-    suppressed; the fully composed ``namespace=`` value is emitted directly on
-    each ``<node>`` element.
+    Each source file boundary produces a nested ``<group>`` element.
+    Namespaces are flattened: the fully composed ``namespace=`` value
+    is emitted directly on each ``<node>`` element.
     """
     if include_args is None:
         include_args = {}
@@ -401,7 +389,7 @@ def render_resolved_xml(
     for node in nodes:
         # Compute the target source stack.
         full_stack = _node_source_stack(node, package, root_share_path)
-        target_src = [full_stack[-1]] if flatten and full_stack else full_stack
+        target_src = full_stack
 
         common = _common_prefix_len(open_src, target_src)
         src_changing = common < len(open_src) or len(open_src) < len(target_src)
@@ -412,19 +400,17 @@ def render_resolved_xml(
             while len(open_src) > common:
                 depth = len(open_src) - 1
                 pkg, path = open_src.pop()
-                vd = _visual_src_depth(depth, flatten)
-                if not flatten:
-                    out.append(f"{_pad(vd)}</group>\n")
+                vd = _visual_src_depth(depth)
+                out.append(f"{_pad(vd)}</group>\n")
                 out.append(f"{_pad(vd)}<!-- end: {_format_source_label(pkg, path)} -->\n")
 
             # Open intermediate levels persistently.
             while len(open_src) + 1 < len(target_src):
                 depth = len(open_src)
-                vd = _visual_src_depth(depth, flatten)
+                vd = _visual_src_depth(depth)
                 pkg, path = target_src[depth]
                 out.append(f"{_pad(vd)}<!-- source: {_format_source_label(pkg, path)} -->\n")
-                if not flatten:
-                    out.append(f"{_pad(vd)}<group>\n")
+                out.append(f"{_pad(vd)}<group>\n")
                 if show_args:
                     _render_show_args((pkg, path), include_args, declared_args_by_file, vd + 1, out)
                 open_src.append((pkg, path))
@@ -432,7 +418,7 @@ def render_resolved_xml(
             # The marker's own level: inline comment pair only.
             if len(open_src) < len(target_src):
                 depth = len(open_src)
-                vd = _visual_src_depth(depth, flatten)
+                vd = _visual_src_depth(depth)
                 pkg, path = target_src[depth]
                 out.append(f"{_pad(vd)}<!-- source: {_format_source_label(pkg, path)} -->\n")
                 if show_args:
@@ -445,26 +431,24 @@ def render_resolved_xml(
             while len(open_src) > common:
                 depth = len(open_src) - 1
                 pkg, path = open_src.pop()
-                vd = _visual_src_depth(depth, flatten)
-                if not flatten:
-                    out.append(f"{_pad(vd)}</group>\n")
+                vd = _visual_src_depth(depth)
+                out.append(f"{_pad(vd)}</group>\n")
                 out.append(f"{_pad(vd)}<!-- end: {_format_source_label(pkg, path)} -->\n")
 
             # Open new source groups, outermost first.
             while len(open_src) < len(target_src):
                 depth = len(open_src)
-                vd = _visual_src_depth(depth, flatten)
+                vd = _visual_src_depth(depth)
                 pkg, path = target_src[depth]
                 out.append(f"{_pad(vd)}<!-- source: {_format_source_label(pkg, path)} -->\n")
-                if not flatten:
-                    out.append(f"{_pad(vd)}<group>\n")
+                out.append(f"{_pad(vd)}<group>\n")
                 if show_args:
                     _render_show_args((pkg, path), include_args, declared_args_by_file, vd + 1, out)
                 open_src.append((pkg, path))
 
         # Compute node indentation.  Namespaces are always flattened onto
         # node attributes, so there is no namespace sub-group.
-        vd = _visual_src_depth(len(open_src), flatten)
+        vd = _visual_src_depth(len(open_src))
         node_ind = _pad(vd)
         child_ind = _pad(vd + 1)
         stack_only_ns: str | None = None
@@ -505,9 +489,8 @@ def render_resolved_xml(
     while open_src:
         depth = len(open_src) - 1
         pkg, path = open_src.pop()
-        vd = _visual_src_depth(depth, flatten)
-        if not flatten:
-            out.append(f"{_pad(vd)}</group>\n")
+        vd = _visual_src_depth(depth)
+        out.append(f"{_pad(vd)}</group>\n")
         out.append(f"{_pad(vd)}<!-- end: {_format_source_label(pkg, path)} -->\n")
 
     out.append("</launch>\n")

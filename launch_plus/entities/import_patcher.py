@@ -182,7 +182,6 @@ def _build_patched_launch_substitutions():
     mod.EnvironmentVariable = _DeferredEnvironmentVariable
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None
-    mod.ThisLaunchFileDir = lambda: Path(__file__).parent
     return mod
 
 

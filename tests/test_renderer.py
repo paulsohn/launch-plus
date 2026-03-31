@@ -109,75 +109,7 @@ def test_nested_groups_from_include_chain() -> None:
         f"lidar_node should be at 6-space indent: {lidar_line!r}"
     )
 
-
-def test_namespace_on_nodes_flatten() -> None:
-    """Flatten mode: no groups, namespace= directly on each node."""
-    src_a = ("sensor_launch", Path("launch/sensing.launch.xml"))
-    src_b = ("planner_launch", Path("launch/planning.launch.xml"))
-
-    nodes = [
-        ResolvedNode(
-            package="lidar_pkg",
-            executable="lidar_node",
-            name="lidar",
-            namespace="/sensing/lidar",
-            namespace_stack=["sensing", "lidar"],
-            source=src_a,
-        ),
-        ResolvedNode(
-            package="radar_pkg",
-            executable="radar_node",
-            namespace="/sensing/radar",
-            namespace_stack=["sensing", "radar"],
-            source=src_a,
-        ),
-        ResolvedNode(
-            package="planner_pkg",
-            executable="planner",
-            namespace="/planning",
-            namespace_stack=["planning"],
-            source=src_b,
-        ),
-    ]
-
-    xml = render_resolved_xml("my_pkg", "top.launch.xml", nodes, flatten=True)
-
-    assert "<push-ros-namespace" not in xml
-    assert "<group>" not in xml
-    assert 'namespace="/sensing/lidar"' in xml
-    assert 'namespace="/sensing/radar"' in xml
-    assert 'namespace="/planning"' in xml
-
-
-def test_flatten_no_groups() -> None:
-    """--flatten: completely group-free output."""
-    src_a = ("sensor_launch", Path("launch/sensing.launch.xml"))
-
-    nodes = [
-        ResolvedNode(
-            package="lidar_pkg",
-            executable="lidar_node",
-            namespace="/sensing/lidar",
-            namespace_stack=["sensing", "lidar"],
-            source=src_a,
-        ),
-        ResolvedNode(
-            package="radar_pkg",
-            executable="radar_node",
-            namespace="/sensing/radar",
-            namespace_stack=["sensing", "radar"],
-            source=src_a,
-        ),
-    ]
-
-    xml = render_resolved_xml("my_pkg", "top.launch.xml", nodes, flatten=True)
-
-    assert "<group>" not in xml
-    assert "<push-ros-namespace" not in xml
-    assert 'namespace="/sensing/lidar"' in xml
-    assert 'namespace="/sensing/radar"' in xml
-    assert xml.count("<!-- source:") == 1
-    assert xml.count("<!-- end:") == 1
+    assert xml.count("<!-- end:") == 2
 
 
 def test_include_marker_inline_comment_pair_no_group() -> None:

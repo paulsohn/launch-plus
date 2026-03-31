@@ -475,7 +475,6 @@ def fetch(
 @click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--preview", is_flag=True, help="Resolve from source workspace")
 @click.option("--allow-including-unportable-path", is_flag=True)
-@click.option("--flatten", "--flatten-namespaces", "flatten", is_flag=True)
 @click.option("--show-args", is_flag=True)
 @click.option("--apply-opaque-file-access", is_flag=True)
 @click.option("--inline-params", is_flag=True)
@@ -496,7 +495,6 @@ def resolve(
     apply_launch_arg_defaults: bool,
     preview: bool,
     allow_including_unportable_path: bool,
-    flatten: bool,
     show_args: bool,
     apply_opaque_file_access: bool,
     inline_params: bool,
@@ -505,7 +503,7 @@ def resolve(
     dirty: bool,
     shallow: bool,
 ) -> None:
-    """Resolve and flatten launch file (no build)."""
+    """Resolve launch file (no build)."""
     from launch_plus.orchestrator import ResolveWorkflowOptions
 
     initial_args = _parse_launch_args(args)
@@ -529,7 +527,6 @@ def resolve(
         src_dir=src,
         report=report,
         preview=preview,
-        flatten=flatten,
         show_args=show_args,
         suppress_xml=False,
         strict=False,
@@ -603,7 +600,6 @@ def check(
         src_dir=src,
         report=False,
         preview=preview,
-        flatten=False,
         show_args=False,
         suppress_xml=True,
         strict=strict,
@@ -903,7 +899,6 @@ def _cmd_resolve(
     src_dir: str,
     report: bool,
     preview: bool,
-    flatten: bool,
     show_args: bool,
     suppress_xml: bool,
     strict: bool,
@@ -946,7 +941,6 @@ def _cmd_resolve(
             package,
             launcher,
             result.nodes,
-            flatten=flatten,
             include_args=result.include_args,
             show_args=show_args,
             initial_args=result.initial_args,

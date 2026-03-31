@@ -49,6 +49,10 @@ def _resolve_node_details(state, node, context):
     )
     entry["namespace_stack"] = list(state.namespace_stack)
     entry["explicit_namespace"] = ns
+    # Read ros_namespace from _launch_configurations (canonical, matches official ROS 2)
+    ros_ns = context._launch_configurations.get("ros_namespace")
+    if ros_ns:
+        entry["ros_namespace"] = ros_ns
 
     # Parameters and param files
     params = {}

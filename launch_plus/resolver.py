@@ -492,11 +492,9 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
 
         entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
-        # Apply child launch arguments: explicit include args override parent context.
-        # In strict mode (global_arg_cascade=False), strip parent context so the
-        # child only sees explicitly forwarded args + its own DeclareLaunchArgument.
-        if not state.global_arg_cascade:
-            parent_context._launch_configurations.clear()
+        # Set child launch arguments into the context, matching official
+        # IncludeLaunchDescription which uses SetLaunchConfiguration actions.
+        # Child args override any parent values with the same key.
         for k, v in child_args.items():
             parent_context._launch_configurations[k] = v
 
@@ -506,27 +504,25 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
                 _apply_declared_arg(entity, parent_context)
 
         # Pass 2: walk actions — SetLaunchConfiguration, OpaqueFunction, etc.
-        # all mutate parent_context directly, which is the desired effect.
-        # Only context mutations survive; tracked state is rolled back.
+        # all mutate parent_context directly, matching official behavior where
+        # IncludeLaunchDescription (scoped=False) lets child mutations persist.
         _walk_actions(state, entities, parent_context)
     finally:
-        # Restore scoping state only — nodes, includes, packages, params, etc.
-        # are intentionally kept (includes are resolved inline).
+        # Capture child-declared arg names before restoring parent state.
+        child_declared = state.declared_arg_names - saved_declared_arg_names
+        # Restore scoping state.
         state.declared_arg_names.clear()
         state.declared_arg_names.update(saved_declared_arg_names)
         del state.namespace_stack[saved_namespace_depth:]
         state.env.clear()
         state.env.update(saved_env)
 
-    # Restore child-only args that were not SetLaunchConfiguration'd —
-    # child DeclareLaunchArgument defaults should NOT leak into the parent
-    # scope, only SetLaunchConfiguration is a deliberate side-effect.
-    # Keep keys that were either already in the parent or were set via
-    # SetLaunchConfiguration.  Also preserve "global_params" — this is the
-    # accumulation list for SetParameter, not a launch argument.
+    # Remove child-only DeclareLaunchArgument defaults that should not leak
+    # into the parent scope.  All action-produced side-effects persist,
+    # matching official IncludeLaunchDescription (scoped=False).
     set_configs = set(state.tracked["set_launch_configurations"].keys())
     for k in list(parent_context._launch_configurations):
-        if k not in saved_configs and k not in set_configs and k != "global_params":
+        if k in child_declared and k not in saved_configs and k not in set_configs:
             del parent_context._launch_configurations[k]
 
 

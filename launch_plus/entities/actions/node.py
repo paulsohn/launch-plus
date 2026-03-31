@@ -198,6 +198,10 @@ class _TrackedNode(_TrackedAction):
         entry["name"] = name
         entry["namespace_stack"] = list(context._state.namespace_stack)
         entry["explicit_namespace"] = ns
+        # Read ros_namespace from _launch_configurations (canonical, matches official ROS 2)
+        ros_ns = context._launch_configurations.get("ros_namespace")
+        if ros_ns:
+            entry["ros_namespace"] = ros_ns
         # Params
         params: dict[str, str] = {k: str(v) for k, v in context._state.global_params}
         param_files: list[dict] = list(context._state.global_param_files)

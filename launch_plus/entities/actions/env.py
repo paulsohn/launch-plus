@@ -112,10 +112,14 @@ class _TrackedPushRosNamespace(_TrackedAction):
         self._namespace = namespace
 
     def execute(self, context) -> list | None:
-        from launch_plus.entities.helpers import resolve_value
+        from launch_plus.entities.helpers import _ros2_namespace_join, resolve_value
 
         ns = resolve_value(self._namespace, context)
         if ns:
+            # Update _launch_configurations['ros_namespace'] (cumulative, matching official)
+            prev = context._launch_configurations.get("ros_namespace")
+            context._launch_configurations["ros_namespace"] = _ros2_namespace_join(prev, ns)
+            # Also keep state.namespace_stack for tracked output
             context._state.namespace_stack.append(ns)
         return None
 

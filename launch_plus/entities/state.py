@@ -115,6 +115,7 @@ class LaunchContext:
         self._state: ResolverState = state
         # ROS 2 compat — single source of truth for all arg/var lookups
         self._launch_configurations: dict[str, object] = {}
+        self._launch_configurations_stack: list[dict[str, object]] = []
         self.env: dict[str, str] = state.env  # shared reference
         self.launch_file_dir: str | None = None
         self.preview_mode: bool = False
@@ -126,6 +127,14 @@ class LaunchContext:
     @launch_configurations.setter
     def launch_configurations(self, value: dict[str, object]) -> None:
         self._launch_configurations = value
+
+    def _push_launch_configurations(self) -> None:
+        """Save current launch_configurations (matching official ROS 2 scoping)."""
+        self._launch_configurations_stack.append(dict(self._launch_configurations))
+
+    def _pop_launch_configurations(self) -> None:
+        """Restore previously saved launch_configurations."""
+        self._launch_configurations = self._launch_configurations_stack.pop()
 
     def perform_substitution(self, sub) -> str | None:
         """Resolve a substitution to a string. Matches official ROS 2 API.

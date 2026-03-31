@@ -63,7 +63,7 @@ class _TrackedGroupAction(_TrackedAction):
         from launch_plus.resolver import _resolve_element
 
         if self._scoped:
-            saved_lc = dict(ctx._launch_configurations)
+            ctx._push_launch_configurations()
             saved_env = dict(ctx._state.env)
             saved_ns_depth = len(ctx._state.namespace_stack)
             saved_gp = list(ctx._state.global_params)
@@ -72,10 +72,7 @@ class _TrackedGroupAction(_TrackedAction):
         for child in self._xml_children:
             _resolve_element(child, ctx, self._xml_include_stack or [])
         if self._scoped:
-            new_lc = {k: v for k, v in ctx._launch_configurations.items() if k not in saved_lc}
-            ctx._launch_configurations.clear()
-            ctx._launch_configurations.update(saved_lc)
-            ctx._launch_configurations.update(new_lc)
+            ctx._pop_launch_configurations()
             ctx._state.env.clear()
             ctx._state.env.update(saved_env)
             del ctx._state.namespace_stack[saved_ns_depth:]
@@ -85,13 +82,22 @@ class _TrackedGroupAction(_TrackedAction):
 
     def _execute_shim(self, context) -> None:
         """Execute for Python shim path: walk child actions."""
-        depth_before = len(context._state.namespace_stack)
-        saved_env = dict(context._state.env) if self._scoped else None
+        if self._scoped:
+            context._push_launch_configurations()
+            saved_env = dict(context._state.env)
+            saved_ns_depth = len(context._state.namespace_stack)
+            saved_gp = list(context._state.global_params)
+            saved_gr = list(context._state.global_remaps)
+            saved_gpf = list(context._state.global_param_files)
         _R._walk_actions(context._state, self._actions, context)
-        del context._state.namespace_stack[depth_before:]
-        if saved_env is not None:
+        if self._scoped:
+            context._pop_launch_configurations()
             context._state.env.clear()
             context._state.env.update(saved_env)
+            del context._state.namespace_stack[saved_ns_depth:]
+            context._state.global_params[:] = saved_gp
+            context._state.global_remaps[:] = saved_gr
+            context._state.global_param_files[:] = saved_gpf
 
 
 class _TrackedOpaqueFunction(_TrackedAction):

@@ -105,27 +105,6 @@ def _record_and_track(name: str, resolved: str, context=None) -> None:
     state.record_declared_arg(name, resolved, flat=not already_seen)
 
 
-def _execute_xml_arg(arg: DeclareLaunchArgument, context) -> None:
-    """Execute <arg> for the XML path — context is a LaunchContext."""
-    from launch_plus.entities.helpers import resolve_value
-
-    name = arg.name or ""
-    if not name:
-        return
-    if arg.default_value is not None:
-        if name not in context._launch_configurations:
-            if context._state.apply_arg_defaults:
-                resolved = resolve_value(arg.default_value, context) or ""
-                context._launch_configurations[name] = resolved
-            else:
-                resolved = ""
-        else:
-            resolved = str(context._launch_configurations.get(name, ""))
-    else:
-        resolved = str(context._launch_configurations.get(name, ""))
-    _record_and_track(name, resolved, context)
-
-
 def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
     """Resolve a DeclareLaunchArgument default and apply it to the launch context."""
     from launch_plus.entities.substitutions.launch_config import DeferredDefault

@@ -23,14 +23,6 @@ def _needs_quoting(tokens: list[Substitution]) -> bool:
     return False
 
 
-def _serialize_arg(tokens: list[Substitution]) -> str:
-    """Serialize a single argument, quoting if it contains spaces or substitutions."""
-    inner = "".join(t.serialize() for t in tokens)
-    if _needs_quoting(tokens):
-        return f"'{inner}'"
-    return inner
-
-
 @expose_substitution("command")
 class CommandSubstitution(Substitution):
     """Preserve ``$(command <cmd> [on_stderr])`` — cannot be evaluated at static analysis time.

@@ -211,20 +211,6 @@ class ChangeState(Action):
         self._namespace_stack = []
         self._explicit_namespace = None
 
-    def _resolve_matcher(self, state):
-        """Resolve matcher to target node info using state."""
-        matcher = self._matcher
-        if matcher is not None:
-            if hasattr(matcher, "_resolve"):
-                matcher._resolve(state)
-                self._target_node = matcher._node_name
-                self._namespace_stack = matcher._namespace_stack
-                self._explicit_namespace = matcher._explicit_namespace
-            elif hasattr(matcher, "_node_name"):
-                self._target_node = matcher._node_name
-                self._namespace_stack = getattr(matcher, "_namespace_stack", [])
-                self._explicit_namespace = getattr(matcher, "_explicit_namespace", None)
-
 
 class Shutdown(Action):
     """Tracked Shutdown event."""

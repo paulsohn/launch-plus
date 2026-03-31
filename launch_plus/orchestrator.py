@@ -85,17 +85,6 @@ class ResolveResult:
 # ---------------------------------------------------------------------------
 
 
-def _is_launch_file(path: Path) -> bool:
-    s = str(path)
-    return (
-        s.endswith(".launch.xml")
-        or s.endswith(".xml")
-        or s.endswith(".launch.py")
-        or s.endswith(".launch.yaml")
-        or s.endswith(".launch.yml")
-    )
-
-
 def _ensure_package_fetched(
     lockfile: Lockfile,
     package: str,

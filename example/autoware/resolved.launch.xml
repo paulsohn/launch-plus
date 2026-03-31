@@ -3460,14 +3460,14 @@
               <remap from="~/output/image/theora" to="debug/rois/theora"/>
             </composable_node>
           </node_container>
-          <load_composable_node target="traffic_light_node_container">
+          <load_composable_node target="/perception/traffic_light_recognition/camera6/traffic_light_node_container">
             <composable_node pkg="autoware_image_transport_decompressor" plugin="autoware::image_preprocessor::ImageTransportDecompressor" name="traffic_light_image_decompressor">
               <param name="encoding" value="rgb8"/>
               <remap from="~/input/compressed_image" to="/sensing/camera/camera6/image_raw/compressed"/>
               <remap from="~/output/raw_image" to="/sensing/camera/camera6/image_raw"/>
             </composable_node>
           </load_composable_node>
-          <load_composable_node target="traffic_light_node_container">
+          <load_composable_node target="/perception/traffic_light_recognition/camera6/traffic_light_node_container">
             <composable_node pkg="autoware_traffic_light_fine_detector" plugin="autoware::traffic_light::TrafficLightFineDetectorNode" name="traffic_light_fine_detector">
               <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml -->
               <param name="precision" value="fp16"/>
@@ -3485,7 +3485,7 @@
               <remap from="~/output/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
             </composable_node>
           </load_composable_node>
-          <load_composable_node target="traffic_light_node_container">
+          <load_composable_node target="/perception/traffic_light_recognition/camera6/traffic_light_node_container">
             <composable_node pkg="autoware_tensorrt_yolox" plugin="autoware::tensorrt_yolox::TrtYoloXNode" name="traffic_light_whole_image_detector">
               <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
               <param name="score_threshold" value="0.35"/>
@@ -3599,14 +3599,14 @@
               <remap from="~/output/image/theora" to="debug/rois/theora"/>
             </composable_node>
           </node_container>
-          <load_composable_node target="traffic_light_node_container">
+          <load_composable_node target="/perception/traffic_light_recognition/camera7/traffic_light_node_container">
             <composable_node pkg="autoware_image_transport_decompressor" plugin="autoware::image_preprocessor::ImageTransportDecompressor" name="traffic_light_image_decompressor">
               <param name="encoding" value="rgb8"/>
               <remap from="~/input/compressed_image" to="/sensing/camera/camera7/image_raw/compressed"/>
               <remap from="~/output/raw_image" to="/sensing/camera/camera7/image_raw"/>
             </composable_node>
           </load_composable_node>
-          <load_composable_node target="traffic_light_node_container">
+          <load_composable_node target="/perception/traffic_light_recognition/camera7/traffic_light_node_container">
             <composable_node pkg="autoware_traffic_light_fine_detector" plugin="autoware::traffic_light::TrafficLightFineDetectorNode" name="traffic_light_fine_detector">
               <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml -->
               <param name="precision" value="fp16"/>
@@ -3624,7 +3624,7 @@
               <remap from="~/output/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
             </composable_node>
           </load_composable_node>
-          <load_composable_node target="traffic_light_node_container">
+          <load_composable_node target="/perception/traffic_light_recognition/camera7/traffic_light_node_container">
             <composable_node pkg="autoware_tensorrt_yolox" plugin="autoware::tensorrt_yolox::TrtYoloXNode" name="traffic_light_whole_image_detector">
               <!-- params from: $(find-pkg-share autoware_launch)/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
               <param name="score_threshold" value="0.35"/>

@@ -19,6 +19,28 @@ def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
     return parser.parse_substitution(text)
 
 
+def _fully_qualified_name(node_entry: dict) -> str:
+    """Compute fully-qualified node name from tracked entry.
+
+    Matches official ``prefix_namespace(ros_namespace, node_namespace) + "/" + name``
+    then ``make_namespace_absolute``.
+    """
+    from launch_plus.entities.helpers import _ros2_namespace_join
+
+    ros_ns = node_entry.get("ros_namespace")
+    explicit_ns = node_entry.get("explicit_namespace")
+    name = node_entry.get("name", "")
+    # Combine ros_namespace + explicit_namespace
+    ns = _ros2_namespace_join(ros_ns, explicit_ns) if explicit_ns else ros_ns
+    if ns and name:
+        return f"{ns.rstrip('/')}/{name}"
+    if ns:
+        return ns
+    if name:
+        return f"/{name}" if not name.startswith("/") else name
+    return ""
+
+
 def _resolve_xml_composable_plugins(
     xml_plugins: list[dict],
     context,
@@ -473,13 +495,15 @@ class _TrackedLoadComposableNodes(_TrackedAction):
                 if self._raw_target is not None:
                     if isinstance(self._raw_target, _TrackedComposableNodeContainer):
                         self._raw_target._ensure_tracked(state)
-                        target = context._state.tracked["nodes"][self._raw_target._idx].get(
-                            "name"
-                        ) or entry.get("target", "")
+                        container = context._state.tracked["nodes"][self._raw_target._idx]
+                        target = _fully_qualified_name(container)
                     else:
                         target = context.perform_substitution(self._raw_target)
                     if target:
                         entry["target"] = target
+                ros_ns = context._launch_configurations.get("ros_namespace")
+                if ros_ns:
+                    entry["ros_namespace"] = ros_ns
                 from launch_plus.entities.node_resolution import _resolve_composable_plugins
 
                 entry["plugins"] = _resolve_composable_plugins(state, self._descs, context)

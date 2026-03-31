@@ -2359,7 +2359,8 @@ class TestTrackedFindPackageShare:
         R.get_state().package_shares["my_pkg"] = "/install/share/my_pkg"
         fps = R._TrackedFindPackageShare("my_pkg")
         assert fps.perform(None) == "/install/share/my_pkg"
-        assert str(fps) == "/install/share/my_pkg"
+        # str() returns portable form; perform() returns resolved path
+        assert str(fps) == "$(find-pkg-share my_pkg)"
 
     def test_postbuild_unresolvable_reports_error(self, caplog):
         R.get_state().preview_mode = False

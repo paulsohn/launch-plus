@@ -513,37 +513,38 @@ class LaunchContext:
 
     # ─── Substitution ─────────────────────────────────────────────────────
 
-    def perform_substitution(self, sub) -> str | None:
-        """Resolve a substitution to a string. Matches official ROS 2 API.
+    def perform_substitutions(self, subs: list) -> str:
+        """Resolve a list of substitutions to a string.
 
-        Handles: None, str, list[Substitution], single .perform() object.
+        Matches official ``perform_substitutions(context, subs)`` exactly.
+        """
+        return "".join([self.perform_substitution(sub) for sub in subs])
+
+    def perform_substitution(self, sub) -> str:
+        """Resolve a single substitution to a string.
+
+        Matches official ``context.perform_substitution(sub)`` API.
+        Also handles ``str`` (returned as-is), ``None`` (returns ""),
+        and ``list[Substitution]`` (delegates to ``perform_substitutions``).
         """
         if sub is None:
-            return None
+            return ""
         if isinstance(sub, str):
             return sub
         if isinstance(sub, (list, tuple)):
-            parts = []
-            for s in sub:
-                if hasattr(s, "perform"):
-                    try:
-                        result = s.perform(self)
-                        parts.append(str(result) if result is not None else str(s))
-                    except Exception:
-                        parts.append(str(s))
-                else:
-                    parts.append(str(s))
-            return "".join(parts)
-        if hasattr(sub, "perform"):
-            try:
-                result = sub.perform(self)
-                return str(result) if result is not None else None
-            except Exception:
-                return str(sub)
-        return str(sub)
+            return self.perform_substitutions(list(sub))
+        try:
+            result = sub.perform(self)
+            return str(result) if result is not None else str(sub)
+        except Exception:
+            return str(sub)
 
     def perform_substitution_ex(self, sub) -> tuple[str | None, bool]:
-        """Resolve with fallback tracking. Returns (value, is_fallback)."""
+        """Resolve with fallback tracking. Returns (value, is_fallback).
+
+        *is_fallback* is True when perform() returned None or raised and the
+        display name was used instead.
+        """
         if sub is None:
             return None, False
         if isinstance(sub, str):
@@ -552,29 +553,24 @@ class LaunchContext:
             parts = []
             any_fallback = False
             for s in sub:
-                if hasattr(s, "perform"):
-                    try:
-                        result = s.perform(self)
-                        if result is not None:
-                            parts.append(str(result))
-                        else:
-                            parts.append(str(s))
-                            any_fallback = True
-                    except Exception:
+                try:
+                    result = s.perform(self) if not isinstance(s, str) else s
+                    if result is not None:
+                        parts.append(str(result))
+                    else:
                         parts.append(str(s))
                         any_fallback = True
-                else:
+                except Exception:
                     parts.append(str(s))
+                    any_fallback = True
             return "".join(parts), any_fallback
-        if hasattr(sub, "perform"):
-            try:
-                result = sub.perform(self)
-                if result is None:
-                    return str(sub), True
-                return str(result), False
-            except Exception:
+        try:
+            result = sub.perform(self)
+            if result is None:
                 return str(sub), True
-        return str(sub), True
+            return str(result), False
+        except Exception:
+            return str(sub), True
 
 
 # Backward compat aliases

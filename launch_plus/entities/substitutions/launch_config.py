@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from launch_plus.entities.expose import expose_substitution
+from launch_plus.entities.substitution import Substitution
 
 logger = logging.getLogger("launch_plus")
 
@@ -45,7 +46,7 @@ class _DeferredDefault:
 
 
 @expose_substitution("var")
-class _LaunchConfiguration:
+class _LaunchConfiguration(Substitution):
     """Unified substitution: ``$(var name)`` (XML) and ``LaunchConfiguration("name")`` (Python).
 
     Reads from ``context.launch_configurations[name]`` at resolution time,

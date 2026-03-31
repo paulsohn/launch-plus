@@ -56,40 +56,22 @@ class FindPackageShareSubstitution(Substitution):
 # ─── Python-shim substitution ────────────────────────────────────────────────
 
 
-class _TrackedFindPackageShare:
+class _TrackedFindPackageShare(Substitution):
     """Tracks FindPackageShare; package may be a string or a list of substitutions."""
 
     def __init__(self, package):
         self._package_subs = package
 
     def _resolve_name(self, context=None):
-        """Concatenate package name from string or list of substitution objects.
-
-        Returns ``(name, is_fallback)`` where *is_fallback* is ``True`` when
-        any part could not be resolved and the display name was used instead.
-        """
+        """Resolve package name. Returns ``(name, is_fallback)``."""
         subs = self._package_subs
         if isinstance(subs, str):
             return subs, False
-        if isinstance(subs, list):
-            parts = []
-            any_fallback = False
-            for sub in subs:
-                if context is not None and hasattr(sub, "perform"):
-                    result = sub.perform(context)
-                    if result is not None:
-                        parts.append(str(result))
-                    else:
-                        parts.append(str(sub))
-                        any_fallback = True
-                else:
-                    parts.append(str(sub))
-                    if hasattr(sub, "perform"):
-                        any_fallback = True
-            return "".join(parts), any_fallback
-        if hasattr(subs, "perform"):
-            return str(subs), True
-        return str(subs), False
+        if context is not None:
+            result = context.perform_substitution(subs)
+            if result is not None:
+                return result, False
+        return str(subs), True
 
     def _try_ament_resolve(self, state: ResolverState, pkg: str) -> str:
         """Resolve to a real path, return portable form on failure."""
@@ -111,11 +93,9 @@ class _TrackedFindPackageShare:
             return self._try_ament_resolve(state, pkg)
         return f"$(find-pkg-share {pkg})"
 
-    def __str__(self):
-        import launch_plus.resolver as _R
-
-        state = _R.get_state()
+    def serialize(self) -> str:
         pkg, _ = self._resolve_name(None)
-        if not state.preview_mode:
-            return self._try_ament_resolve(state, pkg)
         return f"$(find-pkg-share {pkg})"
+
+    def __str__(self):
+        return self.serialize()

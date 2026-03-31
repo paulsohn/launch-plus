@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from launch_plus.entities.substitution import Substitution
 
-class _TrackedPathJoinSubstitution:
+
+class _TrackedPathJoinSubstitution(Substitution):
     def __init__(self, substitutions):
         self._subs = substitutions
 
     def perform(self, context):
         parts = []
         for sub in self._subs:
-            if hasattr(sub, "perform"):
-                result = sub.perform(context)
-                parts.append(str(result) if result is not None else str(sub))
-            else:
-                parts.append(str(sub))
+            result = context.perform_substitution(sub)
+            parts.append(result if result is not None else str(sub))
         return str(Path(*parts))
+
+    def serialize(self) -> str:
+        return "/".join(str(s) for s in self._subs)

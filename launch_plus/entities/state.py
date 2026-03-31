@@ -215,129 +215,52 @@ class ResolverState:
     def resolve_pkg_share(self, package: str) -> str:
         """Resolve a package share directory path.
 
-        Preview mode + lockfile: source directory (fetch inline if needed).
-        Preview mode + no lockfile: AMENT_PREFIX_PATH, else portable fallback.
-        Non-preview mode: AMENT_PREFIX_PATH only.
+        Delegates to ``fetcher.ensure_package_available()`` for the unified
+        lockfile → AMENT → rosdep resolution. Caches results in
+        ``package_shares``.
 
         Returns absolute path or portable syntax ``$(find-pkg-share pkg)``.
         Raises ``LookupError`` in non-preview mode if package not found.
         """
-        # 1. Fast path: cached in package_shares.
+        # Fast path: already cached
         if package in self.package_shares:
-            pkg_path: str = self.package_shares[package]
-            # In preview mode, lockfile packages may need full fetch.
-            if (
-                self.preview_mode
-                and self.lockfile_data
-                and package in self.lockfile_data
-                and not os.path.isfile(os.path.join(pkg_path, "package.xml"))
-            ):
-                if self._ensure_fetched(package):
-                    return str(self.package_shares[package])
-                logger.error("failed to fetch package '%s' from lockfile", package)
-                return f"$(find-pkg-share {package})"
-            return pkg_path
+            return str(self.package_shares[package])
 
-        # 2. Lockfile package not yet cached — fetch (preview only).
-        if self.preview_mode and self.lockfile_data and package in self.lockfile_data:
-            if self._ensure_fetched(package):
-                return str(self.package_shares[package])
-            logger.error("failed to fetch package '%s' from lockfile", package)
-            return f"$(find-pkg-share {package})"
+        # Delegate to fetcher
+        from pathlib import Path
 
-        # 3. Non-lockfile packages: use AMENT_PREFIX_PATH.
-        real_gps = _get_real_get_package_share_directory()
-        if real_gps is not None:
-            try:
-                return str(real_gps(package))
-            except Exception:
-                pass
+        from launch_plus.fetcher import ensure_package_available
 
-        # 4. Try rosdep install if enabled.
-        if self.rosdep_fallback and self._try_rosdep_install(package) and real_gps is not None:
-            try:
-                return str(real_gps(package))
-            except Exception:
-                pass
+        lockfile = self._build_lockfile() if self.lockfile_data else None
+        fetch_dir = Path(self.fetch_dir) if self.fetch_dir else None
+        result = ensure_package_available(
+            package,
+            lockfile,
+            fetch_dir,
+            self.fetch_options,
+            rosdep_fallback=self.rosdep_fallback,
+        )
+        if result is not None:
+            resolved = str(result)
+            self.package_shares[package] = resolved
+            self.fetched_packages.add(package)
+            return resolved
 
-        # 5. Fallback.
         if self.preview_mode:
             return f"$(find-pkg-share {package})"
         raise LookupError(f"package '{package}' not found in AMENT_PREFIX_PATH")
 
-    def _ensure_fetched(self, package: str) -> bool:
-        """Ensure a lockfile package is fully fetched (has package.xml on disk).
+    def _build_lockfile(self):
+        """Reconstruct a minimal Lockfile from lockfile_data for fetcher API."""
+        from launch_plus.types import Lockfile, PackageLock, RepoLock
 
-        Delegates to ``fetcher.fetch_repo_sparse()`` for the actual git
-        operations.  Updates ``self.package_shares`` after successful fetch.
-        """
-        from pathlib import Path
-
-        if package in self.fetched_packages:
-            return True
-
-        pkg_info = self.lockfile_data.get(package)
-        if not pkg_info or not self.fetch_dir:
-            return False
-
-        repo_workspace_path = pkg_info["repo"]
-        pkg_path_in_repo = pkg_info["path"]
-        repo_url = pkg_info["url"]
-        repo_sha = pkg_info["version"]
-
-        repo_dir = Path(self.fetch_dir) / repo_workspace_path
-        pkg_dir = str(repo_dir / pkg_path_in_repo)
-
-        # Already fully fetched?
-        if os.path.isfile(os.path.join(pkg_dir, "package.xml")):
-            self.fetched_packages.add(package)
-            self.package_shares[package] = pkg_dir
-            return True
-
-        # Fetch via fetcher.py API.
-        try:
-            from launch_plus.fetcher import FetchOptions, fetch_repo_sparse
-
-            sparse_path = "/**" if pkg_path_in_repo in (".", "") else pkg_path_in_repo
-            options = self.fetch_options if self.fetch_options is not None else FetchOptions()
-            fetch_repo_sparse(repo_url, repo_sha, repo_dir, [sparse_path], options)
-
-            if os.path.isfile(os.path.join(pkg_dir, "package.xml")):
-                self.fetched_packages.add(package)
-                self.package_shares[package] = pkg_dir
-                return True
-            logger.warning("fetched '%s' but package.xml not found at %s", package, pkg_dir)
-            return False
-        except Exception as e:
-            logger.warning("failed to fetch '%s': %s", package, e)
-            return False
-
-    def _try_rosdep_install(self, package: str) -> bool:
-        """Try installing a package via rosdep.
-
-        Delegates to ``rosdep.rosdep_install()`` for the actual resolution
-        and installation.
-        """
-        if package in self.rosdep_attempted:
-            return False
-        self.rosdep_attempted.add(package)
-        try:
-            from launch_plus.rosdep import rosdep_install
-
-            rosdep_install([package])
-            return True
-        except Exception:
-            return False
-
-
-def _get_real_get_package_share_directory():
-    """Lazy-import ament_index_python for package share directory lookup."""
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        return get_package_share_directory
-    except Exception:
-        return None
+        packages = {}
+        repositories = {}
+        for pkg_name, info in self.lockfile_data.items():
+            packages[pkg_name] = PackageLock(repo=info["repo"], path=info["path"])
+            if info["repo"] not in repositories:
+                repositories[info["repo"]] = RepoLock(url=info["url"], version=info["version"])
+        return Lockfile(packages=packages, repositories=repositories)
 
 
 # ─── Launch Context ──────────────────────────────────────────────────────────

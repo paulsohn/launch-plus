@@ -509,6 +509,64 @@ def fetch_file(
     return repo_dir / pkg_lock.path / share_path
 
 
+def ensure_package_available(
+    package: str,
+    lockfile: Lockfile | None,
+    fetch_dir: Path | None,
+    options: FetchOptions | None = None,
+    *,
+    rosdep_fallback: bool = False,
+) -> Path | None:
+    """Ensure a package is available on disk — the single entry point.
+
+    Resolution order:
+    1. Lockfile: if the package is in the lockfile, sparse-fetch if needed.
+    2. AMENT_PREFIX_PATH: check installed packages via ``PackageLocator``.
+    3. Rosdep: if ``rosdep_fallback`` is True, try ``rosdep install``.
+
+    Returns the package share directory path, or ``None`` on failure.
+    """
+    from launch_plus.locator import PackageLocator
+
+    if options is None:
+        options = FetchOptions()
+
+    # 1. Lockfile package
+    if lockfile is not None and fetch_dir is not None:
+        pkg_lock = lockfile.packages.get(package)
+        if pkg_lock is not None:
+            pkg_path = fetch_dir / pkg_lock.repo / pkg_lock.path
+            if (pkg_path / "package.xml").exists():
+                return pkg_path
+            try:
+                fetch_packages([package], lockfile, fetch_dir, options)
+                if (pkg_path / "package.xml").exists():
+                    return pkg_path
+            except Exception as e:
+                logger.warning("failed to fetch '%s': %s", package, e)
+            return None
+
+    # 2. AMENT_PREFIX_PATH
+    locator = PackageLocator().add_ament_from_env()
+    result = locator.locate_install_share(package)
+    if result is not None:
+        return result
+
+    # 3. Rosdep fallback
+    if rosdep_fallback:
+        try:
+            from launch_plus.rosdep import rosdep_install
+
+            rosdep_install([package])
+            result = locator.locate_install_share(package)
+            if result is not None:
+                return result
+        except Exception:
+            pass
+
+    return None
+
+
 def is_package_fetched(pkg_name: str, lockfile: Lockfile, fetch_dir: Path) -> bool:
     """Check if a package is already fully fetched (has package.xml)."""
     pkg_lock = lockfile.packages.get(pkg_name)

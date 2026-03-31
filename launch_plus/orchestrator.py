@@ -14,8 +14,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from launch_plus.exceptions import LaunchPlusError
-from launch_plus.fetcher import FetchOptions, WorkspaceState, fetch_packages
+from launch_plus.fetcher import FetchOptions
 from launch_plus.locator import PackageLocator
 from launch_plus.types import (
     DependencyKind,
@@ -95,6 +94,8 @@ def _ensure_package_fetched(
     failed_repos: set[str],
 ) -> bool:
     """Fetch a package if not already fetched. Returns True on success."""
+    from launch_plus.fetcher import ensure_package_available
+
     if package in fetched_packages:
         return True
 
@@ -106,42 +107,15 @@ def _ensure_package_fetched(
     if pkg_lock.repo in failed_repos:
         return False
 
-    pkg_path = fetch_dir / pkg_lock.repo / pkg_lock.path
-    repo_already_handled = options.workspace_state != WorkspaceState.DIRTY and any(
-        lockfile.packages.get(p) is not None and lockfile.packages[p].repo == pkg_lock.repo
-        for p in fetched_packages
-    )
-    if (
-        pkg_path.exists()
-        and (pkg_path / "package.xml").exists()
-        and (options.workspace_state == WorkspaceState.DIRTY or repo_already_handled)
-    ):
-        logger.debug("Package %s already fetched at %s", package, pkg_path)
+    pkg_path = ensure_package_available(package, lockfile, fetch_dir, options)
+    if pkg_path is not None:
         fetched_packages.add(package)
-        return True
-
-    logger.info("Fetching package: %s", package)
-    try:
-        fetch_packages([package], lockfile, fetch_dir, options)
         result.fetched_packages.append(package)
-        fetched_packages.add(package)
         return True
-    except LaunchPlusError as e:
-        logger.error("failed to fetch package '%s': %s", package, e)
-        failed_repos.add(pkg_lock.repo)
-        return False
 
-
-def _try_rosdep_install(package: str) -> bool:
-    """Attempt to install a missing ROS package via rosdep."""
-    try:
-        from launch_plus.rosdep import rosdep_install
-
-        rosdep_install([package])
-        return True
-    except Exception as e:
-        logger.error("%s", e)
-        return False
+    logger.error("failed to fetch package '%s'", package)
+    failed_repos.add(pkg_lock.repo)
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -257,25 +231,21 @@ def _resolve_python_file_recursive(
                 )
                 return
         else:
-            file_path = locator.resolve_install_file(package, share_path)
+            from launch_plus.fetcher import ensure_package_available
+
+            pkg_share = ensure_package_available(
+                package, None, None, rosdep_fallback=workflow_options.rosdep_fallback
+            )
+            if pkg_share is not None:
+                file_path = pkg_share / share_path
+                if not file_path.exists():
+                    file_path = None
             if file_path is None:
-                if workflow_options.rosdep_fallback:
-                    if _try_rosdep_install(package):
-                        file_path = locator.resolve_install_file(package, share_path)
-                        if file_path is None:
-                            logger.error(
-                                "package '%s' not found even after rosdep install", package
-                            )
-                            return
-                    else:
-                        return
-                else:
-                    logger.error(
-                        "package '%s' not found in lockfile or AMENT_PREFIX_PATH; "
-                        "use --rosdep to install missing packages automatically",
-                        package,
-                    )
-                    return
+                logger.error(
+                    "package '%s' not found in lockfile or AMENT_PREFIX_PATH",
+                    package,
+                )
+                return
     else:
         file_path = locator.resolve_install_file(package, share_path)
         if file_path is None:

@@ -118,99 +118,61 @@ class TestTrackPackage:
         assert len(R.get_state().tracked["packages"]) == 0
 
 
-# ─── _resolve_substitution ───────────────────────────────────────────────────
+# ─── perform_substitution / perform_substitutions ────────────────────────────
 
 
-class TestResolveSubstitution:
+class TestPerformSubstitution:
     def test_resolves_launch_configuration(self):
         lc = R._LaunchConfiguration("my_var")
         ctx = _make_context({"my_var": "resolved_value"})
-        assert R._resolve_substitution(lc, ctx) == "resolved_value"
+        assert ctx.perform_substitution(lc) == "resolved_value"
 
     def test_unresolved_falls_back_to_portable(self):
         lc = R._LaunchConfiguration("missing")
         ctx = _make_context({})
-        assert R._resolve_substitution(lc, ctx) == "$(var missing)"
+        assert ctx.perform_substitution(lc) == "$(var missing)"
 
     def test_plain_string_passthrough(self):
-        assert R._resolve_substitution("hello", None) == "hello"
+        ctx = _make_context({})
+        assert ctx.perform_substitution("hello") == "hello"
 
-    def test_none_returns_none(self):
-        assert R._resolve_substitution(None, None) is None
+    def test_none_returns_empty(self):
+        ctx = _make_context({})
+        assert ctx.perform_substitution(None) == ""
 
-    def test_list_of_substitutions(self):
+    def test_perform_substitutions_list(self):
+        from launch_plus.entities.utilities import perform_substitutions
+
         parts = [
             R._LaunchConfiguration("prefix"),
-            "_",
             R._LaunchConfiguration("suffix"),
         ]
         ctx = _make_context({"prefix": "foo", "suffix": "bar"})
-        assert R._resolve_substitution(parts, ctx) == "foo_bar"
+        assert perform_substitutions(ctx, parts) == "foobar"
 
-    def test_list_with_unresolved_element(self):
+    def test_perform_substitutions_with_unresolved(self):
+        from launch_plus.entities.utilities import perform_substitutions
+
         parts = [
             R._LaunchConfiguration("resolved_var"),
-            "/",
             R._LaunchConfiguration("unresolved_var"),
         ]
         ctx = _make_context({"resolved_var": "abc"})
-        # Unresolved element returns portable fallback
-        assert R._resolve_substitution(parts, ctx) == "abc/$(var unresolved_var)"
+        assert perform_substitutions(ctx, parts) == "abc$(var unresolved_var)"
 
     def test_ex_returns_not_fallback_when_resolved(self):
         lc = R._LaunchConfiguration("my_var")
         ctx = _make_context({"my_var": "resolved_value"})
-        value, is_fallback = R._resolve_substitution_ex(lc, ctx)
+        value, is_fallback = ctx.perform_substitution_ex(lc)
         assert value == "resolved_value"
         assert is_fallback is False
 
-    def test_ex_returns_portable_when_unresolved(self):
-        lc = R._LaunchConfiguration("missing")
-        ctx = _make_context({})
-        value, is_fallback = R._resolve_substitution_ex(lc, ctx)
-        assert value == "$(var missing)"
-        # perform() returns a string (not None), so is_fallback is False
-        assert is_fallback is False
-
-    def test_ex_list_with_unresolved_element(self):
-        parts = [R._LaunchConfiguration("a"), "_", R._LaunchConfiguration("b")]
-        ctx = _make_context({"a": "resolved"})
-        value, is_fallback = R._resolve_substitution_ex(parts, ctx)
-        assert value == "resolved_$(var b)"
-        assert is_fallback is False
-
     def test_ex_list_not_fallback_when_all_resolved(self):
-        parts = [R._LaunchConfiguration("a"), "_", R._LaunchConfiguration("b")]
+        parts = [R._LaunchConfiguration("a"), R._LaunchConfiguration("b")]
         ctx = _make_context({"a": "foo", "b": "bar"})
-        value, is_fallback = R._resolve_substitution_ex(parts, ctx)
-        assert value == "foo_bar"
+        value, is_fallback = ctx.perform_substitution_ex(parts)
+        assert value == "foobar"
         assert is_fallback is False
-
-    def test_ex_plain_string_not_fallback(self):
-        value, is_fallback = R._resolve_substitution_ex("hello", None)
-        assert value == "hello"
-        assert is_fallback is False
-
-    def test_ex_tuple_resolves_same_as_list(self):
-        parts = (R._LaunchConfiguration("a"), "_", R._LaunchConfiguration("b"))
-        ctx = _make_context({"a": "foo", "b": "bar"})
-        value, is_fallback = R._resolve_substitution_ex(parts, ctx)
-        assert value == "foo_bar"
-        assert is_fallback is False
-
-    def test_ex_tuple_with_unresolved(self):
-        parts = (R._LaunchConfiguration("a"), "_suffix")
-        ctx = _make_context({})
-        value, is_fallback = R._resolve_substitution_ex(parts, ctx)
-        assert value == "$(var a)_suffix"
-        assert is_fallback is False
-
-    def test_ex_list_no_context(self):
-        """When context is None, substitutions fall back to str(sub)."""
-        parts = [R._LaunchConfiguration("x"), "_literal"]
-        value, is_fallback = R._resolve_substitution_ex(parts, None)
-        assert value == "x_literal"
-        assert is_fallback is True
 
 
 # ─── Node deferred resolution ────────────────────────────────────────────────

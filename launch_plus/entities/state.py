@@ -87,9 +87,11 @@ class ResolverState:
         if not pkg:
             return
         # Skip unresolved substitution objects (single or list)
-        if hasattr(pkg, "perform"):
+        from launch_plus.entities.substitution import Substitution
+
+        if isinstance(pkg, Substitution):
             return
-        if isinstance(pkg, (list, tuple)) and any(hasattr(item, "perform") for item in pkg):
+        if isinstance(pkg, (list, tuple)) and any(isinstance(i, Substitution) for i in pkg):
             return
         pkg = str(pkg)
         if pkg and not pkg.startswith("$(") and pkg not in self.tracked["packages"]:

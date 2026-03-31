@@ -55,6 +55,7 @@ from launch_plus.entities.actions.param import (
 )
 from launch_plus.entities.helpers import _to_str
 from launch_plus.entities.state import _StubLaunchContext
+from launch_plus.entities.substitution import Substitution
 from launch_plus.entities.substitutions.find_pkg_share import _TrackedFindPackageShare
 from launch_plus.entities.substitutions.launch_config import _LaunchConfiguration
 from launch_plus.entities.substitutions.path_join import _TrackedPathJoinSubstitution
@@ -242,7 +243,7 @@ def _build_patched_launch_conditions():
 
         def evaluate(self, context):
             try:
-                if hasattr(self._condition, "perform"):
+                if isinstance(self._condition, Substitution):
                     val = str(self._condition.perform(context)).lower()
                     return val in ("true", "1", "yes", "on")
                 if self._condition is None:
@@ -309,7 +310,7 @@ def _build_patched_launch_launch_description_sources():
                 return None
             parts = []
             for sub in self._location_subs:
-                if hasattr(sub, "perform"):
+                if isinstance(sub, Substitution):
                     try:
                         result = sub.perform(context)
                         parts.append(str(result) if result is not None else str(sub))

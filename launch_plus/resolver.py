@@ -140,8 +140,6 @@ from launch_plus.entities.helpers import (  # noqa: E402, F401
     _parse_portable_path,
     _portable_display,  # noqa: F401 — re-exported
     _read_and_expand_param_file,
-    _resolve_substitution,  # noqa: F401 — re-exported for tests
-    _resolve_substitution_ex,  # noqa: F401 — re-exported for tests
     _ros2_namespace_join,
     _to_str,  # noqa: F401 — re-exported
     resolve_substitutions,

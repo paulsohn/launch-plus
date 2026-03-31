@@ -52,12 +52,14 @@ def _is_substitution(value):
     list-of-substitutions (``SomeSubstitutionsType`` in ROS 2), where any
     element may be a substitution object.
     """
+    from launch_plus.entities.substitution import Substitution
+
     if value is None or isinstance(value, str):
         return False
-    if hasattr(value, "perform"):
+    if isinstance(value, Substitution):
         return True
     if isinstance(value, (list, tuple)):
-        return any(hasattr(item, "perform") for item in value)
+        return any(isinstance(item, Substitution) for item in value)
     return False
 
 
@@ -116,72 +118,19 @@ def _to_str(value: object, context: Any = None) -> str | None:
 
     Every non-``None`` return value is guaranteed to be ``str``.
     """
+    from launch_plus.entities.substitution import Substitution
+
     if value is None:
         return None
     if isinstance(value, str):
         return value
-    if hasattr(value, "perform"):
+    if isinstance(value, Substitution):
         try:
             res = value.perform(context)
             return str(res) if res is not None else None
         except Exception:
             return str(value)
     return str(value)
-
-
-def _resolve_substitution(sub: object, context: Any) -> str | None:
-    """Resolve a substitution, list-of-substitutions, or plain string to str."""
-    value, _fallback = _resolve_substitution_ex(sub, context)
-    return value
-
-
-def _resolve_substitution_ex(sub: object, context: Any) -> tuple[str | None, bool]:
-    """Resolve a substitution and report whether the result is a fallback.
-
-    Returns ``(resolved_str_or_None, is_fallback)`` where *is_fallback* is
-    ``True`` when ``perform()`` returned ``None`` or raised and the display
-    name was used instead.  Callers that need to distinguish "really resolved"
-    from "fell back to variable name" (e.g. package tracking) should use this.
-    """
-    if sub is None:
-        return None, False
-    if isinstance(sub, str):
-        # Plain strings from Python launch code are already resolved (they come from
-        # Python expressions, not unresolved XML/YAML text).  Do NOT call
-        # _resolve_ros_substitutions here — that would eagerly expand portable
-        # $(find-pkg-share ...) paths back to machine-specific filesystem paths.
-        return sub, False
-    if isinstance(sub, (list, tuple)):
-        parts = []
-        any_fallback = False
-        for s in sub:
-            if hasattr(s, "perform"):
-                if context is not None:
-                    try:
-                        result = s.perform(context)
-                        if result is not None:
-                            parts.append(str(result))
-                        else:
-                            parts.append(str(s))
-                            any_fallback = True
-                    except Exception:
-                        parts.append(str(s))
-                        any_fallback = True
-                else:
-                    parts.append(str(s))
-                    any_fallback = True
-            else:
-                parts.append(str(s))
-        return "".join(parts), any_fallback
-    if context is not None and hasattr(sub, "perform"):
-        try:
-            result = sub.perform(context)
-            if result is None:
-                return str(sub), True  # unresolved — use display name
-            return str(result), False
-        except Exception:
-            return str(sub), True
-    return str(sub), True
 
 
 # ─── Substitution Engine (for XML/YAML resolution) ───────────────────────────
@@ -224,44 +173,17 @@ def resolve_substitutions(
 
 
 def resolve_value(value: Any, ctx: _SubstitutionContext | None = None) -> str | None:
-    """Resolve a value to a string, handling all input types uniformly.
+    """Resolve a value to a string using context.perform_substitution().
 
-    Supports:
-    - ``None`` → ``None``
-    - ``str`` → returned as-is
-    - ``list[Substitution]`` (from XML ``parse_substitution()``) → resolved via tokens
-    - object with ``.perform()`` (Python shim substitution) → ``sub.perform(ctx)``
-    - anything else → ``str(value)``
+    Supports: None, str, list[Substitution], single Substitution, anything else.
     """
     if value is None:
         return None
     if isinstance(value, str):
         return value
-    if isinstance(value, list):
-        # list[Substitution] from XML parse, or mixed list from Python shim
-        if not value:
-            return ""
-        if ctx is not None and all(hasattr(t, "perform") for t in value):
-            return resolve_substitutions_from_tokens(value, ctx)
-        # Mixed list: resolve each element individually
-        parts = []
-        for t in value:
-            if hasattr(t, "perform") and ctx is not None:
-                try:
-                    result = t.perform(ctx)
-                    parts.append(str(result) if result is not None else str(t))
-                except Exception:
-                    parts.append(str(t))
-            else:
-                parts.append(str(t))
-        return "".join(parts)
-    if hasattr(value, "perform"):
-        # Single substitution object (Python shim path)
-        try:
-            result = value.perform(ctx)
-            return str(result) if result is not None else None
-        except Exception:
-            return str(value)
+    if ctx is not None:
+        result = ctx.perform_substitution(value)
+        return result if result else None
     return str(value)
 
 

@@ -12,6 +12,7 @@ from launch_plus.entities.helpers import (
     _is_substitution,
     _read_and_expand_param_file,
 )
+from launch_plus.entities.substitution import Substitution
 
 # ─── Node detail resolution helpers ──────────────────────────────────────────
 
@@ -70,7 +71,7 @@ def _resolve_node_details(state, node, context):
             # Deferred resolution: try again with live context if not resolved eagerly
             if path is None and hasattr(p, "_raw_param_file") and p._raw_param_file is not None:
                 raw = p._raw_param_file
-                if hasattr(raw, "perform"):
+                if isinstance(raw, Substitution):
                     try:
                         result = raw.perform(context)
                         if result is not None:
@@ -170,7 +171,7 @@ def _resolve_composable_plugins(state, descs, context):
                 # Deferred resolution: try again with live context if not resolved eagerly
                 if path is None and hasattr(p, "_raw_param_file") and p._raw_param_file is not None:
                     raw = p._raw_param_file
-                    if hasattr(raw, "perform"):
+                    if isinstance(raw, Substitution):
                         try:
                             result = raw.perform(context)
                             if result is not None:

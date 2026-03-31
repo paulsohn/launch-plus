@@ -13,6 +13,7 @@ from launch_plus.entities.helpers import (
     _parse_portable_path,
 )
 from launch_plus.entities.parsing import _ActionParser
+from launch_plus.entities.substitution import Substitution
 from launch_plus.parsers.entity import Entity
 
 logger = logging.getLogger("launch_plus")
@@ -139,7 +140,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             if hasattr(src, "_resolve_location"):
                 # Our deferred source — resolve with real context
                 self._path = src._resolve_location(context)
-            elif hasattr(src, "perform"):
+            elif isinstance(src, Substitution):
                 try:
                     self._path = src.perform(context)
                 except Exception as e:
@@ -190,7 +191,7 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
             if isinstance(v, list):
                 parts = []
                 for sub in v:
-                    if hasattr(sub, "perform"):
+                    if isinstance(sub, Substitution):
                         try:
                             result = sub.perform(context)
                             parts.append(str(result) if result is not None else str(sub))
@@ -199,7 +200,7 @@ def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
                     else:
                         parts.append(str(sub))
                 v_str = "".join(parts)
-            elif hasattr(v, "perform"):
+            elif isinstance(v, Substitution):
                 try:
                     result = v.perform(context)
                     v_str = str(result) if result is not None else str(v)

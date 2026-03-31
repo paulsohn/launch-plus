@@ -5,6 +5,7 @@ from __future__ import annotations
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
+from launch_plus.entities.substitution import Substitution
 from launch_plus.parsers.entity import Entity
 
 
@@ -92,7 +93,7 @@ class _TrackedExecutable(_TrackedAction):
         parts = []
         for part in self._cmd:
             raw_part = part
-            if hasattr(part, "perform") and context is not None:
+            if isinstance(part, Substitution) and context is not None:
                 try:
                     result = part.perform(context)
                     part = result if result is not None else raw_part
@@ -101,7 +102,7 @@ class _TrackedExecutable(_TrackedAction):
             parts.append(str(part))
         cmd_str = " ".join(parts)
         name = self._name
-        if hasattr(name, "perform") and context is not None:
+        if isinstance(name, Substitution) and context is not None:
             try:
                 name = name.perform(context)
             except Exception:

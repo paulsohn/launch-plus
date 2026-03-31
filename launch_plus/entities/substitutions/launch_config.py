@@ -30,13 +30,13 @@ class _DeferredDefault:
     def resolve(self, context):
         """Resolve the deferred substitutions to a string."""
         dv = self.default_value
-        if hasattr(dv, "perform"):
+        if isinstance(dv, Substitution):
             result = dv.perform(context)
             return str(result) if result is not None else str(dv)
         if isinstance(dv, list):
             parts = []
             for sub in dv:
-                if hasattr(sub, "perform"):
+                if isinstance(sub, Substitution):
                     result = sub.perform(context)
                     parts.append(str(result) if result is not None else str(sub))
                 else:
@@ -80,7 +80,7 @@ class _LaunchConfiguration(Substitution):
             # list[Substitution] from XML parse — resolve tokens
             parts = []
             for t in name:
-                if hasattr(t, "perform"):
+                if isinstance(t, Substitution):
                     result = t.perform(context)
                     parts.append(str(result) if result is not None else str(t))
                 else:

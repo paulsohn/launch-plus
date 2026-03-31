@@ -19,7 +19,6 @@ import importlib.util
 import json
 import logging
 import os
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -67,251 +66,6 @@ except Exception:
 # Use $ROS_DISTRO env var so this works across distro versions (jazzy, rolling, etc.)
 _ROS_DISTRO = os.environ.get("ROS_DISTRO", "")
 _ROS_DISTRO_PREFIX = f"/opt/ros/{_ROS_DISTRO}" if _ROS_DISTRO else ""
-
-
-def _parse_rosdep_resolve(stdout: str) -> list[str]:
-    """Parse ``rosdep resolve`` stdout into a list of apt package names.
-
-    Output format::
-
-        #apt
-        ros-humble-ublox-gps
-
-    or with multiple packages on one line::
-
-        #apt
-        libnl-3-dev libnl-genl-3-dev
-
-    Only ``#apt`` packages are returned; other installers (``#pip``, ``#brew``)
-    are ignored.
-    """
-    apt_pkgs: list[str] = []
-    installer = ""
-    for line in stdout.strip().splitlines():
-        if line.startswith("#"):
-            installer = line.lstrip("#").strip()
-        elif installer == "apt" and line.strip():
-            apt_pkgs.extend(line.strip().split())
-    return apt_pkgs
-
-
-def _try_rosdep_install(state, package: str) -> bool:
-    """Resolve a rosdep key to system packages and install them.
-
-    Uses ``rosdep resolve`` + ``apt-get install`` instead of
-    ``rosdep install`` which treats arguments as ROS package names and
-    fails on plain keys.
-    """
-    if package in state.rosdep_attempted:
-        return False
-    state.rosdep_attempted.add(package)
-    ros_distro = os.environ.get("ROS_DISTRO", "")
-    if not ros_distro:
-        return False
-    try:
-        # Step 1: rosdep resolve → find apt package name.
-        resolve = subprocess.run(
-            ["rosdep", "resolve", "--rosdistro", ros_distro, package],
-            capture_output=True,
-            text=True,
-        )
-        if resolve.returncode != 0:
-            return False
-        apt_pkgs = _parse_rosdep_resolve(resolve.stdout)
-        if not apt_pkgs:
-            return False
-        # Step 2: apt-get install.
-        install = subprocess.run(
-            ["sudo", "-n", "apt-get", "install", "-y", "--no-install-recommends", *apt_pkgs],
-            capture_output=True,
-            text=True,
-        )
-        return install.returncode == 0
-    except Exception:
-        return False
-
-
-def _ensure_fetched(state, package: str) -> bool:
-    """Ensure a lockfile package is fully fetched (has package.xml on disk).
-
-    Performs inline git sparse-checkout to fetch the package directory if needed.
-    Updates _state.package_shares with the on-disk path after fetching.
-
-    Returns True if the package is available after this call.
-    Returns False if the package is not in the lockfile or fetching failed.
-    """
-    if package in state.fetched_packages:
-        return True
-
-    pkg_info = state.lockfile_data.get(package)
-    if not pkg_info or not state.fetch_dir:
-        return False
-
-    repo_workspace_path = pkg_info["repo"]
-    pkg_path_in_repo = pkg_info["path"]
-    repo_url = pkg_info["url"]
-    repo_sha = pkg_info["version"]
-
-    repo_dir = os.path.join(state.fetch_dir, repo_workspace_path)
-    pkg_dir = os.path.join(repo_dir, pkg_path_in_repo)
-
-    # Check if already fully fetched (package.xml present).
-    if os.path.isfile(os.path.join(pkg_dir, "package.xml")):
-        state.fetched_packages.add(package)
-        state.package_shares[package] = pkg_dir
-        return True
-
-    # Need to fetch via git sparse-checkout.
-    try:
-        if not os.path.isdir(os.path.join(repo_dir, ".git")):
-            # Repo not cloned yet — sparse clone.
-            os.makedirs(repo_dir, exist_ok=True)
-            # Normalize sparse path: "." means repo root → use "/**"
-            sparse_path = "/**" if pkg_path_in_repo in (".", "") else pkg_path_in_repo
-            subprocess.run(
-                [
-                    "git",
-                    "clone",
-                    "--filter=blob:none",
-                    "--sparse",
-                    "--single-branch",
-                    "--depth=1",
-                    repo_url,
-                    repo_dir,
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            subprocess.run(
-                ["git", "sparse-checkout", "set", "--no-cone", sparse_path],
-                cwd=repo_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            subprocess.run(
-                ["git", "checkout", repo_sha],
-                cwd=repo_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        else:
-            # Repo exists — add to sparse-checkout.
-            sparse_path = "/**" if pkg_path_in_repo in (".", "") else pkg_path_in_repo
-            subprocess.run(
-                ["git", "sparse-checkout", "add", sparse_path],
-                cwd=repo_dir,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-
-        # Verify fetch succeeded.
-        if os.path.isfile(os.path.join(pkg_dir, "package.xml")):
-            state.fetched_packages.add(package)
-            state.package_shares[package] = pkg_dir
-            return True
-        else:
-            logger.warning("fetched package '%s' but package.xml not found at %s", package, pkg_dir)
-            return False
-
-    except subprocess.CalledProcessError as e:
-        logger.warning("git fetch failed for package '%s': %s", package, e.stderr or e)
-        return False
-    except Exception as e:
-        logger.warning("failed to fetch package '%s': %s", package, e)
-        return False
-
-
-# ─── Portable path support ────────────────────────────────────────────────────
-#
-# A "portable path" is a string in $(find-pkg-share <pkg>)/... format.  It is
-# the canonical path representation used internally by launch-plus in all modes.
-# Actual filesystem resolution happens at:
-#   1. Include expansion (resolver reads the included file inline).
-#   2. File access inside OpaqueFunction bodies (via _stub_open / os.path stubs).
-
-from launch_plus.entities.helpers import (  # noqa: E402
-    _current_source_key,  # noqa: F401 — re-exported
-    _extract_pkg_and_share_path,
-    _is_substitution,  # noqa: F401 — re-exported
-    _parse_portable_path,
-    _portable_display,  # noqa: F401 — re-exported
-    _record_declared_arg,  # noqa: F401 — re-exported
-    _resolve_substitution,  # noqa: F401 — re-exported
-    _resolve_substitution_ex,  # noqa: F401 — re-exported
-    _to_str,  # noqa: F401 — re-exported
-    _track_event_handler,  # noqa: F401 — re-exported
-    _track_node,  # noqa: F401 — re-exported
-    _track_package,  # noqa: F401 — re-exported
-    _track_param_file,  # noqa: F401 — re-exported
-)
-
-
-def _resolve_pkg_share(state, package: str) -> str:
-    """Resolve a package share path.
-
-    Preview mode (lockfile workflow):
-      Lockfile packages resolve from the workspace source tree.  If the source
-      directory is not yet fully fetched (no package.xml), _ensure_fetched() is
-      called to fetch it inline.
-
-    Non-preview mode (postbuild):
-      Only AMENT_PREFIX_PATH (installed artifacts) is used.  Source paths are
-      never returned — if a package is not installed, the portable fallback is
-      returned.
-
-    Non-lockfile packages (system / rosdep) are resolved via AMENT_PREFIX_PATH
-    in both modes.
-    """
-    # 1. state.package_shares lookup.
-    #    Preview: contains workspace source paths.
-    #    Postbuild: contains install paths from AMENT_PREFIX_PATH.
-    if package in state.package_shares:
-        pkg_path: str = state.package_shares[package]
-        # In preview mode, lockfile packages may need full fetch.
-        if (
-            state.preview_mode
-            and state.lockfile_data
-            and package in state.lockfile_data
-            and not os.path.isfile(os.path.join(pkg_path, "package.xml"))
-        ):
-            if _ensure_fetched(state, package):
-                return str(state.package_shares[package])
-            logger.error("failed to fetch package '%s' from lockfile", package)
-            return f"$(find-pkg-share {package})"
-        return pkg_path
-    # 2. Lockfile package not yet in state.package_shares — fetch (preview only).
-    if state.preview_mode and state.lockfile_data and package in state.lockfile_data:
-        if _ensure_fetched(state, package):
-            return str(state.package_shares[package])
-        logger.error("failed to fetch package '%s' from lockfile", package)
-        return f"$(find-pkg-share {package})"
-    # 3. Non-lockfile packages (system / rosdep): use AMENT_PREFIX_PATH.
-    if _real_get_package_share_directory is not None:
-        try:
-            return str(_real_get_package_share_directory(package))
-        except Exception:
-            pass  # Fall through to rosdep or portable fallback.
-    # 4. Try rosdep install if enabled.
-    if (
-        state.rosdep_fallback
-        and _try_rosdep_install(state, package)
-        and _real_get_package_share_directory is not None
-    ):
-        try:
-            return str(_real_get_package_share_directory(package))
-        except Exception:
-            pass
-    # 5. Fallback.
-    if state.preview_mode:
-        # Preview: return portable syntax — downstream open() will hit the
-        # FileNotFoundError stub which emits a warning.
-        return f"$(find-pkg-share {package})"
-    # Postbuild: package not installed — this is an error.
-    raise LookupError(f"package '{package}' not found in AMENT_PREFIX_PATH")
 
 
 # ─── XML/YAML Launch File Parser ──────────────────────────────────────────────
@@ -380,9 +134,16 @@ from launch_plus.entities.actions.node import (  # noqa: E402, F401
 from launch_plus.entities.helpers import (  # noqa: E402, F401
     _effective_namespace,
     _evaluate_condition,
+    _extract_pkg_and_share_path,
+    _is_substitution,  # noqa: F401 — re-exported for tests
     _is_truthy,
+    _parse_portable_path,
+    _portable_display,  # noqa: F401 — re-exported
     _read_and_expand_param_file,
+    _resolve_substitution,  # noqa: F401 — re-exported for tests
+    _resolve_substitution_ex,  # noqa: F401 — re-exported for tests
     _ros2_namespace_join,
+    _to_str,  # noqa: F401 — re-exported
     resolve_substitutions,
     resolve_substitutions_from_tokens,
     resolve_value,

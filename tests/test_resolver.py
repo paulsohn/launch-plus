@@ -7,6 +7,7 @@ import tempfile
 import textwrap
 
 from launch_plus import resolver as R
+from launch_plus.entities.state import _parse_rosdep_resolve
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -92,28 +93,28 @@ class TestIsSubstitution:
 
 class TestTrackPackage:
     def test_tracks_plain_string(self):
-        R._track_package(R.get_state(), "my_pkg")
+        R.get_state().track_package("my_pkg")
         assert "my_pkg" in R.get_state().tracked["packages"]
 
     def test_skips_substitution_object(self):
         lc = R._LaunchConfiguration("container_pkg")
-        R._track_package(R.get_state(), lc)
+        R.get_state().track_package(lc)
         assert "container_pkg" not in R.get_state().tracked["packages"]
         assert len(R.get_state().tracked["packages"]) == 0
 
     def test_skips_empty_and_none(self):
-        R._track_package(R.get_state(), None)
-        R._track_package(R.get_state(), "")
+        R.get_state().track_package(None)
+        R.get_state().track_package("")
         assert len(R.get_state().tracked["packages"]) == 0
 
     def test_deduplicates(self):
-        R._track_package(R.get_state(), "pkg_a")
-        R._track_package(R.get_state(), "pkg_a")
+        R.get_state().track_package("pkg_a")
+        R.get_state().track_package("pkg_a")
         assert R.get_state().tracked["packages"].count("pkg_a") == 1
 
     def test_skips_list_of_substitutions(self):
         parts = [R._LaunchConfiguration("pkg_var"), "_suffix"]
-        R._track_package(R.get_state(), parts)
+        R.get_state().track_package(parts)
         assert len(R.get_state().tracked["packages"]) == 0
 
 
@@ -2308,24 +2309,24 @@ class TestResolvePkgShare:
     def test_preview_returns_source_path_from_package_shares(self):
         R.get_state().preview_mode = True
         R.get_state().package_shares["my_pkg"] = "/ws/src/my_pkg"
-        assert R._resolve_pkg_share(R.get_state(), "my_pkg") == "/ws/src/my_pkg"
+        assert R.get_state().resolve_pkg_share("my_pkg") == "/ws/src/my_pkg"
 
     def test_preview_unknown_pkg_returns_portable(self):
         R.get_state().preview_mode = True
-        result = R._resolve_pkg_share(R.get_state(), "unknown_pkg")
+        result = R.get_state().resolve_pkg_share("unknown_pkg")
         assert result == "$(find-pkg-share unknown_pkg)"
 
     def test_postbuild_returns_install_path_from_package_shares(self):
         R.get_state().preview_mode = False
         R.get_state().package_shares["my_pkg"] = "/ws/install/my_pkg/share/my_pkg"
-        assert R._resolve_pkg_share(R.get_state(), "my_pkg") == "/ws/install/my_pkg/share/my_pkg"
+        assert R.get_state().resolve_pkg_share("my_pkg") == "/ws/install/my_pkg/share/my_pkg"
 
     def test_postbuild_unknown_pkg_raises(self):
         R.get_state().preview_mode = False
         import pytest
 
         with pytest.raises(LookupError, match="not found in AMENT_PREFIX_PATH"):
-            R._resolve_pkg_share(R.get_state(), "unknown_pkg")
+            R.get_state().resolve_pkg_share("unknown_pkg")
 
     def test_postbuild_skips_lockfile_fetch(self):
         """In postbuild mode, lockfile packages not in _package_shares are not fetched."""
@@ -2342,7 +2343,7 @@ class TestResolvePkgShare:
 
         # Should raise, not attempt to fetch
         with pytest.raises(LookupError, match="not found in AMENT_PREFIX_PATH"):
-            R._resolve_pkg_share(R.get_state(), "lockfile_pkg")
+            R.get_state().resolve_pkg_share("lockfile_pkg")
 
 
 class TestTrackedFindPackageShare:
@@ -2375,39 +2376,39 @@ class TestTrackedFindPackageShare:
 class TestParseRosdepResolve:
     def test_single_key_apt(self):
         stdout = "#apt\nros-jazzy-rclcpp\n"
-        assert R._parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]
+        assert _parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]
 
     def test_multi_key(self):
         stdout = "#ROSDEP[rclcpp]\n#apt\nros-jazzy-rclcpp\n#ROSDEP[eigen]\n#apt\nlibeigen3-dev\n"
-        assert R._parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp", "libeigen3-dev"]
+        assert _parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp", "libeigen3-dev"]
 
     def test_multi_packages_per_key(self):
         stdout = "#ROSDEP[libnl-3-dev]\n#apt\nlibnl-3-dev libnl-genl-3-dev libnl-route-3-dev\n"
-        assert R._parse_rosdep_resolve(stdout) == [
+        assert _parse_rosdep_resolve(stdout) == [
             "libnl-3-dev",
             "libnl-genl-3-dev",
             "libnl-route-3-dev",
         ]
 
     def test_empty_output(self):
-        assert R._parse_rosdep_resolve("") == []
+        assert _parse_rosdep_resolve("") == []
 
     def test_unsupported_installer_ignored(self):
         stdout = "#brew\nhomebrew-pkg\n"
-        assert R._parse_rosdep_resolve(stdout) == []
+        assert _parse_rosdep_resolve(stdout) == []
 
     def test_mixed_installers_only_apt(self):
         stdout = (
             "#ROSDEP[rclcpp]\n#apt\nros-jazzy-rclcpp\n#ROSDEP[brew_only]\n#brew\nhomebrew-pkg\n"
         )
-        assert R._parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]
+        assert _parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]
 
     def test_pip_ignored(self):
         stdout = "#pip\nsome-pip-package\n"
-        assert R._parse_rosdep_resolve(stdout) == []
+        assert _parse_rosdep_resolve(stdout) == []
 
     def test_unresolved_key_no_installer_line(self):
         """A key with a #ROSDEP header but no #installer line is unresolved."""
         stdout = "#ROSDEP[rclcpp]\n#apt\nros-jazzy-rclcpp\n#ROSDEP[nonexistent_xyz]\n"
         # Only the resolved key's package is returned.
-        assert R._parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]
+        assert _parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]

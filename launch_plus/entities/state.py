@@ -86,8 +86,11 @@ class ResolverState:
         """Record a package reference for dependency tracking."""
         if not pkg:
             return
+        # Skip unresolved substitution objects (single or list)
         if hasattr(pkg, "perform"):
-            return  # Skip unresolved substitution objects
+            return
+        if isinstance(pkg, (list, tuple)) and any(hasattr(item, "perform") for item in pkg):
+            return
         pkg = str(pkg)
         if pkg and not pkg.startswith("$(") and pkg not in self.tracked["packages"]:
             self.tracked["packages"].append(pkg)

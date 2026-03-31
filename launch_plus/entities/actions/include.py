@@ -10,12 +10,10 @@ from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import (
     _extract_pkg_and_share_path,
+    _parse_portable_path,
 )
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
-from launch_plus.resolver import (
-    _parse_portable_path,
-)
 
 logger = logging.getLogger("launch_plus")
 

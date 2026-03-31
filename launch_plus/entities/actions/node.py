@@ -140,12 +140,15 @@ class Node(Action):
         )
 
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
-        self._idx = -1  # set lazily in execute()
+        self._idx = -1
         self._kind = kwargs.pop("_xml_kind", None) or "node"
         self._raw_package = package
         self._raw_executable = executable
         self._raw_name = name
         self._raw_namespace = kwargs.get("namespace")
+        # Unified param/remap/env: XML parse stores these via _xml_* kwargs,
+        # Python shim stores via parameters/remappings/env kwargs.
+        # Merge both into single fields.
         self._raw_parameters = list(kwargs.get("parameters") or [])
         self._raw_remappings = list(kwargs.get("remappings") or [])
         self._raw_env = kwargs.get("env") or []
@@ -153,10 +156,11 @@ class Node(Action):
         self._raw_arguments = kwargs.get("arguments")
         self._raw_respawn = kwargs.get("respawn")
         self._raw_respawn_delay = kwargs.get("respawn_delay")
+        # XML-parsed token structures (merged into the same fields for execute)
         self._xml_params = kwargs.get("_xml_params")
         self._xml_remaps = kwargs.get("_xml_remaps")
         self._xml_envs = kwargs.get("_xml_envs")
-        self._detailed = False
+        self._resolved = False
 
     def _ensure_tracked(self, state) -> int:
         """Create the tracked node entry on first call, return index."""
@@ -187,78 +191,142 @@ class Node(Action):
     def execute(self, context) -> list | None:
         state = context._state
         self._ensure_tracked(state)
-        if not self._detailed:
-            self._detailed = True
-            if self._xml_params is not None:
-                self._resolve_xml_details(context)
-            elif context is not None:
-                # _resolve_node_details is defined below in this file
-
-                _resolve_node_details(state, self, context)
+        if not self._resolved:
+            self._resolved = True
+            self._perform_substitutions(context)
         return None
 
-    def _resolve_xml_details(self, context) -> None:
-        """Resolve XML-parsed token structures into the tracked node entry."""
-        from launch_plus.entities.helpers import resolve_value
+    def _perform_substitutions(self, context) -> None:
+        """Resolve all substitutions into the tracked entry.
 
-        entry = context._state.tracked["nodes"][self._idx]
+        Unified path for both XML parse and Python shim — matching the
+        official ``Node._perform_substitutions(context)`` pattern.
+        """
+        from launch_plus.entities.helpers import (
+            _read_and_expand_param_file,
+            env_overrides,
+            resolve_value,
+        )
+        from launch_plus.entities.substitution import Substitution
+
+        state = context._state
+        entry = state.tracked["nodes"][self._idx]
+
         # Package / executable / name
-        pkg = resolve_value(self._raw_package, context) or ""
-        exe = resolve_value(self._raw_executable, context) or ""
-        name = resolve_value(self._raw_name, context) or ""
-        ns = resolve_value(self._raw_namespace, context)
+        pkg = context.perform_substitution(self._raw_package) or ""
+        exe = context.perform_substitution(self._raw_executable) or ""
+        name = context.perform_substitution(self._raw_name) or ""
+        ns = context.perform_substitution(self._raw_namespace) if self._raw_namespace else None
         if pkg:
-            context._state.track_package(pkg)
+            state.track_package(pkg)
         entry["package"] = pkg
         entry["executable"] = exe
         entry["name"] = name
         entry["explicit_namespace"] = ns
-        # Read from _launch_configurations (matching official Node._perform_substitutions)
+
+        # Namespace from launch_configurations (matching official)
         ros_ns = context._launch_configurations.get("ros_namespace")
         if ros_ns:
             entry["ros_namespace"] = ros_ns
-        # Params — from launch_configurations['global_params']
+
+        # Parameters: global first, then node-specific (matching official order)
         ctx_gp = context._launch_configurations.get("global_params", [])
         params: dict[str, str] = {k: str(v) for k, v in ctx_gp}
-        # Param files — from launch_configurations['global_param_files']
-        param_files: list[dict] = list(context._launch_configurations.get("global_param_files", []))
-        for p in self._xml_params:
+        global_pf = list(context._launch_configurations.get("global_param_files", []))
+        pf_list: list[dict] = list(global_pf)
+        seen_pf: set[str] = set()
+
+        # XML-parsed params
+        for p in self._xml_params or []:
             if "from" in p:
                 path = resolve_value(p["from"], context) or ""
-                context._state.track_param_file(path)
+                state.track_param_file(path)
                 pf_entry: dict = {"path": path}
-                if context._state.inline_params:
-                    from launch_plus.entities.helpers import _read_and_expand_param_file
-
+                if state.inline_params:
                     expanded = _read_and_expand_param_file(path, context)
                     if expanded is not None:
                         pf_entry["params"] = expanded
-                param_files.append(pf_entry)
+                pf_list.append(pf_entry)
             else:
                 k = resolve_value(p["name"], context) or ""
                 v = resolve_value(p["value"], context) or ""
                 params[k] = v
+
+        # Python shim params (ParameterFile objects and dicts)
+        for p in self._raw_parameters:
+            if hasattr(p, "_param_file"):
+                path = p._param_file
+                if path is None and hasattr(p, "_raw_param_file") and p._raw_param_file is not None:
+                    raw = p._raw_param_file
+                    if isinstance(raw, Substitution):
+                        try:
+                            result = raw.perform(context)
+                            if result is not None:
+                                path = str(result)
+                        except Exception:
+                            pass
+                    elif not isinstance(raw, str):
+                        path = str(raw)
+                if path:
+                    path = str(path)
+                    if path not in seen_pf:
+                        seen_pf.add(path)
+                        pf_entry = {"path": path}
+                        if state.inline_params:
+                            expanded = _read_and_expand_param_file(path, state=state)
+                            if expanded is not None:
+                                pf_entry["params"] = expanded
+                        pf_list.append(pf_entry)
+            elif isinstance(p, dict):
+                for k, v in p.items():
+                    resolved_v = context.perform_substitution(v)
+                    params[str(k)] = resolved_v if resolved_v is not None else ""
+
         entry["parameters"] = params
-        entry["param_files"] = param_files
-        # Remaps — from launch_configurations['ros_remaps']
-        remaps: list = list(context._launch_configurations.get("ros_remaps", []))
+        entry["param_files"] = pf_list
+
+        # Remappings: global first, then node-specific (matching official)
+        remaps = list(context._launch_configurations.get("ros_remaps", []))
         for src_tokens, dst_tokens in self._xml_remaps or []:
             remaps.append(
                 [resolve_value(src_tokens, context) or "", resolve_value(dst_tokens, context) or ""]
             )
+        for r in self._raw_remappings:
+            if isinstance(r, (tuple, list)) and len(r) == 2:
+                src = context.perform_substitution(r[0])
+                dst = context.perform_substitution(r[1])
+                remaps.append([src or str(r[0]), dst or str(r[1])])
         entry["remappings"] = remaps
-        # Env
-        from launch_plus.entities.helpers import env_overrides
 
+        # Environment
         env = env_overrides(context)
         for k_tokens, v_tokens in self._xml_envs or []:
             env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
+        raw_env = self._raw_env
+        if isinstance(raw_env, dict):
+            for k, v in raw_env.items():
+                env[context.perform_substitution(k) or str(k)] = (
+                    context.perform_substitution(v) or ""
+                )
+        elif isinstance(raw_env, (list, tuple)):
+            for item in raw_env:
+                if isinstance(item, (tuple, list)) and len(item) == 2:
+                    env[context.perform_substitution(item[0]) or str(item[0])] = (
+                        context.perform_substitution(item[1]) or ""
+                    )
         entry["env"] = env
+
         # Extra fields
-        entry["output"] = resolve_value(self._raw_output, context)
-        entry["args"] = resolve_value(self._raw_arguments, context)
-        entry["respawn"] = resolve_value(self._raw_respawn, context)
-        entry["respawn_delay"] = resolve_value(self._raw_respawn_delay, context)
+        for attr, key in (
+            ("_raw_output", "output"),
+            ("_raw_arguments", "args"),
+            ("_raw_respawn", "respawn"),
+            ("_raw_respawn_delay", "respawn_delay"),
+        ):
+            raw = getattr(self, attr, None)
+            if raw is not None:
+                resolved = context.perform_substitution(raw)
+                entry[key] = resolved if resolved else str(raw)
 
     def __repr__(self):
         return f"TrackedNode(package={self._raw_package!r})"

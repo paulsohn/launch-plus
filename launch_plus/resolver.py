@@ -623,7 +623,7 @@ def _resolve_file_impl(
                 content = f.read()
         except Exception as e:
             logger.error("cannot read %s: %s", launch_file_str, e)
-            return _tracked_to_parsed_launch_file(state.tracked)
+            return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
 
         if launch_file_str.endswith((".yaml", ".yml")):
             elements = parse_yaml_launch(content, launch_file_str)
@@ -634,24 +634,24 @@ def _resolve_file_impl(
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
         subst_ctx.preview_mode = state.preview_mode
         resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file_str])
-        return _tracked_to_parsed_launch_file(state.tracked)
+        return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
 
     # ── Python launch files ──────────────────────────────────────────────
     spec = importlib.util.spec_from_file_location("_target_launch", launch_file_str)
     if spec is None or spec.loader is None:
         logger.error("cannot load %s", launch_file_str)
-        return _tracked_to_parsed_launch_file(state.tracked)
+        return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
 
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
     except Exception as e:
         logger.error("Error loading launch file: %s", e)
-        return _tracked_to_parsed_launch_file(state.tracked)
+        return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
 
     if not hasattr(mod, "generate_launch_description"):
         logger.error("No generate_launch_description() function found")
-        return _tracked_to_parsed_launch_file(state.tracked)
+        return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
 
     # Inject persisted global params
     if "__global_params__" in args_dict:
@@ -670,7 +670,7 @@ def _resolve_file_impl(
         ld = mod.generate_launch_description()
     except Exception as e:
         logger.error("generate_launch_description() failed: %s", e)
-        return _tracked_to_parsed_launch_file(state.tracked)
+        return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
 
     entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
@@ -680,10 +680,12 @@ def _resolve_file_impl(
 
     _walk_actions(state, entities, ctx)
 
-    return _tracked_to_parsed_launch_file(state.tracked)
+    return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
 
 
-def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
+def _tracked_to_parsed_launch_file(
+    tracked: dict[str, Any], resolved_actions: list | None = None
+) -> Any:
     """Convert the internal _state.tracked dict to a ParsedLaunchFile."""
     from pathlib import Path as _Path
 
@@ -936,6 +938,7 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
         declared_arg_defaults=declared_arg_defaults,
         declared_args_by_file=declared_args_by_file,
         global_params=list(tracked.get("global_params", [])),
+        resolved_actions=resolved_actions or [],
     )
 
 

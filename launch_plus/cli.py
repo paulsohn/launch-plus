@@ -898,7 +898,7 @@ def _cmd_resolve(
     from launch_plus.fetcher import FetchOptions
     from launch_plus.log import DiagnosticCollector
     from launch_plus.orchestrator import resolve_launch_recursive
-    from launch_plus.renderer import render_resolved_xml
+    from launch_plus.renderer import render_resolved_xml, render_resolved_xml_from_actions
 
     parsed_lockfile = _read_lockfile(lockfile_path)
     fetch_path = Path(src_dir)
@@ -925,15 +925,26 @@ def _cmd_resolve(
 
     # Render XML to stdout
     if not suppress_xml:
-        xml = render_resolved_xml(
-            package,
-            launcher,
-            result.nodes,
-            include_args=result.include_args,
-            show_args=show_args,
-            initial_args=result.initial_args,
-            declared_args_by_file=result.declared_args_by_file,
-        )
+        if result.resolved_actions:
+            xml = render_resolved_xml_from_actions(
+                package,
+                launcher,
+                result.resolved_actions,
+                include_args=result.include_args,
+                show_args=show_args,
+                initial_args=result.initial_args,
+                declared_args_by_file=result.declared_args_by_file,
+            )
+        else:
+            xml = render_resolved_xml(
+                package,
+                launcher,
+                result.nodes,
+                include_args=result.include_args,
+                show_args=show_args,
+                initial_args=result.initial_args,
+                declared_args_by_file=result.declared_args_by_file,
+            )
         if preview:
             xml = "<!-- PREVIEW: resolved from source workspace, not install paths -->\n" + xml
         click.echo(xml)

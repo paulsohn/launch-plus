@@ -77,6 +77,7 @@ class ResolveResult:
     declared_args_by_file: dict[tuple[str, Path], dict[str, str]] = field(default_factory=dict)
     global_params: list[list] = field(default_factory=list)
     initial_args: dict[str, str] = field(default_factory=dict)
+    resolved_actions: list = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +166,12 @@ def _process_parsed_file(
             if node.source is None:
                 node.source = source
         result.nodes.append(node)
+
+    # Append resolved actions with include chain prefix
+    for action in parsed.resolved_actions:
+        if hasattr(action, "_include_chain"):
+            action._include_chain = list(current_chain) + list(action._include_chain)
+        result.resolved_actions.append(action)
 
     # Store declared args for --show-args
     root_key = (package, share_path)

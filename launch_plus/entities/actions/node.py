@@ -198,6 +198,8 @@ class Node(Action):
         if not self._resolved:
             self._resolved = True
             self._perform_substitutions(context)
+            self._include_chain = list(state.include_chain)
+            state.resolved_actions.append(self)
         return None
 
     def _perform_substitutions(self, context) -> None:
@@ -520,6 +522,8 @@ class ComposableNodeContainer(Action):
         if not self._resolved:
             self._resolved = True
             self._perform_substitutions(context)
+            self._include_chain = list(state.include_chain)
+            state.resolved_actions.append(self)
         return None
 
     def _perform_substitutions(self, context) -> None:
@@ -666,6 +670,8 @@ class LoadComposableNodes(Action):
         if not self._resolved:
             self._resolved = True
             self._perform_substitutions(context)
+            self._include_chain = list(state.include_chain)
+            state.resolved_actions.append(self)
         return None
 
     def _perform_substitutions(self, context) -> None:

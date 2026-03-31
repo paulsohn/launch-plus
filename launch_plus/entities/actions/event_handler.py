@@ -101,6 +101,8 @@ class EventHandler(Action):
                 "actions": eh_actions,
             },
         )
+        self._include_chain = list(context._state.include_chain)
+        context._state.resolved_actions.append(self)
         return None
 
     def serialize_resolved(self, indent: str = "  ") -> str | None:
@@ -183,6 +185,8 @@ class EmitEvent(Action):
                 ],
             },
         )
+        self._include_chain = list(context._state.include_chain)
+        context._state.resolved_actions.append(self)
         return None
 
     def serialize_resolved(self, indent: str = "  ") -> str | None:

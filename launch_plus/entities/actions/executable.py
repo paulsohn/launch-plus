@@ -140,6 +140,8 @@ class ExecuteProcess(Action):
         self._resolved_name = entry.get("name")
         self._resolved_env = env
         self._resolved = True
+        self._include_chain = list(state.include_chain)
+        state.resolved_actions.append(self)
         return None
 
     def serialize_resolved(self, indent: str = "  ") -> str | None:

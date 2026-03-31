@@ -25,7 +25,8 @@ class LogInfo(Action):
 
         msg = resolve_value(self._message, context) or ""
         self._resolved_message = msg
-        context._state.track_node(
+        state = context._state
+        state.track_node(
             {
                 "package": "",
                 "executable": "",
@@ -42,6 +43,8 @@ class LogInfo(Action):
                 "message": msg,
             },
         )
+        self._include_chain = list(state.include_chain)
+        state.resolved_actions.append(self)
         return None
 
     def serialize_resolved(self, indent: str = "  ") -> str | None:

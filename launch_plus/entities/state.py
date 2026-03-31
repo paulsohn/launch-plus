@@ -516,9 +516,11 @@ class LaunchContext:
     def perform_substitutions(self, subs: list) -> str:
         """Resolve a list of substitutions to a string.
 
-        Matches official ``perform_substitutions(context, subs)`` exactly.
+        Convenience wrapper around ``perform_substitutions(context, subs)``.
         """
-        return "".join([self.perform_substitution(sub) for sub in subs])
+        from launch_plus.entities.utilities import perform_substitutions
+
+        return perform_substitutions(self, subs)
 
     def perform_substitution(self, sub) -> str:
         """Resolve a single substitution to a string.

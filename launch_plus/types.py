@@ -213,9 +213,6 @@ class ResolvedNode:
     exec_name: str | None = None
     """Executable: process name."""
 
-    exec_shell: bool = False
-    """Executable: whether to use shell."""
-
     handler_kind: EventHandlerKind | None = None
     """EventHandler: kind of event handler."""
 

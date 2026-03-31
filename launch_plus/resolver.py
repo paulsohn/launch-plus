@@ -743,7 +743,6 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
         remap_to: str | None = None
         exec_cmd: str | None = None
         exec_name: str | None = None
-        exec_shell: bool = False
         handler_kind: _EventHandlerKind | None = None
         handler_target: str | None = None
         handler_target_node: str | None = None
@@ -772,7 +771,6 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
             kind_tag = _NodeKindTag.EXECUTABLE
             exec_cmd = n.get("cmd", "")
             exec_name = name if name else None
-            exec_shell = n.get("shell", False)
         elif kind_str == "event_handler":
             kind_tag = _NodeKindTag.EVENT_HANDLER
             hk_str = n.get("handler_kind", "")
@@ -835,7 +833,6 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
                 remap_to=remap_to,
                 exec_cmd=exec_cmd,
                 exec_name=exec_name,
-                exec_shell=exec_shell,
                 handler_kind=handler_kind,
                 handler_target=handler_target,
                 handler_target_node=handler_target_node,

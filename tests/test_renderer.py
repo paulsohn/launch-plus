@@ -247,13 +247,12 @@ def test_executable() -> None:
             kind=NodeKindTag.EXECUTABLE,
             exec_cmd="ros2 bag play /data/bag",
             exec_name="bag_player",
-            exec_shell=True,
         ),
     ]
 
     xml = render_resolved_xml("my_pkg", "top.launch.xml", nodes)
 
-    assert '<executable cmd="ros2 bag play /data/bag" name="bag_player" shell="true"/>' in xml
+    assert '<executable cmd="ros2 bag play /data/bag" name="bag_player"/>' in xml
 
 
 def test_lifecycle_node() -> None:

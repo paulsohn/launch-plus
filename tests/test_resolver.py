@@ -1583,12 +1583,11 @@ class TestResolveXmlElements:
         assert tracked["nodes"][0]["message"] == "Hello world"
 
     def test_executable(self):
-        xml = '<launch><executable cmd="echo hello" name="echo_cmd" shell="true"/></launch>'
+        xml = '<launch><executable cmd="echo hello" name="echo_cmd"/></launch>'
         _, tracked = _parse_and_walk(xml)
         assert len(tracked["nodes"]) == 1
         assert tracked["nodes"][0]["kind"] == "executable"
         assert tracked["nodes"][0]["cmd"] == "echo hello"
-        assert tracked["nodes"][0]["shell"] is True
 
     # ── Include (with file on disk) ──
 
@@ -1937,13 +1936,12 @@ class TestActionRegistry:
         assert len(lcn["plugins"]) == 1
 
     def test_executable(self):
-        xml = '<launch><executable cmd="echo hi" name="e" shell="true"/></launch>'
+        xml = '<launch><executable cmd="echo hi" name="e"/></launch>'
         tracked = _parse_to_tracked(xml)
         nodes = _tracked_nodes(tracked)
         exe = nodes[0]
         assert exe["kind"] == "executable"
         assert exe["cmd"] == "echo hi"
-        assert exe["shell"] in ("true", True)
 
     def test_set_parameter_merged_into_node(self):
         """SetParameter is consumed and merged into child nodes' parameters."""

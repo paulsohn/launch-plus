@@ -488,10 +488,7 @@ def render_resolved_xml(
             name_attr = ""
             if node.exec_name is not None:
                 name_attr = f' name="{_xml_escape(node.exec_name)}"'
-            shell = str(node.exec_shell).lower()
-            out.append(
-                f'{node_ind}<executable cmd="{_xml_escape(cmd)}"{name_attr} shell="{shell}"/>\n'
-            )
+            out.append(f'{node_ind}<executable cmd="{_xml_escape(cmd)}"{name_attr}/>\n')
         elif node.kind == NodeKindTag.LIFECYCLE_NODE:
             _render_lifecycle_node(node, node_ind, child_ind, stack_only_ns, out)
         elif node.kind == NodeKindTag.EVENT_HANDLER:

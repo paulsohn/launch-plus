@@ -1802,12 +1802,14 @@ class TestResolveXmlElements:
         assert R._is_truthy("true") is True
         assert R._is_truthy("True") is True
         assert R._is_truthy("1") is True
-        assert R._is_truthy("yes") is True
-        assert R._is_truthy("on") is True
         assert R._is_truthy("false") is False
         assert R._is_truthy("0") is False
-        assert R._is_truthy("no") is False
-        assert R._is_truthy("") is False
+        # Invalid values raise ValueError
+        import pytest
+
+        for invalid in ("yes", "on", "no", ""):
+            with pytest.raises(ValueError, match="invalid condition expression"):
+                R._is_truthy(invalid)
 
     # ── YAML walker (same function, different parser) ──
 

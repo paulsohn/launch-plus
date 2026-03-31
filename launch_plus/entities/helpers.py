@@ -419,8 +419,18 @@ def resolve_value(value: Any, ctx: _SubstitutionContext | None = None) -> str | 
 
 
 def _is_truthy(value: str) -> bool:
-    """Check if a resolved condition value is truthy (ROS 2 convention)."""
-    return value.strip().lower() in ("true", "1", "yes", "on")
+    """Check if a resolved condition value is truthy (ROS 2 convention).
+
+    Only ``"true"``/``"1"`` are truthy, ``"false"``/``"0"`` are falsy.
+    Raises ``ValueError`` on anything else, matching the official
+    ``InvalidConditionExpressionError`` behavior.
+    """
+    v = value.strip().lower()
+    if v in ("true", "1"):
+        return True
+    if v in ("false", "0"):
+        return False
+    raise ValueError(f"invalid condition expression: '{value}' (expected true/1/false/0)")
 
 
 def _evaluate_condition(
@@ -433,7 +443,11 @@ def _evaluate_condition(
     kind = condition["kind"]
     expr = condition["expr"]
     resolved = resolve_substitutions(expr, ctx)
-    truthy = _is_truthy(resolved)
+    try:
+        truthy = _is_truthy(resolved)
+    except ValueError as e:
+        logger.error("%s", e)
+        return False
     if kind == "If":
         return truthy
     # Unless

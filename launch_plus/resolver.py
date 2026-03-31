@@ -172,12 +172,12 @@ def _make_launch_context(args_dict):
     return ctx
 
 
-# ─── Node detail resolution (extracted to entities/node_resolution.py) ────────
-from launch_plus.entities.node_resolution import (  # noqa: E402, F401
-    _env_overrides,
+# ─── Node detail resolution (in entities/actions/node.py) ─────────────────────
+from launch_plus.entities.actions.node import (  # noqa: E402, F401
     _resolve_composable_plugins,
     _resolve_node_details,
 )
+from launch_plus.entities.helpers import env_overrides as _env_overrides  # noqa: E402, F401
 
 # ─── Inline Python include resolution ─────────────────────────────────────────
 

@@ -19,6 +19,20 @@ from launch_plus.entities.state import LaunchContext
 
 logger = logging.getLogger("launch_plus")
 
+
+def env_overrides(context: LaunchContext) -> dict[str, str]:
+    """Return env vars explicitly set via SetEnvironmentVariable (overrides only).
+
+    Compares ``context.environment`` against ``os.environ`` to extract only
+    the diff.  Used by node resolution to capture per-node env in output.
+    """
+    overrides = {}
+    for k, v in context.environment.items():
+        if k not in os.environ or os.environ[k] != v:
+            overrides[k] = v
+    return overrides
+
+
 if TYPE_CHECKING:
     from launch_plus.entities.substitution import Substitution as _SubstitutionType
 

@@ -126,9 +126,9 @@ class _TrackedExecutable(_TrackedAction):
         if ros_ns:
             entry["ros_namespace"] = ros_ns
         # Env
-        from launch_plus.entities.node_resolution import _env_overrides
+        from launch_plus.entities.helpers import env_overrides
 
-        env = _env_overrides(context)
+        env = env_overrides(context)
         for k_tokens, v_tokens in self._xml_envs or []:
             env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
         entry["env"] = env

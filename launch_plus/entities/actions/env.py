@@ -1,7 +1,6 @@
 """Action handlers for environment and configuration elements.
 
-Covers: <set_env>, <unset_env>, <push-ros-namespace>,
-<set_parameter>, <set_remap>.
+Covers: <set_env>, <unset_env>, <push-ros-namespace>, <set_remap>.
 """
 
 from __future__ import annotations
@@ -49,7 +48,7 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
             logger.error("SetEnvironmentVariable: resolved name is empty or None — skipping")
             return None
         value = resolve_value(self._value, context) or ""
-        context._state.env[name] = value
+        context.environment[name] = value
         return None
 
 
@@ -90,8 +89,8 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
                 name,
                 name,
             )
-        elif name in context._state.env:
-            del context._state.env[name]
+        elif name in context.environment:
+            del context.environment[name]
         else:
             logger.error("unset_env: environment variable '%s' is not set", name)
         return None
@@ -99,7 +98,11 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
 
 @expose_action("push-ros-namespace")
 class _TrackedPushRosNamespace(_TrackedAction):
-    """Tracks PushRosNamespace / <push-ros-namespace>."""
+    """Tracks PushRosNamespace / <push-ros-namespace>.
+
+    Matching official: computes cumulative namespace and stores in
+    ``context.launch_configurations['ros_namespace']``.
+    """
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
@@ -116,17 +119,17 @@ class _TrackedPushRosNamespace(_TrackedAction):
 
         ns = resolve_value(self._namespace, context)
         if ns:
-            # Update _launch_configurations['ros_namespace'] (cumulative, matching official)
             prev = context._launch_configurations.get("ros_namespace")
             context._launch_configurations["ros_namespace"] = _ros2_namespace_join(prev, ns)
-            # Also keep state.namespace_stack for tracked output
-            context._state.namespace_stack.append(ns)
         return None
 
 
 @expose_action("set_remap")
 class _SetRemap(_TrackedAction):
-    """Tracks <set_remap> — records a global remap."""
+    """Tracks SetRemap / <set_remap>.
+
+    Matching official: appends to ``context.launch_configurations['ros_remaps']``.
+    """
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
@@ -143,5 +146,7 @@ class _SetRemap(_TrackedAction):
 
         src = resolve_value(self._src, context) or ""
         dst = resolve_value(self._dst, context) or ""
-        context._state.global_remaps.append((src, dst))
+        remaps = context._launch_configurations.get("ros_remaps", [])
+        remaps.append((src, dst))
+        context._launch_configurations["ros_remaps"] = remaps
         return None

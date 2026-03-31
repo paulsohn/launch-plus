@@ -471,7 +471,6 @@ def fetch(
 @click.option("-l", "--lockfile", default="manifest.lock.repos", help="Lockfile path")
 @click.option("--src", default="src", help="Source directory")
 @click.option("--report", is_flag=True, help="Print dependency report to stderr")
-@click.option("--allow-global-arg-cascade", is_flag=True)
 @click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--preview", is_flag=True, help="Resolve from source workspace")
 @click.option("--allow-including-unportable-path", is_flag=True)
@@ -491,7 +490,6 @@ def resolve(
     lockfile: str,
     src: str,
     report: bool,
-    allow_global_arg_cascade: bool,
     apply_launch_arg_defaults: bool,
     preview: bool,
     allow_including_unportable_path: bool,
@@ -510,7 +508,6 @@ def resolve(
     workspace_state = _parse_workspace_state(clean, dirty)
 
     workflow_options = ResolveWorkflowOptions(
-        global_arg_cascade=allow_global_arg_cascade,
         apply_arg_defaults=apply_launch_arg_defaults,
         preview=preview,
         allow_unportable_paths=allow_including_unportable_path,
@@ -547,7 +544,6 @@ def resolve(
 @click.argument("args", nargs=-1)
 @click.option("-l", "--lockfile", default="manifest.lock.repos", help="Lockfile path")
 @click.option("--src", default="src", help="Source directory")
-@click.option("--allow-global-arg-cascade", is_flag=True)
 @click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--preview", is_flag=True)
 @click.option("--allow-including-unportable-path", is_flag=True)
@@ -565,7 +561,6 @@ def check(
     args: tuple[str, ...],
     lockfile: str,
     src: str,
-    allow_global_arg_cascade: bool,
     apply_launch_arg_defaults: bool,
     preview: bool,
     allow_including_unportable_path: bool,
@@ -583,7 +578,6 @@ def check(
     workspace_state = _parse_workspace_state(clean, dirty)
 
     workflow_options = ResolveWorkflowOptions(
-        global_arg_cascade=allow_global_arg_cascade,
         apply_arg_defaults=apply_launch_arg_defaults,
         preview=preview,
         allow_unportable_paths=allow_including_unportable_path,
@@ -623,7 +617,6 @@ def check(
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
-@click.option("--allow-global-arg-cascade", is_flag=True)
 @click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--apply-opaque-file-access", is_flag=True)
 @click.option("--allow-including-unportable-path", is_flag=True)
@@ -644,7 +637,6 @@ def build(
     clean: bool,
     dirty: bool,
     shallow: bool,
-    allow_global_arg_cascade: bool,
     apply_launch_arg_defaults: bool,
     apply_opaque_file_access: bool,
     allow_including_unportable_path: bool,
@@ -662,7 +654,6 @@ def build(
     workspace_state = _parse_workspace_state(clean, dirty)
 
     workflow_options = ResolveWorkflowOptions(
-        global_arg_cascade=allow_global_arg_cascade,
         apply_arg_defaults=apply_launch_arg_defaults,
         preview=True,  # always resolve from source for build
         apply_opaque_file_access=apply_opaque_file_access,
@@ -790,7 +781,6 @@ def build_pkg(
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
-@click.option("--allow-global-arg-cascade", is_flag=True)
 @click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--apply-opaque-file-access", is_flag=True)
 @click.option("--allow-including-unportable-path", is_flag=True)
@@ -811,7 +801,6 @@ def test_cmd(
     clean: bool,
     dirty: bool,
     shallow: bool,
-    allow_global_arg_cascade: bool,
     apply_launch_arg_defaults: bool,
     apply_opaque_file_access: bool,
     allow_including_unportable_path: bool,
@@ -829,7 +818,6 @@ def test_cmd(
     workspace_state = _parse_workspace_state(clean, dirty)
 
     workflow_options = ResolveWorkflowOptions(
-        global_arg_cascade=allow_global_arg_cascade,
         apply_arg_defaults=apply_launch_arg_defaults,
         preview=True,
         apply_opaque_file_access=apply_opaque_file_access,
@@ -961,30 +949,19 @@ def _cmd_resolve(
 
         # Show hints for undefined variable errors
         hint_defaults = not workflow_options.apply_arg_defaults
-        hint_cascade = not workflow_options.global_arg_cascade
-        if any("undefined variable" in e for e in all_errors) and (hint_defaults or hint_cascade):
+        if any("undefined variable" in e for e in all_errors) and hint_defaults:
             click.echo(err=True)
             click.echo(
                 "  hint: possible causes for 'undefined variable' in the current mode:",
                 err=True,
             )
-            if hint_defaults:
-                click.echo(err=True)
-                click.echo("  · Arg default not applied (defaults disabled by default).", err=True)
-                click.echo("    → Provide the arg on the command line:  x:=value", err=True)
-                click.echo(
-                    '    → Or: --apply-launch-arg-defaults  (applies <arg default="...">)',
-                    err=True,
-                )
-            if hint_cascade:
-                click.echo(err=True)
-                click.echo("  · Arg set in a parent file but not explicitly forwarded.", err=True)
-                click.echo('    → child file:  add <arg name="x"/>', err=True)
-                click.echo('    → include tag: add <arg name="x" value="$(var x)"/>', err=True)
-                click.echo(
-                    "    → Or: --allow-global-arg-cascade  (inherits parent context)",
-                    err=True,
-                )
+            click.echo(err=True)
+            click.echo("  · Arg default not applied (defaults disabled by default).", err=True)
+            click.echo("    → Provide the arg on the command line:  x:=value", err=True)
+            click.echo(
+                '    → Or: --apply-launch-arg-defaults  (applies <arg default="...">)',
+                err=True,
+            )
             click.echo(err=True)
             click.echo(
                 "  Flags are intentionally verbose — prefer fixing the launch files.",

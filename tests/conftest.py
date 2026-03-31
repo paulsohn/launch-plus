@@ -30,6 +30,5 @@ def _reset_resolver_state():
     # Test defaults differ from production defaults:
     R.get_state().preview_mode = True
     R.get_state().apply_arg_defaults = True
-    R.get_state().global_arg_cascade = True
     yield
     # No teardown needed — next invocation resets again.

@@ -82,9 +82,8 @@ class _TrackedSetParameter(_TrackedAction):
                     value = float(value)
                 except (ValueError, TypeError):
                     pass
-        if context is not None and hasattr(context, "_launch_configurations"):
-            gp_list = context._launch_configurations.setdefault("global_params", [])
-            gp_list.append((name, value))
+        # Matching official SetParameter: write to launch_configurations['global_params']
+        gp_list = context._launch_configurations.setdefault("global_params", [])
+        gp_list.append((name, value))
         context._state.tracked["global_params"].append([name, value])
-        context._state.global_params.append((name, value))
         return None

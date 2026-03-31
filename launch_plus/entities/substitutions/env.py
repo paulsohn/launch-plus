@@ -42,8 +42,8 @@ class EnvSubstitution(Substitution):
         from launch_plus.resolver import resolve_substitutions_from_tokens
 
         name = resolve_substitutions_from_tokens(self.name, ctx)
-        # Check overrides → process env → default
-        value = ctx.env.get(name)
+        # Check context environment → process env → default
+        value = ctx.environment.get(name) if hasattr(ctx, "environment") else None
         if value is None:
             value = os.environ.get(name)
         if value is None and self.default is not None:

@@ -251,7 +251,7 @@ def _track_event_handler(state, eh_dict: dict) -> int:
     return _track_node(state, node_dict)
 
 
-def _track_include(state, path):
+def _track_include(state, path, *, ros_namespace=None):
     if not path:
         return
     path = str(path)
@@ -263,7 +263,7 @@ def _track_include(state, path):
             "package": dep[0],
             "share_path": dep[1],
             "path": path,
-            "namespace_stack": list(state.namespace_stack),
+            "ros_namespace": ros_namespace,
         }
         # Don't deduplicate: the same file may be included multiple times under
         # different <push-ros-namespace> contexts, and each entry carries a distinct

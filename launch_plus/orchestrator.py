@@ -39,9 +39,6 @@ logger = logging.getLogger(__name__)
 class ResolveWorkflowOptions:
     """Options controlling the resolution workflow."""
 
-    global_arg_cascade: bool = False
-    """Pass the full parent arg context to all included files."""
-
     apply_arg_defaults: bool = False
     """Apply ``default="..."`` values from ``<arg>`` elements."""
 

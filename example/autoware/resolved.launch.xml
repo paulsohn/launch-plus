@@ -590,7 +590,7 @@
       <!-- arg name="pointcloud_map_metadata_path" value="{map_path}/pointcloud_map_metadata.yaml" -->
       <!-- arg name="pointcloud_map_path" value="{map_path}/pointcloud_map.pcd" -->
       <!-- arg name="use_multithread" default="false" -->
-      <node_container pkg="rclcpp_components" exec="component_container" name="map_container" namespace="/map">
+      <node_container pkg="rclcpp_components" exec="component_container_mt" name="map_container" namespace="/map">
         <param name="front_overhang" value="1.0"/>
         <param name="left_overhang" value="0.128"/>
         <param name="max_steer_angle" value="0.7"/>
@@ -953,7 +953,7 @@
                 <param name="wheel_tread" value="1.64"/>
                 <param name="wheel_width" value="0.235"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
-                  <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
+                  <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLP16.yaml"/>
                   <param name="cloud_max_angle" value="60"/>
                   <param name="cloud_min_angle" value="300"/>
                   <param name="data_port" value="2369"/>
@@ -963,13 +963,13 @@
                   <param name="host_ip" value="192.168.1.10"/>
                   <param name="launch_hw" value="true"/>
                   <param name="max_range" value="5.0"/>
-                  <param name="min_range" value="0.5"/>
+                  <param name="min_range" value="0.4"/>
                   <param name="packet_mtu_size" value="1500"/>
                   <param name="return_mode" value="SingleStrongest"/>
                   <param name="rotation_speed" value="600"/>
                   <param name="scan_phase" value="180.0"/>
                   <param name="sensor_ip" value="192.168.1.202"/>
-                  <param name="sensor_model" value="VLS128"/>
+                  <param name="sensor_model" value="VLP16"/>
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="pointcloud_raw_ex"/>
@@ -1112,7 +1112,7 @@
                 <param name="wheel_tread" value="1.64"/>
                 <param name="wheel_width" value="0.235"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
-                  <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
+                  <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLP16.yaml"/>
                   <param name="cloud_max_angle" value="60"/>
                   <param name="cloud_min_angle" value="300"/>
                   <param name="data_port" value="2370"/>
@@ -1122,13 +1122,13 @@
                   <param name="host_ip" value="192.168.1.10"/>
                   <param name="launch_hw" value="true"/>
                   <param name="max_range" value="5.0"/>
-                  <param name="min_range" value="0.5"/>
+                  <param name="min_range" value="0.4"/>
                   <param name="packet_mtu_size" value="1500"/>
                   <param name="return_mode" value="SingleStrongest"/>
                   <param name="rotation_speed" value="600"/>
                   <param name="scan_phase" value="180.0"/>
                   <param name="sensor_ip" value="192.168.1.203"/>
-                  <param name="sensor_model" value="VLS128"/>
+                  <param name="sensor_model" value="VLP16"/>
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="pointcloud_raw_ex"/>
@@ -1271,7 +1271,7 @@
                 <param name="wheel_tread" value="1.64"/>
                 <param name="wheel_width" value="0.235"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node">
-                  <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLS128.yaml"/>
+                  <param name="calibration_file" value="$(find-pkg-share nebula_velodyne_decoders)/calibration/VLP16.yaml"/>
                   <param name="cloud_max_angle" value="60"/>
                   <param name="cloud_min_angle" value="300"/>
                   <param name="data_port" value="2371"/>
@@ -1281,13 +1281,13 @@
                   <param name="host_ip" value="192.168.1.10"/>
                   <param name="launch_hw" value="true"/>
                   <param name="max_range" value="1.5"/>
-                  <param name="min_range" value="0.5"/>
+                  <param name="min_range" value="0.4"/>
                   <param name="packet_mtu_size" value="1500"/>
                   <param name="return_mode" value="SingleStrongest"/>
                   <param name="rotation_speed" value="600"/>
                   <param name="scan_phase" value="180.0"/>
                   <param name="sensor_ip" value="192.168.1.204"/>
-                  <param name="sensor_model" value="VLS128"/>
+                  <param name="sensor_model" value="VLP16"/>
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="pointcloud_raw_ex"/>
@@ -1626,14 +1626,14 @@
             <!-- arg name="param_file" default="$(find-pkg-share autoware_gnss_poser)/config/gnss_poser.param.yaml" -->
             <!-- arg name="use_gnss_ins_orientation" value="true" -->
             <node pkg="autoware_gnss_poser" exec="gnss_poser" name="gnss_poser" namespace="/sensing/gnss" output="both">
-              <!-- params from: $(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml -->
-              <param name="use_operation_mode_availability" value="true"/>
-              <param name="rate" value="10.0"/>
-              <param name="input_qos_depth" value="1000"/>
-              <param name="graph_qos_depth" value="1"/>
-              <param name="use_command_mode_mappings" value="true"/>
-              <param name="command_mode_mappings" value="[{mode: 1001, path: /autoware/modes/stop}, {mode: 1002, path: /autoware/modes/autonomous}, {mode: 1003, path: /autoware/modes/local}, {mode: 1004, path: /autoware/modes/remote}, {mode: 2001, path: /autoware/modes/emergency_stop}, {mode: 2002, path: /autoware/modes/comfortable_stop}, {mode: 2003, path: /autoware/modes/pull_over}]"/>
-              <!-- end params from: $(find-pkg-share autoware_diagnostic_graph_aggregator)/config/default.param.yaml -->
+              <!-- params from: $(find-pkg-share autoware_gnss_poser)/config/gnss_poser.param.yaml -->
+              <param name="base_frame" value="base_link"/>
+              <param name="gnss_base_frame" value="gnss_base_link"/>
+              <param name="map_frame" value="map"/>
+              <param name="buff_epoch" value="1"/>
+              <param name="use_gnss_ins_orientation" value="true"/>
+              <param name="gnss_pose_pub_method" value="0"/>
+              <!-- end params from: $(find-pkg-share autoware_gnss_poser)/config/gnss_poser.param.yaml -->
               <param name="front_overhang" value="1.0"/>
               <param name="left_overhang" value="0.128"/>
               <param name="max_steer_angle" value="0.7"/>
@@ -1661,11 +1661,12 @@
           <!-- arg name="input_vehicle_velocity_topic" value="/vehicle/status/velocity_status" -->
           <!-- arg name="output_twist_with_covariance" value="/sensing/vehicle_velocity_converter/twist_with_covariance" -->
           <node pkg="autoware_vehicle_velocity_converter" exec="autoware_vehicle_velocity_converter_node" namespace="/sensing" output="both">
-            <!-- params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
-            <param name="update_rate" value="10.0"/>
-            <param name="add_duplicated_node_names_to_msg" value="true"/>
-            <param name="nodes_to_ignore" value="[/rviz2, /simulation/getParameter]"/>
-            <!-- end params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
+            <!-- params from: $(find-pkg-share autoware_vehicle_velocity_converter)/config/vehicle_velocity_converter.param.yaml -->
+            <param name="speed_scale_factor" value="1.0"/>
+            <param name="velocity_stddev_xx" value="0.2"/>
+            <param name="angular_velocity_stddev_zz" value="0.1"/>
+            <param name="frame_id" value="base_link"/>
+            <!-- end params from: $(find-pkg-share autoware_vehicle_velocity_converter)/config/vehicle_velocity_converter.param.yaml -->
             <param name="front_overhang" value="1.0"/>
             <param name="left_overhang" value="0.128"/>
             <param name="max_steer_angle" value="0.7"/>
@@ -1821,11 +1822,10 @@
             <!-- arg name="output_twist_with_covariance_raw_topic" value="/localization/twist_estimator/twist_with_covariance_raw" -->
             <!-- arg name="output_twist_with_covariance_topic" value="/localization/twist_estimator/twist_with_covariance" -->
             <node pkg="autoware_gyro_odometer" exec="autoware_gyro_odometer_node" namespace="/localization/twist_estimator" output="both">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
-              <param name="update_rate" value="10.0"/>
-              <param name="add_duplicated_node_names_to_msg" value="true"/>
-              <param name="nodes_to_ignore" value="[/rviz2, /simulation/getParameter]"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
+              <!-- params from: $(find-pkg-share autoware_gyro_odometer)/config/gyro_odometer.param.yaml -->
+              <param name="output_frame" value="base_link"/>
+              <param name="message_timeout_sec" value="0.2"/>
+              <!-- end params from: $(find-pkg-share autoware_gyro_odometer)/config/gyro_odometer.param.yaml -->
               <param name="front_overhang" value="1.0"/>
               <param name="left_overhang" value="0.128"/>
               <param name="max_steer_angle" value="0.7"/>
@@ -2104,7 +2104,7 @@
           <!-- arg name="input_twist" value="/localization/twist_estimator/twist_with_covariance" -->
           <!-- arg name="node_name" default="pose_instability_detector" -->
           <!-- arg name="param_file" value="$(find-pkg-share autoware_launch)/config/localization/pose_instability_detector.param.yaml" -->
-          <node pkg="autoware_pose_instability_detector" exec="autoware_pose_instability_detector_node" name="ndt_scan_matcher" namespace="/localization/pose_twist_fusion_filter" output="both">
+          <node pkg="autoware_pose_instability_detector" exec="autoware_pose_instability_detector_node" name="pose_instability_detector" namespace="/localization/pose_twist_fusion_filter" output="both">
             <!-- params from: $(find-pkg-share autoware_launch)/config/localization/pose_instability_detector.param.yaml -->
             <param name="timer_period" value="0.5"/>
             <param name="heading_velocity_maximum" value="16.667"/>
@@ -2816,16 +2816,24 @@
             <!-- arg name="model_path" default="{home}/autoware_data/shape_estimation/pointnet.onnx" -->
             <!-- arg name="node_name" default="shape_estimation" -->
             <!-- arg name="output/objects" value="/perception/object_recognition/detection/clustering/objects_with_feature" -->
-            <node pkg="autoware_shape_estimation" exec="shape_estimation_node" name="ndt_scan_matcher" namespace="/perception/object_recognition/detection/clustering" output="screen">
-              <!-- params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
-              <param name="update_rate" value="10.0"/>
-              <param name="add_duplicated_node_names_to_msg" value="true"/>
-              <param name="nodes_to_ignore" value="[/rviz2, /simulation/getParameter]"/>
-              <!-- end params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
+            <node pkg="autoware_shape_estimation" exec="shape_estimation_node" name="shape_estimation" namespace="/perception/object_recognition/detection/clustering" output="screen">
+              <!-- params from: $(find-pkg-share autoware_shape_estimation)/config/shape_estimation.param.yaml -->
+              <param name="use_corrector" value="true"/>
+              <param name="use_filter" value="true"/>
+              <param name="use_vehicle_reference_yaw" value="false"/>
+              <param name="use_vehicle_reference_shape_size" value="false"/>
+              <param name="use_boost_bbox_optimizer" value="false"/>
+              <param name="fix_filtered_objects_label_to_unknown" value="true"/>
+              <param name="model_params.use_ml_shape_estimator" value="false"/>
+              <param name="model_params.minimum_points" value="16"/>
+              <param name="model_params.precision" value="fp32"/>
+              <param name="model_params.batch_size" value="32"/>
+              <param name="model_params.build_only" value="false"/>
+              <!-- end params from: $(find-pkg-share autoware_shape_estimation)/config/shape_estimation.param.yaml -->
               <param name="front_overhang" value="1.0"/>
               <param name="left_overhang" value="0.128"/>
               <param name="max_steer_angle" value="0.7"/>
-              <param name="model_path" value="{home}/autoware_data/lidar_centerpoint"/>
+              <param name="model_path" value="{home}/autoware_data/shape_estimation/pointnet.onnx"/>
               <param name="rear_overhang" value="1.1"/>
               <param name="right_overhang" value="0.128"/>
               <param name="use_sim_time" value="false"/>
@@ -2846,7 +2854,7 @@
             <!-- arg name="node_name" default="detected_object_feature_remover" -->
             <!-- arg name="output" value="/perception/object_recognition/detection/clustering/objects" -->
             <!-- arg name="run_convex_hull_conversion" default="false" -->
-            <node pkg="autoware_detected_object_feature_remover" exec="detected_object_feature_remover_node" name="ndt_scan_matcher" namespace="/perception/object_recognition/detection/clustering" output="screen">
+            <node pkg="autoware_detected_object_feature_remover" exec="detected_object_feature_remover_node" name="detected_object_feature_remover" namespace="/perception/object_recognition/detection/clustering" output="screen">
               <param name="front_overhang" value="1.0"/>
               <param name="left_overhang" value="0.128"/>
               <param name="max_steer_angle" value="0.7"/>
@@ -3055,7 +3063,7 @@
           <!-- arg name="input/detection12/objects" default="input/objects12" -->
           <!-- arg name="input_channels_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/tracking/multi_object_tracker/input_channels.param.yaml" -->
           <!-- arg name="output/merged_objects" value="/perception/object_recognition/detection/objects" -->
-          <!-- arg name="output/objects" value="objects" -->
+          <!-- arg name="output/objects" value="/perception/object_recognition/tracking/objects" -->
           <!-- arg name="publish_merged_objects" value="false" -->
           <!-- arg name="tracker_setting_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/tracking/multi_object_tracker/multi_object_tracker_node.param.yaml" -->
           <node pkg="autoware_multi_object_tracker" exec="multi_object_tracker_node" name="multi_object_tracker" namespace="/perception/object_recognition/tracking" output="both">
@@ -3216,7 +3224,7 @@
             <remap from="~/input/detection10/objects" to="input/objects10"/>
             <remap from="~/input/detection11/objects" to="input/objects11"/>
             <remap from="~/input/detection12/objects" to="input/objects12"/>
-            <remap from="~/output/objects" to="objects"/>
+            <remap from="~/output/objects" to="/perception/object_recognition/tracking/objects"/>
             <remap from="~/output/merged_objects" to="/perception/object_recognition/detection/objects"/>
           </node>
         </group>
@@ -3230,7 +3238,7 @@
         <!-- arg name="use_vector_map" value="true" -->
         <!-- source: autoware_map_based_prediction://launch/map_based_prediction.launch.xml -->
         <group>
-          <!-- arg name="input_topic" value="/perception/object_recognition/detection/clustering/clusters" -->
+          <!-- arg name="input_topic" value="/perception/object_recognition/tracking/objects" -->
           <!-- arg name="output_topic" value="/perception/object_recognition/objects" -->
           <!-- arg name="param_path" value="$(find-pkg-share autoware_launch)/config/perception/object_recognition/prediction/map_based_prediction.param.yaml" -->
           <!-- arg name="traffic_signals_topic" default="/perception/traffic_light_recognition/traffic_signals" -->
@@ -3299,7 +3307,7 @@
             <remap from="/vector_map" to="/map/vector_map"/>
             <remap from="/traffic_signals" to="/perception/traffic_light_recognition/traffic_signals"/>
             <remap from="~/output/objects" to="/perception/object_recognition/objects"/>
-            <remap from="~/input/objects" to="/perception/object_recognition/detection/clustering/clusters"/>
+            <remap from="~/input/objects" to="/perception/object_recognition/tracking/objects"/>
           </node>
         </group>
         <!-- end: autoware_map_based_prediction://launch/map_based_prediction.launch.xml -->
@@ -3805,7 +3813,7 @@
           <param name="wheel_radius" value="0.383"/>
           <param name="wheel_tread" value="1.64"/>
           <param name="wheel_width" value="0.235"/>
-          <remap from="~/input/objects" to="/perception/object_recognition/detection/clustering/clusters"/>
+          <remap from="~/input/objects" to="/perception/object_recognition/objects"/>
           <remap from="~/perception_analytics" to="/perception/perception_analytics_publisher/perception_analytics"/>
         </node>
       </group>
@@ -4007,7 +4015,7 @@
             <param name="wheel_radius" value="0.383"/>
             <param name="wheel_tread" value="1.64"/>
             <param name="wheel_width" value="0.235"/>
-            <remap from="input/route" to="/planning/route"/>
+            <remap from="input/route" to="/planning/mission_planning/route"/>
             <remap from="output/goal_pose" to="/planning/mission_planning/echo_back_goal_pose"/>
           </node>
         </group>
@@ -4033,11 +4041,14 @@
           <!-- arg name="output_scenario" value="/planning/scenario_planning/scenario" -->
           <!-- arg name="output_trajectory" value="/planning/scenario_planning/scenario_selector/trajectory" -->
           <node pkg="autoware_scenario_selector" exec="autoware_scenario_selector_node" name="scenario_selector" namespace="/planning/scenario_planning" output="screen">
-            <!-- params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
+            <!-- params from: $(find-pkg-share autoware_scenario_selector)/config/scenario_selector.param.yaml -->
             <param name="update_rate" value="10.0"/>
-            <param name="add_duplicated_node_names_to_msg" value="true"/>
-            <param name="nodes_to_ignore" value="[/rviz2, /simulation/getParameter]"/>
-            <!-- end params from: $(find-pkg-share autoware_launch)/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
+            <param name="th_max_message_delay_sec" value="1.0"/>
+            <param name="th_arrived_distance_m" value="1.0"/>
+            <param name="th_stopped_time_sec" value="1.0"/>
+            <param name="th_stopped_velocity_mps" value="0.01"/>
+            <param name="enable_mode_switching" value="true"/>
+            <!-- end params from: $(find-pkg-share autoware_scenario_selector)/config/scenario_selector.param.yaml -->
             <param name="front_overhang" value="1.0"/>
             <param name="left_overhang" value="0.128"/>
             <param name="max_steer_angle" value="0.7"/>
@@ -6822,7 +6833,7 @@
           <remap from="~/input/acceleration" to="/localization/acceleration"/>
           <remap from="~/input/trajectory" to="/planning/trajectory"/>
           <remap from="~/input/reference_trajectory" to="/planning/scenario_planning/lane_driving/motion_planning/path_optimizer/trajectory"/>
-          <remap from="~/input/objects" to="/perception/object_recognition/detection/clustering/clusters"/>
+          <remap from="~/input/objects" to="/perception/object_recognition/objects"/>
           <remap from="~/input/modified_goal" to="/planning/scenario_planning/modified_goal"/>
           <remap from="~/input/route" to="/planning/mission_planning/route"/>
           <remap from="~/input/vector_map" to="/map/vector_map"/>
@@ -6854,7 +6865,7 @@
           <param name="wheel_tread" value="1.64"/>
           <param name="wheel_width" value="0.235"/>
           <remap from="~/input/odometry" to="/localization/kinematic_state"/>
-          <remap from="~/input/map" to="/map/pointcloud_map"/>
+          <remap from="~/input/map" to="/map/vector_map"/>
           <remap from="~/input/route" to="/planning/mission_planning/route"/>
           <remap from="~/input/scenario" to="/planning/scenario_planning/scenario"/>
           <remap from="~/output/mission_remaining_distance_time" to="/planning/mission_remaining_distance_time"/>
@@ -6934,7 +6945,7 @@
       <!-- arg name="vehicle_cmd_gate_param_path" value="$(find-pkg-share autoware_launch)/config/control/vehicle_cmd_gate/vehicle_cmd_gate.param.yaml" -->
       <!-- arg name="vehicle_id" value="default" -->
       <!-- arg name="vehicle_param_file" value="$(find-pkg-share sample_vehicle_description)/config/vehicle_info.param.yaml" -->
-      <node_container pkg="agnocast_components" exec="agnocast_component_container" name="control_container" namespace="/control">
+      <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="control_container" namespace="/control">
         <param name="front_overhang" value="1.0"/>
         <param name="left_overhang" value="0.128"/>
         <param name="max_steer_angle" value="0.7"/>
@@ -7026,7 +7037,7 @@
           <remap from="output/control_cmd" to="/control/command/control_cmd"/>
           <remap from="output/gear_cmd" to="/control/command/gear_cmd"/>
           <remap from="output/turn_indicators_cmd" to="/control/command/turn_indicators_cmd"/>
-          <remap from="output/hazard_lights_cmd" to="/planning/hazard_lights_cmd"/>
+          <remap from="output/hazard_lights_cmd" to="/control/command/hazard_lights_cmd"/>
           <remap from="output/gate_mode" to="/control/current_gate_mode"/>
           <remap from="output/engage" to="/api/autoware/get/engage"/>
           <remap from="output/external_emergency" to="/api/autoware/get/emergency"/>
@@ -7265,7 +7276,7 @@
         <!-- arg name="output/turn_indicators_cmd" default="/external/selected/turn_indicators_cmd" -->
         <!-- arg name="service/select_external_command" default="~/select_external_command" -->
         <!-- arg name="target_container" value="/control/control_container" -->
-        <!-- arg name="use_intra_process" value="true" -->
+        <!-- arg name="use_intra_process" value="false" -->
         <load_composable_node target="/control/control_container">
           <composable_node pkg="autoware_external_cmd_selector" plugin="autoware::external_cmd_selector::ExternalCmdSelector" name="external_cmd_selector">
             <param name="initial_selector_mode" value="local"/>
@@ -7310,7 +7321,7 @@
         <!-- arg name="ref_vel_gain" default="3.0" -->
         <!-- arg name="target_container" value="/control/control_container" -->
         <!-- arg name="timer_rate" default="10.0" -->
-        <!-- arg name="use_intra_process" value="true" -->
+        <!-- arg name="use_intra_process" value="false" -->
         <!-- arg name="wait_for_first_topic" default="true" -->
         <load_composable_node target="/control/control_container">
           <composable_node pkg="autoware_external_cmd_converter" plugin="autoware::external_cmd_converter::ExternalCmdConverterNode" name="external_cmd_converter">
@@ -7332,7 +7343,7 @@
         </load_composable_node>
       </group>
       <!-- end: autoware_external_cmd_converter://launch/external_cmd_converter.launch.py -->
-      <node_container pkg="agnocast_components" exec="agnocast_component_container" name="control_check_container" namespace="/control">
+      <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="control_check_container" namespace="/control">
         <param name="front_overhang" value="1.0"/>
         <param name="left_overhang" value="0.128"/>
         <param name="max_steer_angle" value="0.7"/>

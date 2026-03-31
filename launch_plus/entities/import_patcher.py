@@ -154,25 +154,25 @@ def _build_patched_launch_substitutions():
     _SENTINEL = object()
 
     class _DeferredEnvironmentVariable:
-        """Deferred substitution: reads _state.env at perform() time, not construction."""
+        """Deferred substitution: reads context.environment at perform() time."""
 
         def __init__(self, name, **kw):
             self._name = name
             self._default = kw.get("default_value", _SENTINEL)
 
         def perform(self, context=None):
-            state = context._state if context is not None and hasattr(context, "_state") else None
             name = _to_str(self._name, context) or ""
-            # Look up in override env, then process env.
-            if state is not None and name in state.env:
-                return state.env[name]
+            # Look up in context environment, then process env.
+            if context is not None and hasattr(context, "environment"):
+                env = context.environment
+                if name in env:
+                    return env[name]
             if name in os.environ:
                 return os.environ[name]
             # No match — use default if provided, otherwise error.
             if self._default is not _SENTINEL:
                 return _to_str(self._default, context) or ""
-            if state is not None:
-                logger.error("EnvironmentVariable: '%s' is not set and no default", name)
+            logger.error("EnvironmentVariable: '%s' is not set and no default", name)
             return ""
 
         def __str__(self):

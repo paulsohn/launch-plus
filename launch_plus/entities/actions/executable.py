@@ -123,9 +123,13 @@ class _TrackedExecutable(_TrackedAction):
         entry["cmd"] = cmd
         entry["name"] = name
         entry["shell"] = self._shell
-        entry["namespace_stack"] = list(context._state.namespace_stack)
+        ros_ns = context._launch_configurations.get("ros_namespace")
+        if ros_ns:
+            entry["ros_namespace"] = ros_ns
         # Env
-        env = dict(context._state.env)
+        from launch_plus.entities.node_resolution import _env_overrides
+
+        env = _env_overrides(context)
         for k_tokens, v_tokens in self._xml_envs or []:
             env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
         entry["env"] = env

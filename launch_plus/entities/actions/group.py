@@ -59,45 +59,35 @@ class _TrackedGroupAction(_TrackedAction):
         return None
 
     def _execute_xml(self, ctx) -> None:
-        """Execute for XML path: resolve child entities with scoping."""
+        """Execute for XML path: resolve child entities with scoping.
+
+        Matching official GroupAction: push/pop launch_configurations and
+        environment when scoped=True.
+        """
         from launch_plus.resolver import _resolve_element
 
         if self._scoped:
             ctx._push_launch_configurations()
-            saved_env = dict(ctx._state.env)
-            saved_ns_depth = len(ctx._state.namespace_stack)
-            saved_gp = list(ctx._state.global_params)
-            saved_gr = list(ctx._state.global_remaps)
-            saved_gpf = list(ctx._state.global_param_files)
+            ctx._push_environment()
         for child in self._xml_children:
             _resolve_element(child, ctx, self._xml_include_stack or [])
         if self._scoped:
+            ctx._pop_environment()
             ctx._pop_launch_configurations()
-            ctx._state.env.clear()
-            ctx._state.env.update(saved_env)
-            del ctx._state.namespace_stack[saved_ns_depth:]
-            ctx._state.global_params[:] = saved_gp
-            ctx._state.global_remaps[:] = saved_gr
-            ctx._state.global_param_files[:] = saved_gpf
 
     def _execute_shim(self, context) -> None:
-        """Execute for Python shim path: walk child actions."""
+        """Execute for Python shim path: walk child actions.
+
+        Matching official GroupAction: push/pop launch_configurations and
+        environment when scoped=True.
+        """
         if self._scoped:
             context._push_launch_configurations()
-            saved_env = dict(context._state.env)
-            saved_ns_depth = len(context._state.namespace_stack)
-            saved_gp = list(context._state.global_params)
-            saved_gr = list(context._state.global_remaps)
-            saved_gpf = list(context._state.global_param_files)
+            context._push_environment()
         _R._walk_actions(context._state, self._actions, context)
         if self._scoped:
+            context._pop_environment()
             context._pop_launch_configurations()
-            context._state.env.clear()
-            context._state.env.update(saved_env)
-            del context._state.namespace_stack[saved_ns_depth:]
-            context._state.global_params[:] = saved_gp
-            context._state.global_remaps[:] = saved_gr
-            context._state.global_param_files[:] = saved_gpf
 
 
 class _TrackedOpaqueFunction(_TrackedAction):

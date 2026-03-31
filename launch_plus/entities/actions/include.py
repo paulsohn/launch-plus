@@ -98,7 +98,11 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             logger.warning("max include depth exceeded for %s", file_path)
             return None
 
-        dep_idx = _track_include(ctx._state, file_path)
+        dep_idx = _track_include(
+            ctx._state,
+            file_path,
+            ros_namespace=ctx._launch_configurations.get("ros_namespace"),
+        )
         # Resolve include args sequentially — each arg can reference previous ones.
         # Temporarily set resolved args in parent ctx so $(var x) works for
         # subsequent args; restore parent state afterward.
@@ -147,7 +151,11 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
                     logger.warning("failed to resolve IncludeLaunchDescription source: %s", e)
 
         if self._path and self._dep_idx < 0:
-            self._dep_idx = _track_include(context._state, self._path)
+            self._dep_idx = _track_include(
+                context._state,
+                self._path,
+                ros_namespace=context._launch_configurations.get("ros_namespace"),
+            )
             _resolve_include_args(self._path, self._raw_launch_arguments, context, self._dep_idx)
 
         if self._path and self._path.endswith(".py") and context is not None:

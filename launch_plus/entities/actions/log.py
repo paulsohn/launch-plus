@@ -31,7 +31,7 @@ class _LogAction(_TrackedAction):
                 "package": "",
                 "executable": "",
                 "name": "",
-                "namespace_stack": list(context._state.namespace_stack),
+                "ros_namespace": context._launch_configurations.get("ros_namespace"),
                 "explicit_namespace": None,
                 "parameters": {},
                 "param_files": [],

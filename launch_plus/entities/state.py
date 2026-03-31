@@ -1,45 +1,42 @@
-"""Resolver state: shared mutable state and common exceptions.
+"""Resolver state and launch context.
 
-This module defines ``ResolverState`` (the mutable state bundle) and
-``_StubLaunchContext`` (minimal launch context for substitution resolution).
-The canonical ``_state`` instance lives in ``resolver.py``; entity modules
-receive state via function/method parameters and never import a global
-singleton from this module.
+``ResolverState`` bundles resolver-specific mutable state (tracking, fetching,
+options).  ``LaunchContext`` mirrors the official ROS 2 ``LaunchContext``
+(globals, locals, launch_configurations, environment — each with push/pop
+stacks).  Actions interact with ``LaunchContext``; the resolver manages
+``ResolverState``.
 """
 
 from __future__ import annotations
 
+import logging
+import os
 from typing import Any
+
+logger = logging.getLogger("launch_plus")
 
 # ─── Resolver State ──────────────────────────────────────────────────────────
 
 
 class ResolverState:
-    """Bundles all mutable resolver state.
+    """Bundles resolver-specific mutable state.
 
-    The entry point (``resolver.py``) owns the canonical ``_state`` instance.
-    Entity modules receive state via function/method parameters — they never
-    import a global singleton.  The test fixture resets state by calling
-    ``_state.reset()``.
+    This is NOT part of the launch context — it holds resolver infrastructure
+    (tracking, fetching, options) that the official ``LaunchContext`` does not
+    have.  Entity modules receive state via ``context._state``.
     """
 
     __slots__ = (
         "tracked",
         "declared_arg_names",
-        "namespace_stack",
         "include_chain",
-        "env",
         "inline_params",
-        "global_params",
-        "global_remaps",
-        "global_param_files",
         "package_shares",
         "apply_opaque_file_access",
         "preview_mode",
         "lockfile_data",
         "rosdep_fallback",
         "apply_arg_defaults",
-        "global_arg_cascade",
         "allow_unportable_paths",
         "fetch_dir",
         "fetched_packages",
@@ -68,20 +65,14 @@ class ResolverState:
             "event_handlers": [],
         }
         self.declared_arg_names: set = set()
-        self.namespace_stack: list = []
         self.include_chain: list = []
-        self.env: dict = {}
         self.inline_params: bool = False
-        self.global_params: list[tuple[str, Any]] = []
-        self.global_remaps: list[tuple[str, str]] = []
-        self.global_param_files: list[dict] = []
         self.package_shares: dict = {}
         self.apply_opaque_file_access: bool = False
         self.preview_mode: bool = True
         self.lockfile_data: dict = {}
         self.rosdep_fallback: bool = False
         self.apply_arg_defaults: bool = False
-        self.global_arg_cascade: bool = False
         self.allow_unportable_paths: bool = False
         self.fetch_dir: str = ""
         self.fetched_packages: set = set()
@@ -94,17 +85,14 @@ class ResolverState:
 
 
 class LaunchContext:
-    """Unified launch context for both XML/YAML and Python resolution.
+    """Launch context matching the official ROS 2 ``LaunchContext`` structure.
 
-    Combines the roles of the former ``_SubstitutionContext`` (XML path)
-    and ``_StubLaunchContext`` (Python shim path) into a single type
-    that matches the official ROS 2 ``LaunchContext`` interface.
+    Provides the same scoping primitives as the official implementation:
+    globals/locals (with stack), launch_configurations (with stack),
+    environment (with stack), and ``perform_substitution()``.
 
-    All arg/var lookups go through ``_launch_configurations``.
-
-    Fields: ``_launch_configurations``, ``env``,
-    ``launch_file_dir``, ``preview_mode``, ``_state``,
-    ``perform_substitution()``.
+    Event-related fields are omitted (we're a static resolver, not a runtime).
+    ``_state`` is our resolver-specific extension for tracking and fetching.
     """
 
     def __init__(self, state: ResolverState | None = None):
@@ -113,28 +101,102 @@ class LaunchContext:
 
             state = get_state()
         self._state: ResolverState = state
-        # ROS 2 compat — single source of truth for all arg/var lookups
-        self._launch_configurations: dict[str, object] = {}
-        self._launch_configurations_stack: list[dict[str, object]] = []
-        self.env: dict[str, str] = state.env  # shared reference
+
+        # Locals system (matching official __globals, __locals_stack, __locals)
+        self._globals: dict[str, Any] = {}
+        self._locals_stack: list[dict[str, Any]] = []
+        self._locals: dict[str, Any] = {}
+
+        # Launch configurations (matching official)
+        self._launch_configurations: dict[str, Any] = {}
+        self._launch_configurations_stack: list[dict[str, Any]] = []
+
+        # Environment (matching official __environment_stack)
+        # Initialized from os.environ, matching official LaunchContext.
+        self._environment: dict[str, str] = dict(os.environ)
+        self._environment_stack: list[dict[str, str]] = []
+
+        # Resolver-specific fields (not in official LaunchContext)
         self.launch_file_dir: str | None = None
         self.preview_mode: bool = False
 
+    # ─── Launch configurations ────────────────────────────────────────────
+
     @property
-    def launch_configurations(self) -> dict[str, object]:
+    def launch_configurations(self) -> dict[str, Any]:
+        """Return the current launch configurations dict."""
         return self._launch_configurations
 
     @launch_configurations.setter
-    def launch_configurations(self, value: dict[str, object]) -> None:
+    def launch_configurations(self, value: dict[str, Any]) -> None:
         self._launch_configurations = value
 
     def _push_launch_configurations(self) -> None:
-        """Save current launch_configurations (matching official ROS 2 scoping)."""
+        """Save a snapshot of current launch_configurations onto the stack."""
         self._launch_configurations_stack.append(dict(self._launch_configurations))
 
     def _pop_launch_configurations(self) -> None:
-        """Restore previously saved launch_configurations."""
+        """Restore previously saved launch_configurations from the stack."""
+        if not self._launch_configurations_stack:
+            logger.error("launch_configurations stack unexpectedly empty")
+            return
         self._launch_configurations = self._launch_configurations_stack.pop()
+
+    # ─── Environment ──────────────────────────────────────────────────────
+
+    @property
+    def environment(self) -> dict[str, str]:
+        """Return the current environment dict."""
+        return self._environment
+
+    def _push_environment(self) -> None:
+        """Save a snapshot of current environment onto the stack."""
+        self._environment_stack.append(dict(self._environment))
+
+    def _pop_environment(self) -> None:
+        """Restore previously saved environment from the stack."""
+        if not self._environment_stack:
+            logger.error("environment stack unexpectedly empty")
+            return
+        self._environment = self._environment_stack.pop()
+
+    def _reset_environment(self) -> None:
+        """Clear the environment (matching official ResetEnvironment)."""
+        self._environment.clear()
+
+    # ─── Locals ───────────────────────────────────────────────────────────
+
+    def _push_locals(self) -> None:
+        """Save current locals onto the stack."""
+        self._locals_stack.append(dict(self._locals))
+
+    def _pop_locals(self) -> None:
+        """Restore previously saved locals from the stack."""
+        if not self._locals_stack:
+            logger.error("locals stack unexpectedly empty")
+            return
+        self._locals = self._locals_stack.pop()
+
+    def extend_globals(self, extensions: dict[str, Any]) -> None:
+        """Add key-value pairs to globals (permanent, overridable by locals)."""
+        self._globals.update(extensions)
+
+    def extend_locals(self, extensions: dict[str, Any]) -> None:
+        """Add key-value pairs to current locals (until popped)."""
+        self._locals.update(extensions)
+
+    @property
+    def locals(self) -> dict[str, Any]:
+        """Return combined globals + locals (locals override globals)."""
+        combined = dict(self._globals)
+        combined.update(self._locals)
+        return combined
+
+    def get_locals_as_dict(self) -> dict[str, Any]:
+        """Return locals as a dict (matching official API)."""
+        return self.locals
+
+    # ─── Substitution ─────────────────────────────────────────────────────
 
     def perform_substitution(self, sub) -> str | None:
         """Resolve a substitution to a string. Matches official ROS 2 API.

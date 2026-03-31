@@ -384,6 +384,7 @@ from launch_plus.entities.helpers import (  # noqa: E402, F401
     _evaluate_condition,
     _is_truthy,
     _read_and_expand_param_file,
+    _ros2_namespace_join,
     resolve_substitutions,
     resolve_substitutions_from_tokens,
     resolve_value,
@@ -463,26 +464,10 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
     if not hasattr(mod, "generate_launch_description"):
         return
 
-    # Save scoping state that must be restored after inline execution.
-    # Nodes, includes, packages, params, etc. are KEPT — the resolver
-    # handles all includes inline.
+    # Matching official IncludeLaunchDescription(scoped=False): child actions
+    # mutate the parent_context directly.  All side-effects persist.
     saved_declared_arg_names = set(state.declared_arg_names)
-    saved_namespace_depth = len(state.namespace_stack)
-    saved_env = dict(state.env)
 
-    # Snapshot parent context BEFORE generate_launch_description() so we can
-    # fully restore it after the inline walk.  Only deliberate side-effects
-    # (SetLaunchConfiguration) survive.
-    saved_configs = dict(parent_context._launch_configurations)
-
-    # Most _state.tracked mutations (from constructors in generate_launch_description
-    # AND from _walk_actions) must be rolled back on any exit path, including
-    # exceptions from generate_launch_description() itself.
-    #
-    # Intentionally preserved side-effects (NOT rolled back):
-    #   - set_launch_configurations: the whole purpose of inline includes
-    #   - warnings / errors: diagnostic messages should propagate to the user
-    # Everything else in _state.tracked is rolled back in the finally block below.
     try:
         try:
             ld = mod.generate_launch_description()
@@ -492,38 +477,20 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
 
         entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
-        # Set child launch arguments into the context, matching official
-        # IncludeLaunchDescription which uses SetLaunchConfiguration actions.
-        # Child args override any parent values with the same key.
+        # Set child launch arguments (matching official SetLaunchConfiguration pattern).
         for k, v in child_args.items():
             parent_context._launch_configurations[k] = v
 
-        # Pass 1: apply DeclareLaunchArgument defaults (child-only args).
+        # Pass 1: apply DeclareLaunchArgument defaults.
         for entity in entities:
             if isinstance(entity, _DeclaredArg):
                 _apply_declared_arg(entity, parent_context)
 
-        # Pass 2: walk actions — SetLaunchConfiguration, OpaqueFunction, etc.
-        # all mutate parent_context directly, matching official behavior where
-        # IncludeLaunchDescription (scoped=False) lets child mutations persist.
+        # Pass 2: walk all actions in the shared context.
         _walk_actions(state, entities, parent_context)
     finally:
-        # Capture child-declared arg names before restoring parent state.
-        child_declared = state.declared_arg_names - saved_declared_arg_names
-        # Restore scoping state.
         state.declared_arg_names.clear()
         state.declared_arg_names.update(saved_declared_arg_names)
-        del state.namespace_stack[saved_namespace_depth:]
-        state.env.clear()
-        state.env.update(saved_env)
-
-    # Remove child-only DeclareLaunchArgument defaults that should not leak
-    # into the parent scope.  All action-produced side-effects persist,
-    # matching official IncludeLaunchDescription (scoped=False).
-    set_configs = set(state.tracked["set_launch_configurations"].keys())
-    for k in list(parent_context._launch_configurations):
-        if k in child_declared and k not in saved_configs and k not in set_configs:
-            del parent_context._launch_configurations[k]
 
 
 # ─── XML/YAML AST Walker ────────────────────────────────────────────────────
@@ -542,8 +509,7 @@ def resolve_xml_elements(
     """Walk parsed XML/YAML elements, resolve substitutions, populate _state.tracked.
 
     This is the XML/YAML counterpart of the Python ``_walk_actions`` mechanism.
-    All output goes into the module-level ``_state.tracked`` dict, ``_state.namespace_stack``,
-    and ``_state.env``.
+    All output goes into the module-level ``_state.tracked`` dict.
 
     Dispatches each element through the action registry via :func:`_resolve_element`.
     """
@@ -585,7 +551,6 @@ def resolve_included_file(
 ) -> None:
     """Parse an included launch file and resolve it recursively."""
     from launch_plus.entities.helpers import _extract_pkg_and_share_path
-    from launch_plus.entities.state import LaunchContext as _SubstitutionContext
     from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
     from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
 
@@ -596,6 +561,12 @@ def resolve_included_file(
     else:
         state.include_chain.append(["", file_path])
     new_stack = include_stack + [file_path]
+    # Set child args in the SAME context (matching official IncludeLaunchDescription
+    # scoped=False: child mutations persist in parent).
+    for k, v in child_ctx_args.items():
+        ctx._launch_configurations[k] = v
+    saved_launch_file_dir = ctx.launch_file_dir
+    ctx.launch_file_dir = os.path.dirname(real_path)
     try:
         if real_path.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
             with open(real_path) as f:
@@ -605,27 +576,12 @@ def resolve_included_file(
                 child_entities = list(_parse_yaml_launch_entity(content, real_path))
             else:
                 child_entities = list(_parse_xml_launch_entity(content, real_path))
-            child_ctx = _SubstitutionContext(state)
-            if state.global_arg_cascade:
-                child_ctx._launch_configurations = {**ctx._launch_configurations, **child_ctx_args}
-            else:
-                child_ctx._launch_configurations = dict(child_ctx_args)
-            child_ctx.env = dict(ctx.env)
-            child_ctx.launch_file_dir = os.path.dirname(real_path)
-            child_ctx.preview_mode = ctx.preview_mode
             for child in child_entities:
-                _resolve_element(child, child_ctx, new_stack)
-            ctx._launch_configurations.update(child_ctx._launch_configurations)
+                _resolve_element(child, ctx, new_stack)
         elif real_path.endswith((".launch.py", ".py")):
-            parent_lc = _make_launch_context(dict(ctx._launch_configurations))
-            if state.global_params:
-                parent_lc._launch_configurations["global_params"] = list(state.global_params)
-            _inline_resolve_python_launch(state, file_path, parent_lc, child_ctx_args)
-            set_configs = state.tracked["set_launch_configurations"]
-            for k, v in parent_lc._launch_configurations.items():
-                if (k in set_configs or k in child_ctx_args) and k != "global_params":
-                    ctx._launch_configurations[k] = str(v) if not isinstance(v, str) else v
+            _inline_resolve_python_launch(state, file_path, ctx, child_ctx_args)
     finally:
+        ctx.launch_file_dir = saved_launch_file_dir
         state.include_chain.pop()
 
 
@@ -750,7 +706,8 @@ def _walk_untracked_action(state, action, context):
                 except Exception:
                     loc = None
             if loc:
-                _track_include(state, loc)
+                ros_ns = context._launch_configurations.get("ros_namespace") if context else None
+                _track_include(state, loc, ros_namespace=ros_ns)
 
     # Warn about action classes we do not recognise.
     if cls_name not in _KNOWN_UNTRACKED_CLASSES:
@@ -864,14 +821,9 @@ def _resolve_file_impl(
 ) -> Any:
     launch_file_str = str(launch_file)
 
-    state.namespace_stack = []
     root_dep = _extract_pkg_and_share_path(launch_file_str)
     state.root_source_key = f"{root_dep[0]}://{root_dep[1]}" if root_dep else launch_file_str
 
-    state.env.clear()
-    state.global_params.clear()
-    state.global_remaps.clear()
-    state.global_param_files.clear()
     state.fetched_packages.clear()
     state.declared_arg_names.clear()
     state.include_chain.clear()
@@ -900,7 +852,6 @@ def _resolve_file_impl(
         state.inline_params = bool(getattr(workflow_options, "inline_params", False))
         state.rosdep_fallback = bool(getattr(workflow_options, "rosdep_fallback", False))
         state.apply_arg_defaults = bool(getattr(workflow_options, "apply_arg_defaults", False))
-        state.global_arg_cascade = bool(getattr(workflow_options, "global_arg_cascade", False))
         state.allow_unportable_paths = bool(
             getattr(workflow_options, "allow_unportable_paths", False)
         )
@@ -910,7 +861,6 @@ def _resolve_file_impl(
         state.inline_params = False
         state.rosdep_fallback = False
         state.apply_arg_defaults = False
-        state.global_arg_cascade = False
         state.allow_unportable_paths = False
 
     # Build lockfile data from the Lockfile dataclass
@@ -960,7 +910,6 @@ def _resolve_file_impl(
         subst_ctx._launch_configurations = dict(args_dict)
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
         subst_ctx.preview_mode = state.preview_mode
-        subst_ctx.env = state.env
         resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file_str])
         return _tracked_to_parsed_launch_file(state.tracked)
 
@@ -993,7 +942,6 @@ def _resolve_file_impl(
     if persisted_global_params:
         gp_tuples = [(entry[0], entry[1]) for entry in persisted_global_params if len(entry) == 2]
         ctx._launch_configurations["global_params"] = list(gp_tuples)
-        state.global_params.extend(gp_tuples)
 
     try:
         ld = mod.generate_launch_description()
@@ -1058,9 +1006,9 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
         if kind_str == "set_parameter":
             continue
 
-        ns_stack = n.get("namespace_stack", [])
+        ros_ns = n.get("ros_namespace")
         explicit_ns = n.get("explicit_namespace")
-        eff_ns = _effective_namespace(ns_stack, explicit_ns)
+        eff_ns = _ros2_namespace_join(ros_ns, explicit_ns) if explicit_ns else ros_ns
         name = n.get("name", "")
 
         # Map kind
@@ -1116,7 +1064,7 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
                 continue
             handler_target = n.get("target")
             handler_target_node = n.get("target_node")
-            handler_namespace = _effective_namespace(ns_stack, explicit_ns)
+            handler_namespace = eff_ns
             handler_start_state = n.get("start_state")
             handler_goal_state = n.get("goal_state")
             handler_actions = [
@@ -1150,7 +1098,7 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
                 name=name if name else None,
                 namespace=eff_ns,
                 explicit_namespace=explicit_ns,
-                namespace_stack=list(ns_stack),
+                namespace_stack=[ros_ns] if ros_ns else [],
                 parameters=dict(n.get("parameters", {})),
                 remappings=[(f, t) for f, t in n.get("remappings", [])],
                 env=dict(n.get("env", {})),
@@ -1193,9 +1141,9 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
             hk = hk_map.get(eh.get("handler_kind", ""))
             if hk is None:
                 continue
-            ns_stack = eh.get("namespace_stack", [])
+            ros_ns = eh.get("ros_namespace")
             explicit_ns = eh.get("explicit_namespace")
-            handler_ns = _effective_namespace(ns_stack, explicit_ns)
+            handler_ns = _ros2_namespace_join(ros_ns, explicit_ns) if explicit_ns else ros_ns
             actions = [
                 _ResolvedEventAction(
                     event=a.get("event", ""),
@@ -1207,7 +1155,7 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
             resolved_nodes.append(
                 _ResolvedNode(
                     kind=_NodeKindTag.EVENT_HANDLER,
-                    namespace_stack=list(ns_stack),
+                    namespace_stack=[ros_ns] if ros_ns else [],
                     explicit_namespace=explicit_ns,
                     handler_kind=hk,
                     handler_target=eh.get("target"),
@@ -1231,7 +1179,7 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
                 package=dep["package"],
                 share_path=_Path(dep["share_path"]),
                 explicit_args=dep_include_args,
-                namespace_stack=dep.get("namespace_stack", []),
+                namespace_stack=[dep["ros_namespace"]] if dep.get("ros_namespace") else [],
             )
         )
 

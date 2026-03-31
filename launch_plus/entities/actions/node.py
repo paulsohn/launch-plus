@@ -196,15 +196,16 @@ class _TrackedNode(_TrackedAction):
         entry["package"] = pkg
         entry["executable"] = exe
         entry["name"] = name
-        entry["namespace_stack"] = list(context._state.namespace_stack)
         entry["explicit_namespace"] = ns
-        # Read ros_namespace from _launch_configurations (canonical, matches official ROS 2)
+        # Read from _launch_configurations (matching official Node._perform_substitutions)
         ros_ns = context._launch_configurations.get("ros_namespace")
         if ros_ns:
             entry["ros_namespace"] = ros_ns
-        # Params
-        params: dict[str, str] = {k: str(v) for k, v in context._state.global_params}
-        param_files: list[dict] = list(context._state.global_param_files)
+        # Params — from launch_configurations['global_params']
+        ctx_gp = context._launch_configurations.get("global_params", [])
+        params: dict[str, str] = {k: str(v) for k, v in ctx_gp}
+        # Param files — from launch_configurations['global_param_files']
+        param_files: list[dict] = list(context._launch_configurations.get("global_param_files", []))
         for p in self._xml_params:
             if "from" in p:
                 path = resolve_value(p["from"], context) or ""
@@ -223,15 +224,17 @@ class _TrackedNode(_TrackedAction):
                 params[k] = v
         entry["parameters"] = params
         entry["param_files"] = param_files
-        # Remaps
-        remaps: list = list(context._state.global_remaps)
+        # Remaps — from launch_configurations['ros_remaps']
+        remaps: list = list(context._launch_configurations.get("ros_remaps", []))
         for src_tokens, dst_tokens in self._xml_remaps or []:
             remaps.append(
                 [resolve_value(src_tokens, context) or "", resolve_value(dst_tokens, context) or ""]
             )
         entry["remappings"] = remaps
         # Env
-        env = dict(context._state.env)
+        from launch_plus.entities.node_resolution import _env_overrides
+
+        env = _env_overrides(context)
         for k_tokens, v_tokens in self._xml_envs or []:
             env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
         entry["env"] = env
@@ -392,14 +395,19 @@ class _TrackedComposableNodeContainer(_TrackedAction):
         entry["package"] = pkg
         entry["executable"] = exe
         entry["name"] = name
-        entry["namespace_stack"] = list(context._state.namespace_stack)
         entry["explicit_namespace"] = ns
+        ros_ns = context._launch_configurations.get("ros_namespace")
+        if ros_ns:
+            entry["ros_namespace"] = ros_ns
         # Params (container has no inline params from XML — only global)
-        entry["parameters"] = {k: str(v) for k, v in context._state.global_params}
-        entry["param_files"] = list(context._state.global_param_files)
-        entry["remappings"] = list(context._state.global_remaps)
+        ctx_gp = context._launch_configurations.get("global_params", [])
+        entry["parameters"] = {k: str(v) for k, v in ctx_gp}
+        entry["param_files"] = list(context._launch_configurations.get("global_param_files", []))
+        entry["remappings"] = list(context._launch_configurations.get("ros_remaps", []))
         # Env
-        env = dict(context._state.env)
+        from launch_plus.entities.node_resolution import _env_overrides
+
+        env = _env_overrides(context)
         for k_tokens, v_tokens in self._xml_envs or []:
             env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
         entry["env"] = env
@@ -493,7 +501,9 @@ class _TrackedLoadComposableNodes(_TrackedAction):
         target = resolve_value(self._raw_target, context) or ""
         ns = resolve_value(self._xml_namespace, context)
         entry["target"] = target
-        entry["namespace_stack"] = list(context._state.namespace_stack)
         entry["explicit_namespace"] = ns
+        ros_ns = context._launch_configurations.get("ros_namespace")
+        if ros_ns:
+            entry["ros_namespace"] = ros_ns
         # Plugins
         entry["plugins"] = _resolve_xml_composable_plugins(self._xml_plugins, context)

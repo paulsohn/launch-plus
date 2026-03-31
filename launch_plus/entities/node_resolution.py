@@ -17,9 +17,18 @@ from launch_plus.entities.helpers import (
 # ─── Node detail resolution helpers ──────────────────────────────────────────
 
 
-def _env_overrides(state):
-    """Return a copy of the current env overrides for per-node output."""
-    return dict(state.env)
+def _env_overrides(context):
+    """Return env vars explicitly set via SetEnvironmentVariable (overrides only).
+
+    Compares context.environment against os.environ to extract only the diff.
+    """
+    import os
+
+    overrides = {}
+    for k, v in context.environment.items():
+        if k not in os.environ or os.environ[k] != v:
+            overrides[k] = v
+    return overrides
 
 
 def _resolve_node_details(state, node, context):
@@ -47,9 +56,7 @@ def _resolve_node_details(state, node, context):
         if node._raw_namespace is not None
         else None
     )
-    entry["namespace_stack"] = list(state.namespace_stack)
     entry["explicit_namespace"] = ns
-    # Read ros_namespace from _launch_configurations (canonical, matches official ROS 2)
     ros_ns = context._launch_configurations.get("ros_namespace")
     if ros_ns:
         entry["ros_namespace"] = ros_ns
@@ -87,17 +94,16 @@ def _resolve_node_details(state, node, context):
             for k, v in p.items():
                 resolved_v = context.perform_substitution(v)
                 params[str(k)] = resolved_v if resolved_v is not None else ""
-    # Merge global params from the launch context (global first, node-local overrides).
-    # In ROS 2, Node.execute() reads global_params from context._launch_configurations.
-    # ComposableNodeContainer inherits from Node, so it also gets global params.
+    # Global params from launch_configurations (matching official Node)
     ctx_global_params = context._launch_configurations.get("global_params", [])
     merged_params = {k: str(v) for k, v in ctx_global_params}
     merged_params.update(params)
     entry["parameters"] = merged_params
-    entry["param_files"] = list(state.global_param_files) + pf_list
+    global_pf = context._launch_configurations.get("global_param_files", [])
+    entry["param_files"] = list(global_pf) + pf_list
 
-    # Remappings: list of [src, dst] pairs — merge global remaps first
-    remaps = list(state.global_remaps)
+    # Remappings from launch_configurations (matching official Node)
+    remaps = list(context._launch_configurations.get("ros_remaps", []))
     for r in node._raw_remappings:
         if isinstance(r, (tuple, list)) and len(r) == 2:
             src = context.perform_substitution(r[0])
@@ -106,7 +112,7 @@ def _resolve_node_details(state, node, context):
     entry["remappings"] = remaps
 
     # Env vars: start with inherited env diff, then node-local overrides
-    env = _env_overrides(state)
+    env = _env_overrides(context)
     raw_env = node._raw_env
     if isinstance(raw_env, dict):
         for k, v in raw_env.items():

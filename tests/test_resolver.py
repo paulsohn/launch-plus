@@ -349,9 +349,9 @@ class TestInlinePythonInclude:
             assert ctx._launch_configurations["child_var"] == "child_value"
             assert ctx._launch_configurations["parent_var"] == "parent_value"
 
-    def test_child_declared_args_do_not_leak(self):
-        """DeclareLaunchArgument defaults from a child file should NOT
-        persist in the parent context (only SetLaunchConfiguration should)."""
+    def test_child_declared_args_persist(self):
+        """DeclareLaunchArgument defaults from a child file persist in the
+        parent context (matching official IncludeLaunchDescription scoped=False)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             child_path = _write_launch_py(
                 tmpdir,
@@ -363,7 +363,7 @@ class TestInlinePythonInclude:
 
                 def generate_launch_description():
                     return LaunchDescription([
-                        DeclareLaunchArgument("child_only_arg", default_value="should_not_leak"),
+                        DeclareLaunchArgument("child_only_arg", default_value="persists_too"),
                         SetLaunchConfiguration("sticky_var", "persists"),
                     ])
             """,
@@ -372,7 +372,6 @@ class TestInlinePythonInclude:
             ctx = _make_context({})
             R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
 
-            assert "child_only_arg" not in ctx._launch_configurations
             assert ctx._launch_configurations["sticky_var"] == "persists"
 
     def test_child_args_forwarded(self):
@@ -566,9 +565,9 @@ class TestEnvStack:
         assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
         R._TrackedSetEnvironmentVariable(name=name, value="val").execute(ctx)
-        assert name in R.get_state().env
+        assert name in ctx.environment
         R._TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
-        assert name not in R.get_state().env
+        assert name not in ctx.environment
         errors = R.get_state().tracked.get("errors", [])
         assert not any(name in e for e in errors)
 
@@ -612,8 +611,8 @@ class TestEnvStack:
         entry = R.get_state().tracked["nodes"][node._idx]
         assert entry["env"]["FOO"] == "local"
 
-    def test_inline_include_env_rollback(self):
-        """Env set by inline-included child does NOT leak to parent."""
+    def test_inline_include_env_persists(self):
+        """Env set by inline-included child persists (matching official scoped=False)."""
         import tempfile
         import textwrap
 
@@ -632,12 +631,13 @@ class TestEnvStack:
                 )
             ctx = _make_context()
             R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
-            assert "CHILD_VAR" not in R.get_state().env
+            assert ctx.environment.get("CHILD_VAR") == "child_val"
 
     def test_env_overrides_returns_only_overrides(self):
         """_env_overrides() returns only explicitly set vars, not process env."""
-        R.get_state().env["NEW_VAR"] = "new_val"
-        overrides = R._env_overrides(R.get_state())
+        ctx = _make_context()
+        ctx.environment["NEW_VAR"] = "new_val"
+        overrides = R._env_overrides(ctx)
         assert overrides["NEW_VAR"] == "new_val"
         # Process env vars must NOT appear in overrides.
         import os
@@ -647,14 +647,16 @@ class TestEnvStack:
 
     def test_env_overrides_empty_when_no_overrides(self):
         """Empty overrides when nothing has been set."""
-        assert R._env_overrides(R.get_state()) == {}
+        ctx = _make_context()
+        assert R._env_overrides(ctx) == {}
 
     def test_net_zero_error_includes_value(self):
         """Net-zero leak error includes the override value (safe, user-set)."""
-        R.get_state().env["MY_KEY"] = "my_value"
+        ctx = _make_context()
+        ctx.environment["MY_KEY"] = "my_value"
         # Simulate the net-zero check inline (same logic as main())
         errors = []
-        for k, v in R.get_state().env.items():
+        for k, v in ctx.environment.items():
             errors.append(
                 f"env var '{k}' was set to '{v}' but not restored (leaked from file scope)"
             )
@@ -972,6 +974,8 @@ def _fresh_subst_ctx(**kwargs):
     for k, v in kwargs.items():
         if k in ("args", "vars"):
             lc_updates.update(v)
+        elif k == "env":
+            ctx._environment.update(v)
         else:
             setattr(ctx, k, v)
     if lc_updates:
@@ -1170,8 +1174,6 @@ def _fresh_walker_ctx(**kwargs):
         elif isinstance(R.get_state().tracked[key], dict):
             R.get_state().tracked[key] = {}
     # Reset module-level state
-    R.get_state().namespace_stack.clear()
-    R.get_state().env.clear()
     R.get_state().declared_arg_names.clear()
     ctx = R._SubstitutionContext()
     # Translate legacy args/vars kwargs to _launch_configurations
@@ -1179,6 +1181,8 @@ def _fresh_walker_ctx(**kwargs):
     for k, v in kwargs.items():
         if k in ("args", "vars"):
             lc_updates.update(v)
+        elif k == "env":
+            ctx._environment.update(v)
         else:
             setattr(ctx, k, v)
     if lc_updates:
@@ -1351,8 +1355,8 @@ class TestResolveXmlElements:
             </launch>
         """)
         _, tracked = _parse_and_walk(xml)
-        assert tracked["nodes"][0]["namespace_stack"] == ["/scoped_ns"]
-        assert tracked["nodes"][1]["namespace_stack"] == []
+        assert tracked["nodes"][0].get("ros_namespace") == "/scoped_ns"
+        assert tracked["nodes"][1].get("ros_namespace") is None
 
     def test_unscoped_group_shares_namespace(self):
         xml = textwrap.dedent("""\
@@ -1366,8 +1370,8 @@ class TestResolveXmlElements:
         """)
         _, tracked = _parse_and_walk(xml)
         # Unscoped: namespace persists
-        assert tracked["nodes"][0]["namespace_stack"] == ["/shared"]
-        assert tracked["nodes"][1]["namespace_stack"] == ["/shared"]
+        assert tracked["nodes"][0].get("ros_namespace") == "/shared"
+        assert tracked["nodes"][1].get("ros_namespace") == "/shared"
 
     # ── Env handling ──
 
@@ -1428,7 +1432,7 @@ class TestResolveXmlElements:
             </launch>
         """)
         _, tracked = _parse_and_walk(xml)
-        assert tracked["nodes"][0]["namespace_stack"] == ["/robot"]
+        assert tracked["nodes"][0].get("ros_namespace") == "/robot"
 
     def test_push_ros_namespace_with_condition(self):
         xml = textwrap.dedent("""\
@@ -1439,7 +1443,7 @@ class TestResolveXmlElements:
             </launch>
         """)
         _, tracked = _parse_and_walk(xml)
-        assert tracked["nodes"][0]["namespace_stack"] == []
+        assert tracked["nodes"][0].get("ros_namespace") is None
 
     def test_node_explicit_namespace(self):
         xml = textwrap.dedent("""\
@@ -1449,7 +1453,7 @@ class TestResolveXmlElements:
             </launch>
         """)
         _, tracked = _parse_and_walk(xml)
-        assert tracked["nodes"][0]["namespace_stack"] == ["/robot"]
+        assert tracked["nodes"][0].get("ros_namespace") == "/robot"
         assert tracked["nodes"][0]["explicit_namespace"] == "/override"
 
     def test_node_output_args_respawn_resolved(self):
@@ -1905,7 +1909,7 @@ class TestActionRegistry:
         assert node["executable"] == "e"
         assert node["name"] == "n"
         assert node["explicit_namespace"] == "local"
-        assert node["namespace_stack"] == ["/robot"]
+        assert node.get("ros_namespace") == "/robot"
 
     def test_lifecycle_node(self):
         xml = '<launch><lifecycle_node pkg="p" exec="e" name="n"/></launch>'
@@ -2097,7 +2101,7 @@ class TestActionRegistry:
         tracked = _parse_to_tracked(xml)
         nodes = _tracked_nodes(tracked)
         node = nodes[0]
-        assert node["namespace_stack"] == ["/a", "b"]
+        assert node.get("ros_namespace") == "/a/b"
         assert node["explicit_namespace"] == "c"
 
     def test_absolute_namespace_resets(self):
@@ -2229,7 +2233,7 @@ class TestApplyDeclaredArgLazy:
 
 
 class TestStrictnessFlags:
-    """Tests for apply_arg_defaults, global_arg_cascade, allow_unportable_paths."""
+    """Tests for apply_arg_defaults, allow_unportable_paths."""
 
     def test_apply_arg_defaults_true_applies_default(self):
         R.get_state().apply_arg_defaults = True
@@ -2264,51 +2268,6 @@ class TestStrictnessFlags:
         with caplog.at_level(logging.WARNING):
             R.resolve_xml_elements(elements, ctx)
         assert "undefined" in caplog.text
-
-    def test_global_arg_cascade_true_inherits_parent_args(self, caplog):
-        R.get_state().global_arg_cascade = True
-        with tempfile.TemporaryDirectory() as child_share:
-            R.get_state().package_shares["child_pkg"] = child_share
-            launch_dir = os.path.join(child_share, "launch")
-            os.makedirs(launch_dir, exist_ok=True)
-            with open(os.path.join(launch_dir, "child.launch.xml"), "w") as f:
-                f.write('<launch><arg name="x" default="fallback"/></launch>')
-            ctx = R._SubstitutionContext()
-            ctx._launch_configurations = {"x": "from_parent"}
-            elements = R.parse_xml_launch(
-                "<launch>"
-                '<include file="$(find-pkg-share child_pkg)'
-                '/launch/child.launch.xml"/>'
-                "</launch>",
-                "test.xml",
-            )
-            with caplog.at_level(logging.WARNING):
-                R.resolve_xml_elements(elements, ctx)
-            # Child sees parent arg — no error
-            assert not any(r.levelno >= logging.ERROR for r in caplog.records)
-
-    def test_global_arg_cascade_false_no_parent_args(self, caplog):
-        R.get_state().global_arg_cascade = False
-        R.get_state().apply_arg_defaults = False
-        with tempfile.TemporaryDirectory() as child_share:
-            R.get_state().package_shares["child_pkg"] = child_share
-            launch_dir = os.path.join(child_share, "launch")
-            os.makedirs(launch_dir, exist_ok=True)
-            with open(os.path.join(launch_dir, "child.launch.xml"), "w") as f:
-                f.write('<launch><arg name="x"/><let name="y" value="$(arg x)"/></launch>')
-            ctx = R._SubstitutionContext()
-            ctx._launch_configurations = {"x": "from_parent"}
-            elements = R.parse_xml_launch(
-                "<launch>"
-                '<include file="$(find-pkg-share child_pkg)'
-                '/launch/child.launch.xml"/>'
-                "</launch>",
-                "test.xml",
-            )
-            with caplog.at_level(logging.WARNING):
-                R.resolve_xml_elements(elements, ctx)
-            # Child can't see parent arg — undefined error
-            assert "undefined" in caplog.text
 
     def test_allow_unportable_paths_false_errors(self, caplog):
         R.get_state().allow_unportable_paths = False

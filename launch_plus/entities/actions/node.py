@@ -8,6 +8,13 @@ from __future__ import annotations
 
 from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
+from launch_plus.entities.helpers import (
+    _read_and_expand_param_file,
+    _ros2_namespace_join,
+    env_overrides,
+    resolve_value,
+)
+from launch_plus.entities.parameter_descriptions import Parameter, ParameterFile
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
@@ -25,7 +32,6 @@ def _fully_qualified_name(node_entry: dict) -> str:
     Matches official ``make_namespace_absolute(prefix_namespace(
     ros_namespace, prefix_namespace(node_namespace, name)))``.
     """
-    from launch_plus.entities.helpers import _ros2_namespace_join
 
     ros_ns = node_entry.get("ros_namespace")
     explicit_ns = node_entry.get("explicit_namespace")
@@ -37,26 +43,20 @@ def _fully_qualified_name(node_entry: dict) -> str:
 
 def _resolve_plugin(desc_or_dict, context) -> dict:
     """Resolve a single ComposableNode to output dict."""
-    from launch_plus.entities.helpers import _read_and_expand_param_file, resolve_value
-    from launch_plus.entities.substitution import Substitution
 
     state = context._state
     params: dict[str, str] = {}
     pf_list: list[dict] = []
-    seen_pf: set[str] = set()
     remaps: list = []
 
     if isinstance(desc_or_dict, ComposableNode):
         desc = desc_or_dict
-        # Resolve package/plugin/name
         pkg = context.perform_substitution(desc._raw_package) or desc._package
         plugin_name = context.perform_substitution(desc._raw_plugin) or desc._plugin
         name = context.perform_substitution(desc._raw_name) or desc._name or None
-        # Params
         for p in desc._raw_parameters:
-            if isinstance(p, dict) and "from" in p:
-                # param file reference
-                path = resolve_value(p["from"], context) or ""
+            if isinstance(p, ParameterFile):
+                path = p.evaluate(context)
                 state.track_param_file(path)
                 pf_entry: dict = {"path": path}
                 if state.inline_params:
@@ -64,37 +64,10 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
                     if expanded is not None:
                         pf_entry["params"] = expanded
                 pf_list.append(pf_entry)
-            elif isinstance(p, dict) and "name" in p and "value" in p:
-                # inline param
-                k = resolve_value(p["name"], context) or ""
-                v = resolve_value(p["value"], context) or ""
+            elif isinstance(p, Parameter):
+                k, v = p.evaluate(context)
                 params[k] = v
-            elif hasattr(p, "_param_file"):
-                # deferred param file
-                path = p._param_file
-                if path is None and hasattr(p, "_raw_param_file") and p._raw_param_file is not None:
-                    raw = p._raw_param_file
-                    if isinstance(raw, Substitution):
-                        try:
-                            result = raw.perform(context)
-                            if result is not None:
-                                path = str(result)
-                        except Exception:
-                            pass
-                    elif not isinstance(raw, str):
-                        path = str(raw)
-                if path:
-                    path = str(path)
-                    if path not in seen_pf:
-                        seen_pf.add(path)
-                        pf_entry = {"path": path}
-                        if state.inline_params:
-                            expanded = _read_and_expand_param_file(path, state=state)
-                            if expanded is not None:
-                                pf_entry["params"] = expanded
-                        pf_list.append(pf_entry)
             elif isinstance(p, dict):
-                # plain param dict
                 for k, v in p.items():
                     resolved_v = context.perform_substitution(v)
                     params[str(k)] = resolved_v if resolved_v is not None else ""
@@ -230,13 +203,6 @@ class Node(Action):
         Matching
         official ``Node._perform_substitutions(context)`` pattern.
         """
-        from launch_plus.entities.helpers import (
-            _read_and_expand_param_file,
-            env_overrides,
-            resolve_value,
-        )
-        from launch_plus.entities.substitution import Substitution
-
         state = context._state
         entry = state.tracked["nodes"][self._idx]
 
@@ -262,12 +228,10 @@ class Node(Action):
         params: dict[str, str] = {k: str(v) for k, v in ctx_gp}
         global_pf = list(context._launch_configurations.get("global_param_files", []))
         pf_list: list[dict] = list(global_pf)
-        seen_pf: set[str] = set()
 
         for p in self._raw_parameters:
-            if isinstance(p, dict) and "from" in p:
-                # param file reference
-                path = resolve_value(p["from"], context) or ""
+            if isinstance(p, ParameterFile):
+                path = p.evaluate(context)
                 state.track_param_file(path)
                 pf_entry: dict = {"path": path}
                 if state.inline_params:
@@ -275,37 +239,10 @@ class Node(Action):
                     if expanded is not None:
                         pf_entry["params"] = expanded
                 pf_list.append(pf_entry)
-            elif isinstance(p, dict) and "name" in p and "value" in p:
-                # inline param
-                k = resolve_value(p["name"], context) or ""
-                v = resolve_value(p["value"], context) or ""
+            elif isinstance(p, Parameter):
+                k, v = p.evaluate(context)
                 params[k] = v
-            elif hasattr(p, "_param_file"):
-                # deferred param file
-                path = p._param_file
-                if path is None and hasattr(p, "_raw_param_file") and p._raw_param_file is not None:
-                    raw = p._raw_param_file
-                    if isinstance(raw, Substitution):
-                        try:
-                            result = raw.perform(context)
-                            if result is not None:
-                                path = str(result)
-                        except Exception:
-                            pass
-                    elif not isinstance(raw, str):
-                        path = str(raw)
-                if path:
-                    path = str(path)
-                    if path not in seen_pf:
-                        seen_pf.add(path)
-                        pf_entry = {"path": path}
-                        if state.inline_params:
-                            expanded = _read_and_expand_param_file(path, state=state)
-                            if expanded is not None:
-                                pf_entry["params"] = expanded
-                        pf_list.append(pf_entry)
             elif isinstance(p, dict):
-                # plain param dict
                 for k, v in p.items():
                     resolved_v = context.perform_substitution(v)
                     params[str(k)] = resolved_v if resolved_v is not None else ""
@@ -467,7 +404,6 @@ class ComposableNodeContainer(Action):
 
     def _perform_substitutions(self, context) -> None:
         """Resolve all substitutions into the tracked entry."""
-        from launch_plus.entities.helpers import env_overrides, resolve_value
 
         state = context._state
         entry = state.tracked["nodes"][self._idx]

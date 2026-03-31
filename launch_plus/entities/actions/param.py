@@ -7,19 +7,11 @@ from __future__ import annotations
 
 from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
+from launch_plus.entities.parameter_descriptions import (
+    ParameterFile,  # noqa: F401 — re-exported for import_patcher
+)
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
-
-
-class ParameterFile(Action):
-    """Tracks ParameterFile references so they can be reported as param_file dependencies."""
-
-    def __init__(self, param_file=None, *args, allow_substs=False, **kwargs):
-        if param_file is None and args:
-            param_file = args[0]
-        # Store raw — resolve lazily (matches official: no eager resolution)
-        self._param_file = param_file if isinstance(param_file, str) else None
-        self._raw_param_file = param_file
 
 
 @expose_action("let")

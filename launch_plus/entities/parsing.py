@@ -54,22 +54,24 @@ class _ActionParser:
         - ``{"name": tokens, "value": tokens}`` for inline params
         - ``{"from": tokens}`` for param file references
         """
+        from launch_plus.entities.parameter_descriptions import Parameter, ParameterFile
+
         items = entity.get_attr("param", data_type=list, optional=True)
         if not items:
             return []
-        result = []
+        result: list = []
         for p in items:
             name = p.get_attr("name", optional=True)
             value = p.get_attr("value", optional=True)
             from_file = p.get_attr("from", optional=True)
             if from_file:
-                result.append({"from": self.parse_substitution(from_file)})
+                result.append(ParameterFile(self.parse_substitution(from_file)))
             elif name:
                 result.append(
-                    {
-                        "name": self.parse_substitution(name),
-                        "value": self.parse_substitution(value or ""),
-                    }
+                    Parameter(
+                        name=self.parse_substitution(name),
+                        value=self.parse_substitution(value or ""),
+                    )
                 )
         return result
 

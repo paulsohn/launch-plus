@@ -5,13 +5,13 @@ Covers: <let> (XML), SetLaunchConfiguration / SetParameter / ParameterFile (Pyth
 
 from __future__ import annotations
 
-from launch_plus.entities.action import _TrackedAction
+from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 
-class _TrackedParameterFile(_TrackedAction):
+class ParameterFile(Action):
     """Tracks ParameterFile references so they can be reported as param_file dependencies."""
 
     def __init__(self, param_file=None, *args, allow_substs=False, **kwargs):
@@ -23,7 +23,7 @@ class _TrackedParameterFile(_TrackedAction):
 
 
 @expose_action("let")
-class _SetLaunchConfiguration(_TrackedAction):
+class SetLaunchConfiguration(Action):
     """Implements SetLaunchConfiguration / <let>: updates launch_configurations."""
 
     @classmethod
@@ -54,7 +54,7 @@ class _SetLaunchConfiguration(_TrackedAction):
 
 
 @expose_action("set_parameter")
-class _TrackedSetParameter(_TrackedAction):
+class SetParameter(Action):
     """Mirrors launch_ros SetParameter / <set_parameter>."""
 
     @classmethod

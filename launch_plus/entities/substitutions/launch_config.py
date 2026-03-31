@@ -16,12 +16,12 @@ from launch_plus.entities.substitution import Substitution
 logger = logging.getLogger("launch_plus")
 
 
-class _DeferredDefault:
+class DeferredDefault:
     """Wraps an unresolved DeclareLaunchArgument default_value.
 
     Stored in ``_launch_configurations`` instead of a resolved string.
     Resolution is deferred until the value is actually read via
-    ``_LaunchConfiguration.perform()``.
+    ``LaunchConfiguration.perform()``.
     """
 
     def __init__(self, default_value):
@@ -46,15 +46,15 @@ class _DeferredDefault:
 
 
 @expose_substitution("var")
-class _LaunchConfiguration(Substitution):
+class LaunchConfiguration(Substitution):
     """Unified substitution: ``$(var name)`` (XML) and ``LaunchConfiguration("name")`` (Python).
 
     Reads from ``context.launch_configurations[name]`` at resolution time,
     matching the official ROS 2 ``LaunchConfiguration`` semantics.
 
     Construction:
-    - Python shim: ``_LaunchConfiguration("variable_name", default=...)``
-    - XML parse: ``_LaunchConfiguration.parse(args)`` → ``cls(variable_name=name_tokens)``
+    - Python shim: ``LaunchConfiguration("variable_name", default=...)``
+    - XML parse: ``LaunchConfiguration.parse(args)`` → ``cls(variable_name=name_tokens)``
     """
 
     def __init__(self, variable_name=None, default=None, **kwargs):
@@ -65,7 +65,7 @@ class _LaunchConfiguration(Substitution):
         self._default = default
 
     @classmethod
-    def parse(cls, args: list[Any]) -> tuple[type[_LaunchConfiguration], dict[str, Any]]:
+    def parse(cls, args: list[Any]) -> tuple[type[LaunchConfiguration], dict[str, Any]]:
         """Parse ``$(var name)`` from XML substitution syntax."""
         if not args:
             raise ValueError("$(var ...) requires a name argument")
@@ -97,7 +97,7 @@ class _LaunchConfiguration(Substitution):
             lc = getattr(context, "_launch_configurations", {})
             if name in lc:
                 value = lc[name]
-                if isinstance(value, _DeferredDefault):
+                if isinstance(value, DeferredDefault):
                     resolved = value.resolve(context)
                     lc[name] = resolved
                     return resolved

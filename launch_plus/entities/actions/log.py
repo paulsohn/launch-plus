@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from launch_plus.entities.action import _TrackedAction
+from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
 
 @expose_action("log")
-class _LogAction(_TrackedAction):
+class LogInfo(Action):
     """Tracks <log> — records a log message as a node entry."""
 
     @classmethod

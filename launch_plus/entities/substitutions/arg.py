@@ -29,7 +29,7 @@ class ArgSubstitution(Substitution):
 
     def perform(self, ctx: LaunchContext) -> str:
         from launch_plus.entities.helpers import resolve_substitutions_from_tokens
-        from launch_plus.entities.substitutions.launch_config import _DeferredDefault
+        from launch_plus.entities.substitutions.launch_config import DeferredDefault
 
         name = resolve_substitutions_from_tokens(self.name, ctx)
         lc = getattr(ctx, "_launch_configurations", {})
@@ -37,7 +37,7 @@ class ArgSubstitution(Substitution):
         if value is None:
             logger.error("undefined argument: %s", name)
             return f"$(arg {name})"
-        if isinstance(value, _DeferredDefault):
+        if isinstance(value, DeferredDefault):
             resolved = value.resolve(ctx)
             lc[name] = resolved
             value = resolved

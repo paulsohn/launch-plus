@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 import launch_plus.resolver as _R
-from launch_plus.entities.action import _TrackedAction
+from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
@@ -14,7 +14,7 @@ logger = logging.getLogger("launch_plus")
 
 
 @expose_action("group")
-class _TrackedGroupAction(_TrackedAction):
+class GroupAction(Action):
     """Stores GroupAction's child actions so the walker can recurse into them."""
 
     @classmethod
@@ -90,7 +90,7 @@ class _TrackedGroupAction(_TrackedAction):
             context._pop_launch_configurations()
 
 
-class _TrackedOpaqueFunction(_TrackedAction):
+class OpaqueFunction(Action):
     """Stores an OpaqueFunction's callable so the walker can invoke it."""
 
     def __init__(self, *, function=None, **kwargs):
@@ -108,7 +108,7 @@ class _TrackedOpaqueFunction(_TrackedAction):
         return None
 
 
-class _TimerAction(_TrackedAction):
+class TimerAction(Action):
     """Stores TimerAction child actions so the walker can recurse into them."""
 
     def __init__(self, *, period=None, actions=None, **kwargs):

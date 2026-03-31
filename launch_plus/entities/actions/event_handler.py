@@ -6,7 +6,7 @@ Covers: <on_process_start>, <on_process_exit>, <on_state_transition>,
 
 from __future__ import annotations
 
-from launch_plus.entities.action import _TrackedAction
+from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
@@ -16,7 +16,7 @@ from launch_plus.parsers.entity import Entity
 @expose_action("on_process_exit")
 @expose_action("on_state_transition")
 @expose_action("on_shutdown")
-class _EventHandlerAction(_TrackedAction):
+class EventHandler(Action):
     """Tracks <on_process_start>, <on_process_exit>, <on_state_transition>, <on_shutdown>."""
 
     @classmethod
@@ -97,7 +97,7 @@ class _EventHandlerAction(_TrackedAction):
 
 
 @expose_action("emit_event")
-class _EmitEventAction(_TrackedAction):
+class EmitEvent(Action):
     """Tracks <emit_event> — records an event emission."""
 
     @classmethod
@@ -142,7 +142,7 @@ class _EmitEventAction(_TrackedAction):
 
 # ─── Python-shim actions ─────────────────────────────────────────────────────
 
-from launch_plus.entities.action import _TrackedAction  # noqa: E402
+from launch_plus.entities.action import Action  # noqa: E402
 
 
 def _transition_name(transition_id):
@@ -176,7 +176,7 @@ def _action_namespace_info(action, state):
     return entry.get("namespace_stack", []), entry.get("explicit_namespace")
 
 
-class _TrackedEmitEvent(_TrackedAction):
+class TrackedEmitEvent(Action):
     """Tracked emit_event — records the event type and optional target node."""
 
     def __init__(self, event=None, **kwargs):
@@ -201,7 +201,7 @@ class _TrackedEmitEvent(_TrackedAction):
         }
 
 
-class _TrackedChangeState(_TrackedAction):
+class ChangeState(Action):
     """Tracked ChangeState event — records the transition and target node."""
 
     def __init__(self, lifecycle_node_matcher=None, transition_id=None, **kwargs):
@@ -226,7 +226,7 @@ class _TrackedChangeState(_TrackedAction):
                 self._explicit_namespace = getattr(matcher, "_explicit_namespace", None)
 
 
-class _TrackedShutdown(_TrackedAction):
+class Shutdown(Action):
     """Tracked Shutdown event."""
 
     _event_name = "shutdown"
@@ -249,7 +249,7 @@ class _TrackedShutdown(_TrackedAction):
         }
 
 
-class _TrackedMatchesAction(_TrackedAction):
+class MatchesAction(Action):
     """Wraps ``matches_action(node)`` — carries the raw action for deferred name resolution."""
 
     def __init__(self, action):
@@ -270,7 +270,7 @@ class _TrackedMatchesAction(_TrackedAction):
         return True
 
 
-class _TrackedOnProcessStart(_TrackedAction):
+class OnProcessStart(Action):
     """Tracked OnProcessStart event handler."""
 
     def __init__(self, target_action=None, on_start=None, **kwargs):
@@ -292,7 +292,7 @@ class _TrackedOnProcessStart(_TrackedAction):
         }
 
 
-class _TrackedOnProcessExit(_TrackedAction):
+class OnProcessExit(Action):
     """Tracked OnProcessExit event handler."""
 
     def __init__(self, target_action=None, on_exit=None, **kwargs):
@@ -314,7 +314,7 @@ class _TrackedOnProcessExit(_TrackedAction):
         }
 
 
-class _TrackedOnStateTransition(_TrackedAction):
+class OnStateTransition(Action):
     """Tracked OnStateTransition event handler."""
 
     def __init__(
@@ -340,7 +340,7 @@ class _TrackedOnStateTransition(_TrackedAction):
         }
 
 
-class _TrackedOnShutdown(_TrackedAction):
+class OnShutdown(Action):
     """Tracked OnShutdown event handler."""
 
     def __init__(self, on_shutdown=None, **kwargs):
@@ -359,7 +359,7 @@ class _TrackedOnShutdown(_TrackedAction):
         }
 
 
-class _TrackedRegisterEventHandler(_TrackedAction):
+class RegisterEventHandler(Action):
     """Tracked RegisterEventHandler — records the event handler to _state.tracked."""
 
     def __init__(self, event_handler=None, **kwargs):

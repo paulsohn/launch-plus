@@ -119,8 +119,11 @@ def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
 import launch_plus.entities.actions  # noqa: F401, E402
 
 # ─── Internal imports (used by resolver logic) ───────────────────────────────
-from launch_plus.entities.action import _TrackedAction  # noqa: E402
-from launch_plus.entities.actions.arg import _apply_declared_arg, _DeclaredArg  # noqa: E402
+from launch_plus.entities.action import Action  # noqa: E402
+from launch_plus.entities.actions.arg import (  # noqa: E402
+    DeclareLaunchArgument,
+    _apply_declared_arg,
+)
 from launch_plus.entities.helpers import (  # noqa: E402
     _extract_pkg_and_share_path,
     _parse_portable_path,
@@ -199,7 +202,7 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
 
         # Pass 1: apply DeclareLaunchArgument defaults.
         for entity in entities:
-            if isinstance(entity, _DeclaredArg):
+            if isinstance(entity, DeclareLaunchArgument):
                 _apply_declared_arg(entity, parent_context)
 
         # Pass 2: walk all actions in the shared context.
@@ -307,7 +310,7 @@ def resolve_included_file(
 def _walk_actions(state, actions, context):
     """Walk a list of actions, calling ``execute()`` on each.
 
-    Tracked actions (subclasses of ``_TrackedAction``) implement the polymorphic
+    Tracked actions (subclasses of ``Action``) implement the polymorphic
     ``execute(context)`` method.  Untracked actions (real ROS 2 objects from
     OpaqueFunction returns) are handled by ``_walk_untracked_action()``.
     """
@@ -323,7 +326,7 @@ def _walk_actions(state, actions, context):
             if action is None:
                 continue
             try:
-                if isinstance(action, _TrackedAction):
+                if isinstance(action, Action):
                     children = action.execute(context)
                     if children:
                         _walk_actions(state, children, context)
@@ -435,7 +438,7 @@ def _walk_untracked_action(state, action, context):
 # ─── Known untracked action class names ──────────────────────────────────────
 
 # Real ROS 2 class names that _walk_untracked_action handles or that are safe
-# to skip.  Our _TrackedAction subclasses are dispatched via execute() and
+# to skip.  Our Action subclasses are dispatched via execute() and
 # don't need to be listed here.
 _KNOWN_UNTRACKED_CLASSES: frozenset = frozenset(
     {
@@ -666,7 +669,7 @@ def _resolve_file_impl(
     entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
     for entity in entities:
-        if isinstance(entity, _DeclaredArg):
+        if isinstance(entity, DeclareLaunchArgument):
             _apply_declared_arg(entity, ctx)
 
     _walk_actions(state, entities, ctx)

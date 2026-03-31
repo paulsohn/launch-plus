@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import os
 
-from launch_plus.entities.action import _TrackedAction
+from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
@@ -17,7 +17,7 @@ logger = logging.getLogger("launch_plus")
 
 
 @expose_action("set_env")
-class _TrackedSetEnvironmentVariable(_TrackedAction):
+class SetEnvironmentVariable(Action):
     """Tracks SetEnvironmentVariable / <set_env>."""
 
     @classmethod
@@ -53,7 +53,7 @@ class _TrackedSetEnvironmentVariable(_TrackedAction):
 
 
 @expose_action("unset_env")
-class _TrackedUnsetEnvironmentVariable(_TrackedAction):
+class UnsetEnvironmentVariable(Action):
     """Tracks UnsetEnvironmentVariable / <unset_env>."""
 
     @classmethod
@@ -97,7 +97,7 @@ class _TrackedUnsetEnvironmentVariable(_TrackedAction):
 
 
 @expose_action("push-ros-namespace")
-class _TrackedPushRosNamespace(_TrackedAction):
+class PushRosNamespace(Action):
     """Tracks PushRosNamespace / <push-ros-namespace>.
 
     Matching official: computes cumulative namespace and stores in
@@ -125,7 +125,7 @@ class _TrackedPushRosNamespace(_TrackedAction):
 
 
 @expose_action("set_remap")
-class _SetRemap(_TrackedAction):
+class SetRemap(Action):
     """Tracks SetRemap / <set_remap>.
 
     Matching official: appends to ``context.launch_configurations['ros_remaps']``.

@@ -6,7 +6,7 @@ Covers: <node>, <lifecycle_node>, <node_container>,
 
 from __future__ import annotations
 
-from launch_plus.entities.action import _TrackedAction
+from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
@@ -106,7 +106,7 @@ def _parse_optional_raw(text: str | None) -> list | None:
 
 @expose_action("node")
 @expose_action("lifecycle_node")
-class _TrackedNode(_TrackedAction):
+class Node(Action):
     """Tracks a Node / LifecycleNode for both XML and Python shim paths."""
 
     @classmethod
@@ -264,14 +264,14 @@ class _TrackedNode(_TrackedAction):
         return f"TrackedNode(package={self._raw_package!r})"
 
 
-class _TrackedLifecycleNode(_TrackedNode):
+class LifecycleNode(Node):
     def __init__(self, **kwargs):
         kwargs.setdefault("_xml_kind", "lifecycle_node")
         super().__init__(**kwargs)
         self._kind = "lifecycle_node"
 
 
-class _TrackedComposableNode(_TrackedAction):
+class ComposableNode(Action):
     """A composable node plugin loaded into a container process.
 
     Does NOT add to the flat ``_state.tracked["nodes"]`` list — it is attached to the
@@ -294,7 +294,7 @@ class _TrackedComposableNode(_TrackedAction):
 
 @expose_action("node_container")
 @expose_action("composable_node_container")
-class _TrackedComposableNodeContainer(_TrackedAction):
+class ComposableNodeContainer(Action):
     """A composable node container process.
 
     Emits a ``kind='container'`` entry whose ``plugins`` list is populated during
@@ -426,7 +426,7 @@ class _TrackedComposableNodeContainer(_TrackedAction):
 
 
 @expose_action("load_composable_node")
-class _TrackedLoadComposableNodes(_TrackedAction):
+class LoadComposableNodes(Action):
     """Loads composable nodes into an existing container."""
 
     @classmethod
@@ -488,7 +488,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
             elif context is not None:
                 entry = context._state.tracked["nodes"][self._idx]
                 if self._raw_target is not None:
-                    if isinstance(self._raw_target, _TrackedComposableNodeContainer):
+                    if isinstance(self._raw_target, ComposableNodeContainer):
                         self._raw_target._ensure_tracked(state)
                         container = context._state.tracked["nodes"][self._raw_target._idx]
                         target = _fully_qualified_name(container)
@@ -526,8 +526,8 @@ class _TrackedLoadComposableNodes(_TrackedAction):
 def _resolve_node_details(state, node, context):
     """Fill in deferred details (package, executable, name, namespace, params, remaps, env).
 
-    Works for both ``_TrackedNode`` / ``_TrackedLifecycleNode`` and
-    ``_TrackedComposableNodeContainer`` — both expose the same raw fields.
+    Works for both ``Node`` / ``LifecycleNode`` and
+    ``ComposableNodeContainer`` — both expose the same raw fields.
     """
     from launch_plus.entities.helpers import (
         _is_substitution,
@@ -634,7 +634,7 @@ def _resolve_node_details(state, node, context):
 
 
 def _resolve_composable_plugins(state, descs, context):
-    """Convert ``_TrackedComposableNode`` descriptions to serialisable plugin dicts."""
+    """Convert ``ComposableNode`` descriptions to serialisable plugin dicts."""
     from launch_plus.entities.helpers import (
         _is_substitution,
         _read_and_expand_param_file,
@@ -643,7 +643,7 @@ def _resolve_composable_plugins(state, descs, context):
 
     plugins = []
     for desc in descs:
-        if not isinstance(desc, _TrackedComposableNode):
+        if not isinstance(desc, ComposableNode):
             pkg = getattr(desc, "package", None) or getattr(desc, "_package", None)
             plugin = getattr(desc, "plugin", None) or getattr(desc, "_plugin", None)
             if pkg or plugin:

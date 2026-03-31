@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from launch_plus.entities.action import _TrackedAction
+from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import _portable_display
 from launch_plus.entities.parsing import _ActionParser
@@ -14,7 +14,7 @@ logger = logging.getLogger("launch_plus")
 
 
 @expose_action("arg")
-class _DeclaredArg(_TrackedAction):
+class DeclareLaunchArgument(Action):
     """Stub for DeclareLaunchArgument / <arg>."""
 
     @classmethod
@@ -39,7 +39,7 @@ class _DeclaredArg(_TrackedAction):
 
     def execute(self, context) -> list | None:
         from launch_plus.entities.helpers import resolve_value
-        from launch_plus.entities.substitutions.launch_config import _DeferredDefault
+        from launch_plus.entities.substitutions.launch_config import DeferredDefault
 
         name = self.name
         if not name:
@@ -88,7 +88,7 @@ class _DeclaredArg(_TrackedAction):
 
         # Apply default — set in _launch_configurations so $(var name) can find it
         dv = self.default_value
-        context._launch_configurations[name] = _DeferredDefault(dv)
+        context._launch_configurations[name] = DeferredDefault(dv)
         display = resolve_value(dv, context) or ""
         _record_and_track(name, display, context)
         return None
@@ -105,7 +105,7 @@ def _record_and_track(name: str, resolved: str, context=None) -> None:
     state.record_declared_arg(name, resolved, flat=not already_seen)
 
 
-def _execute_xml_arg(arg: _DeclaredArg, context) -> None:
+def _execute_xml_arg(arg: DeclareLaunchArgument, context) -> None:
     """Execute <arg> for the XML path — context is a LaunchContext."""
     from launch_plus.entities.helpers import resolve_value
 
@@ -126,9 +126,9 @@ def _execute_xml_arg(arg: _DeclaredArg, context) -> None:
     _record_and_track(name, resolved, context)
 
 
-def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
+def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
     """Resolve a DeclareLaunchArgument default and apply it to the launch context."""
-    from launch_plus.entities.substitutions.launch_config import _DeferredDefault
+    from launch_plus.entities.substitutions.launch_config import DeferredDefault
 
     if not arg.name:
         return
@@ -172,4 +172,4 @@ def _apply_declared_arg(arg: _DeclaredArg, context) -> None:
     _record_and_track(arg.name, display, context)
 
     if context is not None:
-        context._launch_configurations[arg.name] = _DeferredDefault(dv)
+        context._launch_configurations[arg.name] = DeferredDefault(dv)

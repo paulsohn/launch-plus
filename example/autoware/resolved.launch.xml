@@ -8,7 +8,7 @@
   <group>
     <!-- arg name="container_name" value="pointcloud_container" -->
     <!-- arg name="use_multithread" value="true" -->
-    <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="pointcloud_container">
+    <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="pointcloud_container" namespace="/">
       <param name="front_overhang" value="1.0"/>
       <param name="left_overhang" value="0.128"/>
       <param name="max_steer_angle" value="0.7"/>

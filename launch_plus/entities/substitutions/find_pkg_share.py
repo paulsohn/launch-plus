@@ -53,7 +53,7 @@ class FindPackageShareSubstitution(Substitution):
 # ─── Python-shim substitution ────────────────────────────────────────────────
 
 
-class _TrackedFindPackageShare(Substitution):
+class FindPackageShare(Substitution):
     """Tracks FindPackageShare; package may be a string or a list of substitutions."""
 
     def __init__(self, package):

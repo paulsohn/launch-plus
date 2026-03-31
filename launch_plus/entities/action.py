@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-class _TrackedAction:
+class Action:
     """Base for all tracked Python-side action classes.
 
     Mirrors the official ROS 2 ``Action.execute(context)`` pattern: each

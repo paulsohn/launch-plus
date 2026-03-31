@@ -110,13 +110,13 @@ def _portable_display(sub) -> str:
     Used for recording unresolved declared arg defaults in --show-args metadata.
     """
     # Lazy imports to avoid circular dependencies
-    from launch_plus.entities.substitutions.find_pkg_share import _TrackedFindPackageShare
-    from launch_plus.entities.substitutions.path_join import _TrackedPathJoinSubstitution
+    from launch_plus.entities.substitutions.find_pkg_share import FindPackageShare
+    from launch_plus.entities.substitutions.path_join import PathJoinSubstitution
 
-    if isinstance(sub, _TrackedFindPackageShare):
+    if isinstance(sub, FindPackageShare):
         pkg, _ = sub._resolve_name(None)
         return f"$(find-pkg-share {pkg})"
-    if isinstance(sub, _TrackedPathJoinSubstitution):
+    if isinstance(sub, PathJoinSubstitution):
         return "/".join(_portable_display(s) for s in sub._subs)
     return str(sub)
 

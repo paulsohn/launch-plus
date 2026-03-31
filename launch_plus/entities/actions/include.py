@@ -6,7 +6,7 @@ import logging
 import os
 
 import launch_plus.resolver as _R
-from launch_plus.entities.action import _TrackedAction
+from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import (
     _extract_pkg_and_share_path,
@@ -20,7 +20,7 @@ logger = logging.getLogger("launch_plus")
 
 
 @expose_action("include")
-class _TrackedIncludeLaunchDescription(_TrackedAction):
+class IncludeLaunchDescription(Action):
     """Tracks IncludeLaunchDescription for both XML and Python shim paths."""
 
     @classmethod

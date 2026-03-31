@@ -16,39 +16,39 @@ import types
 from pathlib import Path
 
 import launch_plus.resolver as _R
-from launch_plus.entities.actions.arg import _DeclaredArg
+from launch_plus.entities.actions.arg import DeclareLaunchArgument
 from launch_plus.entities.actions.env import (
-    _TrackedPushRosNamespace,
-    _TrackedSetEnvironmentVariable,
-    _TrackedUnsetEnvironmentVariable,
+    PushRosNamespace,
+    SetEnvironmentVariable,
+    UnsetEnvironmentVariable,
 )
 from launch_plus.entities.actions.event_handler import (
-    _TrackedEmitEvent,
-    _TrackedOnProcessExit,
-    _TrackedOnProcessStart,
-    _TrackedOnShutdown,
-    _TrackedOnStateTransition,
-    _TrackedRegisterEventHandler,
-    _TrackedShutdown,
+    OnProcessExit,
+    OnProcessStart,
+    OnShutdown,
+    OnStateTransition,
+    RegisterEventHandler,
+    Shutdown,
+    TrackedEmitEvent,
 )
-from launch_plus.entities.actions.executable import _TrackedExecutable
+from launch_plus.entities.actions.executable import ExecuteProcess
 from launch_plus.entities.actions.group import (
-    _TimerAction,
-    _TrackedGroupAction,
-    _TrackedOpaqueFunction,
+    GroupAction,
+    OpaqueFunction,
+    TimerAction,
 )
-from launch_plus.entities.actions.include import _TrackedIncludeLaunchDescription
+from launch_plus.entities.actions.include import IncludeLaunchDescription
 from launch_plus.entities.actions.node import (
-    _TrackedComposableNode,
-    _TrackedComposableNodeContainer,
-    _TrackedLifecycleNode,
-    _TrackedLoadComposableNodes,
-    _TrackedNode,
+    ComposableNode,
+    ComposableNodeContainer,
+    LifecycleNode,
+    LoadComposableNodes,
+    Node,
 )
 from launch_plus.entities.actions.param import (
-    _SetLaunchConfiguration,
-    _TrackedParameterFile,
-    _TrackedSetParameter,
+    ParameterFile,
+    SetLaunchConfiguration,
+    SetParameter,
 )
 from launch_plus.entities.conditions import (
     IfCondition,
@@ -63,9 +63,9 @@ from launch_plus.entities.launch_description_source import (
 )
 from launch_plus.entities.state import LaunchContext
 from launch_plus.entities.substitutions.environment_variable import DeferredEnvironmentVariable
-from launch_plus.entities.substitutions.find_pkg_share import _TrackedFindPackageShare
-from launch_plus.entities.substitutions.launch_config import _LaunchConfiguration
-from launch_plus.entities.substitutions.path_join import _TrackedPathJoinSubstitution
+from launch_plus.entities.substitutions.find_pkg_share import FindPackageShare
+from launch_plus.entities.substitutions.launch_config import LaunchConfiguration
+from launch_plus.entities.substitutions.path_join import PathJoinSubstitution
 
 logger = logging.getLogger("launch_plus")
 
@@ -95,13 +95,13 @@ def _build_patched_launch_ros():
 
 def _build_patched_launch_ros_actions():
     mod = types.ModuleType("launch_ros.actions")
-    mod.Node = _TrackedNode
-    mod.LifecycleNode = _TrackedLifecycleNode
-    mod.ComposableNodeContainer = _TrackedComposableNodeContainer
-    mod.LoadComposableNodes = _TrackedLoadComposableNodes
-    mod.SetParameter = _TrackedSetParameter
+    mod.Node = Node
+    mod.LifecycleNode = LifecycleNode
+    mod.ComposableNodeContainer = ComposableNodeContainer
+    mod.LoadComposableNodes = LoadComposableNodes
+    mod.SetParameter = SetParameter
     mod.SetRemap = lambda *a, **kw: None
-    mod.PushRosNamespace = _TrackedPushRosNamespace
+    mod.PushRosNamespace = PushRosNamespace
     mod.SetParametersCallback = lambda *a, **kw: None
     return mod
 
@@ -124,17 +124,17 @@ def _build_patched_launch_ros_utilities():
 
 def _build_patched_launch_ros_descriptions():
     mod = types.ModuleType("launch_ros.descriptions")
-    mod.ComposableNode = _TrackedComposableNode
-    mod.ParameterFile = _TrackedParameterFile
+    mod.ComposableNode = ComposableNode
+    mod.ParameterFile = ParameterFile
     return mod
 
 
 def _build_patched_launch_substitutions():
     mod = types.ModuleType("launch.substitutions")
     mod.__path__ = []
-    mod.FindPackageShare = _TrackedFindPackageShare
-    mod.PathJoinSubstitution = _TrackedPathJoinSubstitution
-    mod.LaunchConfiguration = _LaunchConfiguration
+    mod.FindPackageShare = FindPackageShare
+    mod.PathJoinSubstitution = PathJoinSubstitution
+    mod.LaunchConfiguration = LaunchConfiguration
     mod.EnvironmentVariable = DeferredEnvironmentVariable
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None
@@ -152,34 +152,34 @@ def _build_patched_launch_substitutions_environment_variable():
 
 def _build_patched_launch_actions():
     mod = types.ModuleType("launch.actions")
-    mod.IncludeLaunchDescription = _TrackedIncludeLaunchDescription
-    mod.DeclareLaunchArgument = _DeclaredArg
-    mod.OpaqueFunction = _TrackedOpaqueFunction
-    mod.GroupAction = _TrackedGroupAction
-    mod.SetLaunchConfiguration = _SetLaunchConfiguration
+    mod.IncludeLaunchDescription = IncludeLaunchDescription
+    mod.DeclareLaunchArgument = DeclareLaunchArgument
+    mod.OpaqueFunction = OpaqueFunction
+    mod.GroupAction = GroupAction
+    mod.SetLaunchConfiguration = SetLaunchConfiguration
     mod.LogInfo = lambda *a, **kw: None
-    mod.TimerAction = _TimerAction
-    mod.RegisterEventHandler = _TrackedRegisterEventHandler
-    mod.EmitEvent = _TrackedEmitEvent
-    mod.Shutdown = _TrackedShutdown
+    mod.TimerAction = TimerAction
+    mod.RegisterEventHandler = RegisterEventHandler
+    mod.EmitEvent = TrackedEmitEvent
+    mod.Shutdown = Shutdown
     mod.PushLaunchConfigurations = lambda *a, **kw: None
     mod.PopLaunchConfigurations = lambda *a, **kw: None
-    mod.SetEnvironmentVariable = _TrackedSetEnvironmentVariable
-    mod.UnsetEnvironmentVariable = _TrackedUnsetEnvironmentVariable
-    mod.ExecuteProcess = _TrackedExecutable
+    mod.SetEnvironmentVariable = SetEnvironmentVariable
+    mod.UnsetEnvironmentVariable = UnsetEnvironmentVariable
+    mod.ExecuteProcess = ExecuteProcess
     mod.ExecuteLocal = lambda *a, **kw: None
-    mod.OnProcessExit = _TrackedOnProcessExit
-    mod.OnProcessStart = _TrackedOnProcessStart
+    mod.OnProcessExit = OnProcessExit
+    mod.OnProcessStart = OnProcessStart
     return mod
 
 
 def _build_patched_launch_event_handlers():
     mod = types.ModuleType("launch.event_handlers")
-    mod.OnProcessExit = _TrackedOnProcessExit
-    mod.OnProcessStart = _TrackedOnProcessStart
+    mod.OnProcessExit = OnProcessExit
+    mod.OnProcessStart = OnProcessStart
     mod.OnProcessIO = lambda *a, **kw: None
-    mod.OnShutdown = _TrackedOnShutdown
-    mod.OnStateTransition = _TrackedOnStateTransition
+    mod.OnShutdown = OnShutdown
+    mod.OnStateTransition = OnStateTransition
     mod.OnExecutionComplete = lambda *a, **kw: None
     return mod
 
@@ -202,13 +202,13 @@ def _build_patched_launch_launch_description_sources():
 
 def _build_patched_launch_ros_substitutions():
     mod = types.ModuleType("launch_ros.substitutions")
-    mod.FindPackageShare = _TrackedFindPackageShare
+    mod.FindPackageShare = FindPackageShare
     return mod
 
 
 def _build_patched_launch_ros_parameter_descriptions():
     mod = types.ModuleType("launch_ros.parameter_descriptions")
-    mod.ParameterFile = _TrackedParameterFile
+    mod.ParameterFile = ParameterFile
     mod.ParameterDescription = lambda *a, **kw: None
     mod.ParameterValue = lambda *a, **kw: None
     return mod

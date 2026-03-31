@@ -7,7 +7,7 @@ from pathlib import Path
 from launch_plus.entities.substitution import Substitution
 
 
-class _TrackedPathJoinSubstitution(Substitution):
+class PathJoinSubstitution(Substitution):
     def __init__(self, substitutions):
         self._subs = substitutions
 

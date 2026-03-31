@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from launch_plus.entities.action import _TrackedAction
+from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.entities.substitution import Substitution
@@ -17,7 +17,7 @@ def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
 
 
 @expose_action("executable")
-class _TrackedExecutable(_TrackedAction):
+class ExecuteProcess(Action):
     """Tracks an ExecuteProcess so the walker can render it as <executable>."""
 
     @classmethod

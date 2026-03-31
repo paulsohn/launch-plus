@@ -220,17 +220,7 @@ def _process_parsed_file(
                 namespace_stack=list(include.namespace_stack),
             )
         else:
-            existing = result.include_args[key]
-            if (
-                existing.explicit != include.explicit_args
-                or existing.namespace_stack != include.namespace_stack
-            ):
-                logger.warning(
-                    "File %s from package %s is included multiple times with different "
-                    "argument contexts; --show-args will use the first include site's args.",
-                    key[1],
-                    key[0],
-                )
+            pass  # Same file included multiple times with different args is normal
         if key not in existing_launch:
             result.launch_files.append(
                 FileDependency(

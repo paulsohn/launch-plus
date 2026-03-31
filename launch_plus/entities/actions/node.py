@@ -223,6 +223,12 @@ class Node(Action):
         if ros_ns:
             entry["ros_namespace"] = ros_ns
 
+        # Store resolved data on instance for serialize_resolved()
+        self._resolved_package = pkg
+        self._resolved_executable = exe
+        self._resolved_name = name or None
+        self._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
+
         # Parameters: global first, then node-specific (matching official order)
         ctx_gp = context._launch_configurations.get("global_params", [])
         params: dict[str, str] = {k: str(v) for k, v in ctx_gp}
@@ -249,6 +255,8 @@ class Node(Action):
 
         entry["parameters"] = params
         entry["param_files"] = pf_list
+        self._resolved_parameters = params
+        self._resolved_param_files = pf_list
 
         # Remappings: global first, then node-specific (matching official)
         remaps = list(context._launch_configurations.get("ros_remaps", []))
@@ -263,6 +271,7 @@ class Node(Action):
                     ]
                 )
         entry["remappings"] = remaps
+        self._resolved_remappings = remaps
 
         # Environment
         env = env_overrides(context)
@@ -270,8 +279,13 @@ class Node(Action):
             if isinstance(item, (tuple, list)) and len(item) == 2:
                 env[resolve_value(item[0], context) or ""] = resolve_value(item[1], context) or ""
         entry["env"] = env
+        self._resolved_env = env
 
         # Extra fields
+        self._resolved_output = None
+        self._resolved_args = None
+        self._resolved_respawn = None
+        self._resolved_respawn_delay = None
         for attr, key in (
             ("_raw_output", "output"),
             ("_raw_arguments", "args"),
@@ -282,9 +296,69 @@ class Node(Action):
             if raw is not None:
                 resolved = context.perform_substitution(raw)
                 entry[key] = resolved if resolved else str(raw)
+                setattr(self, f"_resolved_{key}", entry[key])
+
+    def serialize_resolved(self, indent: str = "  ") -> str | None:
+        """Render this node as a resolved XML snippet."""
+        if not self._resolved:
+            return None
+        child_ind = indent + "  "
+        esc = self._esc
+
+        pkg = esc(self._resolved_package)
+        exe = esc(self._resolved_executable)
+        tag = f'{indent}<node pkg="{pkg}" exec="{exe}"'
+        if self._resolved_name:
+            tag += f' name="{esc(self._resolved_name)}"'
+        if self._resolved_namespace:
+            tag += f' namespace="{esc(self._resolved_namespace)}"'
+        if self._resolved_output:
+            tag += f' output="{esc(self._resolved_output)}"'
+        if self._resolved_args:
+            tag += f' args="{esc(self._resolved_args)}"'
+        if self._resolved_respawn:
+            tag += f' respawn="{esc(self._resolved_respawn)}"'
+        if self._resolved_respawn_delay:
+            tag += f' respawn_delay="{esc(self._resolved_respawn_delay)}"'
+
+        children = self._serialize_children(child_ind)
+        if children:
+            return f"{tag}>\n{children}{indent}</node>\n"
+        return f"{tag}/>\n"
+
+    def _serialize_children(self, indent: str) -> str:
+        """Render param_files, parameters, remappings, env as XML children."""
+        esc = self._esc
+        out: list[str] = []
+
+        for pf in getattr(self, "_resolved_param_files", []):
+            path = pf.get("path", "")
+            inlined = pf.get("params")
+            if inlined is not None:
+                out.append(f"{indent}<!-- params from: {esc(path)} -->\n")
+                for k, v in inlined:
+                    out.append(f'{indent}<param name="{esc(k)}" value="{esc(str(v))}"/>\n')
+                out.append(f"{indent}<!-- end params from: {esc(path)} -->\n")
+            else:
+                out.append(f'{indent}<param from="{esc(path)}"/>\n')
+
+        for key, value in sorted(getattr(self, "_resolved_parameters", {}).items()):
+            out.append(f'{indent}<param name="{esc(key)}" value="{esc(value)}"/>\n')
+
+        ns = getattr(self, "_resolved_namespace", None)
+        for from_, to in getattr(self, "_resolved_remappings", []):
+            # Only qualify 'to' — 'from' is a node-internal name
+            if to and ns and not to.startswith("/") and not to.startswith("~/"):
+                to = f"{ns.rstrip('/')}/{to}"
+            out.append(f'{indent}<remap from="{esc(from_)}" to="{esc(to)}"/>\n')
+
+        for name, value in sorted(getattr(self, "_resolved_env", {}).items()):
+            out.append(f'{indent}<env name="{esc(name)}" value="{esc(value)}"/>\n')
+
+        return "".join(out)
 
     def __repr__(self):
-        return f"TrackedNode(package={self._raw_package!r})"
+        return f"Node(package={self._raw_package!r})"
 
 
 class LifecycleNode(Node):

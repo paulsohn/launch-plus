@@ -134,4 +134,22 @@ class ExecuteProcess(Action):
             for k_tokens, v_tokens in self.__additional_env:
                 env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
         entry["env"] = env
+
+        # Store resolved data on instance for serialize_resolved()
+        self._resolved_cmd = entry["cmd"]
+        self._resolved_name = entry.get("name")
+        self._resolved_env = env
+        self._resolved = True
         return None
+
+    def serialize_resolved(self, indent: str = "  ") -> str | None:
+        if not getattr(self, "_resolved", False):
+            return None
+        esc = self._esc
+        cmd = getattr(self, "_resolved_cmd", "") or ""
+        tag = f'{indent}<executable cmd="{esc(cmd)}"'
+        name = getattr(self, "_resolved_name", None)
+        if name:
+            tag += f' name="{esc(name)}"'
+        tag += "/>\n"
+        return tag

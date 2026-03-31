@@ -117,10 +117,10 @@ def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
 # `_call_opaque_with_stubs`.
 
 import launch_plus.entities.actions  # noqa: F401, E402
-from launch_plus.entities.actions.arg import _apply_declared_arg, _DeclaredArg  # noqa: E402
 
 # ─── Shim classes (re-exported for backward compatibility) ──────���────────────
-from launch_plus.entities.actions.base import _TrackedAction  # noqa: E402
+from launch_plus.entities.action import _TrackedAction  # noqa: E402
+from launch_plus.entities.actions.arg import _apply_declared_arg, _DeclaredArg  # noqa: E402
 from launch_plus.entities.actions.env import (  # noqa: E402, F401
     _TrackedSetEnvironmentVariable,
     _TrackedUnsetEnvironmentVariable,

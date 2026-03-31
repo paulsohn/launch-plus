@@ -6,7 +6,7 @@ Covers: <on_process_start>, <on_process_exit>, <on_state_transition>,
 
 from __future__ import annotations
 
-from launch_plus.entities.actions.base import _TrackedAction
+from launch_plus.entities.action import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
@@ -142,7 +142,7 @@ class _EmitEventAction(_TrackedAction):
 
 # ─── Python-shim actions ─────────────────────────────────────────────────────
 
-from launch_plus.entities.actions.base import _TrackedAction  # noqa: E402
+from launch_plus.entities.action import _TrackedAction  # noqa: E402
 
 
 def _transition_name(transition_id):

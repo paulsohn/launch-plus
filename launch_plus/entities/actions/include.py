@@ -6,7 +6,7 @@ import logging
 import os
 
 import launch_plus.resolver as _R
-from launch_plus.entities.actions.base import _TrackedAction
+from launch_plus.entities.action import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import (
     _extract_pkg_and_share_path,

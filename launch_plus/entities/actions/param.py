@@ -5,7 +5,7 @@ Covers: <let> (XML), SetLaunchConfiguration / SetParameter / ParameterFile (Pyth
 
 from __future__ import annotations
 
-from launch_plus.entities.actions.base import _TrackedAction
+from launch_plus.entities.action import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity

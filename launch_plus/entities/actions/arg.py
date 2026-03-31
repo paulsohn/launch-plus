@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from launch_plus.entities.actions.base import _TrackedAction
+from launch_plus.entities.action import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import _portable_display
 from launch_plus.entities.parsing import _ActionParser

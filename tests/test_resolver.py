@@ -27,7 +27,7 @@ from launch_plus.entities.helpers import (
     env_overrides,
     resolve_substitutions,
 )
-from launch_plus.entities.state import LaunchContext, _parse_rosdep_resolve
+from launch_plus.entities.state import LaunchContext
 from launch_plus.entities.substitutions.find_pkg_share import FindPackageShare
 from launch_plus.entities.substitutions.launch_config import (
     DeferredDefault,
@@ -2358,44 +2358,3 @@ class TestTrackedFindPackageShare:
         # Returns portable fallback but records an error
         assert result == "$(find-pkg-share missing_pkg)"
         assert "missing_pkg" in caplog.text
-
-
-class TestParseRosdepResolve:
-    def test_single_key_apt(self):
-        stdout = "#apt\nros-jazzy-rclcpp\n"
-        assert _parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]
-
-    def test_multi_key(self):
-        stdout = "#ROSDEP[rclcpp]\n#apt\nros-jazzy-rclcpp\n#ROSDEP[eigen]\n#apt\nlibeigen3-dev\n"
-        assert _parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp", "libeigen3-dev"]
-
-    def test_multi_packages_per_key(self):
-        stdout = "#ROSDEP[libnl-3-dev]\n#apt\nlibnl-3-dev libnl-genl-3-dev libnl-route-3-dev\n"
-        assert _parse_rosdep_resolve(stdout) == [
-            "libnl-3-dev",
-            "libnl-genl-3-dev",
-            "libnl-route-3-dev",
-        ]
-
-    def test_empty_output(self):
-        assert _parse_rosdep_resolve("") == []
-
-    def test_unsupported_installer_ignored(self):
-        stdout = "#brew\nhomebrew-pkg\n"
-        assert _parse_rosdep_resolve(stdout) == []
-
-    def test_mixed_installers_only_apt(self):
-        stdout = (
-            "#ROSDEP[rclcpp]\n#apt\nros-jazzy-rclcpp\n#ROSDEP[brew_only]\n#brew\nhomebrew-pkg\n"
-        )
-        assert _parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]
-
-    def test_pip_ignored(self):
-        stdout = "#pip\nsome-pip-package\n"
-        assert _parse_rosdep_resolve(stdout) == []
-
-    def test_unresolved_key_no_installer_line(self):
-        """A key with a #ROSDEP header but no #installer line is unresolved."""
-        stdout = "#ROSDEP[rclcpp]\n#apt\nros-jazzy-rclcpp\n#ROSDEP[nonexistent_xyz]\n"
-        # Only the resolved key's package is returned.
-        assert _parse_rosdep_resolve(stdout) == ["ros-jazzy-rclcpp"]

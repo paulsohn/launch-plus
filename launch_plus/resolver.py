@@ -484,6 +484,7 @@ def resolve_file(
     lockfile: Any = None,
     fetch_dir: "Path | None" = None,
     global_params: list | None = None,
+    fetch_options: Any = None,
 ) -> Any:
     """Resolve a launch file and return a ParsedLaunchFile.
 
@@ -501,6 +502,8 @@ def resolve_file(
         Lockfile with package/repo info.
     fetch_dir : Path | None
         Directory for sparse-checkout.
+    fetch_options : FetchOptions | None
+        Options for inline git sparse-checkout.
     global_params : list | None
         Persisted global params from prior files.
 
@@ -521,6 +524,7 @@ def resolve_file(
             lockfile,
             fetch_dir,
             global_params,
+            fetch_options,
         )
     finally:
         _current_state.reset(token)
@@ -535,6 +539,7 @@ def _resolve_file_impl(
     lockfile: Any = None,
     fetch_dir: "Path | None" = None,
     global_params: list | None = None,
+    fetch_options: Any = None,
 ) -> Any:
     launch_file_str = str(launch_file)
 
@@ -597,6 +602,7 @@ def _resolve_file_impl(
         state.lockfile_data = {}
 
     state.fetch_dir = str(fetch_dir) if fetch_dir else ""
+    state.fetch_options = fetch_options  # FetchOptions from CLI/orchestrator
 
     args_dict = dict(args)
 

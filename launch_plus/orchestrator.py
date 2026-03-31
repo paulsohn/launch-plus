@@ -318,6 +318,7 @@ def _resolve_python_file_recursive(
             lockfile=lockfile,
             fetch_dir=fetch_dir,
             global_params=current_global_params,
+            fetch_options=options,
         )
     except Exception as e:
         logger.error("failed to resolve launch file %s: %s", file_path, e)

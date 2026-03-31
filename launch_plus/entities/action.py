@@ -35,5 +35,5 @@ class Action:
 
     @staticmethod
     def _esc(value: str) -> str:
-        """XML-escape a string value."""
-        return _xml_escape(value)
+        """XML-escape a string value, including quotes for attribute safety."""
+        return _xml_escape(value, {'"': "&quot;"})

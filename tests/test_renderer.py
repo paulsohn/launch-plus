@@ -372,3 +372,37 @@ def test_format_source_label_empty_package() -> None:
     assert "<!-- end: /absolute/path/launch.xml -->" in xml
     # Must NOT contain ":///"
     assert ":///" not in xml
+
+
+# ─── serialize_resolved() tests ──────────────────────────────────────────────
+
+
+def test_serialize_resolved_node_escapes_quotes() -> None:
+    """Quotes in param values must be escaped to &quot; in XML attributes."""
+    from launch_plus.entities.actions.node import Node
+    from launch_plus.entities.state import LaunchContext, ResolverState
+
+    state = ResolverState()
+    ctx = LaunchContext(state)
+    ctx._launch_configurations["global_params"] = [("key_with_quotes", 'value with "quotes"')]
+    node = Node(package="pkg", executable="exec", name="n")
+    node.execute(ctx)
+    snippet = node.serialize_resolved("  ")
+    assert snippet is not None
+    assert "&quot;" in snippet
+    assert 'value with "quotes"' not in snippet
+
+
+def test_serialize_resolved_executable() -> None:
+    """ExecuteProcess.serialize_resolved() produces <executable> XML."""
+    from launch_plus.entities.actions.executable import ExecuteProcess
+    from launch_plus.entities.state import LaunchContext, ResolverState
+
+    state = ResolverState()
+    ctx = LaunchContext(state)
+    ep = ExecuteProcess(cmd=["echo", "hello"])
+    ep.execute(ctx)
+    snippet = ep.serialize_resolved("  ")
+    assert snippet is not None
+    assert "<executable" in snippet
+    assert "echo hello" in snippet

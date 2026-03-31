@@ -127,7 +127,6 @@ from launch_plus.entities.actions.arg import (  # noqa: E402
 from launch_plus.entities.helpers import (  # noqa: E402
     _extract_pkg_and_share_path,
     _parse_portable_path,
-    _ros2_namespace_join,
 )
 from launch_plus.entities.opaque_stubs import _call_opaque_with_stubs  # noqa: E402
 from launch_plus.entities.parsing import _ActionParser  # noqa: E402
@@ -686,17 +685,11 @@ def _resolve_file_impl(
 def _tracked_to_parsed_launch_file(
     tracked: dict[str, Any], resolved_actions: list | None = None
 ) -> Any:
-    """Convert the internal _state.tracked dict to a ParsedLaunchFile."""
+    """Build a ParsedLaunchFile from tracked state and resolved actions."""
     from pathlib import Path as _Path
 
     from launch_plus.types import (
-        ComposablePlugin as _ComposablePlugin,
-    )
-    from launch_plus.types import (
         DependencyKind as _DependencyKind,
-    )
-    from launch_plus.types import (
-        EventHandlerKind as _EventHandlerKind,
     )
     from launch_plus.types import (
         FileDependency as _FileDependency,
@@ -705,191 +698,10 @@ def _tracked_to_parsed_launch_file(
         LaunchInclude as _LaunchInclude,
     )
     from launch_plus.types import (
-        NodeKindTag as _NodeKindTag,
-    )
-    from launch_plus.types import (
-        ParamFileInlined as _ParamFileInlined,
-    )
-    from launch_plus.types import (
-        ParamFileReference as _ParamFileReference,
-    )
-    from launch_plus.types import (
         ParsedLaunchFile as _ParsedLaunchFile,
     )
-    from launch_plus.types import (
-        ResolvedEventAction as _ResolvedEventAction,
-    )
-    from launch_plus.types import (
-        ResolvedNode as _ResolvedNode,
-    )
-    # _effective_namespace is imported at module level from xml_resolver
 
-    # ── Convert nodes ────────────────────────────────────────────────────
-    resolved_nodes: list[_ResolvedNode] = []
-    for n in tracked.get("nodes", []):
-        kind_str = n.get("kind", "node")
-        if kind_str == "set_parameter":
-            continue
-
-        ros_ns = n.get("ros_namespace")
-        explicit_ns = n.get("explicit_namespace")
-        eff_ns = _ros2_namespace_join(ros_ns, explicit_ns) if explicit_ns else ros_ns
-        name = n.get("name", "")
-
-        # Map kind
-        kind_tag: _NodeKindTag
-        plugins: list[_ComposablePlugin] = []
-        load_target: str | None = None
-        log_message: str | None = None
-        remap_from: str | None = None
-        remap_to: str | None = None
-        exec_cmd: str | None = None
-        exec_name: str | None = None
-        handler_kind: _EventHandlerKind | None = None
-        handler_target: str | None = None
-        handler_target_node: str | None = None
-        handler_namespace: str | None = None
-        handler_start_state: str | None = None
-        handler_goal_state: str | None = None
-        handler_actions: list[_ResolvedEventAction] = []
-
-        if kind_str == "container":
-            kind_tag = _NodeKindTag.CONTAINER
-            plugins = _convert_plugins(n.get("plugins", []))
-        elif kind_str == "load_composable":
-            kind_tag = _NodeKindTag.LOAD_COMPOSABLE
-            load_target = n.get("target", "")
-            plugins = _convert_plugins(n.get("plugins", []))
-        elif kind_str == "lifecycle_node":
-            kind_tag = _NodeKindTag.LIFECYCLE_NODE
-        elif kind_str == "set_remap":
-            kind_tag = _NodeKindTag.SET_REMAP
-            remap_from = n.get("remap_from", "")
-            remap_to = n.get("remap_to", "")
-        elif kind_str == "log":
-            kind_tag = _NodeKindTag.LOG
-            log_message = n.get("message", "")
-        elif kind_str == "executable":
-            kind_tag = _NodeKindTag.EXECUTABLE
-            exec_cmd = n.get("cmd", "")
-            exec_name = name if name else None
-        elif kind_str == "event_handler":
-            kind_tag = _NodeKindTag.EVENT_HANDLER
-            hk_str = n.get("handler_kind", "")
-            hk_map = {
-                "on_process_start": _EventHandlerKind.ON_PROCESS_START,
-                "on_process_exit": _EventHandlerKind.ON_PROCESS_EXIT,
-                "on_state_transition": _EventHandlerKind.ON_STATE_TRANSITION,
-                "on_shutdown": _EventHandlerKind.ON_SHUTDOWN,
-            }
-            handler_kind = hk_map.get(hk_str)
-            if handler_kind is None:
-                continue
-            handler_target = n.get("target")
-            handler_target_node = n.get("target_node")
-            handler_namespace = eff_ns
-            handler_start_state = n.get("start_state")
-            handler_goal_state = n.get("goal_state")
-            handler_actions = [
-                _ResolvedEventAction(
-                    event=a.get("event", ""),
-                    target_node=a.get("target_node"),
-                    namespace=a.get("explicit_namespace"),
-                )
-                for a in n.get("eh_actions", [])
-            ]
-        else:
-            kind_tag = _NodeKindTag.NODE
-
-        # Include chain
-        chain_raw = n.get("include_chain", [])
-        include_chain = [(pkg, _Path(sp)) for pkg, sp in chain_raw]
-        source = include_chain[-1] if include_chain else None
-
-        # Param files
-        param_files: list[_ParamFileReference | _ParamFileInlined] = []
-        for pf in n.get("param_files", []):
-            if pf.get("params") is not None:
-                param_files.append(_ParamFileInlined(display=pf["path"], params=pf["params"]))
-            else:
-                param_files.append(_ParamFileReference(display=pf["path"], abs=pf["path"]))
-
-        resolved_nodes.append(
-            _ResolvedNode(
-                package=n.get("package", ""),
-                executable=n.get("executable", ""),
-                name=name if name else None,
-                namespace=eff_ns,
-                explicit_namespace=explicit_ns,
-                namespace_stack=[ros_ns] if ros_ns else [],
-                parameters=dict(n.get("parameters", {})),
-                remappings=[(f, t) for f, t in n.get("remappings", [])],
-                env=dict(n.get("env", {})),
-                source=source,
-                include_chain=include_chain,
-                kind=kind_tag,
-                plugins=plugins,
-                load_target=load_target,
-                log_message=log_message,
-                remap_from=remap_from,
-                remap_to=remap_to,
-                exec_cmd=exec_cmd,
-                exec_name=exec_name,
-                handler_kind=handler_kind,
-                handler_target=handler_target,
-                handler_target_node=handler_target_node,
-                handler_namespace=handler_namespace,
-                handler_start_state=handler_start_state,
-                handler_goal_state=handler_goal_state,
-                handler_actions=handler_actions,
-                param_files=param_files,
-                output=n.get("output"),
-                args=n.get("args"),
-                respawn=n.get("respawn"),
-                respawn_delay=n.get("respawn_delay"),
-            )
-        )
-
-    # ── Legacy event handlers ────────────────────────────────────────────
-    has_inline_eh = any(n.kind == _NodeKindTag.EVENT_HANDLER for n in resolved_nodes)
-    if not has_inline_eh:
-        hk_map = {
-            "on_process_start": _EventHandlerKind.ON_PROCESS_START,
-            "on_process_exit": _EventHandlerKind.ON_PROCESS_EXIT,
-            "on_state_transition": _EventHandlerKind.ON_STATE_TRANSITION,
-            "on_shutdown": _EventHandlerKind.ON_SHUTDOWN,
-        }
-        for eh in tracked.get("event_handlers", []):
-            hk = hk_map.get(eh.get("handler_kind", ""))
-            if hk is None:
-                continue
-            ros_ns = eh.get("ros_namespace")
-            explicit_ns = eh.get("explicit_namespace")
-            handler_ns = _ros2_namespace_join(ros_ns, explicit_ns) if explicit_ns else ros_ns
-            actions = [
-                _ResolvedEventAction(
-                    event=a.get("event", ""),
-                    target_node=a.get("target_node"),
-                    namespace=a.get("explicit_namespace"),
-                )
-                for a in eh.get("actions", [])
-            ]
-            resolved_nodes.append(
-                _ResolvedNode(
-                    kind=_NodeKindTag.EVENT_HANDLER,
-                    namespace_stack=[ros_ns] if ros_ns else [],
-                    explicit_namespace=explicit_ns,
-                    handler_kind=hk,
-                    handler_target=eh.get("target"),
-                    handler_target_node=eh.get("target_node"),
-                    handler_namespace=handler_ns,
-                    handler_start_state=eh.get("start_state"),
-                    handler_goal_state=eh.get("goal_state"),
-                    handler_actions=actions,
-                )
-            )
-
-    # ── Convert include deps ─────────────────────────────────────────────
+    # ── Include deps ──────────────────────────────────────────────────
     launch_includes: list[_LaunchInclude] = []
     include_args_map = tracked.get("include_args", {})
     for dep in tracked.get("include_deps", []):
@@ -905,10 +717,10 @@ def _tracked_to_parsed_launch_file(
             )
         )
 
-    # ── Declared args ────────────────────────────────────────────────────
+    # ── Declared args ─────────────────────────────────────────────────
     declared_arg_defaults = {a["name"]: a["default"] for a in tracked.get("declared_args", [])}
 
-    # ── Param file deps ──────────────────────────────────────────────────
+    # ── Param file deps ───────────────────────────────────────────────
     param_file_deps = [
         _FileDependency(
             package=dep["package"],
@@ -918,7 +730,7 @@ def _tracked_to_parsed_launch_file(
         for dep in tracked.get("param_file_deps", [])
     ]
 
-    # ── Per-file declared args ───────────────────────────────────────────
+    # ── Per-file declared args ────────────────────────────────────────
     declared_args_by_file: dict[tuple[str, _Path], dict[str, str]] = {}
     for key_str, args_list in tracked.get("declared_args_by_file", {}).items():
         if "://" in key_str:
@@ -932,7 +744,7 @@ def _tracked_to_parsed_launch_file(
 
     return _ParsedLaunchFile(
         packages=list(tracked.get("packages", [])),
-        nodes=resolved_nodes,
+        nodes=[],
         launch_includes=launch_includes,
         param_files=param_file_deps,
         declared_arg_defaults=declared_arg_defaults,
@@ -940,36 +752,3 @@ def _tracked_to_parsed_launch_file(
         global_params=list(tracked.get("global_params", [])),
         resolved_actions=resolved_actions or [],
     )
-
-
-def _convert_plugins(raw_plugins: list[dict]) -> list:
-    """Convert raw plugin dicts to ComposablePlugin dataclasses."""
-    from launch_plus.types import (
-        ComposablePlugin as _ComposablePlugin,
-    )
-    from launch_plus.types import (
-        ParamFileInlined as _ParamFileInlined,
-    )
-    from launch_plus.types import (
-        ParamFileReference as _ParamFileReference,
-    )
-
-    result = []
-    for p in raw_plugins:
-        pf_list: list[_ParamFileReference | _ParamFileInlined] = []
-        for pf in p.get("param_files", []):
-            if pf.get("params") is not None:
-                pf_list.append(_ParamFileInlined(display=pf["path"], params=pf["params"]))
-            else:
-                pf_list.append(_ParamFileReference(display=pf["path"], abs=pf["path"]))
-        result.append(
-            _ComposablePlugin(
-                package=p.get("package", ""),
-                plugin=p.get("plugin", ""),
-                name=p.get("name"),
-                parameters=dict(p.get("parameters", {})),
-                remappings=[(f, t) for f, t in p.get("remappings", [])],
-                param_files=pf_list,
-            )
-        )
-    return result

@@ -21,9 +21,7 @@ from launch_plus.types import (
     FileDependency,
     IncludeArgContext,
     Lockfile,
-    NodeKindTag,
     ParsedLaunchFile,
-    ResolvedNode,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,7 +70,7 @@ class ResolveResult:
     other_files: list[FileDependency] = field(default_factory=list)
     fetched_packages: list[str] = field(default_factory=list)
     parsed_files: list[Path] = field(default_factory=list)
-    nodes: list[ResolvedNode] = field(default_factory=list)
+    nodes: list = field(default_factory=list)  # legacy, use resolved_actions
     include_args: dict[tuple[str, Path], IncludeArgContext] = field(default_factory=dict)
     declared_args_by_file: dict[tuple[str, Path], dict[str, str]] = field(default_factory=dict)
     global_params: list[list] = field(default_factory=list)
@@ -150,22 +148,6 @@ def _process_parsed_file(
 
     result.global_params.extend(parsed.global_params)
     result.parsed_files.append(file_path)
-
-    # Set include_chain and source on all nodes
-    source = (package, share_path)
-    for node in parsed.nodes:
-        if node.include_chain:
-            node.include_chain = list(current_chain) + list(node.include_chain)
-        elif node.kind == NodeKindTag.INCLUDE_MARKER:
-            chain = list(current_chain)
-            if node.source is not None:
-                chain.append(node.source)
-            node.include_chain = chain
-        else:
-            node.include_chain = list(current_chain)
-            if node.source is None:
-                node.source = source
-        result.nodes.append(node)
 
     # Append resolved actions with include chain prefix
     for action in parsed.resolved_actions:

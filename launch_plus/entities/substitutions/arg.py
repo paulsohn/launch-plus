@@ -28,8 +28,8 @@ class ArgSubstitution(Substitution):
         return cls, {"name": args[0] if isinstance(args[0], list) else [args[0]]}
 
     def perform(self, ctx: LaunchContext) -> str:
+        from launch_plus.entities.helpers import resolve_substitutions_from_tokens
         from launch_plus.entities.substitutions.launch_config import _DeferredDefault
-        from launch_plus.resolver import resolve_substitutions_from_tokens
 
         name = resolve_substitutions_from_tokens(self.name, ctx)
         lc = getattr(ctx, "_launch_configurations", {})

@@ -7,14 +7,39 @@ import tempfile
 import textwrap
 
 from launch_plus import resolver as R
-from launch_plus.entities.state import _parse_rosdep_resolve
+from launch_plus.entities.actions.arg import _apply_declared_arg, _DeclaredArg
+from launch_plus.entities.actions.env import (
+    _TrackedSetEnvironmentVariable,
+    _TrackedUnsetEnvironmentVariable,
+)
+from launch_plus.entities.actions.group import _TrackedGroupAction
+from launch_plus.entities.actions.node import (
+    _resolve_composable_plugins,
+    _resolve_node_details,
+    _TrackedComposableNode,
+    _TrackedComposableNodeContainer,
+    _TrackedNode,
+)
+from launch_plus.entities.helpers import (
+    _effective_namespace,
+    _is_substitution,
+    _is_truthy,
+    env_overrides,
+    resolve_substitutions,
+)
+from launch_plus.entities.state import LaunchContext, _parse_rosdep_resolve
+from launch_plus.entities.substitutions.find_pkg_share import _TrackedFindPackageShare
+from launch_plus.entities.substitutions.launch_config import (
+    _DeferredDefault,
+    _LaunchConfiguration,
+)
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 
 def _make_context(configs=None):
     """Build a _StubLaunchContext with the given launch configurations."""
-    ctx = R.LaunchContext()
+    ctx = LaunchContext()
     ctx._launch_configurations = dict(configs or {})
     return ctx
 
@@ -32,31 +57,31 @@ def _write_launch_py(directory, filename, body):
 
 class TestLaunchConfiguration:
     def test_perform_returns_value_when_set(self):
-        lc = R._LaunchConfiguration("my_var")
+        lc = _LaunchConfiguration("my_var")
         ctx = _make_context({"my_var": "hello"})
         assert lc.perform(ctx) == "hello"
 
     def test_perform_returns_fallback_when_unset(self):
-        lc = R._LaunchConfiguration("missing_var")
+        lc = _LaunchConfiguration("missing_var")
         ctx = _make_context({})
         assert lc.perform(ctx) == "$(var missing_var)"
 
     def test_perform_returns_default_when_unset_but_default_given(self):
-        lc = R._LaunchConfiguration("missing_var", default="fallback")
+        lc = _LaunchConfiguration("missing_var", default="fallback")
         ctx = _make_context({})
         assert lc.perform(ctx) == "fallback"
 
     def test_perform_prefers_context_over_default(self):
-        lc = R._LaunchConfiguration("my_var", default="fallback")
+        lc = _LaunchConfiguration("my_var", default="fallback")
         ctx = _make_context({"my_var": "from_context"})
         assert lc.perform(ctx) == "from_context"
 
     def test_perform_returns_fallback_without_context(self):
-        lc = R._LaunchConfiguration("x")
+        lc = _LaunchConfiguration("x")
         assert lc.perform(None) == "$(var x)"
 
     def test_str_returns_variable_name(self):
-        lc = R._LaunchConfiguration("pkg_name")
+        lc = _LaunchConfiguration("pkg_name")
         assert str(lc) == "pkg_name"
 
 
@@ -65,27 +90,27 @@ class TestLaunchConfiguration:
 
 class TestIsSubstitution:
     def test_launch_configuration_is_substitution(self):
-        assert R._is_substitution(R._LaunchConfiguration("x"))
+        assert _is_substitution(_LaunchConfiguration("x"))
 
     def test_string_is_not_substitution(self):
-        assert not R._is_substitution("rclcpp_components")
+        assert not _is_substitution("rclcpp_components")
 
     def test_none_is_not_substitution(self):
-        assert not R._is_substitution(None)
+        assert not _is_substitution(None)
 
     def test_list_of_substitutions_is_substitution(self):
-        parts = [R._LaunchConfiguration("x"), "_suffix"]
-        assert R._is_substitution(parts)
+        parts = [_LaunchConfiguration("x"), "_suffix"]
+        assert _is_substitution(parts)
 
     def test_list_of_plain_strings_is_not_substitution(self):
-        assert not R._is_substitution(["hello", "world"])
+        assert not _is_substitution(["hello", "world"])
 
     def test_empty_list_is_not_substitution(self):
-        assert not R._is_substitution([])
+        assert not _is_substitution([])
 
     def test_tuple_of_substitutions_is_substitution(self):
-        parts = (R._LaunchConfiguration("x"),)
-        assert R._is_substitution(parts)
+        parts = (_LaunchConfiguration("x"),)
+        assert _is_substitution(parts)
 
 
 # ─── _track_package ──────────────────────────────────────────────────────────
@@ -97,7 +122,7 @@ class TestTrackPackage:
         assert "my_pkg" in R.get_state().tracked["packages"]
 
     def test_skips_substitution_object(self):
-        lc = R._LaunchConfiguration("container_pkg")
+        lc = _LaunchConfiguration("container_pkg")
         R.get_state().track_package(lc)
         assert "container_pkg" not in R.get_state().tracked["packages"]
         assert len(R.get_state().tracked["packages"]) == 0
@@ -113,7 +138,7 @@ class TestTrackPackage:
         assert R.get_state().tracked["packages"].count("pkg_a") == 1
 
     def test_skips_list_of_substitutions(self):
-        parts = [R._LaunchConfiguration("pkg_var"), "_suffix"]
+        parts = [_LaunchConfiguration("pkg_var"), "_suffix"]
         R.get_state().track_package(parts)
         assert len(R.get_state().tracked["packages"]) == 0
 
@@ -123,12 +148,12 @@ class TestTrackPackage:
 
 class TestPerformSubstitution:
     def test_resolves_launch_configuration(self):
-        lc = R._LaunchConfiguration("my_var")
+        lc = _LaunchConfiguration("my_var")
         ctx = _make_context({"my_var": "resolved_value"})
         assert ctx.perform_substitution(lc) == "resolved_value"
 
     def test_unresolved_falls_back_to_portable(self):
-        lc = R._LaunchConfiguration("missing")
+        lc = _LaunchConfiguration("missing")
         ctx = _make_context({})
         assert ctx.perform_substitution(lc) == "$(var missing)"
 
@@ -144,8 +169,8 @@ class TestPerformSubstitution:
         from launch_plus.entities.utilities import perform_substitutions
 
         parts = [
-            R._LaunchConfiguration("prefix"),
-            R._LaunchConfiguration("suffix"),
+            _LaunchConfiguration("prefix"),
+            _LaunchConfiguration("suffix"),
         ]
         ctx = _make_context({"prefix": "foo", "suffix": "bar"})
         assert perform_substitutions(ctx, parts) == "foobar"
@@ -154,21 +179,21 @@ class TestPerformSubstitution:
         from launch_plus.entities.utilities import perform_substitutions
 
         parts = [
-            R._LaunchConfiguration("resolved_var"),
-            R._LaunchConfiguration("unresolved_var"),
+            _LaunchConfiguration("resolved_var"),
+            _LaunchConfiguration("unresolved_var"),
         ]
         ctx = _make_context({"resolved_var": "abc"})
         assert perform_substitutions(ctx, parts) == "abc$(var unresolved_var)"
 
     def test_ex_returns_not_fallback_when_resolved(self):
-        lc = R._LaunchConfiguration("my_var")
+        lc = _LaunchConfiguration("my_var")
         ctx = _make_context({"my_var": "resolved_value"})
         value, is_fallback = ctx.perform_substitution_ex(lc)
         assert value == "resolved_value"
         assert is_fallback is False
 
     def test_ex_list_not_fallback_when_all_resolved(self):
-        parts = [R._LaunchConfiguration("a"), R._LaunchConfiguration("b")]
+        parts = [_LaunchConfiguration("a"), _LaunchConfiguration("b")]
         ctx = _make_context({"a": "foo", "b": "bar"})
         value, is_fallback = ctx.perform_substitution_ex(parts)
         assert value == "foobar"
@@ -183,8 +208,8 @@ class TestNodeDeferredResolution:
         """When package is a LaunchConfiguration, _resolve_node_details should
         resolve it to the concrete value and track the resolved package."""
         ctx = _make_context({"my_pkg_var": "actual_package"})
-        node = R._TrackedNode(
-            package=R._LaunchConfiguration("my_pkg_var"),
+        node = _TrackedNode(
+            package=_LaunchConfiguration("my_pkg_var"),
             executable="my_exec",
         )
         # Before execute(): node is not yet tracked
@@ -199,8 +224,8 @@ class TestNodeDeferredResolution:
         """When the LaunchConfiguration cannot be resolved (not in context),
         the entry keeps the variable name but does NOT track it as a package."""
         ctx = _make_context({})
-        node = R._TrackedNode(
-            package=R._LaunchConfiguration("unknown_pkg"),
+        node = _TrackedNode(
+            package=_LaunchConfiguration("unknown_pkg"),
             executable="exec",
         )
         node.execute(ctx)
@@ -219,13 +244,13 @@ class TestNodeDeferredResolution:
                 "cname": "my_container",
             }
         )
-        container = R._TrackedComposableNodeContainer(
-            package=R._LaunchConfiguration("pkg"),
-            executable=R._LaunchConfiguration("exe"),
-            name=R._LaunchConfiguration("cname"),
+        container = _TrackedComposableNodeContainer(
+            package=_LaunchConfiguration("pkg"),
+            executable=_LaunchConfiguration("exe"),
+            name=_LaunchConfiguration("cname"),
         )
         container._ensure_tracked(ctx._state)
-        R._resolve_node_details(ctx._state, container, ctx)
+        _resolve_node_details(ctx._state, container, ctx)
 
         entry = R.get_state().tracked["nodes"][container._idx]
         assert entry["package"] == "rclcpp_components"
@@ -236,7 +261,7 @@ class TestNodeDeferredResolution:
     def test_plain_string_package_tracked_on_execute(self):
         """When package is a plain string, it should be tracked after execute()."""
         ctx = _make_context()
-        node = R._TrackedNode(package="my_real_pkg", executable="exec")
+        node = _TrackedNode(package="my_real_pkg", executable="exec")
         assert node._idx == -1  # not yet tracked
         node.execute(ctx)
         assert node._idx >= 0
@@ -249,23 +274,23 @@ class TestNodeDeferredResolution:
 class TestComposablePluginResolution:
     def test_composable_node_resolves_package(self):
         ctx = _make_context({"plugin_pkg": "sensor_driver"})
-        desc = R._TrackedComposableNode(
-            package=R._LaunchConfiguration("plugin_pkg"),
+        desc = _TrackedComposableNode(
+            package=_LaunchConfiguration("plugin_pkg"),
             plugin="sensor_driver::SensorNode",
             name="sensor",
         )
-        plugins = R._resolve_composable_plugins(ctx._state, [desc], ctx)
+        plugins = _resolve_composable_plugins(ctx._state, [desc], ctx)
         assert len(plugins) == 1
         assert plugins[0]["package"] == "sensor_driver"
         assert "sensor_driver" in R.get_state().tracked["packages"]
 
     def test_composable_node_unresolved_package_not_tracked(self):
         ctx = _make_context({})
-        desc = R._TrackedComposableNode(
-            package=R._LaunchConfiguration("unknown"),
+        desc = _TrackedComposableNode(
+            package=_LaunchConfiguration("unknown"),
             plugin="foo::Bar",
         )
-        plugins = R._resolve_composable_plugins(ctx._state, [desc], ctx)
+        plugins = _resolve_composable_plugins(ctx._state, [desc], ctx)
         assert plugins[0]["package"] == "$(var unknown)"  # portable fallback
         assert "unknown" not in R.get_state().tracked["packages"]
 
@@ -273,14 +298,14 @@ class TestComposablePluginResolution:
         """Remapping resolved to empty string should be preserved, not
         replaced with the substitution display name."""
         ctx = _make_context({"remap_src": "", "remap_dst": ""})
-        desc = R._TrackedComposableNode(
+        desc = _TrackedComposableNode(
             package="my_pkg",
             plugin="my_pkg::Node",
         )
         desc._raw_remappings = [
-            (R._LaunchConfiguration("remap_src"), R._LaunchConfiguration("remap_dst")),
+            (_LaunchConfiguration("remap_src"), _LaunchConfiguration("remap_dst")),
         ]
-        plugins = R._resolve_composable_plugins(ctx._state, [desc], ctx)
+        plugins = _resolve_composable_plugins(ctx._state, [desc], ctx)
         assert plugins[0]["remappings"] == [["", ""]]
 
 
@@ -502,8 +527,8 @@ class TestEnvStack:
     def test_set_env_inherits_to_node(self):
         """SetEnvironmentVariable then Node → node's env includes the var."""
         ctx = _make_context()
-        set_env = R._TrackedSetEnvironmentVariable(name="FOO", value="bar")
-        node = R._TrackedNode(package="p", executable="e", name="n")
+        set_env = _TrackedSetEnvironmentVariable(name="FOO", value="bar")
+        node = _TrackedNode(package="p", executable="e", name="n")
         set_env.execute(ctx)
         node.execute(ctx)
         entry = R.get_state().tracked["nodes"][node._idx]
@@ -517,7 +542,7 @@ class TestEnvStack:
         assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
         with caplog.at_level(logging.WARNING):
-            R._TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
+            _TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
         assert name in caplog.text and "not set" in caplog.text
 
     def test_unset_env_override_only_accepted(self):
@@ -527,9 +552,9 @@ class TestEnvStack:
         name = f"OVERRIDE_ONLY_{uuid.uuid4().hex[:8]}"
         assert name not in os.environ, f"precondition: {name} must not be in process env"
         ctx = _make_context()
-        R._TrackedSetEnvironmentVariable(name=name, value="val").execute(ctx)
+        _TrackedSetEnvironmentVariable(name=name, value="val").execute(ctx)
         assert name in ctx.environment
-        R._TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
+        _TrackedUnsetEnvironmentVariable(name=name).execute(ctx)
         assert name not in ctx.environment
         errors = R.get_state().tracked.get("errors", [])
         assert not any(name in e for e in errors)
@@ -537,12 +562,12 @@ class TestEnvStack:
     def test_group_scoped_env_does_not_leak(self):
         """GroupAction(scoped=True) → env mutations don't leak to siblings."""
         ctx = _make_context()
-        group = R._TrackedGroupAction(
-            actions=[R._TrackedSetEnvironmentVariable(name="SCOPED_VAR", value="val")],
+        group = _TrackedGroupAction(
+            actions=[_TrackedSetEnvironmentVariable(name="SCOPED_VAR", value="val")],
             scoped=True,
         )
         group.execute(ctx)
-        node = R._TrackedNode(package="p", executable="e", name="n")
+        node = _TrackedNode(package="p", executable="e", name="n")
         node.execute(ctx)
         entry = R.get_state().tracked["nodes"][node._idx]
         assert "SCOPED_VAR" not in entry["env"]
@@ -550,12 +575,12 @@ class TestEnvStack:
     def test_group_unscoped_env_leaks(self):
         """GroupAction(scoped=False) → env mutations leak to siblings."""
         ctx = _make_context()
-        group = R._TrackedGroupAction(
-            actions=[R._TrackedSetEnvironmentVariable(name="LEAKED_VAR", value="val")],
+        group = _TrackedGroupAction(
+            actions=[_TrackedSetEnvironmentVariable(name="LEAKED_VAR", value="val")],
             scoped=False,
         )
         group.execute(ctx)
-        node = R._TrackedNode(package="p", executable="e", name="n")
+        node = _TrackedNode(package="p", executable="e", name="n")
         node.execute(ctx)
         entry = R.get_state().tracked["nodes"][node._idx]
         assert entry["env"]["LEAKED_VAR"] == "val"
@@ -563,8 +588,8 @@ class TestEnvStack:
     def test_node_local_env_overrides_inherited(self):
         """Node-local env overrides inherited env for the same key."""
         ctx = _make_context()
-        R._TrackedSetEnvironmentVariable(name="FOO", value="inherited").execute(ctx)
-        node = R._TrackedNode(
+        _TrackedSetEnvironmentVariable(name="FOO", value="inherited").execute(ctx)
+        node = _TrackedNode(
             package="p",
             executable="e",
             name="n",
@@ -600,7 +625,7 @@ class TestEnvStack:
         """_env_overrides() returns only explicitly set vars, not process env."""
         ctx = _make_context()
         ctx.environment["NEW_VAR"] = "new_val"
-        overrides = R._env_overrides(ctx)
+        overrides = env_overrides(ctx)
         assert overrides["NEW_VAR"] == "new_val"
         # Process env vars must NOT appear in overrides.
         import os
@@ -611,7 +636,7 @@ class TestEnvStack:
     def test_env_overrides_empty_when_no_overrides(self):
         """Empty overrides when nothing has been set."""
         ctx = _make_context()
-        assert R._env_overrides(ctx) == {}
+        assert env_overrides(ctx) == {}
 
     def test_net_zero_error_includes_value(self):
         """Net-zero leak error includes the override value (safe, user-set)."""
@@ -630,8 +655,8 @@ class TestEnvStack:
     def test_process_env_never_exposed_in_node(self):
         """Node env should only contain overrides, never process env vars."""
         ctx = _make_context()
-        R._TrackedSetEnvironmentVariable(name="MY_OVERRIDE", value="val").execute(ctx)
-        node = R._TrackedNode(package="p", executable="e", name="n")
+        _TrackedSetEnvironmentVariable(name="MY_OVERRIDE", value="val").execute(ctx)
+        node = _TrackedNode(package="p", executable="e", name="n")
         node.execute(ctx)
         entry = R.get_state().tracked["nodes"][node._idx]
         # Only the explicit override should appear.
@@ -931,7 +956,7 @@ def _fresh_subst_ctx(**kwargs):
             R.get_state().tracked[key] = []
         elif isinstance(R.get_state().tracked[key], dict):
             R.get_state().tracked[key] = {}
-    ctx = R.LaunchContext()
+    ctx = LaunchContext()
     # Translate legacy args/vars kwargs to _launch_configurations
     lc_updates: dict = {}
     for k, v in kwargs.items():
@@ -951,29 +976,29 @@ class TestResolveSubstitutions:
 
     def test_resolve_arg(self):
         ctx = _fresh_subst_ctx(args={"vehicle": "sample_vehicle"})
-        result = R.resolve_substitutions("$(arg vehicle)", ctx)
+        result = resolve_substitutions("$(arg vehicle)", ctx)
         assert result == "sample_vehicle"
 
     def test_resolve_var(self):
         ctx = _fresh_subst_ctx(vars={"config": "/path/to/config"})
-        result = R.resolve_substitutions("$(var config)", ctx)
+        result = resolve_substitutions("$(var config)", ctx)
         assert result == "/path/to/config"
 
     def test_resolve_var_falls_back_to_args(self):
         ctx = _fresh_subst_ctx(args={"fallback": "from_args"})
-        result = R.resolve_substitutions("$(var fallback)", ctx)
+        result = resolve_substitutions("$(var fallback)", ctx)
         assert result == "from_args"
 
     def test_resolve_env_from_context(self):
         ctx = _fresh_subst_ctx(env={"TEST_LAUNCH_VAR": "test_value"})
-        result = R.resolve_substitutions("$(env TEST_LAUNCH_VAR)", ctx)
+        result = resolve_substitutions("$(env TEST_LAUNCH_VAR)", ctx)
         assert result == "test_value"
 
     def test_resolve_env_with_default_unset(self):
         var = "LAUNCH_PLUS_TEST_UNSET_a1b2c3"
         assert var not in os.environ, f"precondition: {var} must not be set"
         ctx = _fresh_subst_ctx()
-        result = R.resolve_substitutions(f"$(env {var} fallback)", ctx)
+        result = resolve_substitutions(f"$(env {var} fallback)", ctx)
         assert result == "fallback"
 
     def test_resolve_env_unset_without_default_errors(self, caplog):
@@ -981,28 +1006,28 @@ class TestResolveSubstitutions:
         assert var not in os.environ, f"precondition: {var} must not be set"
         ctx = _fresh_subst_ctx()
         with caplog.at_level(logging.WARNING):
-            R.resolve_substitutions(f"$(env {var})", ctx)
+            resolve_substitutions(f"$(env {var})", ctx)
         assert "not set" in caplog.text
 
     def test_resolve_dirname(self):
         ctx = _fresh_subst_ctx(launch_file_dir="/path/to/launch")
-        result = R.resolve_substitutions("$(dirname)/config.yaml", ctx)
+        result = resolve_substitutions("$(dirname)/config.yaml", ctx)
         assert result == "/path/to/launch/config.yaml"
 
     def test_resolve_dirname_unset(self):
         ctx = _fresh_subst_ctx()
-        result = R.resolve_substitutions("$(dirname)/config.yaml", ctx)
+        result = resolve_substitutions("$(dirname)/config.yaml", ctx)
         assert result == "$(dirname)/config.yaml"
 
     def test_resolve_find_pkg_share_preview(self):
         ctx = _fresh_subst_ctx(preview_mode=True)
-        result = R.resolve_substitutions("$(find-pkg-share my_pkg)/config", ctx)
+        result = resolve_substitutions("$(find-pkg-share my_pkg)/config", ctx)
         assert result == "$(find-pkg-share my_pkg)/config"
         assert "my_pkg" in R.get_state().tracked["packages"]
 
     def test_resolve_find_pkg_prefix(self):
         ctx = _fresh_subst_ctx()
-        result = R.resolve_substitutions("$(find-pkg-prefix my_pkg)/lib", ctx)
+        result = resolve_substitutions("$(find-pkg-prefix my_pkg)/lib", ctx)
         assert result == "$(find-pkg-prefix my_pkg)/lib"
         assert "my_pkg" in R.get_state().tracked["packages"]
 
@@ -1011,7 +1036,7 @@ class TestResolveSubstitutions:
             vars={"pkg_name": "vehicle_description"},
             preview_mode=True,
         )
-        result = R.resolve_substitutions("$(find-pkg-share $(var pkg_name))/config", ctx)
+        result = resolve_substitutions("$(find-pkg-share $(var pkg_name))/config", ctx)
         assert result == "$(find-pkg-share vehicle_description)/config"
 
     def test_resolve_chained_vars(self):
@@ -1023,20 +1048,20 @@ class TestResolveSubstitutions:
             },
             preview_mode=True,
         )
-        result = R.resolve_substitutions("$(var config_path)/params.yaml", ctx)
+        result = resolve_substitutions("$(var config_path)/params.yaml", ctx)
         assert result == "$(find-pkg-share sample_description)/config/params.yaml"
 
     def test_resolve_error_undefined_arg(self, caplog):
         ctx = _fresh_subst_ctx()
         with caplog.at_level(logging.WARNING):
-            result = R.resolve_substitutions("$(arg undefined)", ctx)
+            result = resolve_substitutions("$(arg undefined)", ctx)
         assert "$(arg undefined)" in result
         assert "undefined argument" in caplog.text
 
     def test_resolve_error_undefined_var(self, caplog):
         ctx = _fresh_subst_ctx()
         with caplog.at_level(logging.WARNING):
-            result = R.resolve_substitutions("$(var undefined)", ctx)
+            result = resolve_substitutions("$(var undefined)", ctx)
         assert "$(var undefined)" in result
         assert "undefined variable" in caplog.text
 
@@ -1044,17 +1069,17 @@ class TestResolveSubstitutions:
         # After XML entity decoding, &quot; becomes " — the == is inside a
         # double-quoted template that the Lark grammar parses correctly.
         ctx = _fresh_subst_ctx(vars={"gnss_receiver": "ublox"})
-        result = R.resolve_substitutions("""$(eval "'$(var gnss_receiver)'=='ublox'")""", ctx)
+        result = resolve_substitutions("""$(eval "'$(var gnss_receiver)'=='ublox'")""", ctx)
         assert result == "True"
 
     def test_resolve_eval_false_comparison(self):
         ctx = _fresh_subst_ctx(vars={"x": "foo"})
-        result = R.resolve_substitutions("""$(eval "'$(var x)'=='bar'")""", ctx)
+        result = resolve_substitutions("""$(eval "'$(var x)'=='bar'")""", ctx)
         assert result == "False"
 
     def test_resolve_eval_outer_single_quote_wrapper(self):
         ctx = _fresh_subst_ctx()
-        result = R.resolve_substitutions(
+        result = resolve_substitutions(
             r"$(eval '\'cuda\' == \'cuda\' or \'cuda\' == \'cuda-all-in-one\'')",
             ctx,
         )
@@ -1062,7 +1087,7 @@ class TestResolveSubstitutions:
 
     def test_resolve_eval_outer_double_quote_wrapper(self):
         ctx = _fresh_subst_ctx()
-        result = R.resolve_substitutions(
+        result = resolve_substitutions(
             r"""$(eval '"camera_lidar_radar_fusion"=="camera_lidar_radar_fusion"')""",
             ctx,
         )
@@ -1070,7 +1095,7 @@ class TestResolveSubstitutions:
 
     def test_resolve_eval_outer_double_quote_false(self):
         ctx = _fresh_subst_ctx()
-        result = R.resolve_substitutions(
+        result = resolve_substitutions(
             r"""$(eval '"camera_lidar_radar_fusion"=="lidar"')""",
             ctx,
         )
@@ -1084,7 +1109,7 @@ class TestResolveSubstitutions:
                 "list_end": '""]',
             },
         )
-        result = R.resolve_substitutions(
+        result = resolve_substitutions(
             """$(eval "'$(var modules)' + '$(var list_end)'")""",
             ctx,
         )
@@ -1096,7 +1121,7 @@ class TestResolveSubstitutions:
                 "func": r"list(set('ndt'.split('_')).intersection(['ndt','yabloc']))",
             },
         )
-        result = R.resolve_substitutions(r"$(eval $(var func))", ctx)
+        result = resolve_substitutions(r"$(eval $(var func))", ctx)
         assert result == "['ndt']"
 
     def test_resolve_eval_with_backslash_unescape(self):
@@ -1105,22 +1130,22 @@ class TestResolveSubstitutions:
                 "func2": r"list(set('ndt'.split('_')).intersection([\'ndt\',\'yabloc\']))",
             },
         )
-        result = R.resolve_substitutions(r"$(eval $(var func2))", ctx)
+        result = resolve_substitutions(r"$(eval $(var func2))", ctx)
         assert result == "['ndt']"
 
     def test_resolve_command_preserved(self):
         ctx = _fresh_subst_ctx()
-        result = R.resolve_substitutions("$(command echo hello)", ctx)
+        result = resolve_substitutions("$(command echo hello)", ctx)
         assert result == "$(command echo hello)"
 
     def test_resolve_literal_passthrough(self):
         ctx = _fresh_subst_ctx()
-        result = R.resolve_substitutions("/path/to/file.yaml", ctx)
+        result = resolve_substitutions("/path/to/file.yaml", ctx)
         assert result == "/path/to/file.yaml"
 
     def test_resolve_multiple_packages_tracked(self):
         ctx = _fresh_subst_ctx(preview_mode=True)
-        R.resolve_substitutions("$(find-pkg-share pkg1)/$(find-pkg-share pkg2)", ctx)
+        resolve_substitutions("$(find-pkg-share pkg1)/$(find-pkg-share pkg2)", ctx)
         assert "pkg1" in R.get_state().tracked["packages"]
         assert "pkg2" in R.get_state().tracked["packages"]
 
@@ -1138,7 +1163,7 @@ def _fresh_walker_ctx(**kwargs):
             R.get_state().tracked[key] = {}
     # Reset module-level state
     R.get_state().declared_arg_names.clear()
-    ctx = R.LaunchContext()
+    ctx = LaunchContext()
     # Translate legacy args/vars kwargs to _launch_configurations
     lc_updates: dict = {}
     for k, v in kwargs.items():
@@ -1752,31 +1777,31 @@ class TestResolveXmlElements:
     # ── Namespace helper functions ──
 
     def test_effective_namespace_basic(self):
-        assert R._effective_namespace([]) is None
-        assert R._effective_namespace(["/ns"]) == "/ns"
-        assert R._effective_namespace(["ns1", "ns2"]) == "/ns1/ns2"
-        assert R._effective_namespace(["/a", "b"]) == "/a/b"
+        assert _effective_namespace([]) is None
+        assert _effective_namespace(["/ns"]) == "/ns"
+        assert _effective_namespace(["ns1", "ns2"]) == "/ns1/ns2"
+        assert _effective_namespace(["/a", "b"]) == "/a/b"
 
     def test_effective_namespace_absolute_resets(self):
-        assert R._effective_namespace(["/a", "/b"]) == "/b"
-        assert R._effective_namespace(["a", "/b", "c"]) == "/b/c"
+        assert _effective_namespace(["/a", "/b"]) == "/b"
+        assert _effective_namespace(["a", "/b", "c"]) == "/b/c"
 
     def test_effective_namespace_with_explicit(self):
-        assert R._effective_namespace(["/robot"], "/override") == "/override"
-        assert R._effective_namespace(["/robot"], "local") == "/robot/local"
+        assert _effective_namespace(["/robot"], "/override") == "/override"
+        assert _effective_namespace(["/robot"], "local") == "/robot/local"
 
     def test_is_truthy(self):
-        assert R._is_truthy("true") is True
-        assert R._is_truthy("True") is True
-        assert R._is_truthy("1") is True
-        assert R._is_truthy("false") is False
-        assert R._is_truthy("0") is False
+        assert _is_truthy("true") is True
+        assert _is_truthy("True") is True
+        assert _is_truthy("1") is True
+        assert _is_truthy("false") is False
+        assert _is_truthy("0") is False
         # Invalid values raise ValueError
         import pytest
 
         for invalid in ("yes", "on", "no", ""):
             with pytest.raises(ValueError, match="invalid condition expression"):
-                R._is_truthy(invalid)
+                _is_truthy(invalid)
 
     # ── YAML walker (same function, different parser) ──
 
@@ -2125,15 +2150,15 @@ class TestApplyDeclaredArgLazy:
         R.get_state().preview_mode = False
         # No package in AMENT — perform() would error if called.
         ctx = _make_context({"my_arg": "already_set_value"})
-        arg = R._DeclaredArg(
+        arg = _DeclaredArg(
             "my_arg",
             default_value=[
-                R._TrackedFindPackageShare("nonexistent_pkg"),
+                _TrackedFindPackageShare("nonexistent_pkg"),
                 "/config/file.yaml",
             ],
         )
         with caplog.at_level(logging.WARNING):
-            R._apply_declared_arg(arg, ctx)
+            _apply_declared_arg(arg, ctx)
         # Arg value unchanged (caller's value preserved).
         assert ctx._launch_configurations["my_arg"] == "already_set_value"
         # No error — default was not resolved.
@@ -2143,15 +2168,15 @@ class TestApplyDeclaredArgLazy:
         """Default is stored as _DeferredDefault, resolved on read."""
         R.get_state().preview_mode = True
         ctx = _make_context({})
-        arg = R._DeclaredArg(
+        arg = _DeclaredArg(
             "my_arg",
             default_value="simple_default",
         )
-        R._apply_declared_arg(arg, ctx)
+        _apply_declared_arg(arg, ctx)
         # Stored as deferred, not yet resolved.
-        assert isinstance(ctx._launch_configurations["my_arg"], R._DeferredDefault)
+        assert isinstance(ctx._launch_configurations["my_arg"], _DeferredDefault)
         # Reading via LaunchConfiguration resolves it.
-        lc = R._LaunchConfiguration("my_arg")
+        lc = _LaunchConfiguration("my_arg")
         assert lc.perform(ctx) == "simple_default"
         # Now it's resolved in the context.
         assert ctx._launch_configurations["my_arg"] == "simple_default"
@@ -2160,31 +2185,31 @@ class TestApplyDeclaredArgLazy:
         """FindPackageShare for uninstalled pkg causes no error if arg is never read."""
         R.get_state().preview_mode = False
         ctx = _make_context({})
-        arg = R._DeclaredArg(
+        arg = _DeclaredArg(
             "cuda_param",
             default_value=[
-                R._TrackedFindPackageShare("uninstalled_cuda_pkg"),
+                _TrackedFindPackageShare("uninstalled_cuda_pkg"),
                 "/config/file.yaml",
             ],
         )
         with caplog.at_level(logging.WARNING):
-            R._apply_declared_arg(arg, ctx)
+            _apply_declared_arg(arg, ctx)
         # Default is deferred — no resolution happened, no error.
-        assert isinstance(ctx._launch_configurations["cuda_param"], R._DeferredDefault)
+        assert isinstance(ctx._launch_configurations["cuda_param"], _DeferredDefault)
         assert "uninstalled_cuda_pkg" not in caplog.text
 
     def test_unresolved_default_recorded_for_show_args(self):
         """When arg is already set, the raw default string is recorded for --show-args."""
         R.get_state().preview_mode = False
         ctx = _make_context({"my_arg": "caller_value"})
-        arg = R._DeclaredArg(
+        arg = _DeclaredArg(
             "my_arg",
             default_value=[
-                R._TrackedFindPackageShare("some_pkg"),
+                _TrackedFindPackageShare("some_pkg"),
                 "/config/file.yaml",
             ],
         )
-        R._apply_declared_arg(arg, ctx)
+        _apply_declared_arg(arg, ctx)
         # declared_args records the unresolved default (str() form).
         recorded = R.get_state().tracked["declared_args"]
         assert len(recorded) == 1
@@ -2200,17 +2225,17 @@ class TestStrictnessFlags:
 
     def test_apply_arg_defaults_true_applies_default(self):
         R.get_state().apply_arg_defaults = True
-        ctx = R.LaunchContext()
+        ctx = LaunchContext()
         elements = R.parse_xml_launch(
             '<launch><arg name="x" default="hello"/></launch>', "test.xml"
         )
         R.resolve_xml_elements(elements, ctx)
         # Default is stored as _DeferredDefault; resolve via $(arg x)
-        assert R.resolve_substitutions("$(arg x)", ctx) == "hello"
+        assert resolve_substitutions("$(arg x)", ctx) == "hello"
 
     def test_apply_arg_defaults_false_skips_default(self):
         R.get_state().apply_arg_defaults = False
-        ctx = R.LaunchContext()
+        ctx = LaunchContext()
         elements = R.parse_xml_launch(
             '<launch><arg name="x" default="hello"/></launch>', "test.xml"
         )
@@ -2220,7 +2245,7 @@ class TestStrictnessFlags:
 
     def test_apply_arg_defaults_false_undefined_ref_errors(self, caplog):
         R.get_state().apply_arg_defaults = False
-        ctx = R.LaunchContext()
+        ctx = LaunchContext()
         elements = R.parse_xml_launch(
             """<launch>
                 <arg name="x" default="hello"/>
@@ -2235,7 +2260,7 @@ class TestStrictnessFlags:
     def test_allow_unportable_paths_false_errors(self, caplog):
         R.get_state().allow_unportable_paths = False
         R.get_state().preview_mode = True
-        ctx = R.LaunchContext()
+        ctx = LaunchContext()
         elements = R.parse_xml_launch(
             '<launch><include file="/absolute/path/to/file.launch.xml"/></launch>',
             "test.xml",
@@ -2247,7 +2272,7 @@ class TestStrictnessFlags:
     def test_allow_unportable_paths_true_warns(self, caplog):
         R.get_state().allow_unportable_paths = True
         R.get_state().preview_mode = True
-        ctx = R.LaunchContext()
+        ctx = LaunchContext()
         elements = R.parse_xml_launch(
             '<launch><include file="/absolute/path/to/file.launch.xml"/></launch>',
             "test.xml",
@@ -2313,21 +2338,21 @@ class TestTrackedFindPackageShare:
 
     def test_preview_returns_portable(self):
         R.get_state().preview_mode = True
-        fps = R._TrackedFindPackageShare("my_pkg")
+        fps = _TrackedFindPackageShare("my_pkg")
         assert fps.perform(None) == "$(find-pkg-share my_pkg)"
         assert str(fps) == "$(find-pkg-share my_pkg)"
 
     def test_postbuild_returns_install_path(self):
         R.get_state().preview_mode = False
         R.get_state().package_shares["my_pkg"] = "/install/share/my_pkg"
-        fps = R._TrackedFindPackageShare("my_pkg")
+        fps = _TrackedFindPackageShare("my_pkg")
         assert fps.perform(None) == "/install/share/my_pkg"
         # str() returns portable form; perform() returns resolved path
         assert str(fps) == "$(find-pkg-share my_pkg)"
 
     def test_postbuild_unresolvable_reports_error(self, caplog):
         R.get_state().preview_mode = False
-        fps = R._TrackedFindPackageShare("missing_pkg")
+        fps = _TrackedFindPackageShare("missing_pkg")
         with caplog.at_level(logging.WARNING):
             result = fps.perform(None)
         # Returns portable fallback but records an error

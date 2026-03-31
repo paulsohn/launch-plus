@@ -32,7 +32,7 @@ class FindPackageShareSubstitution(Substitution):
         return cls, {"package": args[0] if isinstance(args[0], list) else [args[0]]}
 
     def perform(self, ctx: LaunchContext) -> str:
-        from launch_plus.resolver import (
+        from launch_plus.entities.helpers import (
             resolve_substitutions_from_tokens,
         )
 

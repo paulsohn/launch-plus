@@ -39,7 +39,7 @@ class EnvSubstitution(Substitution):
         return cls, {"name": name, "default": default}
 
     def perform(self, ctx: LaunchContext) -> str:
-        from launch_plus.resolver import resolve_substitutions_from_tokens
+        from launch_plus.entities.helpers import resolve_substitutions_from_tokens
 
         name = resolve_substitutions_from_tokens(self.name, ctx)
         # Check context environment → process env → default

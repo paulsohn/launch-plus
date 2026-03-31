@@ -41,7 +41,7 @@ class EvalSubstitution(Substitution):
         return cls, {"expression": parts}
 
     def perform(self, ctx: LaunchContext) -> str:
-        from launch_plus.resolver import resolve_substitutions_from_tokens
+        from launch_plus.entities.helpers import resolve_substitutions_from_tokens
 
         expr = resolve_substitutions_from_tokens(self.expression, ctx)
         # Unescape \' and \" that may come from XML entity values.

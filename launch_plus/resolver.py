@@ -118,49 +118,16 @@ def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
 
 import launch_plus.entities.actions  # noqa: F401, E402
 
-# ─── Shim classes (re-exported for backward compatibility) ──────���────────────
+# ─── Internal imports (used by resolver logic) ───────────────────────────────
 from launch_plus.entities.action import _TrackedAction  # noqa: E402
 from launch_plus.entities.actions.arg import _apply_declared_arg, _DeclaredArg  # noqa: E402
-from launch_plus.entities.actions.env import (  # noqa: E402, F401
-    _TrackedSetEnvironmentVariable,
-    _TrackedUnsetEnvironmentVariable,
-)
-from launch_plus.entities.actions.group import _TrackedGroupAction  # noqa: E402, F401
-from launch_plus.entities.actions.node import (  # noqa: E402, F401
-    _TrackedComposableNode,
-    _TrackedComposableNodeContainer,
-    _TrackedNode,
-)
-from launch_plus.entities.helpers import (  # noqa: E402, F401
-    _effective_namespace,
-    _evaluate_condition,
+from launch_plus.entities.helpers import (  # noqa: E402
     _extract_pkg_and_share_path,
-    _is_substitution,  # noqa: F401 — re-exported for tests
-    _is_truthy,
     _parse_portable_path,
-    _portable_display,  # noqa: F401 — re-exported
-    _read_and_expand_param_file,
     _ros2_namespace_join,
-    _to_str,  # noqa: F401 — re-exported
-    resolve_substitutions,
-    resolve_substitutions_from_tokens,
-    resolve_value,
 )
-
-# ─── OpaqueFunction stubs (extracted to entities/opaque_stubs.py) ─────────────
-from launch_plus.entities.opaque_stubs import (  # noqa: E402, F401
-    _STUB_ROS_PARAM_YAML,
-    _call_opaque_with_stubs,
-    _DefaultParamDict,
-)
-from launch_plus.entities.parsing import _ActionParser  # noqa: E402, F401
-from launch_plus.entities.substitutions.find_pkg_share import (
-    _TrackedFindPackageShare,  # noqa: E402, F401
-)
-from launch_plus.entities.substitutions.launch_config import (  # noqa: E402, F401
-    _DeferredDefault,
-    _LaunchConfiguration,
-)
+from launch_plus.entities.opaque_stubs import _call_opaque_with_stubs  # noqa: E402
+from launch_plus.entities.parsing import _ActionParser  # noqa: E402
 
 # ─── LaunchContext factory ────────────────────────────────────────────────────
 
@@ -171,13 +138,6 @@ def _make_launch_context(args_dict):
     ctx._launch_configurations = dict(args_dict)
     return ctx
 
-
-# ─── Node detail resolution (in entities/actions/node.py) ─────────────────────
-from launch_plus.entities.actions.node import (  # noqa: E402, F401
-    _resolve_composable_plugins,
-    _resolve_node_details,
-)
-from launch_plus.entities.helpers import env_overrides as _env_overrides  # noqa: E402, F401
 
 # ─── Inline Python include resolution ─────────────────────────────────────────
 

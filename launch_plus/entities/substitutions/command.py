@@ -56,7 +56,7 @@ class CommandSubstitution(Substitution):
         return cls, {"arguments": arguments}
 
     def perform(self, ctx: LaunchContext) -> str:
-        from launch_plus.resolver import resolve_substitutions_from_tokens
+        from launch_plus.entities.helpers import resolve_substitutions_from_tokens
 
         resolved_args: list[str] = []
         for arg_tokens in self.arguments:

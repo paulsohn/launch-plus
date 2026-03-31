@@ -29,6 +29,18 @@ def _xml_escape(s: str) -> str:
     return s.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _qualify_topic(topic: str, namespace: str | None) -> str:
+    """Qualify a relative topic name with the node's namespace.
+
+    Absolute topics (starting with ``/``) and private topics (starting with
+    ``~/``) are returned as-is.  Relative topics are prefixed with the
+    node's namespace, matching how the ROS 2 runtime resolves them.
+    """
+    if not topic or not namespace or topic.startswith("/") or topic.startswith("~/"):
+        return topic
+    return f"{namespace.rstrip('/')}/{topic}"
+
+
 def _pad(depth: int) -> str:
     """Indentation string for the given visual depth level.
 
@@ -133,6 +145,8 @@ def _render_node_children(
     for key, value in sorted(node.parameters.items()):
         out.append(f'{child_ind}<param name="{_xml_escape(key)}" value="{_xml_escape(value)}"/>\n')
     for from_, to in node.remappings:
+        # Only qualify 'to' — 'from' is a node-internal name pattern, not a graph topic
+        to = _qualify_topic(to, node.namespace)
         out.append(f'{child_ind}<remap from="{_xml_escape(from_)}" to="{_xml_escape(to)}"/>\n')
     for name, value in sorted(node.env.items()):
         out.append(f'{child_ind}<env name="{_xml_escape(name)}" value="{_xml_escape(value)}"/>\n')

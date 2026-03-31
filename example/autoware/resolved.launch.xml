@@ -1492,10 +1492,10 @@
               <param name="wheel_radius" value="0.383"/>
               <param name="wheel_tread" value="1.64"/>
               <param name="wheel_width" value="0.235"/>
-              <remap from="input" to="tamagawa/imu_raw"/>
-              <remap from="gyro_bias_input" to="gyro_bias"/>
-              <remap from="gyro_scale_input" to="gyro_scale"/>
-              <remap from="output" to="imu_data"/>
+              <remap from="input" to="/sensing/imu/tamagawa/imu_raw"/>
+              <remap from="gyro_bias_input" to="/sensing/imu/gyro_bias"/>
+              <remap from="gyro_scale_input" to="/sensing/imu/gyro_scale"/>
+              <remap from="output" to="/sensing/imu/imu_data"/>
             </node>
           </group>
           <!-- end: autoware_imu_corrector://launch/imu_corrector.launch.xml -->
@@ -1573,12 +1573,12 @@
               <param name="wheel_radius" value="0.383"/>
               <param name="wheel_tread" value="1.64"/>
               <param name="wheel_width" value="0.235"/>
-              <remap from="~/input/imu_raw" to="tamagawa/imu_raw"/>
+              <remap from="~/input/imu_raw" to="/sensing/imu/tamagawa/imu_raw"/>
               <remap from="~/input/odom" to="/localization/kinematic_state"/>
               <remap from="~/input/pose_ndt" to="/localization/pose_estimator/pose_with_covariance"/>
-              <remap from="~/output/gyro_bias" to="gyro_bias"/>
-              <remap from="~/output/gyro_scale" to="gyro_scale"/>
-              <remap from="~/output/imu_scaled" to="imu_scaled"/>
+              <remap from="~/output/gyro_bias" to="/sensing/imu/gyro_bias"/>
+              <remap from="~/output/gyro_scale" to="/sensing/imu/gyro_scale"/>
+              <remap from="~/output/imu_scaled" to="/sensing/imu/imu_scaled"/>
             </node>
           </group>
           <!-- end: autoware_imu_corrector://launch/gyro_bias_estimator.launch.xml -->
@@ -1645,11 +1645,11 @@
               <param name="wheel_radius" value="0.383"/>
               <param name="wheel_tread" value="1.64"/>
               <param name="wheel_width" value="0.235"/>
-              <remap from="fix" to="ublox/nav_sat_fix"/>
+              <remap from="fix" to="/sensing/gnss/ublox/nav_sat_fix"/>
               <remap from="autoware_orientation" to="/autoware_orientation"/>
-              <remap from="gnss_pose" to="pose"/>
-              <remap from="gnss_pose_cov" to="pose_with_covariance"/>
-              <remap from="gnss_fixed" to="fixed"/>
+              <remap from="gnss_pose" to="/sensing/gnss/pose"/>
+              <remap from="gnss_pose_cov" to="/sensing/gnss/pose_with_covariance"/>
+              <remap from="gnss_fixed" to="/sensing/gnss/fixed"/>
             </node>
           </group>
           <!-- end: autoware_gnss_poser://launch/gnss_poser.launch.xml -->
@@ -1839,9 +1839,9 @@
               <param name="wheel_width" value="0.235"/>
               <remap from="vehicle/twist_with_covariance" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
               <remap from="imu" to="/sensing/imu/imu_data"/>
-              <remap from="twist_raw" to="gyro_twist_raw"/>
+              <remap from="twist_raw" to="/localization/twist_estimator/gyro_twist_raw"/>
               <remap from="twist_with_covariance_raw" to="/localization/twist_estimator/twist_with_covariance_raw"/>
-              <remap from="twist" to="gyro_twist"/>
+              <remap from="twist" to="/localization/twist_estimator/gyro_twist"/>
               <remap from="twist_with_covariance" to="/localization/twist_estimator/twist_with_covariance"/>
             </node>
           </group>
@@ -2028,15 +2028,15 @@
             <remap from="in_pose_with_covariance" to="/localization/pose_estimator/pose_with_covariance"/>
             <remap from="in_twist_with_covariance" to="/localization/twist_estimator/twist_with_covariance"/>
             <remap from="initialpose" to="/initialpose3d"/>
-            <remap from="trigger_node_srv" to="trigger_node"/>
-            <remap from="ekf_odom" to="kinematic_state"/>
-            <remap from="ekf_pose" to="pose"/>
+            <remap from="trigger_node_srv" to="/localization/pose_twist_fusion_filter/trigger_node"/>
+            <remap from="ekf_odom" to="/localization/pose_twist_fusion_filter/kinematic_state"/>
+            <remap from="ekf_pose" to="/localization/pose_twist_fusion_filter/pose"/>
             <remap from="ekf_pose_with_covariance" to="/localization/pose_with_covariance"/>
-            <remap from="ekf_biased_pose" to="biased_pose"/>
-            <remap from="ekf_biased_pose_with_covariance" to="biased_pose_with_covariance"/>
-            <remap from="ekf_twist" to="twist"/>
-            <remap from="ekf_twist_with_covariance" to="twist_with_covariance"/>
-            <remap from="debug/processing_time_ms" to="debug/processing_time_ms"/>
+            <remap from="ekf_biased_pose" to="/localization/pose_twist_fusion_filter/biased_pose"/>
+            <remap from="ekf_biased_pose_with_covariance" to="/localization/pose_twist_fusion_filter/biased_pose_with_covariance"/>
+            <remap from="ekf_twist" to="/localization/pose_twist_fusion_filter/twist"/>
+            <remap from="ekf_twist_with_covariance" to="/localization/pose_twist_fusion_filter/twist_with_covariance"/>
+            <remap from="debug/processing_time_ms" to="/localization/pose_twist_fusion_filter/debug/processing_time_ms"/>
           </node>
         </group>
         <!-- end: autoware_ekf_localizer://launch/ekf_localizer.launch.xml -->
@@ -2066,7 +2066,7 @@
             <param name="wheel_width" value="0.235"/>
             <remap from="input/odom" to="/localization/pose_twist_fusion_filter/kinematic_state"/>
             <remap from="output/odom" to="/localization/kinematic_state"/>
-            <remap from="debug/stop_flag" to="debug/stop_flag"/>
+            <remap from="debug/stop_flag" to="/localization/pose_twist_fusion_filter/debug/stop_flag"/>
           </node>
         </group>
         <!-- end: autoware_stop_filter://launch/stop_filter.launch.xml -->
@@ -3220,10 +3220,10 @@
             <remap from="~/input/detection06/objects" to="/perception/object_recognition/detection/radar/far_objects"/>
             <remap from="~/input/detection07/objects" to="/perception/object_recognition/detection/camera_vru/objects"/>
             <remap from="~/input/detection08/objects" to="/perception/object_recognition/detection/camera_only/objects"/>
-            <remap from="~/input/detection09/objects" to="input/objects09"/>
-            <remap from="~/input/detection10/objects" to="input/objects10"/>
-            <remap from="~/input/detection11/objects" to="input/objects11"/>
-            <remap from="~/input/detection12/objects" to="input/objects12"/>
+            <remap from="~/input/detection09/objects" to="/perception/object_recognition/tracking/input/objects09"/>
+            <remap from="~/input/detection10/objects" to="/perception/object_recognition/tracking/input/objects10"/>
+            <remap from="~/input/detection11/objects" to="/perception/object_recognition/tracking/input/objects11"/>
+            <remap from="~/input/detection12/objects" to="/perception/object_recognition/tracking/input/objects12"/>
             <remap from="~/output/objects" to="/perception/object_recognition/tracking/objects"/>
             <remap from="~/output/merged_objects" to="/perception/object_recognition/detection/objects"/>
           </node>
@@ -3786,9 +3786,9 @@
             <param name="wheel_radius" value="0.383"/>
             <param name="wheel_tread" value="1.64"/>
             <param name="wheel_width" value="0.235"/>
-            <remap from="~/input/tl_state" to="traffic_signals"/>
+            <remap from="~/input/tl_state" to="/perception/traffic_light_recognition/traffic_signals"/>
             <remap from="~/input/vector_map" to="/map/vector_map"/>
-            <remap from="~/output/traffic_light" to="traffic_signals/markers"/>
+            <remap from="~/output/traffic_light" to="/perception/traffic_light_recognition/traffic_signals/markers"/>
           </node>
         </group>
         <!-- end: autoware_traffic_light_visualization://launch/traffic_light_map_visualizer.launch.xml -->

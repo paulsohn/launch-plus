@@ -100,29 +100,28 @@ class _ActionParser:
         ]
 
     def parse_composable_plugins(self, entity: Entity) -> list:
-        """Extract <composable_node> children as unresolved plugin dicts."""
+        """Extract <composable_node> children as ComposableNode instances.
+
+        Matching official: ``ComposableNode.parse(parser, entity)`` creates
+        ``ComposableNode`` instances, not raw dicts.
+        """
+        from launch_plus.entities.actions.node import ComposableNode
+
         items = entity.get_attr("composable_node", data_type=list, optional=True)
         if not items:
             return []
         plugins = []
         for cn in items:
-            # Condition must be evaluated at parse time (determines structure)
-            cond_if = cn.get_attr("if", optional=True)
-            cond_unless = cn.get_attr("unless", optional=True)
-            cond: dict[str, str] | None = None
-            if cond_if is not None:
-                cond = {"kind": "If", "expr": cond_if}
-            elif cond_unless is not None:
-                cond = {"kind": "Unless", "expr": cond_unless}
-            if not _evaluate_condition(cond, self.ctx):
+            if not self.evaluate_condition(cn):
                 continue
+            name_raw = cn.get_attr("name", optional=True)
             plugins.append(
-                {
-                    "package": self.parse_substitution(cn.get_attr("pkg", optional=True) or ""),
-                    "plugin": self.parse_substitution(cn.get_attr("plugin", optional=True) or ""),
-                    "name": cn.get_attr("name", optional=True),
-                    "params": self.parse_params(cn),
-                    "remaps": self.parse_remaps(cn),
-                }
+                ComposableNode(
+                    package=self.parse_substitution(cn.get_attr("pkg", optional=True) or ""),
+                    plugin=self.parse_substitution(cn.get_attr("plugin", optional=True) or ""),
+                    name=self.parse_substitution(name_raw) if name_raw else None,
+                    parameters=self.parse_params(cn),
+                    remappings=self.parse_remaps(cn),
+                )
             )
         return plugins

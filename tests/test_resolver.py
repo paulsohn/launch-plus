@@ -17,8 +17,7 @@ from launch_plus.entities.actions.node import (
     ComposableNode,
     ComposableNodeContainer,
     Node,
-    _resolve_composable_plugins,
-    _resolve_node_details,
+    _resolve_plugins,
 )
 from launch_plus.entities.helpers import (
     _effective_namespace,
@@ -249,8 +248,7 @@ class TestNodeDeferredResolution:
             executable=LaunchConfiguration("exe"),
             name=LaunchConfiguration("cname"),
         )
-        container._ensure_tracked(ctx._state)
-        _resolve_node_details(ctx._state, container, ctx)
+        container.execute(ctx)
 
         entry = R.get_state().tracked["nodes"][container._idx]
         assert entry["package"] == "rclcpp_components"
@@ -279,7 +277,7 @@ class TestComposablePluginResolution:
             plugin="sensor_driver::SensorNode",
             name="sensor",
         )
-        plugins = _resolve_composable_plugins(ctx._state, [desc], ctx)
+        plugins = _resolve_plugins([desc], ctx)
         assert len(plugins) == 1
         assert plugins[0]["package"] == "sensor_driver"
         assert "sensor_driver" in R.get_state().tracked["packages"]
@@ -290,7 +288,7 @@ class TestComposablePluginResolution:
             package=LaunchConfiguration("unknown"),
             plugin="foo::Bar",
         )
-        plugins = _resolve_composable_plugins(ctx._state, [desc], ctx)
+        plugins = _resolve_plugins([desc], ctx)
         assert plugins[0]["package"] == "$(var unknown)"  # portable fallback
         assert "unknown" not in R.get_state().tracked["packages"]
 
@@ -305,7 +303,7 @@ class TestComposablePluginResolution:
         desc._raw_remappings = [
             (LaunchConfiguration("remap_src"), LaunchConfiguration("remap_dst")),
         ]
-        plugins = _resolve_composable_plugins(ctx._state, [desc], ctx)
+        plugins = _resolve_plugins([desc], ctx)
         assert plugins[0]["remappings"] == [["", ""]]
 
 

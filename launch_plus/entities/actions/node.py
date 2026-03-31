@@ -104,6 +104,9 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
     }
     if pf_list:
         entry["param_files"] = pf_list
+    # Store resolved data back on the ComposableNode for serialize_resolved()
+    if isinstance(desc_or_dict, ComposableNode):
+        desc_or_dict._resolved_data = entry
     return entry
 
 
@@ -298,16 +301,19 @@ class Node(Action):
                 entry[key] = resolved if resolved else str(raw)
                 setattr(self, f"_resolved_{key}", entry[key])
 
+    _tag_name = "node"
+
     def serialize_resolved(self, indent: str = "  ") -> str | None:
         """Render this node as a resolved XML snippet."""
         if not self._resolved:
             return None
         child_ind = indent + "  "
         esc = self._esc
+        tag_name = self._tag_name
 
         pkg = esc(self._resolved_package)
         exe = esc(self._resolved_executable)
-        tag = f'{indent}<node pkg="{pkg}" exec="{exe}"'
+        tag = f'{indent}<{tag_name} pkg="{pkg}" exec="{exe}"'
         if self._resolved_name:
             tag += f' name="{esc(self._resolved_name)}"'
         if self._resolved_namespace:
@@ -323,7 +329,7 @@ class Node(Action):
 
         children = self._serialize_children(child_ind)
         if children:
-            return f"{tag}>\n{children}{indent}</node>\n"
+            return f"{tag}>\n{children}{indent}</{tag_name}>\n"
         return f"{tag}/>\n"
 
     def _serialize_children(self, indent: str) -> str:
@@ -362,6 +368,8 @@ class Node(Action):
 
 
 class LifecycleNode(Node):
+    _tag_name = "lifecycle_node"
+
     def __init__(self, **kwargs):
         kwargs.setdefault("kind", "lifecycle_node")
         super().__init__(**kwargs)
@@ -375,6 +383,8 @@ class ComposableNode(Action):
     container's ``plugins`` list when the container is resolved in ``execute()``.
     """
 
+    _resolved_data: dict | None = None
+
     def __init__(self, *, package=None, plugin=None, name=None, **kwargs):
         self._raw_package = package
         self._package = str(package) if package else ""
@@ -385,8 +395,44 @@ class ComposableNode(Action):
         self._raw_parameters = list(kwargs.get("parameters") or [])
         self._raw_remappings = list(kwargs.get("remappings") or [])
 
+    def serialize_resolved(self, indent: str = "  ") -> str | None:
+        """Render as <composable_node> element (called by parent container)."""
+        # Resolved data is set by _resolve_plugin() via _resolved_data attribute
+        data = getattr(self, "_resolved_data", None)
+        if data is None:
+            return None
+        esc = self._esc
+        child_ind = indent + "  "
+
+        pkg = esc(data.get("package", ""))
+        plugin = esc(data.get("plugin", ""))
+        tag = f'{indent}<composable_node pkg="{pkg}" plugin="{plugin}"'
+        name = data.get("name")
+        if name:
+            tag += f' name="{esc(name)}"'
+
+        children: list[str] = []
+        for pf in data.get("param_files", []):
+            path = pf.get("path", "")
+            inlined = pf.get("params")
+            if inlined is not None:
+                children.append(f"{child_ind}<!-- params from: {esc(path)} -->\n")
+                for k, v in inlined:
+                    children.append(f'{child_ind}<param name="{esc(k)}" value="{esc(str(v))}"/>\n')
+                children.append(f"{child_ind}<!-- end params from: {esc(path)} -->\n")
+            else:
+                children.append(f'{child_ind}<param from="{esc(path)}"/>\n')
+        for k, v in sorted(data.get("parameters", {}).items()):
+            children.append(f'{child_ind}<param name="{esc(k)}" value="{esc(v)}"/>\n')
+        for from_, to in data.get("remappings", []):
+            children.append(f'{child_ind}<remap from="{esc(from_)}" to="{esc(to)}"/>\n')
+
+        if children:
+            return f"{tag}>\n{''.join(children)}{indent}</composable_node>\n"
+        return f"{tag}/>\n"
+
     def __repr__(self):
-        return f"TrackedComposableNode(package={self._package!r}, plugin={self._plugin!r})"
+        return f"ComposableNode(package={self._package!r}, plugin={self._plugin!r})"
 
 
 @expose_action("node_container")
@@ -496,11 +542,23 @@ class ComposableNodeContainer(Action):
         if ros_ns:
             entry["ros_namespace"] = ros_ns
 
+        # Store resolved data on instance
+        self._resolved_package = pkg
+        self._resolved_executable = exe
+        self._resolved_name = name or None
+        self._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
+
         # Params (global only for container)
         ctx_gp = context._launch_configurations.get("global_params", [])
-        entry["parameters"] = {k: str(v) for k, v in ctx_gp}
-        entry["param_files"] = list(context._launch_configurations.get("global_param_files", []))
-        entry["remappings"] = list(context._launch_configurations.get("ros_remaps", []))
+        params = {k: str(v) for k, v in ctx_gp}
+        pf_list = list(context._launch_configurations.get("global_param_files", []))
+        remaps = list(context._launch_configurations.get("ros_remaps", []))
+        entry["parameters"] = params
+        entry["param_files"] = pf_list
+        entry["remappings"] = remaps
+        self._resolved_parameters = params
+        self._resolved_param_files = pf_list
+        self._resolved_remappings = remaps
 
         # Env
         env = env_overrides(context)
@@ -508,8 +566,49 @@ class ComposableNodeContainer(Action):
             if isinstance(item, (tuple, list)) and len(item) == 2:
                 env[resolve_value(item[0], context) or ""] = resolve_value(item[1], context) or ""
         entry["env"] = env
+        self._resolved_env = env
 
         entry["plugins"] = _resolve_plugins(self._composable_node_descriptions, context)
+
+    def serialize_resolved(self, indent: str = "  ") -> str | None:
+        if not self._resolved:
+            return None
+        esc = self._esc
+        child_ind = indent + "  "
+
+        pkg = esc(self._resolved_package)
+        exe = esc(self._resolved_executable)
+        tag = f'{indent}<node_container pkg="{pkg}" exec="{exe}"'
+        if self._resolved_name:
+            tag += f' name="{esc(self._resolved_name)}"'
+        if self._resolved_namespace:
+            tag += f' namespace="{esc(self._resolved_namespace)}"'
+
+        children: list[str] = []
+        # Node children (params, remaps, env)
+        for pf in self._resolved_param_files:
+            path = pf.get("path", "")
+            inlined = pf.get("params")
+            if inlined is not None:
+                children.append(f"{child_ind}<!-- params from: {esc(path)} -->\n")
+                for k, v in inlined:
+                    children.append(f'{child_ind}<param name="{esc(k)}" value="{esc(str(v))}"/>\n')
+                children.append(f"{child_ind}<!-- end params from: {esc(path)} -->\n")
+        for k, v in sorted(self._resolved_parameters.items()):
+            children.append(f'{child_ind}<param name="{esc(k)}" value="{esc(v)}"/>\n')
+        for from_, to in self._resolved_remappings:
+            children.append(f'{child_ind}<remap from="{esc(from_)}" to="{esc(to)}"/>\n')
+        for name, value in sorted(self._resolved_env.items()):
+            children.append(f'{child_ind}<env name="{esc(name)}" value="{esc(value)}"/>\n')
+        # Composable plugins
+        for desc in self._composable_node_descriptions:
+            snippet = desc.serialize_resolved(child_ind)
+            if snippet:
+                children.append(snippet)
+
+        if children:
+            return f"{tag}>\n{''.join(children)}{indent}</node_container>\n"
+        return f"{tag}/>\n"
 
 
 @expose_action("load_composable_node")
@@ -575,6 +674,7 @@ class LoadComposableNodes(Action):
         entry = state.tracked["nodes"][self._idx]
 
         # Resolve target
+        target = ""
         if self._raw_target is not None:
             if isinstance(self._raw_target, ComposableNodeContainer):
                 self._raw_target._ensure_tracked(state)
@@ -591,3 +691,29 @@ class LoadComposableNodes(Action):
             entry["ros_namespace"] = ros_ns
 
         entry["plugins"] = _resolve_plugins(self._composable_node_descriptions, context)
+
+        # Store resolved data on instance
+        self._resolved_target = target
+        self._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
+
+    def serialize_resolved(self, indent: str = "  ") -> str | None:
+        if not self._resolved:
+            return None
+        if not self._composable_node_descriptions:
+            return None
+        esc = self._esc
+        child_ind = indent + "  "
+
+        target = self._resolved_target or ""
+        tag = f"{indent}<load_composable_node"
+        if target:
+            tag += f' target="{esc(target)}"'
+        tag += ">\n"
+
+        children: list[str] = []
+        for desc in self._composable_node_descriptions:
+            snippet = desc.serialize_resolved(child_ind)
+            if snippet:
+                children.append(snippet)
+
+        return f"{tag}{''.join(children)}{indent}</load_composable_node>\n"

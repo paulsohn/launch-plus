@@ -243,17 +243,17 @@ def _evaluate_condition(
 # ─── Namespace helpers ────────────────────────────────────────────────────────
 
 
-def _ros2_namespace_join(base: str | None, next_ns: str) -> str | None:
-    """Join two ROS 2 namespace components."""
-    next_ns = next_ns.rstrip("/")
-    if not next_ns:
-        return base
-    if next_ns.startswith("/"):
-        # Absolute — resets
-        return next_ns
-    if not base or base in ("", "/"):
-        return f"/{next_ns}"
-    return f"{base.rstrip('/')}/{next_ns}"
+def _ros2_namespace_join(base: str | None, next_ns: str | None) -> str | None:
+    """Join two ROS 2 namespace components using official semantics.
+
+    Delegates to ``make_namespace_absolute(prefix_namespace(base, next_ns))``.
+    """
+    from launch_plus.entities.utilities.namespace_utils import (
+        make_namespace_absolute,
+        prefix_namespace,
+    )
+
+    return make_namespace_absolute(prefix_namespace(base, next_ns))
 
 
 def _effective_namespace(

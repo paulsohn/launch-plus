@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.helpers import _track_node
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
@@ -57,8 +56,7 @@ class _TrackedExecutable(_TrackedAction):
     def _ensure_tracked(self, state) -> int:
         if self._idx >= 0:
             return int(self._idx)
-        self._idx = _track_node(
-            state,
+        self._idx = state.track_node(
             {
                 "package": "",
                 "executable": "",

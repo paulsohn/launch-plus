@@ -8,10 +8,6 @@ from __future__ import annotations
 
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.helpers import (
-    _track_node,
-    _track_param_file,
-)
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
@@ -48,7 +44,7 @@ def _resolve_xml_composable_plugins(
         for param in p.get("params") or []:
             if "from" in param:
                 path = resolve_value(param["from"], context) or ""
-                _track_param_file(state, path)
+                state.track_param_file(path)
                 pf_entry: dict = {"path": path}
                 if state.inline_params:
                     expanded = _read_and_expand_param_file(path, context)
@@ -147,9 +143,8 @@ class _TrackedNode(_TrackedAction):
         state.track_package(self._raw_package)
         for p in self._raw_parameters:
             if hasattr(p, "_param_file") and p._param_file:
-                _track_param_file(state, p._param_file)
-        self._idx = _track_node(
-            state,
+                state.track_param_file(p._param_file)
+        self._idx = state.track_node(
             {
                 "package": str(self._raw_package) if self._raw_package else "",
                 "executable": str(self._raw_executable) if self._raw_executable else "",
@@ -208,7 +203,7 @@ class _TrackedNode(_TrackedAction):
         for p in self._xml_params:
             if "from" in p:
                 path = resolve_value(p["from"], context) or ""
-                _track_param_file(context._state, path)
+                context._state.track_param_file(path)
                 pf_entry: dict = {"path": path}
                 if context._state.inline_params:
                     from launch_plus.entities.helpers import _read_and_expand_param_file
@@ -341,8 +336,7 @@ class _TrackedComposableNodeContainer(_TrackedAction):
             raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
             if raw_pkg:
                 state.track_package(raw_pkg)
-        self._idx = _track_node(
-            state,
+        self._idx = state.track_node(
             {
                 "package": str(self._raw_package) if self._raw_package else "",
                 "executable": str(self._raw_executable) if self._raw_executable else "",
@@ -449,8 +443,7 @@ class _TrackedLoadComposableNodes(_TrackedAction):
             raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
             if raw_pkg:
                 state.track_package(raw_pkg)
-        self._idx = _track_node(
-            state,
+        self._idx = state.track_node(
             {
                 "package": "",
                 "executable": "",

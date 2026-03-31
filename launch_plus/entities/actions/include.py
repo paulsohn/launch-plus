@@ -10,7 +10,6 @@ from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import (
     _extract_pkg_and_share_path,
-    _track_include,
 )
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
@@ -97,8 +96,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
             logger.warning("max include depth exceeded for %s", file_path)
             return None
 
-        dep_idx = _track_include(
-            ctx._state,
+        dep_idx = ctx._state.track_include(
             file_path,
             ros_namespace=ctx._launch_configurations.get("ros_namespace"),
         )
@@ -150,8 +148,7 @@ class _TrackedIncludeLaunchDescription(_TrackedAction):
                     logger.warning("failed to resolve IncludeLaunchDescription source: %s", e)
 
         if self._path and self._dep_idx < 0:
-            self._dep_idx = _track_include(
-                context._state,
+            self._dep_idx = context._state.track_include(
                 self._path,
                 ros_namespace=context._launch_configurations.get("ros_namespace"),
             )

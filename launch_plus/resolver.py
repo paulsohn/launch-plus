@@ -244,9 +244,7 @@ from launch_plus.entities.helpers import (  # noqa: E402
     _resolve_substitution_ex,  # noqa: F401 — re-exported
     _to_str,  # noqa: F401 — re-exported
     _track_event_handler,  # noqa: F401 — re-exported
-    _track_include,
     _track_node,  # noqa: F401 — re-exported
-    _track_node_from_action,
     _track_package,  # noqa: F401 — re-exported
     _track_param_file,  # noqa: F401 — re-exported
 )
@@ -657,12 +655,12 @@ def _walk_untracked_action(state, action, context):
     if cls_name in ("Node", "LifecycleNode") and hasattr(action, "_package"):
         pkg = getattr(action, "_package", None)
         exe = getattr(action, "_node_executable", getattr(action, "_node_name", None))
-        _track_node_from_action(state, pkg, exe)
+        state.track_node_from_action(pkg, exe)
     elif cls_name == "ComposableNodeContainer" and hasattr(action, "_package"):
         pkg = getattr(action, "_package", None)
         exe = getattr(action, "_node_executable", getattr(action, "_node_name", None))
         name = getattr(action, "_name", None)
-        _track_node_from_action(state, pkg, exe, name)
+        state.track_node_from_action(pkg, exe, name)
         descs = (
             getattr(
                 action,
@@ -672,8 +670,7 @@ def _walk_untracked_action(state, action, context):
             or []
         )
         for desc in descs:
-            _track_node_from_action(
-                state,
+            state.track_node_from_action(
                 getattr(desc, "package", None),
                 getattr(desc, "plugin", None),
                 getattr(desc, "node_name", getattr(desc, "name", None)),
@@ -688,8 +685,7 @@ def _walk_untracked_action(state, action, context):
             or []
         )
         for desc in descs:
-            _track_node_from_action(
-                state,
+            state.track_node_from_action(
                 getattr(desc, "package", None),
                 getattr(desc, "plugin", None),
                 getattr(desc, "node_name", getattr(desc, "name", None)),
@@ -707,7 +703,7 @@ def _walk_untracked_action(state, action, context):
                     loc = None
             if loc:
                 ros_ns = context._launch_configurations.get("ros_namespace") if context else None
-                _track_include(state, loc, ros_namespace=ros_ns)
+                state.track_include(loc, ros_namespace=ros_ns)
 
     # Warn about action classes we do not recognise.
     if cls_name not in _KNOWN_UNTRACKED_CLASSES:

@@ -6,7 +6,7 @@ import logging
 
 from launch_plus.entities.actions.base import _TrackedAction
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.helpers import _portable_display, _record_declared_arg
+from launch_plus.entities.helpers import _portable_display
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
@@ -102,7 +102,7 @@ def _record_and_track(name: str, resolved: str, context=None) -> None:
     already_seen = name in state.declared_arg_names
     if not already_seen:
         state.declared_arg_names.add(name)
-    _record_declared_arg(state, name, resolved, flat=not already_seen)
+    state.record_declared_arg(name, resolved, flat=not already_seen)
 
 
 def _execute_xml_arg(arg: _DeclaredArg, context) -> None:

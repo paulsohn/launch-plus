@@ -92,6 +92,119 @@ class ResolverState:
         if pkg and not pkg.startswith("$(") and pkg not in self.tracked["packages"]:
             self.tracked["packages"].append(pkg)
 
+    def current_source_key(self) -> str:
+        """Return the source key for the current file being resolved."""
+        if self.include_chain:
+            pkg, path = self.include_chain[-1]
+            return f"{pkg}://{path}" if pkg else path
+        return str(self.root_source_key)
+
+    def track_node(self, node_dict: dict) -> int:
+        """Append a node dict to tracked["nodes"] with source info from include_chain."""
+        if self.include_chain:
+            node_dict["include_chain"] = list(self.include_chain)
+        idx = len(self.tracked["nodes"])
+        self.tracked["nodes"].append(node_dict)
+        return idx
+
+    def track_event_handler(self, eh_dict: dict) -> int:
+        """Track an event handler as a node-shaped entry for encounter ordering."""
+        node_dict = {
+            "package": "",
+            "executable": "",
+            "name": "",
+            "ros_namespace": eh_dict.get("ros_namespace"),
+            "explicit_namespace": eh_dict.get("explicit_namespace"),
+            "parameters": {},
+            "param_files": [],
+            "remappings": [],
+            "env": {},
+            "kind": "event_handler",
+            "plugins": [],
+            "target": eh_dict.get("target"),
+            "handler_kind": eh_dict.get("handler_kind", ""),
+            "target_node": eh_dict.get("target_node"),
+            "start_state": eh_dict.get("start_state"),
+            "goal_state": eh_dict.get("goal_state"),
+            "eh_actions": eh_dict.get("actions", []),
+        }
+        return self.track_node(node_dict)
+
+    def track_include(self, path, *, ros_namespace=None) -> int:
+        """Record an included file for dependency tracking. Returns dep index."""
+        from launch_plus.entities.helpers import _extract_pkg_and_share_path
+
+        if not path:
+            return -1
+        path = str(path)
+        if path not in self.tracked["includes"]:
+            self.tracked["includes"].append(path)
+        dep = _extract_pkg_and_share_path(path)
+        if dep:
+            entry = {
+                "package": dep[0],
+                "share_path": dep[1],
+                "path": path,
+                "ros_namespace": ros_namespace,
+                "include_args": {},
+            }
+            self.tracked["include_deps"].append(entry)
+        for i in range(len(self.tracked["include_deps"]) - 1, -1, -1):
+            if self.tracked["include_deps"][i].get("path") == path:
+                return i
+        return -1
+
+    def track_param_file(self, path) -> None:
+        """Record a parameter file for dependency tracking."""
+        from launch_plus.entities.helpers import _extract_pkg_and_share_path
+
+        if not path:
+            return
+        path = str(path)
+        if path not in self.tracked["param_files"]:
+            self.tracked["param_files"].append(path)
+        dep = _extract_pkg_and_share_path(path)
+        if dep:
+            entry = {"package": dep[0], "share_path": dep[1]}
+            if entry not in self.tracked["param_file_deps"]:
+                self.tracked["param_file_deps"].append(entry)
+
+    def record_declared_arg(self, name: str, default: str, *, flat: bool = True) -> None:
+        """Record a declared arg in the per-file dict and optionally the flat list."""
+        if flat:
+            self.tracked["declared_args"].append({"name": name, "default": default})
+        key = self.current_source_key()
+        if key:
+            by_file = self.tracked["declared_args_by_file"]
+            if key not in by_file:
+                by_file[key] = []
+            by_file[key].append({"name": name, "default": default})
+
+    def track_node_from_action(self, package, executable, name=None) -> int:
+        """Track a node from an unpatched ROS 2 action (e.g. OpaqueFunction return)."""
+        self.track_package(package)
+        package = str(package) if package else ""
+        executable = str(executable) if executable else ""
+        name = str(name) if name else ""
+        return self.track_node(
+            {
+                "package": package,
+                "executable": executable,
+                "name": name,
+                "namespace_stack": [],
+                "explicit_namespace": None,
+                "parameters": {},
+                "param_files": [],
+                "remappings": [],
+                "env": {},
+                "kind": "node",
+                "plugins": [],
+                "target": None,
+            }
+        )
+
+    # ─── Package resolution ───────────────────────────────────────────────
+
     def resolve_pkg_share(self, package: str) -> str:
         """Resolve a package share directory path.
 

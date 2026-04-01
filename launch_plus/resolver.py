@@ -560,6 +560,7 @@ def _resolve_file_impl(
             getattr(workflow_options, "allow_unportable_paths", False)
         )
         state.show_empty_includes = bool(getattr(workflow_options, "show_empty_includes", False))
+        state.show_args = bool(getattr(workflow_options, "show_args", False))
     else:
         state.apply_opaque_file_access = False
         state.preview_mode = True
@@ -568,6 +569,7 @@ def _resolve_file_impl(
         state.apply_arg_defaults = False
         state.allow_unportable_paths = False
         state.show_empty_includes = False
+        state.show_args = False
 
     # Build lockfile data from the Lockfile dataclass
     if lockfile is not None:
@@ -607,7 +609,7 @@ def _resolve_file_impl(
                 content = f.read()
         except Exception as e:
             logger.error("cannot read %s: %s", launch_file_str, e)
-            return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
+            return _tracked_to_parsed_launch_file(state.tracked)
 
         if launch_file_str.endswith((".yaml", ".yml")):
             elements = parse_yaml_launch(content, launch_file_str)
@@ -617,27 +619,25 @@ def _resolve_file_impl(
         subst_ctx._launch_configurations = dict(args_dict)
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
         subst_ctx.preview_mode = state.preview_mode
-        state.resolved_actions = resolve_xml_elements(
-            elements, subst_ctx, include_stack=[launch_file_str]
-        )
-        return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
+        resolved = resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file_str])
+        return _tracked_to_parsed_launch_file(state.tracked, resolved)
 
     # ── Python launch files ──────────────────────────────────────────────
     spec = importlib.util.spec_from_file_location("_target_launch", launch_file_str)
     if spec is None or spec.loader is None:
         logger.error("cannot load %s", launch_file_str)
-        return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
+        return _tracked_to_parsed_launch_file(state.tracked)
 
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
     except Exception as e:
         logger.error("Error loading launch file: %s", e)
-        return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
+        return _tracked_to_parsed_launch_file(state.tracked)
 
     if not hasattr(mod, "generate_launch_description"):
         logger.error("No generate_launch_description() function found")
-        return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
+        return _tracked_to_parsed_launch_file(state.tracked)
 
     # Inject persisted global params
     if "__global_params__" in args_dict:
@@ -656,7 +656,7 @@ def _resolve_file_impl(
         ld = mod.generate_launch_description()
     except Exception as e:
         logger.error("generate_launch_description() failed: %s", e)
-        return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
+        return _tracked_to_parsed_launch_file(state.tracked)
 
     entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
@@ -664,9 +664,9 @@ def _resolve_file_impl(
         if isinstance(entity, DeclareLaunchArgument):
             _apply_declared_arg(entity, ctx)
 
-    state.resolved_actions = _walk_actions(state, entities, ctx)
+    resolved = _walk_actions(state, entities, ctx)
 
-    return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
+    return _tracked_to_parsed_launch_file(state.tracked, resolved)
 
 
 def _tracked_to_parsed_launch_file(

@@ -57,6 +57,9 @@ class ResolveWorkflowOptions:
     show_empty_includes: bool = False
     """Show source groups even for includes that produce no resolved actions."""
 
+    show_args: bool = False
+    """Add arg markers to include groups showing include arguments."""
+
 
 # ---------------------------------------------------------------------------
 # Result

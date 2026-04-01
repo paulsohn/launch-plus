@@ -521,6 +521,7 @@ def resolve(
         rosdep_fallback=rosdep,
         inline_params=inline_params,
         show_empty_includes=show_empty_includes,
+        show_args=show_args,
     )
 
     _cmd_resolve(

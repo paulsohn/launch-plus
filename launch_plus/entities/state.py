@@ -28,7 +28,6 @@ class ResolverState:
 
     __slots__ = (
         "tracked",
-        "resolved_actions",
         "declared_arg_names",
         "include_chain",
         "inline_params",
@@ -66,7 +65,6 @@ class ResolverState:
             "include_deps": [],
             "param_file_deps": [],
         }
-        self.resolved_actions: list = []  # Actions with serialize_resolved()
         self.declared_arg_names: set = set()
         self.include_chain: list = []
         self.inline_params: bool = False

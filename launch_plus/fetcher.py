@@ -524,7 +524,7 @@ def ensure_package_available(
     2. AMENT_PREFIX_PATH: check installed packages via ``PackageLocator``.
     3. Rosdep: if ``rosdep_fallback`` is True, try ``rosdep install``.
 
-    Returns the package share directory path, or ``None`` on failure.
+    Returns an absolute path to the package share directory, or ``None`` on failure.
     """
     from launch_plus.locator import PackageLocator
 
@@ -535,7 +535,7 @@ def ensure_package_available(
     if lockfile is not None and fetch_dir is not None:
         pkg_lock = lockfile.packages.get(package)
         if pkg_lock is not None:
-            pkg_path = fetch_dir / pkg_lock.repo / pkg_lock.path
+            pkg_path = (fetch_dir / pkg_lock.repo / pkg_lock.path).resolve()
             if (pkg_path / "package.xml").exists():
                 return pkg_path
             try:
@@ -550,7 +550,7 @@ def ensure_package_available(
     locator = PackageLocator().add_ament_from_env()
     result = locator.locate_install_share(package)
     if result is not None:
-        return result
+        return result.resolve()
 
     # 3. Rosdep fallback
     if rosdep_fallback:
@@ -560,7 +560,7 @@ def ensure_package_available(
             rosdep_install([package])
             result = locator.locate_install_share(package)
             if result is not None:
-                return result
+                return result.resolve()
         except Exception:
             pass
 

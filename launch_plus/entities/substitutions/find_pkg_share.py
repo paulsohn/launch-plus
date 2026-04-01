@@ -18,9 +18,8 @@ logger = logging.getLogger("launch_plus")
 class FindPackageShareSubstitution(Substitution):
     """Resolve ``$(find-pkg-share <pkg>)`` to the package's share directory.
 
-    Always returns a real filesystem path. In preview mode, pyfakefs makes
-    the predicted install path exist; in non-preview mode, the package is
-    actually installed.
+    Always returns a real filesystem path — source path in preview mode,
+    install path in non-preview mode.
     """
 
     def __init__(self, *, package: list[Substitution]) -> None:

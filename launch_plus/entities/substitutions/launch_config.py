@@ -110,7 +110,7 @@ class LaunchConfiguration(Substitution):
         return f"$(var {name})"
 
     def serialize(self) -> str:
-        """Return the portable ``$(var name)`` form."""
+        """Return the ``$(var name)`` form."""
         if isinstance(self._name, list):
             return f"$(var {''.join(t.serialize() for t in self._name)})"
         return f"$(var {self._name})"

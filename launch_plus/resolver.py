@@ -280,9 +280,10 @@ def resolve_file(
     launch_file: "Path",
     args: dict[str, str],
     package_shares: dict[str, str],
+    fetch_dir: "Path",
+    *,
     workflow_options: Any = None,
     lockfile: Any = None,
-    fetch_dir: "Path | None" = None,
     global_params: list | None = None,
     fetch_options: Any = None,
 ) -> Any:
@@ -300,8 +301,8 @@ def resolve_file(
         Workflow flags.
     lockfile : Lockfile
         Lockfile with package/repo info.
-    fetch_dir : Path | None
-        Directory for sparse-checkout.
+    fetch_dir : Path
+        Absolute path to the source/fetch directory.
     fetch_options : FetchOptions | None
         Options for inline git sparse-checkout.
     global_params : list | None
@@ -320,11 +321,11 @@ def resolve_file(
             launch_file,
             args,
             package_shares,
-            workflow_options,
-            lockfile,
             fetch_dir,
-            global_params,
-            fetch_options,
+            workflow_options=workflow_options,
+            lockfile=lockfile,
+            global_params=global_params,
+            fetch_options=fetch_options,
         )
     finally:
         _current_state.reset(token)
@@ -335,9 +336,10 @@ def _resolve_file_impl(
     launch_file: "Path",
     args: dict[str, str],
     package_shares: dict[str, str],
+    fetch_dir: "Path",
+    *,
     workflow_options: Any = None,
     lockfile: Any = None,
-    fetch_dir: "Path | None" = None,
     global_params: list | None = None,
     fetch_options: Any = None,
 ) -> Any:
@@ -395,7 +397,7 @@ def _resolve_file_impl(
     else:
         state.lockfile_data = {}
 
-    state.fetch_dir = str(fetch_dir) if fetch_dir else ""
+    state.fetch_dir = str(fetch_dir)
     state.fetch_options = fetch_options  # FetchOptions from CLI/orchestrator
 
     args_dict = dict(args)

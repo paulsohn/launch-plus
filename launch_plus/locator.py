@@ -27,7 +27,7 @@ class PackageLocator:
         lockfile: Lockfile | None = None,
         ament_prefixes: list[Path] | None = None,
     ) -> None:
-        self.workspace_src = workspace_src
+        self.workspace_src = workspace_src.resolve() if workspace_src else None
         self.lockfile = lockfile
         self.ament_prefixes: list[Path] = list(ament_prefixes) if ament_prefixes else []
 

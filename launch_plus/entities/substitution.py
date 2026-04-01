@@ -16,12 +16,12 @@ class Substitution(ABC):
     def perform(self, ctx: LaunchContext) -> str:
         """Resolve this substitution to a concrete string.
 
-        In preview mode the result should be portable (e.g. ``$(find-pkg-share pkg)``).
+        Returns a real filesystem path or resolved value.
         """
 
     @abstractmethod
     def serialize(self) -> str:
-        """Return the canonical portable form, always (regardless of preview mode)."""
+        """Return the canonical serialized form (e.g. ``$(var name)``)."""
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.serialize()!r})"

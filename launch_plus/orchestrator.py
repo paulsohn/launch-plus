@@ -54,12 +54,6 @@ class ResolveWorkflowOptions:
     show_args: bool = False
     """Add arg markers to include groups showing include arguments."""
 
-    install_base: str | None = None
-    """Fully qualified install directory. Defaults to ``<workspace>/install``."""
-
-    merge_install: bool = False
-    """Use merged install layout (``install/share/<pkg>/``) instead of isolated."""
-
 
 # ---------------------------------------------------------------------------
 # Result
@@ -256,12 +250,12 @@ def _resolve_python_file_recursive(
 
     try:
         parsed, actions = _py_resolve_file(
-            launch_file=file_path,
-            args=initial_args,
-            package_shares=package_shares,
+            file_path,
+            initial_args,
+            package_shares,
+            fetch_dir.resolve(),
             workflow_options=workflow_options,
             lockfile=lockfile,
-            fetch_dir=fetch_dir,
             global_params=current_global_params,
             fetch_options=options,
         )
@@ -313,40 +307,19 @@ def resolve_launch_recursive(
         )
 
     share_path = Path("launch") / launcher
-
-    def _do_resolve():
-        _resolve_python_file_recursive(
-            lockfile,
-            locator,
-            package,
-            share_path,
-            fetch_dir,
-            options,
-            initial_args,
-            workflow_options,
-            result,
-            fetched_packages,
-            failed_repos,
-        )
-
-    if workflow_options.preview:
-        from launch_plus.vfs import virtual_install_mount
-
-        src_dir = fetch_dir.resolve()
-        install_base = (
-            Path(workflow_options.install_base)
-            if workflow_options.install_base
-            else src_dir.parent / "install"
-        )
-        with virtual_install_mount(
-            lockfile,
-            src_dir=src_dir,
-            install_base=install_base,
-            merge_install=workflow_options.merge_install,
-        ):
-            _do_resolve()
-    else:
-        _do_resolve()
+    _resolve_python_file_recursive(
+        lockfile,
+        locator,
+        package,
+        share_path,
+        fetch_dir,
+        options,
+        initial_args,
+        workflow_options,
+        result,
+        fetched_packages,
+        failed_repos,
+    )
 
     logger.info(
         "Resolution complete: %d direct packages, %d packages fetched",

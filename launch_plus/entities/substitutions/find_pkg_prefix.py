@@ -1,7 +1,8 @@
-"""``$(find-pkg-prefix pkg)`` substitution — kept in portable form."""
+"""``$(find-pkg-prefix pkg)`` substitution — resolves a package prefix directory."""
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from launch_plus.entities.expose import expose_substitution
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
 
 @expose_substitution("find-pkg-prefix")
 class FindPackagePrefixSubstitution(Substitution):
-    """Resolve ``$(find-pkg-prefix <pkg>)`` — always kept in portable form."""
+    """Resolve ``$(find-pkg-prefix <pkg>)`` to the package's install prefix."""
 
     def __init__(self, *, package: list[Substitution]) -> None:
         self.package = package
@@ -25,15 +26,14 @@ class FindPackagePrefixSubstitution(Substitution):
         return cls, {"package": args[0] if isinstance(args[0], list) else [args[0]]}
 
     def perform(self, ctx: LaunchContext) -> str:
-        from launch_plus.entities.helpers import (
-            resolve_substitutions_from_tokens,
-        )
+        from launch_plus.entities.helpers import resolve_substitutions_from_tokens
 
         state = ctx._state
         pkg = resolve_substitutions_from_tokens(self.package, ctx)
         state.track_package(pkg)
-        # Always keep portable — prefix resolution not implemented.
-        return f"$(find-pkg-prefix {pkg})"
+        share = state.resolve_pkg_share(pkg)
+        # Prefix is the parent of share/<pkg> — e.g. /opt/ros/humble
+        return str(Path(share).parent.parent)
 
     def serialize(self) -> str:
         return f"$(find-pkg-prefix {''.join(t.serialize() for t in self.package)})"

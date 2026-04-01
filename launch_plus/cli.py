@@ -481,9 +481,6 @@ def fetch(
     is_flag=True,
     help="Show source groups for includes with no resolved actions",
 )
-@click.option("--install-base", default=None, help="Install directory (default: <ws>/install)")
-@click.option("--merge-install", is_flag=True, help="Use merged install layout")
-@click.option("--symlink-install", is_flag=True, help="Alias for isolated install layout (default)")
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
@@ -502,9 +499,6 @@ def resolve(
     inline_params: bool,
     rosdep: bool,
     show_empty_includes: bool,
-    install_base: str | None,
-    merge_install: bool,
-    symlink_install: bool,
     clean: bool,
     dirty: bool,
     shallow: bool,
@@ -522,8 +516,6 @@ def resolve(
         inline_params=inline_params,
         show_empty_includes=show_empty_includes,
         show_args=show_args,
-        install_base=str(Path(install_base).resolve()) if install_base else None,
-        merge_install=merge_install and not symlink_install,
     )
 
     _cmd_resolve(

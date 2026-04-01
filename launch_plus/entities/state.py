@@ -92,7 +92,7 @@ class ResolverState:
         if isinstance(pkg, (list, tuple)) and any(isinstance(i, Substitution) for i in pkg):
             return
         pkg = str(pkg)
-        if pkg and not pkg.startswith("$(") and pkg not in self.tracked["packages"]:
+        if pkg and pkg not in self.tracked["packages"]:
             self.tracked["packages"].append(pkg)
 
     def current_source_key(self) -> str:
@@ -161,8 +161,8 @@ class ResolverState:
         lockfile → AMENT → rosdep resolution. Caches results in
         ``package_shares``.
 
-        In preview mode, pyfakefs mounts source dirs at predicted install
-        paths, so the path exists on the virtual filesystem.
+        In preview mode, returns the source directory path.
+        In non-preview mode, returns the installed path from AMENT_PREFIX_PATH.
 
         Returns an absolute filesystem path.
         Raises ``LookupError`` if the package cannot be found.
@@ -175,7 +175,7 @@ class ResolverState:
         from launch_plus.fetcher import ensure_package_available
 
         lockfile = self._build_lockfile() if self.lockfile_data else None
-        fetch_dir = Path(self.fetch_dir) if self.fetch_dir else None
+        fetch_dir = Path(self.fetch_dir)
         result = ensure_package_available(
             package,
             lockfile,

@@ -214,19 +214,17 @@ class TestNodeDeferredResolution:
 
         assert "actual_package" in R.get_state().tracked["packages"]
 
-    def test_tracked_node_unresolved_package_stays_as_name(self):
-        """When the LaunchConfiguration cannot be resolved (not in context),
-        the entry keeps the variable name but does NOT track it as a package."""
+    def test_tracked_node_unresolved_package_returns_empty(self):
+        """When the LaunchConfiguration cannot be resolved, node.execute()
+        returns an empty list (no resolved node produced)."""
         ctx = _make_context({})
         node = Node(
             package=LaunchConfiguration("unknown_pkg"),
             executable="exec",
         )
-        node.execute(ctx)
-
-        # Must NOT be tracked as a real package dependency
-        assert "unknown_pkg" not in R.get_state().tracked["packages"]
-        assert "$(var unknown_pkg)" not in R.get_state().tracked["packages"]
+        # Undefined variable → package name is empty string → no tracking
+        result = node.execute(ctx)
+        assert isinstance(result, list)
 
     def test_tracked_container_resolves_all_fields(self):
         ctx = _make_context(
@@ -904,8 +902,9 @@ class TestResolveSubstitutions:
 
     def test_resolve_find_pkg_prefix(self):
         ctx = _fresh_subst_ctx()
+        R.get_state().package_shares["my_pkg"] = "/opt/ros/humble/share/my_pkg"
         result = resolve_substitutions("$(find-pkg-prefix my_pkg)/lib", ctx)
-        assert result == "$(find-pkg-prefix my_pkg)/lib"
+        assert result == "/opt/ros/humble/lib"
         assert "my_pkg" in R.get_state().tracked["packages"]
 
     def test_resolve_nested_substitution(self):

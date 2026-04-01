@@ -995,7 +995,6 @@ def _cmd_resolve(
         click.echo(f"Launch files:      {len(result.launch_files)}", err=True)
         click.echo(f"Param files:       {len(result.param_files)}", err=True)
         click.echo(f"Files parsed:      {len(result.parsed_files)}", err=True)
-        click.echo(f"Nodes resolved:    {len(result.nodes)}", err=True)
 
         if result.launch_files:
             click.echo("\nLaunch files:", err=True)

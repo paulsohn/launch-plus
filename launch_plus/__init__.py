@@ -12,7 +12,7 @@ Usage:
     ros2 launch-plus <package> <launcher>
 
     # Python API
-    from launch_plus.types import ResolvedNode, ParsedLaunchFile
+    from launch_plus.types import ParsedLaunchFile
 """
 
 __version__ = "0.2.0"

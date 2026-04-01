@@ -732,7 +732,6 @@ def _tracked_to_parsed_launch_file(
 
     return _ParsedLaunchFile(
         packages=list(tracked.get("packages", [])),
-        nodes=[],
         launch_includes=launch_includes,
         param_files=param_file_deps,
         declared_arg_defaults=declared_arg_defaults,

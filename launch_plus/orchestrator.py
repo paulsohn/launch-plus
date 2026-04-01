@@ -73,7 +73,6 @@ class ResolveResult:
     other_files: list[FileDependency] = field(default_factory=list)
     fetched_packages: list[str] = field(default_factory=list)
     parsed_files: list[Path] = field(default_factory=list)
-    nodes: list = field(default_factory=list)  # legacy, use resolved_actions
     include_args: dict[tuple[str, Path], IncludeArgContext] = field(default_factory=dict)
     declared_args_by_file: dict[tuple[str, Path], dict[str, str]] = field(default_factory=dict)
     global_params: list[list] = field(default_factory=list)

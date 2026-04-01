@@ -32,47 +32,9 @@ class DependencyKind(Enum):
     """Other file type — needs fetching, no special handling."""
 
 
-class EventHandlerKind(Enum):
-    """Kind of event handler in a resolved launch graph."""
-
-    ON_PROCESS_START = "on_process_start"
-    ON_PROCESS_EXIT = "on_process_exit"
-    ON_STATE_TRANSITION = "on_state_transition"
-    ON_SHUTDOWN = "on_shutdown"
-
-    @property
-    def tag_name(self) -> str:
-        """XML tag name for this handler kind."""
-        return self.value
-
-
 # ---------------------------------------------------------------------------
 # Dataclasses — small building blocks
 # ---------------------------------------------------------------------------
-
-
-@dataclass
-class ParamFileReference:
-    """File reference — not inlined.  Renderer emits ``<param from="display"/>``."""
-
-    display: str
-    abs: str
-
-
-@dataclass
-class ParamFileInlined:
-    """Pre-expanded at resolve time (when ``--inline-params`` is active).
-
-    Renderer emits ``<!-- params from: display -->``, individual ``<param>``
-    elements, and ``<!-- end params from: display -->``.
-    """
-
-    display: str
-    params: list[tuple[str, str]]
-
-
-ParamFile = ParamFileReference | ParamFileInlined
-"""A parameter file — either a reference or inlined key-value pairs."""
 
 
 @dataclass
@@ -112,171 +74,6 @@ class LaunchInclude:
     namespace_stack: list[str] = field(default_factory=list)
 
 
-@dataclass
-class ComposablePlugin:
-    """A composable node plugin loaded into a container."""
-
-    package: str
-    plugin: str
-    """C++ plugin class name (e.g. ``nebula::ros::HesaiRosWrapper``)."""
-
-    name: str | None = None
-    parameters: dict[str, str] = field(default_factory=dict)
-    remappings: list[tuple[str, str]] = field(default_factory=list)
-    param_files: list[ParamFile] = field(default_factory=list)
-
-
-@dataclass
-class ResolvedEventAction:
-    """An action inside an event handler."""
-
-    event: str
-    """Event name for ``<emit_event event="..."/>``."""
-
-    target_node: str | None = None
-    namespace: str | None = None
-
-
-# ---------------------------------------------------------------------------
-# NodeKind — discriminated via a tag enum + optional payload fields
-# ---------------------------------------------------------------------------
-#
-# Rust uses a rich enum with per-variant fields.  Python dataclasses can't do
-# that ergonomically, so we use a tag enum on ResolvedNode and put the variant
-# payload into optional fields.  The renderer/orchestrator switches on the tag.
-# ---------------------------------------------------------------------------
-
-
-class NodeKindTag(Enum):
-    """Discriminator for the kind of resolved node."""
-
-    NODE = auto()
-    CONTAINER = auto()
-    LOAD_COMPOSABLE = auto()
-    INCLUDE_MARKER = auto()
-    LOG = auto()
-    SET_REMAP = auto()
-    EXECUTABLE = auto()
-    LIFECYCLE_NODE = auto()
-    EVENT_HANDLER = auto()
-
-
-# ---------------------------------------------------------------------------
-# ResolvedNode
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class ResolvedNode:
-    """A single resolved node in the launch graph."""
-
-    # --- core identity ---
-    package: str = ""
-    executable: str = ""
-    name: str | None = None
-    namespace: str | None = None
-    explicit_namespace: str | None = None
-    namespace_stack: list[str] = field(default_factory=list)
-
-    # --- parameters / remappings / env ---
-    parameters: dict[str, str] = field(default_factory=dict)
-    remappings: list[tuple[str, str]] = field(default_factory=list)
-    env: dict[str, str] = field(default_factory=dict)
-    param_files: list[ParamFile] = field(default_factory=list)
-
-    # --- source traceability (excluded from semantic comparison) ---
-    source: tuple[str, Path] | None = None
-    include_chain: list[tuple[str, Path]] = field(default_factory=list)
-
-    # --- node kind ---
-    kind: NodeKindTag = NodeKindTag.NODE
-
-    # --- kind-specific payload (set depending on `kind`) ---
-    plugins: list[ComposablePlugin] = field(default_factory=list)
-    """Container / LoadComposable: composable node plugins."""
-
-    load_target: str | None = None
-    """LoadComposable: target container name."""
-
-    log_message: str | None = None
-    """Log: message text."""
-
-    remap_from: str | None = None
-    """SetRemap: source topic."""
-
-    remap_to: str | None = None
-    """SetRemap: destination topic."""
-
-    exec_cmd: str | None = None
-    """Executable: command string."""
-
-    exec_name: str | None = None
-    """Executable: process name."""
-
-    handler_kind: EventHandlerKind | None = None
-    """EventHandler: kind of event handler."""
-
-    handler_target: str | None = None
-    """EventHandler: target process name."""
-
-    handler_target_node: str | None = None
-    """EventHandler: target lifecycle node name."""
-
-    handler_namespace: str | None = None
-    """EventHandler: namespace."""
-
-    handler_start_state: str | None = None
-    """EventHandler: start state (for state transitions)."""
-
-    handler_goal_state: str | None = None
-    """EventHandler: goal state (for state transitions)."""
-
-    handler_actions: list[ResolvedEventAction] = field(default_factory=list)
-    """EventHandler: child actions."""
-
-    # --- output attributes ---
-    output: str | None = None
-    args: str | None = None
-    respawn: str | None = None
-    respawn_delay: str | None = None
-
-
-# ---------------------------------------------------------------------------
-# SemanticNode — for comparing resolved outputs
-# ---------------------------------------------------------------------------
-
-
-@dataclass(eq=True, frozen=True)
-class SemanticNode:
-    """Execution-relevant subset of :class:`ResolvedNode` for semantic comparison.
-
-    Excludes ``source`` and ``include_chain`` which encode *where* a node was
-    declared, not *what* it does.
-    """
-
-    package: str
-    executable: str
-    name: str | None
-    namespace: str | None
-    namespace_stack: tuple[str, ...]
-    parameters: tuple[tuple[str, str], ...]
-    remappings: tuple[tuple[str, str], ...]
-    env: tuple[tuple[str, str], ...]
-
-    @classmethod
-    def from_resolved(cls, node: ResolvedNode) -> SemanticNode:
-        return cls(
-            package=node.package,
-            executable=node.executable,
-            name=node.name,
-            namespace=node.namespace,
-            namespace_stack=tuple(node.namespace_stack),
-            parameters=tuple(sorted(node.parameters.items())),
-            remappings=tuple(node.remappings),
-            env=tuple(sorted(node.env.items())),
-        )
-
-
 # ---------------------------------------------------------------------------
 # ParsedLaunchFile — output of the resolver for one file
 # ---------------------------------------------------------------------------
@@ -287,7 +84,6 @@ class ParsedLaunchFile:
     """Result of resolving a single launch file."""
 
     packages: list[str] = field(default_factory=list)
-    nodes: list[ResolvedNode] = field(default_factory=list)
     launch_includes: list[LaunchInclude] = field(default_factory=list)
     param_files: list[FileDependency] = field(default_factory=list)
     other_files: list[FileDependency] = field(default_factory=list)
@@ -492,28 +288,3 @@ def effective_namespace(stack: list[str], node_ns: str | None = None) -> str | N
     if node_ns is not None:
         current = ros2_namespace_join(current, node_ns)
     return current
-
-
-# ---------------------------------------------------------------------------
-# Semantic comparison
-# ---------------------------------------------------------------------------
-
-_NON_EXEC_KINDS = frozenset(
-    {
-        NodeKindTag.INCLUDE_MARKER,
-        NodeKindTag.SET_REMAP,
-        NodeKindTag.LOG,
-        NodeKindTag.EVENT_HANDLER,
-    }
-)
-
-
-def semantic_eq(a: list[ResolvedNode], b: list[ResolvedNode]) -> bool:
-    """Return ``True`` if *a* and *b* contain the same executable nodes in the same order.
-
-    Ignores location fields (``source``, ``include_chain``) and non-executable
-    node kinds (``IncludeMarker``, ``SetRemap``, ``Log``, ``EventHandler``).
-    """
-    a_s = [SemanticNode.from_resolved(n) for n in a if n.kind not in _NON_EXEC_KINDS]
-    b_s = [SemanticNode.from_resolved(n) for n in b if n.kind not in _NON_EXEC_KINDS]
-    return a_s == b_s

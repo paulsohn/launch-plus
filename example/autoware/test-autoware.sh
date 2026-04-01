@@ -68,22 +68,18 @@ LAUNCH_ARGS=(
     autoware_launch autoware.launch.xml
     sensor_model:=sample_sensor_kit
     vehicle_model:=sample_vehicle
-    "map_path:=[map_path]"
+    "map_path:={map_path}"
 )
 
 # Resolver behavior flags (shared between resolve and build)
 COMMON_FLAGS=(
-    --allow-global-arg-cascade
     --apply-launch-arg-defaults
-    --apply-opaque-file-access
-    --allow-including-unportable-path
     --rosdep
 )
 
 # Resolve-only display flags (not accepted by build)
 RESOLVE_DISPLAY=(
     --inline-params
-    --show-args
 )
 
 # ── Acados environment (if installed) ────────────────────────────────────────
@@ -98,7 +94,7 @@ fi
 
 export ENABLE_AGNOCAST="${ENABLE_AGNOCAST:-1}"
 
-# ── Step 1: Preview resolve (portable paths, no expand) ──────────────────────
+# ── Step 1: Preview resolve (source paths) ───────────────────────────────────
 
 echo "==> Step 1: Preview resolve"
 $LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" "${RESOLVE_DISPLAY[@]}" --preview > preview_raw.xml
@@ -129,35 +125,23 @@ $LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAG
 echo "    OK (postbuild.xml)"
 echo
 
-# ── Step 5: Normalize and compare ────────────────────────────────────────────
-# Replace real install paths with portable $(find-pkg-share ...) tokens so we
-# can diff preview (portable) vs postbuild (real paths).
+# ── Step 5: Compare preview vs postbuild ─────────────────────────────────────
+# Diff preview (source paths) vs postbuild (install paths).
+# Lines containing "PREVIEW:" or "xacro" are expected to differ (path-dependent).
 
-echo "==> Step 5: Normalize postbuild paths and diff against preview"
+echo "==> Step 5: Compare preview vs postbuild"
 
-INSTALL_DIR="$(pwd)/install"
+UNEXPECTED=$(diff preview_raw.xml postbuild.xml \
+    | grep "^[<>]" \
+    | grep -v "PREVIEW:" \
+    | grep -v "xacro" \
+    || true)
 
-if [[ -z "${ROS_DISTRO:-}" ]]; then
-    echo "ERROR: ROS_DISTRO is not set. Source your ROS 2 environment first." >&2
-    exit 1
-fi
-ROS_SHARE="/opt/ros/${ROS_DISTRO}/share"
-
-# Normalize colcon install paths:  <install>/<pkg>/share/<pkg> → $(find-pkg-share <pkg>)
-# Normalize ROS system paths:      /opt/ros/<distro>/share/<pkg> → $(find-pkg-share <pkg>)
-# Also strip the preview marker line from preview_raw.xml.
-sed -E \
-    -e "s|${INSTALL_DIR}/[^/]+/share/([^/]+)|\$(find-pkg-share \1)|g" \
-    -e "s|${ROS_SHARE}/([^/]+)|\$(find-pkg-share \1)|g" \
-    postbuild.xml > postbuild_normalized.xml
-
-grep -v '^<!-- PREVIEW:' preview_raw.xml > preview.xml
-
-if diff preview.xml postbuild_normalized.xml > /dev/null 2>&1; then
-    echo "    OK (identical after normalization)"
+if [[ -z "$UNEXPECTED" ]]; then
+    echo "    OK (no unexpected differences)"
 else
-    echo "    FAIL: preview.xml and postbuild_normalized.xml differ!"
-    diff preview.xml postbuild_normalized.xml | head -60
+    echo "    FAIL: unexpected differences between preview and postbuild:"
+    echo "$UNEXPECTED" | head -20
     exit 1
 fi
 

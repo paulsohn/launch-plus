@@ -28,17 +28,15 @@ def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
     return parser.parse_substitution(text)
 
 
-def _fully_qualified_name(node_entry: dict) -> str:
-    """Compute fully-qualified node name from tracked entry.
+def _fully_qualified_name(action) -> str:
+    """Compute fully-qualified node name from an action's resolved attributes.
 
     Matches official ``make_namespace_absolute(prefix_namespace(
     ros_namespace, prefix_namespace(node_namespace, name)))``.
     """
-
-    ros_ns = node_entry.get("ros_namespace")
-    explicit_ns = node_entry.get("explicit_namespace")
-    name = node_entry.get("name", "")
-    # Combine: ros_namespace + explicit_namespace + name
+    ros_ns = getattr(action, "_resolved_ros_namespace", None)
+    explicit_ns = getattr(action, "_resolved_explicit_namespace", None)
+    name = getattr(action, "_resolved_name", None) or ""
     ns = _ros2_namespace_join(ros_ns, explicit_ns) if explicit_ns else ros_ns
     return _ros2_namespace_join(ns, name) or ""
 
@@ -153,7 +151,6 @@ class Node(Action):
         )
 
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
-        self._idx = -1
         self._kind = kwargs.pop("kind", None) or "node"
         self._raw_package = package
         self._raw_executable = executable
@@ -168,35 +165,8 @@ class Node(Action):
         self._raw_respawn_delay = kwargs.get("respawn_delay")
         self._resolved = False
 
-    def _ensure_tracked(self, state) -> int:
-        """Create the tracked node entry on first call, return index."""
-        if self._idx >= 0:
-            return int(self._idx)
-        state.track_package(self._raw_package)
-        for p in self._raw_parameters:
-            if hasattr(p, "_param_file") and p._param_file:
-                state.track_param_file(p._param_file)
-        self._idx = state.track_node(
-            {
-                "package": str(self._raw_package) if self._raw_package else "",
-                "executable": str(self._raw_executable) if self._raw_executable else "",
-                "name": str(self._raw_name) if self._raw_name else "",
-                "namespace_stack": [],
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": self._kind,
-                "plugins": [],
-                "target": None,
-            },
-        )
-        return int(self._idx)
-
     def execute(self, context) -> list | None:
         state = context._state
-        self._ensure_tracked(state)
         if not self._resolved:
             self._resolved = True
             self._perform_substitutions(context)
@@ -205,42 +175,29 @@ class Node(Action):
         return None
 
     def _perform_substitutions(self, context) -> None:
-        """Resolve all substitutions into the tracked entry.
-
-        Matching
-        official ``Node._perform_substitutions(context)`` pattern.
-        """
+        """Resolve all substitutions. Matching official pattern."""
         state = context._state
-        entry = state.tracked["nodes"][self._idx]
 
-        # Package / executable / name
         pkg = context.perform_substitution(self._raw_package) or ""
         exe = context.perform_substitution(self._raw_executable) or ""
         name = context.perform_substitution(self._raw_name) or ""
         ns = context.perform_substitution(self._raw_namespace) if self._raw_namespace else None
         if pkg:
             state.track_package(pkg)
-        entry["package"] = pkg
-        entry["executable"] = exe
-        entry["name"] = name
-        entry["explicit_namespace"] = ns
 
-        # Namespace from launch_configurations (matching official)
         ros_ns = context._launch_configurations.get("ros_namespace")
-        if ros_ns:
-            entry["ros_namespace"] = ros_ns
 
-        # Store resolved data on instance for serialize_resolved()
         self._resolved_package = pkg
         self._resolved_executable = exe
         self._resolved_name = name or None
+        self._resolved_ros_namespace = ros_ns
+        self._resolved_explicit_namespace = ns
         self._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
 
-        # Parameters: global first, then node-specific (matching official order)
+        # Parameters: global first, then node-specific
         ctx_gp = context._launch_configurations.get("global_params", [])
         params: dict[str, str] = {k: str(v) for k, v in ctx_gp}
-        global_pf = list(context._launch_configurations.get("global_param_files", []))
-        pf_list: list[dict] = list(global_pf)
+        pf_list: list[dict] = list(context._launch_configurations.get("global_param_files", []))
 
         for p in self._raw_parameters:
             if isinstance(p, ParameterFile):
@@ -260,24 +217,16 @@ class Node(Action):
                     resolved_v = context.perform_substitution(v)
                     params[str(k)] = resolved_v if resolved_v is not None else ""
 
-        entry["parameters"] = params
-        entry["param_files"] = pf_list
         self._resolved_parameters = params
         self._resolved_param_files = pf_list
 
-        # Remappings: global first, then node-specific (matching official)
+        # Remappings: global first, then node-specific
         remaps = list(context._launch_configurations.get("ros_remaps", []))
         for r in self._raw_remappings:
             if isinstance(r, (tuple, list)) and len(r) == 2:
                 src = context.perform_substitution(r[0])
                 dst = context.perform_substitution(r[1])
-                remaps.append(
-                    [
-                        src if src is not None else str(r[0]),
-                        dst if dst is not None else str(r[1]),
-                    ]
-                )
-        entry["remappings"] = remaps
+                remaps.append([src or str(r[0]), dst or str(r[1])])
         self._resolved_remappings = remaps
 
         # Environment
@@ -285,7 +234,6 @@ class Node(Action):
         for item in self._raw_env or []:
             if isinstance(item, (tuple, list)) and len(item) == 2:
                 env[resolve_value(item[0], context) or ""] = resolve_value(item[1], context) or ""
-        entry["env"] = env
         self._resolved_env = env
 
         # Extra fields
@@ -293,17 +241,16 @@ class Node(Action):
         self._resolved_args = None
         self._resolved_respawn = None
         self._resolved_respawn_delay = None
-        for attr, key in (
-            ("_raw_output", "output"),
-            ("_raw_arguments", "args"),
-            ("_raw_respawn", "respawn"),
-            ("_raw_respawn_delay", "respawn_delay"),
+        for raw_attr, resolved_attr in (
+            ("_raw_output", "_resolved_output"),
+            ("_raw_arguments", "_resolved_args"),
+            ("_raw_respawn", "_resolved_respawn"),
+            ("_raw_respawn_delay", "_resolved_respawn_delay"),
         ):
-            raw = getattr(self, attr, None)
+            raw = getattr(self, raw_attr, None)
             if raw is not None:
                 resolved = context.perform_substitution(raw)
-                entry[key] = resolved if resolved else str(raw)
-                setattr(self, f"_resolved_{key}", entry[key])
+                setattr(self, resolved_attr, resolved if resolved else str(raw))
 
     _tag_name = "node"
 
@@ -480,7 +427,6 @@ class ComposableNodeContainer(Action):
         composable_node_descriptions=None,
         **kwargs,
     ):
-        self._idx = -1
         self._raw_package = package
         self._raw_executable = executable
         self._raw_name = name
@@ -491,36 +437,8 @@ class ComposableNodeContainer(Action):
         self._composable_node_descriptions = list(composable_node_descriptions or [])
         self._resolved = False
 
-    def _ensure_tracked(self, state) -> int:
-        """Create the tracked container entry on first call, return index."""
-        if self._idx >= 0:
-            return int(self._idx)
-        state.track_package(self._raw_package)
-        for desc in self._composable_node_descriptions:
-            raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
-            if raw_pkg:
-                state.track_package(raw_pkg)
-        self._idx = state.track_node(
-            {
-                "package": str(self._raw_package) if self._raw_package else "",
-                "executable": str(self._raw_executable) if self._raw_executable else "",
-                "name": str(self._raw_name) if self._raw_name else "",
-                "namespace_stack": [],
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": "container",
-                "plugins": [],
-                "target": None,
-            },
-        )
-        return int(self._idx)
-
     def execute(self, context) -> list | None:
         state = context._state
-        self._ensure_tracked(state)
         if not self._resolved:
             self._resolved = True
             self._perform_substitutions(context)
@@ -529,10 +447,8 @@ class ComposableNodeContainer(Action):
         return None
 
     def _perform_substitutions(self, context) -> None:
-        """Resolve all substitutions into the tracked entry."""
-
+        """Resolve all substitutions."""
         state = context._state
-        entry = state.tracked["nodes"][self._idx]
 
         pkg = context.perform_substitution(self._raw_package) or ""
         exe = context.perform_substitution(self._raw_executable) or ""
@@ -540,41 +456,34 @@ class ComposableNodeContainer(Action):
         ns = context.perform_substitution(self._raw_namespace) if self._raw_namespace else None
         if pkg:
             state.track_package(pkg)
-        entry["package"] = pkg
-        entry["executable"] = exe
-        entry["name"] = name
-        entry["explicit_namespace"] = ns
-        ros_ns = context._launch_configurations.get("ros_namespace")
-        if ros_ns:
-            entry["ros_namespace"] = ros_ns
+        for desc in self._composable_node_descriptions:
+            raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
+            if raw_pkg:
+                state.track_package(raw_pkg)
 
-        # Store resolved data on instance
+        ros_ns = context._launch_configurations.get("ros_namespace")
+
         self._resolved_package = pkg
         self._resolved_executable = exe
         self._resolved_name = name or None
+        self._resolved_ros_namespace = ros_ns
+        self._resolved_explicit_namespace = ns
         self._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
 
-        # Params (global only for container)
         ctx_gp = context._launch_configurations.get("global_params", [])
-        params = {k: str(v) for k, v in ctx_gp}
-        pf_list = list(context._launch_configurations.get("global_param_files", []))
-        remaps = list(context._launch_configurations.get("ros_remaps", []))
-        entry["parameters"] = params
-        entry["param_files"] = pf_list
-        entry["remappings"] = remaps
-        self._resolved_parameters = params
-        self._resolved_param_files = pf_list
-        self._resolved_remappings = remaps
+        self._resolved_parameters = {k: str(v) for k, v in ctx_gp}
+        self._resolved_param_files = list(
+            context._launch_configurations.get("global_param_files", [])
+        )
+        self._resolved_remappings = list(context._launch_configurations.get("ros_remaps", []))
 
-        # Env
         env = env_overrides(context)
         for item in self._raw_env or []:
             if isinstance(item, (tuple, list)) and len(item) == 2:
                 env[resolve_value(item[0], context) or ""] = resolve_value(item[1], context) or ""
-        entry["env"] = env
         self._resolved_env = env
 
-        entry["plugins"] = _resolve_plugins(self._composable_node_descriptions, context)
+        _resolve_plugins(self._composable_node_descriptions, context)
 
     def serialize_resolved(self) -> list[ET.Element]:
         if not self._resolved:
@@ -637,41 +546,13 @@ class LoadComposableNodes(Action):
         )
 
     def __init__(self, *, composable_node_descriptions=None, target_container=None, **kwargs):
-        self._idx = -1
         self._raw_target = target_container
         self._raw_namespace = kwargs.get("namespace")
         self._composable_node_descriptions = list(composable_node_descriptions or [])
         self._resolved = False
 
-    def _ensure_tracked(self, state) -> int:
-        """Create the tracked load_composable entry on first call, return index."""
-        if self._idx >= 0:
-            return int(self._idx)
-        for desc in self._composable_node_descriptions:
-            raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
-            if raw_pkg:
-                state.track_package(raw_pkg)
-        self._idx = state.track_node(
-            {
-                "package": "",
-                "executable": "",
-                "name": "",
-                "namespace_stack": [],
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": "load_composable",
-                "plugins": [],
-                "target": "",
-            },
-        )
-        return int(self._idx)
-
     def execute(self, context) -> list | None:
         state = context._state
-        self._ensure_tracked(state)
         if not self._resolved:
             self._resolved = True
             self._perform_substitutions(context)
@@ -680,31 +561,30 @@ class LoadComposableNodes(Action):
         return None
 
     def _perform_substitutions(self, context) -> None:
-        """Resolve all substitutions into the tracked entry."""
+        """Resolve all substitutions."""
         state = context._state
-        entry = state.tracked["nodes"][self._idx]
 
-        # Resolve target
+        for desc in self._composable_node_descriptions:
+            raw_pkg = getattr(desc, "_raw_package", None) or getattr(desc, "_package", None)
+            if raw_pkg:
+                state.track_package(raw_pkg)
+
+        # Resolve target — reads container's _resolved_* attributes
         target = ""
         if self._raw_target is not None:
             if isinstance(self._raw_target, ComposableNodeContainer):
-                self._raw_target._ensure_tracked(state)
-                container = state.tracked["nodes"][self._raw_target._idx]
-                target = _fully_qualified_name(container)
+                target = _fully_qualified_name(self._raw_target)
             else:
                 target = context.perform_substitution(self._raw_target) or ""
-            entry["target"] = target
 
         ns = context.perform_substitution(self._raw_namespace) if self._raw_namespace else None
-        entry["explicit_namespace"] = ns
         ros_ns = context._launch_configurations.get("ros_namespace")
-        if ros_ns:
-            entry["ros_namespace"] = ros_ns
 
-        entry["plugins"] = _resolve_plugins(self._composable_node_descriptions, context)
+        _resolve_plugins(self._composable_node_descriptions, context)
 
-        # Store resolved data on instance
         self._resolved_target = target
+        self._resolved_ros_namespace = ros_ns
+        self._resolved_explicit_namespace = ns
         self._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
 
     def serialize_resolved(self) -> list[ET.Element]:

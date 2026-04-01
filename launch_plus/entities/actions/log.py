@@ -27,26 +27,8 @@ class LogInfo(Action):
 
         msg = resolve_value(self._message, context) or ""
         self._resolved_message = msg
-        state = context._state
-        state.track_node(
-            {
-                "package": "",
-                "executable": "",
-                "name": "",
-                "ros_namespace": context._launch_configurations.get("ros_namespace"),
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": "log",
-                "plugins": [],
-                "target": None,
-                "message": msg,
-            },
-        )
-        self._include_chain = list(state.include_chain)
-        state.resolved_actions.append(self)
+        self._include_chain = list(context._state.include_chain)
+        context._state.resolved_actions.append(self)
         return None
 
     def serialize_resolved(self) -> list[ET.Element]:

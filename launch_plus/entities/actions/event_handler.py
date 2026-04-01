@@ -222,18 +222,15 @@ def _transition_name(transition_id):
 
 
 def _action_name(action, state):
-    """Extract the node name from a tracked action for event handler targeting."""
-    if action is not None and hasattr(action, "_idx") and action._idx >= 0:
-        return state.tracked["nodes"][action._idx].get("name", "")
-    return ""
+    """Extract the node name from a resolved action for event handler targeting."""
+    return getattr(action, "_resolved_name", None) or ""
 
 
 def _action_namespace_info(action, state):
-    """Extract namespace_stack and explicit_namespace for a tracked node action."""
-    if action is None or not hasattr(action, "_idx") or action._idx < 0:
+    """Extract namespace info from a resolved action."""
+    if action is None:
         return [], None
-    entry = state.tracked["nodes"][action._idx]
-    return entry.get("namespace_stack", []), entry.get("explicit_namespace")
+    return [], getattr(action, "_resolved_explicit_namespace", None)
 
 
 class TrackedEmitEvent(Action):

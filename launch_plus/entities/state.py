@@ -56,7 +56,6 @@ class ResolverState:
         self.tracked: dict[str, Any] = {
             "packages": [],
             "includes": [],
-            "nodes": [],
             "declared_args": [],
             "declared_args_by_file": {},
             "global_params": [],
@@ -110,36 +109,9 @@ class ResolverState:
             return f"{pkg}://{path}" if pkg else path
         return str(self.root_source_key)
 
-    def track_node(self, node_dict: dict) -> int:
-        """Append a node dict to tracked["nodes"] with source info from include_chain."""
-        if self.include_chain:
-            node_dict["include_chain"] = list(self.include_chain)
-        idx = len(self.tracked["nodes"])
-        self.tracked["nodes"].append(node_dict)
-        return idx
-
-    def track_event_handler(self, eh_dict: dict) -> int:
-        """Track an event handler as a node-shaped entry for encounter ordering."""
-        node_dict = {
-            "package": "",
-            "executable": "",
-            "name": "",
-            "ros_namespace": eh_dict.get("ros_namespace"),
-            "explicit_namespace": eh_dict.get("explicit_namespace"),
-            "parameters": {},
-            "param_files": [],
-            "remappings": [],
-            "env": {},
-            "kind": "event_handler",
-            "plugins": [],
-            "target": eh_dict.get("target"),
-            "handler_kind": eh_dict.get("handler_kind", ""),
-            "target_node": eh_dict.get("target_node"),
-            "start_state": eh_dict.get("start_state"),
-            "goal_state": eh_dict.get("goal_state"),
-            "eh_actions": eh_dict.get("actions", []),
-        }
-        return self.track_node(node_dict)
+    def track_event_handler(self, eh_dict: dict) -> None:
+        """Record an event handler for dependency tracking."""
+        self.tracked["event_handlers"].append(eh_dict)
 
     def track_include(self, path, *, ros_namespace=None) -> int:
         """Record an included file for dependency tracking. Returns dep index."""
@@ -191,28 +163,10 @@ class ResolverState:
                 by_file[key] = []
             by_file[key].append({"name": name, "default": default})
 
-    def track_node_from_action(self, package, executable, name=None) -> int:
-        """Track a node from an unpatched ROS 2 action (e.g. OpaqueFunction return)."""
+    def track_node_from_action(self, package, executable=None, name=None) -> None:
+        """Track a node from an unpatched ROS 2 action for dependency tracking."""
         self.track_package(package)
-        package = str(package) if package else ""
-        executable = str(executable) if executable else ""
-        name = str(name) if name else ""
-        return self.track_node(
-            {
-                "package": package,
-                "executable": executable,
-                "name": name,
-                "namespace_stack": [],
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": "node",
-                "plugins": [],
-                "target": None,
-            }
-        )
+        # executable and name are unused — kept for call-site compatibility
 
     # ─── Package resolution ───────────────────────────────────────────────
 

@@ -553,7 +553,6 @@ def _resolve_file_impl(
     # Reset state.tracked
     state.tracked["packages"] = []
     state.tracked["includes"] = []
-    state.tracked["nodes"] = []
     state.tracked["declared_args"] = []
     state.tracked["declared_args_by_file"] = {}
     state.tracked["global_params"] = []

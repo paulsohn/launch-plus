@@ -37,7 +37,6 @@ class ExecuteProcess(Action):
             self.__cmd = [normalize_to_list_of_substitutions(x) for x in cmd]
         self.__name = normalize_to_list_of_substitutions(name) if name is not None else None
         self.__additional_env = kwargs.pop("additional_env", None)
-        self._idx = -1
 
     @classmethod
     def _parse_cmdline(cls, cmd: str, parser: _ActionParser) -> list[list[Substitution]]:
@@ -89,56 +88,20 @@ class ExecuteProcess(Action):
             additional_env=parser.parse_envs(entity),
         )
 
-    def _ensure_tracked(self, state) -> int:
-        if self._idx >= 0:
-            return int(self._idx)
-        self._idx = state.track_node(
-            {
-                "package": "",
-                "executable": "",
-                "name": "",
-                "namespace_stack": [],
-                "explicit_namespace": None,
-                "parameters": {},
-                "param_files": [],
-                "remappings": [],
-                "env": {},
-                "kind": "executable",
-                "plugins": [],
-                "target": None,
-                "cmd": "",
-            },
-        )
-        return int(self._idx)
-
     def execute(self, context) -> list | None:
         from launch_plus.entities.helpers import env_overrides, resolve_value
 
         state = context._state
-        self._ensure_tracked(state)
-
-        entry = state.tracked["nodes"][self._idx]
-
-        # Resolve cmd: each arg is a list[Substitution] → resolved string
         cmd_parts = [perform_substitutions(context, arg) for arg in self.__cmd]
-        entry["cmd"] = " ".join(cmd_parts)
-
-        if self.__name is not None:
-            entry["name"] = perform_substitutions(context, self.__name)
-
-        ros_ns = context._launch_configurations.get("ros_namespace")
-        if ros_ns:
-            entry["ros_namespace"] = ros_ns
+        self._resolved_cmd = " ".join(cmd_parts)
+        self._resolved_name = (
+            perform_substitutions(context, self.__name) if self.__name is not None else None
+        )
 
         env = env_overrides(context)
         if self.__additional_env is not None:
             for k_tokens, v_tokens in self.__additional_env:
                 env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
-        entry["env"] = env
-
-        # Store resolved data on instance for serialize_resolved()
-        self._resolved_cmd = entry["cmd"]
-        self._resolved_name = entry.get("name")
         self._resolved_env = env
         self._resolved = True
         self._include_chain = list(state.include_chain)

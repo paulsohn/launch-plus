@@ -99,12 +99,10 @@ class OpaqueFunction(Action):
         self.function = function
 
     def execute(self, context) -> list:
-        from launch_plus.entities.opaque_stubs import _call_opaque_with_stubs
-
         fn = self.function
         if fn and context:
             try:
-                result = _call_opaque_with_stubs(context._state, fn, context)
+                result = fn(context)
                 if result:
                     return _R._execute_actions(result, context)
             except Exception as e:

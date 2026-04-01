@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from typing import TYPE_CHECKING, Any
 
 import yaml
@@ -38,26 +37,6 @@ if TYPE_CHECKING:
 
 # ─── Portable path support ────────────────────────────────────────────────────
 
-_PORTABLE_PATH_RE = re.compile(r"^\$\(find-pkg-share ([^)]+)\)(.*)")
-
-
-def _parse_portable_path(path_str: str):
-    """Extract ``(pkg_name, rest)`` from a portable path string, or return ``None``.
-
-    ``rest`` is the portion after the closing ``)`` with any leading separator stripped.
-    For example::
-
-        "$(find-pkg-share my_pkg)/config/file.yaml"  →  ("my_pkg", "config/file.yaml")
-        "$(find-pkg-share my_pkg)"                   →  ("my_pkg", "")
-        "/absolute/path"                             →  None
-    """
-    m = _PORTABLE_PATH_RE.match(path_str)
-    if not m:
-        return None
-    pkg = m.group(1).strip()
-    rest = m.group(2).lstrip("/").lstrip(os.sep)
-    return pkg, rest
-
 
 def _is_substitution(value):
     """Return True if *value* is a launch substitution (not yet resolved to a string).
@@ -78,20 +57,14 @@ def _is_substitution(value):
 
 
 def _extract_pkg_and_share_path(path_str: str):
-    """Extract (package, share_path) from a portable or AMENT install path.
+    """Extract (package, share_path) from an install path.
 
-    Handles two forms:
-      - Portable: ``$(find-pkg-share pkg)/launch/foo.py`` → ``("pkg", "launch/foo.py")``
-      - AMENT:    ``/opt/.../share/pkg/launch/foo.py``    → ``("pkg", "launch/foo.py")``
+    Matches: ``/opt/.../share/pkg/launch/foo.py`` → ``("pkg", "launch/foo.py")``
 
-    Returns ``None`` if neither form matches.
+    Returns ``None`` if the path doesn't match the ``/share/<pkg>/`` pattern.
     """
-    parsed = _parse_portable_path(path_str)
-    if parsed:
-        return parsed
-    # AMENT install path: .../share/<package>/<rest>
     idx = path_str.find("/share/")
-    if idx >= 0 and "$(" not in path_str:
+    if idx >= 0:
         after_share = path_str[idx + 7 :]  # skip "/share/"
         slash = after_share.find("/")
         if slash > 0:
@@ -100,25 +73,6 @@ def _extract_pkg_and_share_path(path_str: str):
             if rest:
                 return pkg, rest
     return None
-
-
-def _portable_display(sub) -> str:
-    """Get the portable display string for a substitution without triggering resolution.
-
-    Unlike ``str(sub)`` which may call ``_resolve_pkg_share()`` in non-preview
-    mode, this always returns the portable form (e.g. ``$(find-pkg-share pkg)``).
-    Used for recording unresolved declared arg defaults in --show-args metadata.
-    """
-    # Lazy imports to avoid circular dependencies
-    from launch_plus.entities.substitutions.find_pkg_share import FindPackageShare
-    from launch_plus.entities.substitutions.path_join import PathJoinSubstitution
-
-    if isinstance(sub, FindPackageShare):
-        pkg, _ = sub._resolve_name(None)
-        return f"$(find-pkg-share {pkg})"
-    if isinstance(sub, PathJoinSubstitution):
-        return "/".join(_portable_display(s) for s in sub._subs)
-    return str(sub)
 
 
 def _to_str(value: object, context: Any = None) -> str | None:
@@ -331,31 +285,10 @@ def _read_and_expand_param_file(
     """Read a param file and expand ros__parameters. Returns None on failure."""
     if state is None and ctx is not None:
         state = ctx._state
+    if not os.path.isfile(path):
+        logger.error("param file not found: '%s'", path)
+        return None
     real_path = path
-    parsed = _parse_portable_path(path)
-    if parsed:
-        pkg, rest = parsed
-        pkg_share = state.package_shares.get(pkg)
-        if not pkg_share:
-            # Try fetching the package if it's in the lockfile.
-            if state._ensure_fetched(pkg):
-                pkg_share = state.package_shares.get(pkg)
-            if not pkg_share:
-                try:
-                    pkg_share = state.resolve_pkg_share(pkg)
-                except Exception:
-                    logger.error("param file not found: '%s' (package not available)", path)
-                    return None
-        real_path = os.path.join(pkg_share, rest)
-    if not os.path.isfile(real_path):
-        # Package share was known but file missing — try full fetch.
-        if parsed and state._ensure_fetched(parsed[0]):
-            pkg_share = state.package_shares.get(parsed[0])
-            if pkg_share:
-                real_path = os.path.join(pkg_share, parsed[1])
-        if not os.path.isfile(real_path):
-            logger.error("param file not found: '%s' (resolved from '%s')", real_path, path)
-            return None
     try:
         with open(real_path) as f:
             content = f.read()

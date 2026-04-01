@@ -1346,7 +1346,7 @@ class TestApplyDeclaredArgLazy:
 
 
 class TestStrictnessFlags:
-    """Tests for apply_arg_defaults, allow_unportable_paths."""
+    """Tests for apply_arg_defaults."""
 
     def test_apply_arg_defaults_true_applies_default(self):
         R.get_state().apply_arg_defaults = True
@@ -1381,35 +1381,6 @@ class TestStrictnessFlags:
         with caplog.at_level(logging.WARNING):
             R.resolve_xml_elements(elements, ctx)
         assert "undefined" in caplog.text
-
-    def test_allow_unportable_paths_false_errors(self, caplog):
-        R.get_state().allow_unportable_paths = False
-        R.get_state().preview_mode = True
-        ctx = LaunchContext()
-        elements = R.parse_xml_launch(
-            '<launch><include file="/absolute/path/to/file.launch.xml"/></launch>',
-            "test.xml",
-        )
-        with caplog.at_level(logging.WARNING):
-            R.resolve_xml_elements(elements, ctx)
-        assert any("unportable" in r.message and r.levelno >= logging.ERROR for r in caplog.records)
-
-    def test_allow_unportable_paths_true_warns(self, caplog):
-        R.get_state().allow_unportable_paths = True
-        R.get_state().preview_mode = True
-        ctx = LaunchContext()
-        elements = R.parse_xml_launch(
-            '<launch><include file="/absolute/path/to/file.launch.xml"/></launch>',
-            "test.xml",
-        )
-        with caplog.at_level(logging.WARNING):
-            R.resolve_xml_elements(elements, ctx)
-        assert any(
-            "unportable" in r.message and r.levelno == logging.WARNING for r in caplog.records
-        )
-        assert not any(
-            "unportable" in r.message and r.levelno >= logging.ERROR for r in caplog.records
-        )
 
 
 # ─── _resolve_pkg_share and FindPackageShare ─────────────────────────

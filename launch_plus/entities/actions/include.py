@@ -9,10 +9,7 @@ from launch_plus.entities.action import Action
 from launch_plus.entities.actions.group import GroupAction
 from launch_plus.entities.actions.marker import ArgComment, EndSourceMarker, SourceMarker
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.helpers import (
-    _extract_pkg_and_share_path,
-    _parse_portable_path,
-)
+from launch_plus.entities.helpers import _extract_pkg_and_share_path
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.entities.substitution import Substitution
 from launch_plus.parsers.entity import Entity
@@ -81,44 +78,22 @@ class IncludeLaunchDescription(Action):
             logger.warning("max include depth exceeded for %s", file_path)
             return []
 
-        # Step 3: Check unportable paths (XML path only)
-        if (
-            self.raw_file
-            and state.preview_mode
-            and os.path.isabs(file_path)
-            and "$(find-pkg-share" not in self.raw_file
-            and "$(dirname)" not in self.raw_file
-        ):
-            if state.allow_unportable_paths:
-                logger.warning("unportable absolute path in include: %s", file_path)
-            else:
-                logger.error("unportable absolute path in include: %s", file_path)
-
-        # Step 4: Track include
+        # Step 3: Track include
         dep_idx = state.track_include(
             file_path,
             ros_namespace=context._launch_configurations.get("ros_namespace"),
         )
 
-        # Step 5: Resolve include arguments
+        # Step 4: Resolve include arguments
         child_args = self._resolve_args(context, file_path, dep_idx)
 
-        # Step 6: Resolve real filesystem path
-        real_path = file_path
-        parsed_path = _parse_portable_path(file_path)
-        if parsed_path:
-            pkg, rest = parsed_path
-            try:
-                pkg_share = state.resolve_pkg_share(pkg)
-                real_path = os.path.join(pkg_share, rest)
-            except Exception:
-                return []
-        if not os.path.isfile(real_path):
+        # Step 5: Check file exists
+        if not os.path.isfile(file_path):
             return []
 
-        # Step 7: Resolve children
+        # Step 6: Resolve children
         children = resolve_included_file(
-            context, self.include_stack, real_path, file_path, child_args
+            context, self.include_stack, file_path, file_path, child_args
         )
 
         # Step 8: Wrap with markers

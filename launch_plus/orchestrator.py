@@ -42,14 +42,8 @@ class ResolveWorkflowOptions:
     preview: bool = False
     """Resolve from source workspace instead of AMENT_PREFIX_PATH."""
 
-    allow_unportable_paths: bool = False
-    """Allow raw filesystem paths in ``<include file=...>``."""
-
     rosdep_fallback: bool = False
     """Auto-install missing packages via ``rosdep``."""
-
-    apply_opaque_file_access: bool = False
-    """Allow OpaqueFunction bodies to open files via portable paths."""
 
     inline_params: bool = False
     """Expand ``<param from="...">`` files at resolve time."""

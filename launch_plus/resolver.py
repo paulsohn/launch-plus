@@ -95,27 +95,6 @@ def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
 #
 # Action handlers live in launch_plus.entities.actions.*.  Importing the
 # package triggers @expose_action registration into action_parse_methods.
-# ─── Param-file stubs for OpaqueFunction resilience ─────────────────────────
-#
-# OpaqueFunction bodies in Autoware typically call `open(param_file)` and
-# `yaml.safe_load(f)` to read ROS 2 parameter YAML files before constructing
-# their composable nodes.  In preview mode these paths are resolved to
-# workspace-relative strings which may not exist (e.g. naming mismatches
-# between the autoware_launch config and the package's own config directory).
-#
-# To recover from this edge case we temporarily patch `builtins.open` and
-# `yaml.safe_load` during OpaqueFunction execution:
-#   - open(): if the requested file is not found, emit a warning and return a
-#     StringIO stub containing a minimal valid ROS 2 parameter YAML.
-#   - yaml.safe_load(): wraps any `ros__parameters` dict in `_DefaultParamDict`
-#     so that missing keys return `False` instead of raising `KeyError`.
-#     Boolean-flag guards such as `if params["downsample_input_pointcloud"]:`
-#     then evaluate to False, skipping optional branches while still letting
-#     the function reach and register its core composable nodes.
-#
-# The patches are installed/removed atomically around `fn(context)` via
-# `_call_opaque_with_stubs`.
-
 import launch_plus.entities.actions  # noqa: F401, E402
 
 # ─── Internal imports (used by resolver logic) ───────────────────────────────
@@ -123,10 +102,7 @@ from launch_plus.entities.actions.arg import (  # noqa: E402
     DeclareLaunchArgument,
     _apply_declared_arg,
 )
-from launch_plus.entities.helpers import (  # noqa: E402
-    _extract_pkg_and_share_path,
-    _parse_portable_path,
-)
+from launch_plus.entities.helpers import _extract_pkg_and_share_path  # noqa: E402
 from launch_plus.entities.parsing import _ActionParser  # noqa: E402
 
 # ─── LaunchContext factory ────────────────────────────────────────────────────
@@ -151,15 +127,6 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
     """
 
     real_path = launch_file
-    parsed = _parse_portable_path(launch_file)
-    if parsed:
-        pkg, rest = parsed
-        try:
-            pkg_share = state.resolve_pkg_share(pkg)
-        except Exception:
-            return []
-        real_path = os.path.join(pkg_share, rest)
-
     if not os.path.isfile(real_path):
         return []
 
@@ -398,25 +365,17 @@ def _resolve_file_impl(
 
     # Workflow flags
     if workflow_options is not None:
-        state.apply_opaque_file_access = bool(
-            getattr(workflow_options, "apply_opaque_file_access", False)
-        )
         state.preview_mode = bool(getattr(workflow_options, "preview", True))
         state.inline_params = bool(getattr(workflow_options, "inline_params", False))
         state.rosdep_fallback = bool(getattr(workflow_options, "rosdep_fallback", False))
         state.apply_arg_defaults = bool(getattr(workflow_options, "apply_arg_defaults", False))
-        state.allow_unportable_paths = bool(
-            getattr(workflow_options, "allow_unportable_paths", False)
-        )
         state.show_empty_includes = bool(getattr(workflow_options, "show_empty_includes", False))
         state.show_args = bool(getattr(workflow_options, "show_args", False))
     else:
-        state.apply_opaque_file_access = False
         state.preview_mode = True
         state.inline_params = False
         state.rosdep_fallback = False
         state.apply_arg_defaults = False
-        state.allow_unportable_paths = False
         state.show_empty_includes = False
         state.show_args = False
 

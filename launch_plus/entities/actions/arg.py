@@ -6,7 +6,6 @@ import logging
 
 from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
-from launch_plus.entities.helpers import _portable_display
 from launch_plus.entities.parsing import _ActionParser
 from launch_plus.parsers.entity import Entity
 
@@ -107,6 +106,7 @@ def _record_and_track(name: str, resolved: str, context=None) -> None:
 
 def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
     """Resolve a DeclareLaunchArgument default and apply it to the launch context."""
+    from launch_plus.entities.helpers import resolve_value
     from launch_plus.entities.substitutions.launch_config import DeferredDefault
 
     if not arg.name:
@@ -130,25 +130,16 @@ def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
 
     already_set = context is not None and arg.name in context._launch_configurations
     if already_set:
-        dv = arg.default_value
-        if isinstance(dv, list):
-            raw = "".join(_portable_display(s) for s in dv)
-        else:
-            raw = _portable_display(dv)
-        _record_and_track(arg.name, raw, context)
+        resolved = resolve_value(arg.default_value, context) or ""
+        _record_and_track(arg.name, resolved, context)
         return
 
     if not context._state.apply_arg_defaults:
         _record_and_track(arg.name, "", context)
         return
 
-    dv = arg.default_value
-    if isinstance(dv, list):
-        display = "".join(_portable_display(s) for s in dv)
-    else:
-        display = _portable_display(dv)
-
-    _record_and_track(arg.name, display, context)
+    resolved = resolve_value(arg.default_value, context) or ""
+    _record_and_track(arg.name, resolved, context)
 
     if context is not None:
-        context._launch_configurations[arg.name] = DeferredDefault(dv)
+        context._launch_configurations[arg.name] = DeferredDefault(arg.default_value)

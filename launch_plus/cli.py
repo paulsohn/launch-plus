@@ -473,9 +473,7 @@ def fetch(
 @click.option("--report", is_flag=True, help="Print dependency report to stderr")
 @click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--preview", is_flag=True, help="Resolve from source workspace")
-@click.option("--allow-including-unportable-path", is_flag=True)
 @click.option("--show-args", is_flag=True)
-@click.option("--apply-opaque-file-access", is_flag=True)
 @click.option("--inline-params", is_flag=True)
 @click.option("--rosdep", is_flag=True, help="Install missing packages via rosdep")
 @click.option(
@@ -500,9 +498,7 @@ def resolve(
     report: bool,
     apply_launch_arg_defaults: bool,
     preview: bool,
-    allow_including_unportable_path: bool,
     show_args: bool,
-    apply_opaque_file_access: bool,
     inline_params: bool,
     rosdep: bool,
     show_empty_includes: bool,
@@ -522,8 +518,6 @@ def resolve(
     workflow_options = ResolveWorkflowOptions(
         apply_arg_defaults=apply_launch_arg_defaults,
         preview=preview,
-        allow_unportable_paths=allow_including_unportable_path,
-        apply_opaque_file_access=apply_opaque_file_access,
         rosdep_fallback=rosdep,
         inline_params=inline_params,
         show_empty_includes=show_empty_includes,
@@ -562,8 +556,6 @@ def resolve(
 @click.option("--src", default="src", help="Source directory")
 @click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--preview", is_flag=True)
-@click.option("--allow-including-unportable-path", is_flag=True)
-@click.option("--apply-opaque-file-access", is_flag=True)
 @click.option("--rosdep", is_flag=True)
 @click.option("--strict", is_flag=True, help="Treat warnings as errors")
 @click.option("-c", "--clean", is_flag=True)
@@ -579,8 +571,6 @@ def check(
     src: str,
     apply_launch_arg_defaults: bool,
     preview: bool,
-    allow_including_unportable_path: bool,
-    apply_opaque_file_access: bool,
     rosdep: bool,
     strict: bool,
     clean: bool,
@@ -596,8 +586,6 @@ def check(
     workflow_options = ResolveWorkflowOptions(
         apply_arg_defaults=apply_launch_arg_defaults,
         preview=preview,
-        allow_unportable_paths=allow_including_unportable_path,
-        apply_opaque_file_access=apply_opaque_file_access,
         rosdep_fallback=rosdep,
         inline_params=False,
     )
@@ -634,8 +622,6 @@ def check(
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
 @click.option("--apply-launch-arg-defaults", is_flag=True)
-@click.option("--apply-opaque-file-access", is_flag=True)
-@click.option("--allow-including-unportable-path", is_flag=True)
 @click.option("--rosdep", is_flag=True)
 @click.option("--build-base", default="build")
 @click.option("--install-base", default="install")
@@ -654,8 +640,6 @@ def build(
     dirty: bool,
     shallow: bool,
     apply_launch_arg_defaults: bool,
-    apply_opaque_file_access: bool,
-    allow_including_unportable_path: bool,
     rosdep: bool,
     build_base: str,
     install_base: str,
@@ -672,8 +656,6 @@ def build(
     workflow_options = ResolveWorkflowOptions(
         apply_arg_defaults=apply_launch_arg_defaults,
         preview=True,  # always resolve from source for build
-        apply_opaque_file_access=apply_opaque_file_access,
-        allow_unportable_paths=allow_including_unportable_path,
         rosdep_fallback=rosdep,
     )
 
@@ -798,8 +780,6 @@ def build_pkg(
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
 @click.option("--apply-launch-arg-defaults", is_flag=True)
-@click.option("--apply-opaque-file-access", is_flag=True)
-@click.option("--allow-including-unportable-path", is_flag=True)
 @click.option("--rosdep", is_flag=True)
 @click.option("--build-base", default="build")
 @click.option("--install-base", default="install")
@@ -818,8 +798,6 @@ def test_cmd(
     dirty: bool,
     shallow: bool,
     apply_launch_arg_defaults: bool,
-    apply_opaque_file_access: bool,
-    allow_including_unportable_path: bool,
     rosdep: bool,
     build_base: str,
     install_base: str,
@@ -836,8 +814,6 @@ def test_cmd(
     workflow_options = ResolveWorkflowOptions(
         apply_arg_defaults=apply_launch_arg_defaults,
         preview=True,
-        apply_opaque_file_access=apply_opaque_file_access,
-        allow_unportable_paths=allow_including_unportable_path,
         rosdep_fallback=rosdep,
     )
 

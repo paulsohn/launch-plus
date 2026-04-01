@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from launch_plus.entities.actions.executable import ExecuteProcess
+from launch_plus.entities.actions.group import GroupAction
 from launch_plus.entities.actions.marker import EndSourceMarker, SourceMarker
 from launch_plus.entities.actions.node import (
     ComposableNode,
@@ -133,8 +134,7 @@ def test_groups_by_source_file() -> None:
 
     actions = [
         SourceMarker("sensor_launch", "launch/sensing.launch.xml"),
-        *r1,
-        *r2,
+        GroupAction(resolved_children=[*r1, *r2]),
         EndSourceMarker("sensor_launch", "launch/sensing.launch.xml"),
     ]
     xml = render_resolved_xml("my_pkg", "top.launch.xml", actions)
@@ -147,13 +147,23 @@ def test_nested_groups() -> None:
     ctx = _make_ctx()
     resolved_n = Node(package="p", executable="e", name="n").execute(ctx)
 
+    inner = GroupAction(resolved_children=list(resolved_n))
+    mid = GroupAction(
+        resolved_children=[
+            SourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
+            inner,
+            EndSourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
+        ]
+    )
     actions = [
         SourceMarker("root_pkg", "launch/root.launch.xml"),
-        SourceMarker("comp_pkg", "launch/comp.launch.xml"),
-        SourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
-        *resolved_n,
-        EndSourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
-        EndSourceMarker("comp_pkg", "launch/comp.launch.xml"),
+        GroupAction(
+            resolved_children=[
+                SourceMarker("comp_pkg", "launch/comp.launch.xml"),
+                mid,
+                EndSourceMarker("comp_pkg", "launch/comp.launch.xml"),
+            ]
+        ),
         EndSourceMarker("root_pkg", "launch/root.launch.xml"),
     ]
     xml = render_resolved_xml("my_pkg", "top.launch.xml", actions)
@@ -177,14 +187,3 @@ def test_show_args() -> None:
     )
     assert '<!-- arg name="sensor_model" value="kit" -->' in xml
     assert '<!-- arg name="vehicle_model" value="sample" -->' in xml
-
-
-# ─── XML escape ─────────────────────────────────────────────────────────────
-
-
-def test_xml_escape() -> None:
-    from launch_plus.renderer import _xml_escape
-
-    assert _xml_escape('a "b" c') == "a &quot;b&quot; c"
-    assert _xml_escape("a & b") == "a &amp; b"
-    assert _xml_escape("a < b > c") == "a &lt; b &gt; c"

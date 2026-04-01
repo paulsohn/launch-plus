@@ -46,6 +46,7 @@ class ResolverState:
         "root_source_key",
         "walk_depth",
         "show_empty_includes",
+        "show_args",
     )
 
     def __init__(self) -> None:
@@ -83,6 +84,7 @@ class ResolverState:
         self.root_source_key: str = ""
         self.walk_depth: int = 0
         self.show_empty_includes: bool = False
+        self.show_args: bool = False
 
     # ─── Package tracking and resolution ──────────────────────────────────
 

@@ -936,10 +936,8 @@ def _cmd_resolve(
             package,
             launcher,
             result.resolved_actions,
-            include_args=result.include_args,
             show_args=show_args,
             initial_args=result.initial_args,
-            declared_args_by_file=result.declared_args_by_file,
         )
         if preview:
             xml = "<!-- PREVIEW: resolved from source workspace, not install paths -->\n" + xml

@@ -743,13 +743,13 @@
               <!-- arg name="frame_id" value="velodyne_top" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_link" -->
+              <!-- arg name="input_frame" default="base_frame" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
               <!-- arg name="max_range" value="250.0" -->
               <!-- arg name="min_range" value="0.5" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_link" -->
+              <!-- arg name="output_frame" default="base_frame" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
@@ -911,34 +911,34 @@
             <!-- source: common_sensor_launch://launch/nebula_node_container.launch.py -->
             <group>
               <!-- arg name="base_frame" default="base_link" -->
-              <!-- arg name="cloud_max_angle" value="360" -->
-              <!-- arg name="cloud_min_angle" value="0" -->
+              <!-- arg name="cloud_max_angle" value="60" -->
+              <!-- arg name="cloud_min_angle" value="300" -->
               <!-- arg name="config_file" default="" -->
               <!-- arg name="container_name" value="pointcloud_container" -->
-              <!-- arg name="data_port" value="2368" -->
+              <!-- arg name="data_port" value="2369" -->
               <!-- arg name="distortion_correction_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml" -->
               <!-- arg name="dual_return_distance_threshold" default="0.1" -->
-              <!-- arg name="frame_id" value="velodyne_top" -->
+              <!-- arg name="frame_id" value="velodyne_left" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_link" -->
+              <!-- arg name="input_frame" default="base_frame" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
-              <!-- arg name="max_range" value="250.0" -->
-              <!-- arg name="min_range" value="0.5" -->
+              <!-- arg name="max_range" value="5.0" -->
+              <!-- arg name="min_range" value="0.4" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_link" -->
+              <!-- arg name="output_frame" default="base_frame" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
               <!-- arg name="rotation_speed" default="600" -->
-              <!-- arg name="scan_phase" value="300.0" -->
-              <!-- arg name="sensor_ip" value="192.168.1.201" -->
-              <!-- arg name="sensor_model" value="VLS128" -->
+              <!-- arg name="scan_phase" value="180.0" -->
+              <!-- arg name="sensor_ip" value="192.168.1.202" -->
+              <!-- arg name="sensor_model" value="VLP16" -->
               <!-- arg name="setup_sensor" default="True" -->
               <!-- arg name="udp_only" value="false" -->
               <!-- arg name="use_intra_process" value="true" -->
-              <!-- arg name="use_multithread" value="true" -->
+              <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
               <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/left/pointcloud_preprocessor">
                 <param name="front_overhang" value="1.0"/>
@@ -1040,7 +1040,7 @@
             <!-- end: common_sensor_launch://launch/nebula_node_container.launch.py -->
             <!-- source: autoware_velodyne_monitor://launch/velodyne_monitor.launch.xml -->
             <group>
-              <!-- arg name="ip_address" value="192.168.1.201" -->
+              <!-- arg name="ip_address" value="192.168.1.202" -->
               <!-- arg name="velodyne_monitor_param_file" default="$(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml" -->
               <node pkg="autoware_velodyne_monitor" exec="autoware_velodyne_monitor_node" name="velodyne_monitor" namespace="/sensing/lidar/left" output="log" respawn="true" respawn_delay="5.0">
                 <!-- params from: $(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml -->
@@ -1074,7 +1074,7 @@
             <!-- arg name="cloud_max_angle" value="60" -->
             <!-- arg name="cloud_min_angle" value="300" -->
             <!-- arg name="container_name" value="pointcloud_container" -->
-            <!-- arg name="data_port" value="2369" -->
+            <!-- arg name="data_port" value="2370" -->
             <!-- arg name="host_ip" value="192.168.1.10" -->
             <!-- arg name="launch_driver" value="true" -->
             <!-- arg name="max_range" value="5.0" -->
@@ -1082,41 +1082,41 @@
             <!-- arg name="model" default="VLP16" -->
             <!-- arg name="return_mode" default="SingleStrongest" -->
             <!-- arg name="scan_phase" value="180.0" -->
-            <!-- arg name="sensor_frame" value="velodyne_left" -->
-            <!-- arg name="sensor_ip" value="192.168.1.202" -->
+            <!-- arg name="sensor_frame" value="velodyne_right" -->
+            <!-- arg name="sensor_ip" value="192.168.1.203" -->
             <!-- arg name="udp_only" default="false" -->
             <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
             <!-- source: common_sensor_launch://launch/nebula_node_container.launch.py -->
             <group>
               <!-- arg name="base_frame" default="base_link" -->
-              <!-- arg name="cloud_max_angle" value="360" -->
-              <!-- arg name="cloud_min_angle" value="0" -->
+              <!-- arg name="cloud_max_angle" value="60" -->
+              <!-- arg name="cloud_min_angle" value="300" -->
               <!-- arg name="config_file" default="" -->
               <!-- arg name="container_name" value="pointcloud_container" -->
-              <!-- arg name="data_port" value="2368" -->
+              <!-- arg name="data_port" value="2370" -->
               <!-- arg name="distortion_correction_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml" -->
               <!-- arg name="dual_return_distance_threshold" default="0.1" -->
-              <!-- arg name="frame_id" value="velodyne_top" -->
+              <!-- arg name="frame_id" value="velodyne_right" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_link" -->
+              <!-- arg name="input_frame" default="base_frame" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
-              <!-- arg name="max_range" value="250.0" -->
-              <!-- arg name="min_range" value="0.5" -->
+              <!-- arg name="max_range" value="5.0" -->
+              <!-- arg name="min_range" value="0.4" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_link" -->
+              <!-- arg name="output_frame" default="base_frame" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
               <!-- arg name="rotation_speed" default="600" -->
-              <!-- arg name="scan_phase" value="300.0" -->
-              <!-- arg name="sensor_ip" value="192.168.1.201" -->
-              <!-- arg name="sensor_model" value="VLS128" -->
+              <!-- arg name="scan_phase" value="180.0" -->
+              <!-- arg name="sensor_ip" value="192.168.1.203" -->
+              <!-- arg name="sensor_model" value="VLP16" -->
               <!-- arg name="setup_sensor" default="True" -->
               <!-- arg name="udp_only" value="false" -->
               <!-- arg name="use_intra_process" value="true" -->
-              <!-- arg name="use_multithread" value="true" -->
+              <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
               <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/right/pointcloud_preprocessor">
                 <param name="front_overhang" value="1.0"/>
@@ -1218,7 +1218,7 @@
             <!-- end: common_sensor_launch://launch/nebula_node_container.launch.py -->
             <!-- source: autoware_velodyne_monitor://launch/velodyne_monitor.launch.xml -->
             <group>
-              <!-- arg name="ip_address" value="192.168.1.201" -->
+              <!-- arg name="ip_address" value="192.168.1.203" -->
               <!-- arg name="velodyne_monitor_param_file" default="$(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml" -->
               <node pkg="autoware_velodyne_monitor" exec="autoware_velodyne_monitor_node" name="velodyne_monitor" namespace="/sensing/lidar/right" output="log" respawn="true" respawn_delay="5.0">
                 <!-- params from: $(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml -->
@@ -1252,49 +1252,49 @@
             <!-- arg name="cloud_max_angle" value="60" -->
             <!-- arg name="cloud_min_angle" value="300" -->
             <!-- arg name="container_name" value="pointcloud_container" -->
-            <!-- arg name="data_port" value="2369" -->
+            <!-- arg name="data_port" value="2371" -->
             <!-- arg name="host_ip" value="192.168.1.10" -->
             <!-- arg name="launch_driver" value="true" -->
-            <!-- arg name="max_range" value="5.0" -->
+            <!-- arg name="max_range" value="1.5" -->
             <!-- arg name="min_range" default="0.4" -->
             <!-- arg name="model" default="VLP16" -->
             <!-- arg name="return_mode" default="SingleStrongest" -->
             <!-- arg name="scan_phase" value="180.0" -->
-            <!-- arg name="sensor_frame" value="velodyne_left" -->
-            <!-- arg name="sensor_ip" value="192.168.1.202" -->
+            <!-- arg name="sensor_frame" value="velodyne_rear" -->
+            <!-- arg name="sensor_ip" value="192.168.1.204" -->
             <!-- arg name="udp_only" default="false" -->
             <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
             <!-- source: common_sensor_launch://launch/nebula_node_container.launch.py -->
             <group>
               <!-- arg name="base_frame" default="base_link" -->
-              <!-- arg name="cloud_max_angle" value="360" -->
-              <!-- arg name="cloud_min_angle" value="0" -->
+              <!-- arg name="cloud_max_angle" value="60" -->
+              <!-- arg name="cloud_min_angle" value="300" -->
               <!-- arg name="config_file" default="" -->
               <!-- arg name="container_name" value="pointcloud_container" -->
-              <!-- arg name="data_port" value="2368" -->
+              <!-- arg name="data_port" value="2371" -->
               <!-- arg name="distortion_correction_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/distortion_corrector_node.param.yaml" -->
               <!-- arg name="dual_return_distance_threshold" default="0.1" -->
-              <!-- arg name="frame_id" value="velodyne_top" -->
+              <!-- arg name="frame_id" value="velodyne_rear" -->
               <!-- arg name="gnss_port" default="2380" -->
               <!-- arg name="host_ip" value="192.168.1.10" -->
-              <!-- arg name="input_frame" default="base_link" -->
+              <!-- arg name="input_frame" default="base_frame" -->
               <!-- arg name="launch_driver" value="true" -->
               <!-- arg name="lidar_container_name" default="nebula_node_container" -->
-              <!-- arg name="max_range" value="250.0" -->
-              <!-- arg name="min_range" value="0.5" -->
+              <!-- arg name="max_range" value="1.5" -->
+              <!-- arg name="min_range" value="0.4" -->
               <!-- arg name="output_as_sensor_frame" default="True" -->
-              <!-- arg name="output_frame" default="base_link" -->
+              <!-- arg name="output_frame" default="base_frame" -->
               <!-- arg name="packet_mtu_size" default="1500" -->
               <!-- arg name="return_mode" value="SingleStrongest" -->
               <!-- arg name="ring_outlier_filter_node_param_path" default="$(find-pkg-share common_sensor_launch)/config/ring_outlier_filter_node.param.yaml" -->
               <!-- arg name="rotation_speed" default="600" -->
-              <!-- arg name="scan_phase" value="300.0" -->
-              <!-- arg name="sensor_ip" value="192.168.1.201" -->
-              <!-- arg name="sensor_model" value="VLS128" -->
+              <!-- arg name="scan_phase" value="180.0" -->
+              <!-- arg name="sensor_ip" value="192.168.1.204" -->
+              <!-- arg name="sensor_model" value="VLP16" -->
               <!-- arg name="setup_sensor" default="True" -->
               <!-- arg name="udp_only" value="false" -->
               <!-- arg name="use_intra_process" value="true" -->
-              <!-- arg name="use_multithread" value="true" -->
+              <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="$(find-pkg-share sample_vehicle_description)/config/mirror.param.yaml" -->
               <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/rear/pointcloud_preprocessor">
                 <param name="front_overhang" value="1.0"/>
@@ -1396,7 +1396,7 @@
             <!-- end: common_sensor_launch://launch/nebula_node_container.launch.py -->
             <!-- source: autoware_velodyne_monitor://launch/velodyne_monitor.launch.xml -->
             <group>
-              <!-- arg name="ip_address" value="192.168.1.201" -->
+              <!-- arg name="ip_address" value="192.168.1.204" -->
               <!-- arg name="velodyne_monitor_param_file" default="$(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml" -->
               <node pkg="autoware_velodyne_monitor" exec="autoware_velodyne_monitor_node" name="velodyne_monitor" namespace="/sensing/lidar/rear" output="log" respawn="true" respawn_delay="5.0">
                 <!-- params from: $(find-pkg-share autoware_velodyne_monitor)/config/VLP-16.param.yaml -->

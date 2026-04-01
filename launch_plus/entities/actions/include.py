@@ -6,7 +6,8 @@ import logging
 import os
 
 from launch_plus.entities.action import Action
-from launch_plus.entities.actions.marker import EndSourceMarker, SourceMarker
+from launch_plus.entities.actions.group import GroupAction
+from launch_plus.entities.actions.marker import ArgComment, EndSourceMarker, SourceMarker
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import (
     _extract_pkg_and_share_path,
@@ -179,12 +180,27 @@ class IncludeLaunchDescription(Action):
 
 
 def _wrap_with_markers(children, pkg, share, args, state) -> list:
-    """Wrap resolved children with SourceMarker/EndSourceMarker.
+    """Wrap resolved children in [SourceMarker, GroupAction, EndSourceMarker].
 
-    Empty includes (all children are markers — no real content) are
-    suppressed unless show_empty_includes is set.
+    The GroupAction holds ArgComment markers (explicit + declared defaults)
+    followed by the resolved children.
     """
     has_content = any(not isinstance(c, (SourceMarker, EndSourceMarker)) for c in children)
     if has_content or state.show_empty_includes:
-        return [SourceMarker(pkg, share, args), *children, EndSourceMarker(pkg, share)]
+        # Build arg markers: explicit args + declared defaults
+        source_key = f"{pkg}://{share}" if pkg else share
+        declared = state.tracked.get("declared_args_by_file", {}).get(source_key, [])
+        merged: dict[str, tuple[str, bool]] = {}
+        for name, value in sorted(args.items()):
+            merged[name] = (value, False)
+        for entry in declared:
+            if entry["name"] not in merged:
+                merged[entry["name"]] = (entry["default"], True)
+        arg_markers = [
+            ArgComment(name=k, value=v, is_default=is_def)
+            for k, (v, is_def) in sorted(merged.items())
+        ]
+
+        group = GroupAction(resolved_children=arg_markers + list(children))
+        return [SourceMarker(pkg, share, args), group, EndSourceMarker(pkg, share)]
     return list(children)

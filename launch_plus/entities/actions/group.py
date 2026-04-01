@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import xml.etree.ElementTree as ET
 
 import launch_plus.resolver as _R
 from launch_plus.entities.action import Action
@@ -44,6 +45,8 @@ class GroupAction(Action):
         self.scoped: bool = kwargs.get("scoped", True)
         self.condition = kwargs.get("condition")
         self._include_stack: list = kwargs.get("_include_stack", [])
+        # Set on resolved GroupAction instances (from IncludeLaunchDescription)
+        self.resolved_children: list = kwargs.get("resolved_children", [])
 
     def execute(self, context) -> list:
         """Execute group: push/pop scope, execute children, return results."""
@@ -77,6 +80,16 @@ class GroupAction(Action):
                 context._pop_launch_configurations()
 
         return results
+
+    def serialize_resolved(self) -> list[ET.Element]:
+        """Render as <group> with children serialized recursively."""
+        if not self.resolved_children:
+            return []
+        group = ET.Element("group")
+        for child in self.resolved_children:
+            for elem in child.serialize_resolved():
+                group.append(elem)
+        return [group]
 
 
 class OpaqueFunction(Action):

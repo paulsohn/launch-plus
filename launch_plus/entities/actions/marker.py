@@ -7,6 +7,7 @@ They are inserted by IncludeLaunchDescription to mark source boundaries.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape
 
 from launch_plus.entities.action import Action
 
@@ -14,9 +15,7 @@ from launch_plus.entities.action import Action
 class SourceMarker(Action):
     """Marks the start of an included file in the resolved tree.
 
-    The renderer uses this to open a ``<!-- source: ... -->`` comment
-    and a ``<group>`` element.  Not serialized via ``serialize_resolved()``
-    — the renderer handles the structural nesting directly.
+    Serializes to ``<!-- source: pkg://share_path -->``.
     """
 
     def __init__(self, package: str, share_path: str, include_args: dict | None = None):
@@ -32,12 +31,14 @@ class SourceMarker(Action):
             return f"{self.package}://{self.share_path}"
         return self.share_path
 
+    def serialize_resolved(self) -> list[ET.Element]:
+        return [ET.Comment(f" source: {self.label()} ")]  # type: ignore[list-item]
+
 
 class EndSourceMarker(Action):
     """Marks the end of an included file in the resolved tree.
 
-    The renderer uses this to close the ``</group>`` and emit
-    ``<!-- end: ... -->`` comment.
+    Serializes to ``<!-- end: pkg://share_path -->``.
     """
 
     def __init__(self, package: str, share_path: str):
@@ -51,6 +52,9 @@ class EndSourceMarker(Action):
         if self.package:
             return f"{self.package}://{self.share_path}"
         return self.share_path
+
+    def serialize_resolved(self) -> list[ET.Element]:
+        return [ET.Comment(f" end: {self.label()} ")]  # type: ignore[list-item]
 
 
 class ArgComment(Action):
@@ -66,4 +70,5 @@ class ArgComment(Action):
 
     def serialize_resolved(self) -> list[ET.Element]:
         attr = "default" if self.is_default else "value"
-        return [ET.Comment(f' arg name="{self.name}" {attr}="{self.value}" ')]  # type: ignore[list-item]
+        esc = escape(self.value, {'"': "&quot;"})
+        return [ET.Comment(f' arg name="{self.name}" {attr}="{esc}" ')]  # type: ignore[list-item]

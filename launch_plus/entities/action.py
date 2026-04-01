@@ -16,9 +16,6 @@ class Action:
     to return a list of ``ET.Element`` objects.
     """
 
-    # Set by the resolver when the action is appended to resolved_actions.
-    _include_chain: list[tuple[str, str]] = []
-
     def execute(self, context) -> list | None:
         """Execute this action. Return child actions to walk, or None."""
         return None

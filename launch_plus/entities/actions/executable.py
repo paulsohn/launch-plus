@@ -37,6 +37,10 @@ class ExecuteProcess(Action):
             self.__cmd = [normalize_to_list_of_substitutions(x) for x in cmd]
         self.__name = normalize_to_list_of_substitutions(name) if name is not None else None
         self.__additional_env = kwargs.pop("additional_env", None)
+        self._resolved = False
+        self._resolved_cmd: str = ""
+        self._resolved_name: str | None = None
+        self._resolved_env: dict = {}
 
     @classmethod
     def _parse_cmdline(cls, cmd: str, parser: _ActionParser) -> list[list[Substitution]]:
@@ -88,25 +92,24 @@ class ExecuteProcess(Action):
             additional_env=parser.parse_envs(entity),
         )
 
-    def execute(self, context) -> list | None:
+    def execute(self, context) -> list:
+        """Resolve substitutions and return a clean resolved ExecuteProcess."""
         from launch_plus.entities.helpers import env_overrides, resolve_value
 
-        state = context._state
         cmd_parts = [perform_substitutions(context, arg) for arg in self.__cmd]
-        self._resolved_cmd = " ".join(cmd_parts)
-        self._resolved_name = (
-            perform_substitutions(context, self.__name) if self.__name is not None else None
-        )
+        name = perform_substitutions(context, self.__name) if self.__name is not None else None
 
         env = env_overrides(context)
         if self.__additional_env is not None:
             for k_tokens, v_tokens in self.__additional_env:
                 env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
-        self._resolved_env = env
-        self._resolved = True
-        self._include_chain = list(state.include_chain)
-        state.resolved_actions.append(self)
-        return None
+
+        resolved = ExecuteProcess()
+        resolved._resolved = True
+        resolved._resolved_cmd = " ".join(cmd_parts)
+        resolved._resolved_name = name
+        resolved._resolved_env = env
+        return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:
         if not getattr(self, "_resolved", False):

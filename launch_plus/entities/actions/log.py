@@ -21,15 +21,15 @@ class LogInfo(Action):
 
     def __init__(self, message="", **kwargs):
         self._message = message
+        self._resolved_message: str | None = None
 
-    def execute(self, context) -> list | None:
+    def execute(self, context) -> list:
         from launch_plus.entities.helpers import resolve_value
 
         msg = resolve_value(self._message, context) or ""
-        self._resolved_message = msg
-        self._include_chain = list(context._state.include_chain)
-        context._state.resolved_actions.append(self)
-        return None
+        resolved = LogInfo()
+        resolved._resolved_message = msg
+        return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:
         msg = getattr(self, "_resolved_message", None)

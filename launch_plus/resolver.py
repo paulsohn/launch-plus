@@ -144,7 +144,7 @@ def _make_launch_context(args_dict):
 # ─── Inline Python include resolution ─────────────────────────────────────────
 
 
-def _inline_resolve_python_launch(state, launch_file, parent_context, child_args):
+def _inline_resolve_python_launch(state, launch_file, parent_context, child_args) -> list:
     """Load a Python launch file and walk its actions in the parent context.
 
     This mirrors real ROS 2 behavior where ``IncludeLaunchDescription``
@@ -152,7 +152,6 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
     the child mutate the shared ``LaunchContext``.
     """
 
-    # Resolve portable paths — $(find-pkg-share pkg)/rest → real filesystem path.
     real_path = launch_file
     parsed = _parse_portable_path(launch_file)
     if parsed:
@@ -160,11 +159,11 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
         try:
             pkg_share = state.resolve_pkg_share(pkg)
         except Exception:
-            return  # Package not available
+            return []
         real_path = os.path.join(pkg_share, rest)
 
     if not os.path.isfile(real_path):
-        return  # File not on disk
+        return []
 
     try:
         spec = importlib.util.spec_from_file_location(
@@ -172,40 +171,34 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
         )
         if spec is None or spec.loader is None:
             logger.warning("cannot load included launch file: %s", real_path)
-            return
+            return []
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
     except Exception as e:
         logger.warning("failed to load included launch file %s: %s", real_path, e)
-        return
+        return []
 
     if not hasattr(mod, "generate_launch_description"):
-        return
+        return []
 
-    # Matching official IncludeLaunchDescription(scoped=False): child actions
-    # mutate the parent_context directly.  All side-effects persist.
     saved_declared_arg_names = set(state.declared_arg_names)
-
     try:
         try:
             ld = mod.generate_launch_description()
         except Exception as e:
             logger.warning("generate_launch_description() failed in %s: %s", launch_file, e)
-            return
+            return []
 
         entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
-        # Set child launch arguments (matching official SetLaunchConfiguration pattern).
         for k, v in child_args.items():
             parent_context._launch_configurations[k] = v
 
-        # Pass 1: apply DeclareLaunchArgument defaults.
         for entity in entities:
             if isinstance(entity, DeclareLaunchArgument):
                 _apply_declared_arg(entity, parent_context)
 
-        # Pass 2: walk all actions in the shared context.
-        _walk_actions(state, entities, parent_context)
+        return _walk_actions(state, entities, parent_context)
     finally:
         state.declared_arg_names.clear()
         state.declared_arg_names.update(saved_declared_arg_names)
@@ -223,31 +216,22 @@ def resolve_xml_elements(
     ctx,
     *,
     include_stack: list[str] | None = None,
-) -> None:
-    """Walk parsed XML/YAML elements, resolve substitutions, populate _state.tracked.
-
-    This is the XML/YAML counterpart of the Python ``_walk_actions`` mechanism.
-    All output goes into the module-level ``_state.tracked`` dict.
-
-    Dispatches each element through the action registry via :func:`_resolve_element`.
-    """
+) -> list:
+    """Walk parsed XML/YAML elements, return resolved actions."""
     if include_stack is None:
         include_stack = []
+    results: list = []
     for elem in elements:
-        _resolve_element(elem, ctx, include_stack)
+        results.extend(_resolve_element(elem, ctx, include_stack))
+    return results
 
 
 def _resolve_element(
     elem,
     ctx,
     include_stack: list[str],
-) -> None:
-    """Resolve a single parsed element via the action registry.
-
-    The registered parse method may return an action instance (new style)
-    or None (legacy — side effects already executed in parse).  When an
-    action is returned, ``execute()`` is called to perform side effects.
-    """
+) -> list:
+    """Parse and execute a single element. Returns resolved actions."""
     from launch_plus.entities.expose import action_parse_methods
 
     tag = elem.type_name
@@ -255,9 +239,10 @@ def _resolve_element(
         parser = _ActionParser(ctx, include_stack)
         action = action_parse_methods[tag](elem, parser)
         if action is not None and hasattr(action, "execute"):
-            action.execute(ctx)
-        return
+            return action.execute(ctx) or []
+        return []
     logger.warning("unknown element: <%s>", tag)
+    return []
 
 
 def resolve_included_file(
@@ -266,8 +251,8 @@ def resolve_included_file(
     real_path: str,
     file_path: str,
     child_ctx_args: dict[str, str],
-) -> None:
-    """Parse an included launch file and resolve it recursively."""
+) -> list:
+    """Parse an included launch file and return resolved actions."""
     from launch_plus.entities.helpers import _extract_pkg_and_share_path
     from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
     from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
@@ -279,12 +264,11 @@ def resolve_included_file(
     else:
         state.include_chain.append(["", file_path])
     new_stack = include_stack + [file_path]
-    # Set child args in the SAME context (matching official IncludeLaunchDescription
-    # scoped=False: child mutations persist in parent).
     for k, v in child_ctx_args.items():
         ctx._launch_configurations[k] = v
     saved_launch_file_dir = ctx.launch_file_dir
     ctx.launch_file_dir = os.path.dirname(real_path)
+    results: list = []
     try:
         if real_path.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
             with open(real_path) as f:
@@ -294,32 +278,32 @@ def resolve_included_file(
                 child_entities = list(_parse_yaml_launch_entity(content, real_path))
             else:
                 child_entities = list(_parse_xml_launch_entity(content, real_path))
-            for child in child_entities:
-                _resolve_element(child, ctx, new_stack)
+            results = resolve_xml_elements(child_entities, ctx, include_stack=new_stack)
         elif real_path.endswith((".launch.py", ".py")):
-            _inline_resolve_python_launch(state, file_path, ctx, child_ctx_args)
+            results = _inline_resolve_python_launch(state, file_path, ctx, child_ctx_args)
     finally:
         ctx.launch_file_dir = saved_launch_file_dir
         state.include_chain.pop()
+    return results
 
 
 # ─── Action walker ────────────────────────────────────────────────────────────
 
 
-def _walk_actions(state, actions, context):
-    """Walk a list of actions, calling ``execute()`` on each.
+def _walk_actions(state, actions, context) -> list:
+    """Walk actions, return resolved results.
 
-    Tracked actions (subclasses of ``Action``) implement the polymorphic
-    ``execute(context)`` method.  Untracked actions (real ROS 2 objects from
-    OpaqueFunction returns) are handled by ``_walk_untracked_action()``.
+    Each action's ``execute()`` returns its resolved children.
+    Untracked actions (real ROS 2 objects) are handled separately.
     """
     if actions is None:
-        return
+        return []
     state.walk_depth += 1
     if state.walk_depth > 20:
         state.walk_depth -= 1
         logger.warning("Max include depth reached while walking Python launch description")
-        return
+        return []
+    results: list = []
     try:
         for action in actions:
             if action is None:
@@ -328,13 +312,14 @@ def _walk_actions(state, actions, context):
                 if isinstance(action, Action):
                     children = action.execute(context)
                     if children:
-                        _walk_actions(state, children, context)
+                        results.extend(children)
                 else:
                     _walk_untracked_action(state, action, context)
             except Exception as e:
                 logger.error("Error walking action %s: %s", type(action).__name__, e)
     finally:
         state.walk_depth -= 1
+    return results
 
 
 def _walk_untracked_action(state, action, context):
@@ -633,7 +618,9 @@ def _resolve_file_impl(
         subst_ctx._launch_configurations = dict(args_dict)
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
         subst_ctx.preview_mode = state.preview_mode
-        resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file_str])
+        state.resolved_actions = resolve_xml_elements(
+            elements, subst_ctx, include_stack=[launch_file_str]
+        )
         return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
 
     # ── Python launch files ──────────────────────────────────────────────
@@ -678,7 +665,7 @@ def _resolve_file_impl(
         if isinstance(entity, DeclareLaunchArgument):
             _apply_declared_arg(entity, ctx)
 
-    _walk_actions(state, entities, ctx)
+    state.resolved_actions = _walk_actions(state, entities, ctx)
 
     return _tracked_to_parsed_launch_file(state.tracked, state.resolved_actions)
 

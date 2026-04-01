@@ -38,24 +38,24 @@ def _resolve_and_render(actions, *, show_args=False, initial_args=None):
 def test_node_basic() -> None:
     ctx = _make_ctx()
     node = Node(package="my_pkg", executable="my_exec", name="my_node")
-    node.execute(ctx)
-    xml = render_resolved_xml("p", "l.xml", ctx._state.resolved_actions)
+    resolved = node.execute(ctx)
+    xml = render_resolved_xml("p", "l.xml", resolved)
     assert '<node pkg="my_pkg" exec="my_exec" name="my_node"/>' in xml
 
 
 def test_node_with_params() -> None:
     ctx = _make_ctx(global_params=[("gp", "gv")])
     node = Node(package="p", executable="e", name="n")
-    node.execute(ctx)
-    xml = render_resolved_xml("p", "l.xml", ctx._state.resolved_actions)
+    resolved = node.execute(ctx)
+    xml = render_resolved_xml("p", "l.xml", resolved)
     assert '<param name="gp" value="gv"/>' in xml
 
 
 def test_node_with_namespace() -> None:
     ctx = _make_ctx(ros_namespace="/my_ns")
     node = Node(package="p", executable="e", name="n")
-    node.execute(ctx)
-    xml = render_resolved_xml("p", "l.xml", ctx._state.resolved_actions)
+    resolved = node.execute(ctx)
+    xml = render_resolved_xml("p", "l.xml", resolved)
     assert 'namespace="/my_ns"' in xml
 
 
@@ -64,8 +64,8 @@ def test_node_escapes_quotes() -> None:
 
     ctx = _make_ctx(global_params=[("key", 'val with "quotes"')])
     node = Node(package="p", executable="e", name="n")
-    node.execute(ctx)
-    elems = node.serialize_resolved()
+    resolved = node.execute(ctx)
+    elems = resolved[0].serialize_resolved()
     assert len(elems) == 1
     snippet = ET.tostring(elems[0], encoding="unicode")
     assert "&quot;" in snippet
@@ -84,8 +84,8 @@ def test_container_with_plugins() -> None:
         name="my_container",
         composable_node_descriptions=[desc],
     )
-    container.execute(ctx)
-    xml = render_resolved_xml("p", "l.xml", ctx._state.resolved_actions)
+    resolved = container.execute(ctx)
+    xml = render_resolved_xml("p", "l.xml", resolved)
     assert "<node_container" in xml
     assert "<composable_node" in xml
     assert 'plugin="comp_pkg::MyPlugin"' in xml
@@ -101,8 +101,8 @@ def test_load_composable() -> None:
         composable_node_descriptions=[desc],
         target_container="my_container",
     )
-    load.execute(ctx)
-    xml = render_resolved_xml("p", "l.xml", ctx._state.resolved_actions)
+    resolved = load.execute(ctx)
+    xml = render_resolved_xml("p", "l.xml", resolved)
     assert "<load_composable_node" in xml
     assert 'target="my_container"' in xml
 
@@ -115,8 +115,8 @@ def test_executable() -> None:
 
     ctx = _make_ctx()
     ep = ExecuteProcess(cmd=["echo", "hello"])
-    ep.execute(ctx)
-    elems = ep.serialize_resolved()
+    resolved = ep.execute(ctx)
+    elems = resolved[0].serialize_resolved()
     assert len(elems) == 1
     snippet = ET.tostring(elems[0], encoding="unicode")
     assert "<executable" in snippet
@@ -128,15 +128,13 @@ def test_executable() -> None:
 
 def test_groups_by_source_file() -> None:
     ctx = _make_ctx()
-    n1 = Node(package="p1", executable="e1")
-    n2 = Node(package="p2", executable="e2")
-    n1.execute(ctx)
-    n2.execute(ctx)
+    r1 = Node(package="p1", executable="e1").execute(ctx)
+    r2 = Node(package="p2", executable="e2").execute(ctx)
 
     actions = [
         SourceMarker("sensor_launch", "launch/sensing.launch.xml"),
-        n1,
-        n2,
+        *r1,
+        *r2,
         EndSourceMarker("sensor_launch", "launch/sensing.launch.xml"),
     ]
     xml = render_resolved_xml("my_pkg", "top.launch.xml", actions)
@@ -147,14 +145,13 @@ def test_groups_by_source_file() -> None:
 
 def test_nested_groups() -> None:
     ctx = _make_ctx()
-    n = Node(package="p", executable="e", name="n")
-    n.execute(ctx)
+    resolved_n = Node(package="p", executable="e", name="n").execute(ctx)
 
     actions = [
         SourceMarker("root_pkg", "launch/root.launch.xml"),
         SourceMarker("comp_pkg", "launch/comp.launch.xml"),
         SourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
-        n,
+        *resolved_n,
         EndSourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
         EndSourceMarker("comp_pkg", "launch/comp.launch.xml"),
         EndSourceMarker("root_pkg", "launch/root.launch.xml"),
@@ -169,13 +166,12 @@ def test_nested_groups() -> None:
 
 def test_show_args() -> None:
     ctx = _make_ctx()
-    n = Node(package="p", executable="e")
-    n.execute(ctx)
+    resolved = Node(package="p", executable="e").execute(ctx)
 
     xml = render_resolved_xml(
         "my_pkg",
         "top.launch.xml",
-        ctx._state.resolved_actions,
+        resolved,
         show_args=True,
         initial_args={"vehicle_model": "sample", "sensor_model": "kit"},
     )

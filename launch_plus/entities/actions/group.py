@@ -63,21 +63,21 @@ class GroupAction(Action):
         if self._scoped:
             context._push_launch_configurations()
             context._push_environment()
+        results: list = []
         try:
-            # XML path: parse and execute child entities
             if self._xml_children:
                 for child in self._xml_children:
-                    _R._resolve_element(child, context, self._xml_include_stack or [])
-
-            # Shim path: walk child actions
+                    results.extend(
+                        _R._resolve_element(child, context, self._xml_include_stack or [])
+                    )
             if self._actions:
-                _R._walk_actions(context._state, self._actions, context)
+                results.extend(_R._walk_actions(context._state, self._actions, context))
         finally:
             if self._scoped:
                 context._pop_environment()
                 context._pop_launch_configurations()
 
-        return []
+        return results
 
 
 class OpaqueFunction(Action):
@@ -96,7 +96,7 @@ class OpaqueFunction(Action):
             try:
                 result = _R._call_opaque_with_stubs(state, fn, context)
                 if result:
-                    _R._walk_actions(state, result, context)
+                    return _R._walk_actions(state, result, context)
             except Exception as e:
                 logger.error("OpaqueFunction failed: %s", e)
         return []

@@ -28,19 +28,6 @@ def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
     return parser.parse_substitution(text)
 
 
-def _fully_qualified_name(action) -> str:
-    """Compute fully-qualified node name from an action's resolved attributes.
-
-    Matches official ``make_namespace_absolute(prefix_namespace(
-    ros_namespace, prefix_namespace(node_namespace, name)))``.
-    """
-    ros_ns = getattr(action, "_resolved_ros_namespace", None)
-    explicit_ns = getattr(action, "_resolved_explicit_namespace", None)
-    name = getattr(action, "_resolved_name", None) or ""
-    ns = _ros2_namespace_join(ros_ns, explicit_ns) if explicit_ns else ros_ns
-    return _ros2_namespace_join(ns, name) or ""
-
-
 def _resolve_plugin(desc_or_dict, context) -> dict:
     """Resolve a single ComposableNode to output dict."""
 
@@ -164,18 +151,23 @@ class Node(Action):
         self._raw_respawn = kwargs.get("respawn")
         self._raw_respawn_delay = kwargs.get("respawn_delay")
         self._resolved = False
+        self._resolved_package: str = ""
+        self._resolved_executable: str = ""
+        self._resolved_name: str | None = None
+        self._resolved_ros_namespace: str | None = None
+        self._resolved_explicit_namespace: str | None = None
+        self._resolved_namespace: str | None = None
+        self._resolved_parameters: dict = {}
+        self._resolved_param_files: list = []
+        self._resolved_remappings: list = []
+        self._resolved_env: dict = {}
+        self._resolved_output: str | None = None
+        self._resolved_args: str | None = None
+        self._resolved_respawn: str | None = None
+        self._resolved_respawn_delay: str | None = None
 
-    def execute(self, context) -> list | None:
-        state = context._state
-        if not self._resolved:
-            self._resolved = True
-            self._perform_substitutions(context)
-            self._include_chain = list(state.include_chain)
-            state.resolved_actions.append(self)
-        return None
-
-    def _perform_substitutions(self, context) -> None:
-        """Resolve all substitutions. Matching official pattern."""
+    def execute(self, context) -> list:
+        """Resolve substitutions and return a clean resolved Node."""
         state = context._state
 
         pkg = context.perform_substitution(self._raw_package) or ""
@@ -187,18 +179,10 @@ class Node(Action):
 
         ros_ns = context._launch_configurations.get("ros_namespace")
 
-        self._resolved_package = pkg
-        self._resolved_executable = exe
-        self._resolved_name = name or None
-        self._resolved_ros_namespace = ros_ns
-        self._resolved_explicit_namespace = ns
-        self._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
-
         # Parameters: global first, then node-specific
         ctx_gp = context._launch_configurations.get("global_params", [])
         params: dict[str, str] = {k: str(v) for k, v in ctx_gp}
         pf_list: list[dict] = list(context._launch_configurations.get("global_param_files", []))
-
         for p in self._raw_parameters:
             if isinstance(p, ParameterFile):
                 path = p.evaluate(context)
@@ -217,40 +201,42 @@ class Node(Action):
                     resolved_v = context.perform_substitution(v)
                     params[str(k)] = resolved_v if resolved_v is not None else ""
 
-        self._resolved_parameters = params
-        self._resolved_param_files = pf_list
-
-        # Remappings: global first, then node-specific
         remaps = list(context._launch_configurations.get("ros_remaps", []))
         for r in self._raw_remappings:
             if isinstance(r, (tuple, list)) and len(r) == 2:
                 src = context.perform_substitution(r[0])
                 dst = context.perform_substitution(r[1])
                 remaps.append([src or str(r[0]), dst or str(r[1])])
-        self._resolved_remappings = remaps
 
-        # Environment
         env = env_overrides(context)
         for item in self._raw_env or []:
             if isinstance(item, (tuple, list)) and len(item) == 2:
                 env[resolve_value(item[0], context) or ""] = resolve_value(item[1], context) or ""
-        self._resolved_env = env
 
-        # Extra fields
-        self._resolved_output = None
-        self._resolved_args = None
-        self._resolved_respawn = None
-        self._resolved_respawn_delay = None
-        for raw_attr, resolved_attr in (
-            ("_raw_output", "_resolved_output"),
-            ("_raw_arguments", "_resolved_args"),
-            ("_raw_respawn", "_resolved_respawn"),
-            ("_raw_respawn_delay", "_resolved_respawn_delay"),
-        ):
-            raw = getattr(self, raw_attr, None)
-            if raw is not None:
-                resolved = context.perform_substitution(raw)
-                setattr(self, resolved_attr, resolved if resolved else str(raw))
+        def _resolve_opt(attr):
+            raw = getattr(self, attr, None)
+            if raw is None:
+                return None
+            r = context.perform_substitution(raw)
+            return r if r else str(raw)
+
+        resolved = type(self)(package=pkg, executable=exe, name=name or "")
+        resolved._resolved = True
+        resolved._resolved_package = pkg
+        resolved._resolved_executable = exe
+        resolved._resolved_name = name or None
+        resolved._resolved_ros_namespace = ros_ns
+        resolved._resolved_explicit_namespace = ns
+        resolved._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
+        resolved._resolved_parameters = params
+        resolved._resolved_param_files = pf_list
+        resolved._resolved_remappings = remaps
+        resolved._resolved_env = env
+        resolved._resolved_output = _resolve_opt("_raw_output")
+        resolved._resolved_args = _resolve_opt("_raw_arguments")
+        resolved._resolved_respawn = _resolve_opt("_raw_respawn")
+        resolved._resolved_respawn_delay = _resolve_opt("_raw_respawn_delay")
+        return [resolved]
 
     _tag_name = "node"
 
@@ -436,18 +422,20 @@ class ComposableNodeContainer(Action):
         self._raw_env = kwargs.get("env") or []
         self._composable_node_descriptions = list(composable_node_descriptions or [])
         self._resolved = False
+        self._resolved_package: str = ""
+        self._resolved_executable: str = ""
+        self._resolved_name: str | None = None
+        self._resolved_ros_namespace: str | None = None
+        self._resolved_explicit_namespace: str | None = None
+        self._resolved_namespace: str | None = None
+        self._resolved_parameters: dict = {}
+        self._resolved_param_files: list = []
+        self._resolved_remappings: list = []
+        self._resolved_env: dict = {}
+        self.fqn: str = ""
 
-    def execute(self, context) -> list | None:
-        state = context._state
-        if not self._resolved:
-            self._resolved = True
-            self._perform_substitutions(context)
-            self._include_chain = list(state.include_chain)
-            state.resolved_actions.append(self)
-        return None
-
-    def _perform_substitutions(self, context) -> None:
-        """Resolve all substitutions."""
+    def execute(self, context) -> list:
+        """Resolve substitutions and return a clean resolved Container."""
         state = context._state
 
         pkg = context.perform_substitution(self._raw_package) or ""
@@ -462,28 +450,36 @@ class ComposableNodeContainer(Action):
                 state.track_package(raw_pkg)
 
         ros_ns = context._launch_configurations.get("ros_namespace")
-
-        self._resolved_package = pkg
-        self._resolved_executable = exe
-        self._resolved_name = name or None
-        self._resolved_ros_namespace = ros_ns
-        self._resolved_explicit_namespace = ns
-        self._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
-
         ctx_gp = context._launch_configurations.get("global_params", [])
-        self._resolved_parameters = {k: str(v) for k, v in ctx_gp}
-        self._resolved_param_files = list(
-            context._launch_configurations.get("global_param_files", [])
-        )
-        self._resolved_remappings = list(context._launch_configurations.get("ros_remaps", []))
 
         env = env_overrides(context)
         for item in self._raw_env or []:
             if isinstance(item, (tuple, list)) and len(item) == 2:
                 env[resolve_value(item[0], context) or ""] = resolve_value(item[1], context) or ""
-        self._resolved_env = env
 
         _resolve_plugins(self._composable_node_descriptions, context)
+
+        resolved = ComposableNodeContainer(package=pkg, executable=exe, name=name or "")
+        resolved._resolved = True
+        resolved._resolved_package = pkg
+        resolved._resolved_executable = exe
+        resolved._resolved_name = name or None
+        resolved._resolved_ros_namespace = ros_ns
+        resolved._resolved_explicit_namespace = ns
+        resolved._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
+        resolved._resolved_parameters = {k: str(v) for k, v in ctx_gp}
+        resolved._resolved_param_files = list(
+            context._launch_configurations.get("global_param_files", [])
+        )
+        resolved._resolved_remappings = list(context._launch_configurations.get("ros_remaps", []))
+        resolved._resolved_env = env
+        resolved._composable_node_descriptions = self._composable_node_descriptions
+
+        # Publish FQN on the original object for cross-references
+        # (LoadComposableNodes reads this to identify the target container)
+        self.fqn = _ros2_namespace_join(resolved._resolved_namespace, resolved._resolved_name) or ""
+
+        return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:
         if not self._resolved:
@@ -550,18 +546,13 @@ class LoadComposableNodes(Action):
         self._raw_namespace = kwargs.get("namespace")
         self._composable_node_descriptions = list(composable_node_descriptions or [])
         self._resolved = False
+        self._resolved_target: str = ""
+        self._resolved_ros_namespace: str | None = None
+        self._resolved_explicit_namespace: str | None = None
+        self._resolved_namespace: str | None = None
 
-    def execute(self, context) -> list | None:
-        state = context._state
-        if not self._resolved:
-            self._resolved = True
-            self._perform_substitutions(context)
-            self._include_chain = list(state.include_chain)
-            state.resolved_actions.append(self)
-        return None
-
-    def _perform_substitutions(self, context) -> None:
-        """Resolve all substitutions."""
+    def execute(self, context) -> list:
+        """Resolve substitutions and return a clean resolved LoadComposableNodes."""
         state = context._state
 
         for desc in self._composable_node_descriptions:
@@ -569,11 +560,10 @@ class LoadComposableNodes(Action):
             if raw_pkg:
                 state.track_package(raw_pkg)
 
-        # Resolve target — reads container's _resolved_* attributes
         target = ""
         if self._raw_target is not None:
             if isinstance(self._raw_target, ComposableNodeContainer):
-                target = _fully_qualified_name(self._raw_target)
+                target = getattr(self._raw_target, "fqn", "")
             else:
                 target = context.perform_substitution(self._raw_target) or ""
 
@@ -582,10 +572,14 @@ class LoadComposableNodes(Action):
 
         _resolve_plugins(self._composable_node_descriptions, context)
 
-        self._resolved_target = target
-        self._resolved_ros_namespace = ros_ns
-        self._resolved_explicit_namespace = ns
-        self._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
+        resolved = LoadComposableNodes()
+        resolved._resolved = True
+        resolved._resolved_target = target
+        resolved._resolved_ros_namespace = ros_ns
+        resolved._resolved_explicit_namespace = ns
+        resolved._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
+        resolved._composable_node_descriptions = self._composable_node_descriptions
+        return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:
         if not self._resolved:

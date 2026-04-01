@@ -69,8 +69,15 @@ class EventHandler(Action):
         self._start_state = start_state
         self._goal_state = goal_state
         self._child_events = child_events or []
+        self._resolved_handler_kind: str = handler_kind or ""
+        self._resolved_target: str | None = None
+        self._resolved_target_node: str | None = None
+        self._resolved_start_state: str | None = None
+        self._resolved_goal_state: str | None = None
+        self._resolved_namespace: str | None = None
+        self._resolved_actions: list = []
 
-    def execute(self, context) -> list | None:
+    def execute(self, context) -> list:
         from launch_plus.entities.helpers import resolve_value
 
         eh_actions: list[dict] = []
@@ -83,29 +90,29 @@ class EventHandler(Action):
                     "explicit_namespace": resolve_value(ce["namespace"], context),
                 }
             )
-        self._resolved_handler_kind = self._handler_kind
-        self._resolved_target = resolve_value(self._target, context)
-        self._resolved_target_node = resolve_value(self._target_node, context)
-        self._resolved_start_state = resolve_value(self._start_state, context)
-        self._resolved_goal_state = resolve_value(self._goal_state, context)
-        self._resolved_namespace = resolve_value(self._handler_ns, context)
-        self._resolved_actions = eh_actions
+
+        resolved = EventHandler(handler_kind=self._handler_kind)
+        resolved._resolved_handler_kind = self._handler_kind
+        resolved._resolved_target = resolve_value(self._target, context)
+        resolved._resolved_target_node = resolve_value(self._target_node, context)
+        resolved._resolved_start_state = resolve_value(self._start_state, context)
+        resolved._resolved_goal_state = resolve_value(self._goal_state, context)
+        resolved._resolved_namespace = resolve_value(self._handler_ns, context)
+        resolved._resolved_actions = eh_actions
 
         context._state.track_event_handler(
             {
                 "handler_kind": self._handler_kind,
-                "target": self._resolved_target,
-                "target_node": self._resolved_target_node,
-                "start_state": self._resolved_start_state,
-                "goal_state": self._resolved_goal_state,
+                "target": resolved._resolved_target,
+                "target_node": resolved._resolved_target_node,
+                "start_state": resolved._resolved_start_state,
+                "goal_state": resolved._resolved_goal_state,
                 "ros_namespace": context._launch_configurations.get("ros_namespace"),
-                "explicit_namespace": self._resolved_namespace,
+                "explicit_namespace": resolved._resolved_namespace,
                 "actions": eh_actions,
             },
         )
-        self._include_chain = list(context._state.include_chain)
-        context._state.resolved_actions.append(self)
-        return None
+        return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:
         kind = getattr(self, "_resolved_handler_kind", None)
@@ -152,16 +159,17 @@ class EmitEvent(Action):
         self._event = event
         self._target_node_attr = target_node
         self._namespace = namespace
+        self._resolved_event: str = ""
+        self._resolved_target_node: str | None = None
+        self._resolved_namespace: str | None = None
 
-    def execute(self, context) -> list | None:
+    def execute(self, context) -> list:
         from launch_plus.entities.helpers import resolve_value
 
         event = resolve_value(self._event, context) or ""
         target_node = resolve_value(self._target_node_attr, context)
         ee_ns = resolve_value(self._namespace, context)
-        self._resolved_event = event
-        self._resolved_target_node = target_node
-        self._resolved_namespace = ee_ns
+
         context._state.track_event_handler(
             {
                 "handler_kind": "emit_event",
@@ -181,9 +189,12 @@ class EmitEvent(Action):
                 ],
             },
         )
-        self._include_chain = list(context._state.include_chain)
-        context._state.resolved_actions.append(self)
-        return None
+
+        resolved = EmitEvent(event=event, target_node=target_node, namespace=ee_ns)
+        resolved._resolved_event = event
+        resolved._resolved_target_node = target_node
+        resolved._resolved_namespace = ee_ns
+        return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:
         event = getattr(self, "_resolved_event", None)

@@ -130,7 +130,6 @@ def _process_parsed_file(
     package: str,
     share_path: Path,
     file_path: Path,
-    current_chain: list[tuple[str, Path]],
     result: ResolveResult,
 ) -> None:
     """Common post-processing for any parsed launch file."""
@@ -152,11 +151,7 @@ def _process_parsed_file(
     result.global_params.extend(parsed.global_params)
     result.parsed_files.append(file_path)
 
-    # Append resolved actions with include chain prefix
-    for action in parsed.resolved_actions:
-        if hasattr(action, "_include_chain"):
-            action._include_chain = list(current_chain) + list(action._include_chain)
-        result.resolved_actions.append(action)
+    result.resolved_actions.extend(parsed.resolved_actions)
 
     # Store declared args for --show-args
     root_key = (package, share_path)
@@ -204,7 +199,6 @@ def _resolve_python_file_recursive(
     result: ResolveResult,
     fetched_packages: set[str],
     failed_repos: set[str],
-    parent_chain: list[tuple[str, Path]],
 ) -> None:
     """Resolve a launch file by calling py_resolver directly."""
     # Resolve file path based on mode
@@ -275,11 +269,7 @@ def _resolve_python_file_recursive(
         logger.error("failed to resolve launch file %s: %s", file_path, e)
         return
 
-    # Build include chain
-    current_chain = list(parent_chain)
-    current_chain.append((package, share_path))
-
-    _process_parsed_file(parsed, package, share_path, file_path, current_chain, result)
+    _process_parsed_file(parsed, package, share_path, file_path, result)
 
 
 # ---------------------------------------------------------------------------
@@ -334,7 +324,6 @@ def resolve_launch_recursive(
         result,
         fetched_packages,
         failed_repos,
-        [],  # root: no parent chain
     )
 
     logger.info(

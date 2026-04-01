@@ -65,18 +65,18 @@ class IncludeLaunchDescription(Action):
                 self._path = loc
         self._dep_idx = -1
 
-    def execute(self, context) -> list | None:
+    def execute(self, context) -> list:
         if self._xml_file_tokens is not None:
             return self._execute_xml(context)
         return self._execute_shim(context)
 
-    def _execute_xml(self, ctx) -> list | None:
-        """Execute for XML path: resolve file, include args, process included file."""
+    def _execute_xml(self, ctx) -> list:
+        """Execute for XML path: resolve file, return resolved actions with markers."""
         from launch_plus.entities.helpers import resolve_value
+        from launch_plus.resolver import resolve_included_file
 
         file_path = resolve_value(self._xml_file_tokens, ctx) or ""
 
-        # Check for unportable absolute paths
         if (
             ctx._state.preview_mode
             and os.path.isabs(file_path)
@@ -91,26 +91,20 @@ class IncludeLaunchDescription(Action):
         include_stack = self._xml_include_stack or []
         if file_path in include_stack:
             logger.error("circular include detected: %s", file_path)
-            return None
+            return []
         if len(include_stack) > 20:
             logger.warning("max include depth exceeded for %s", file_path)
-            return None
+            return []
 
         dep_idx = ctx._state.track_include(
             file_path,
             ros_namespace=ctx._launch_configurations.get("ros_namespace"),
         )
-        # Resolve include args sequentially — each arg can reference previous ones.
-        # Temporarily set resolved args in parent ctx so $(var x) works for
-        # subsequent args; restore parent state afterward.
         saved_lc = dict(ctx._launch_configurations)
         child_ctx_args: dict[str, str] = {}
         for arg_name, value_tokens in self._xml_args or []:
             child_ctx_args[arg_name] = resolve_value(value_tokens, ctx) or ""
             ctx._launch_configurations[arg_name] = child_ctx_args[arg_name]
-        # Restore parent context — child args don't leak into parent scope.
-        # Use clear+update (not assignment) to preserve dict identity, since
-        # outer scopes (e.g., <group>) may hold references to the same dict.
         ctx._launch_configurations.clear()
         ctx._launch_configurations.update(saved_lc)
         if dep_idx >= 0 and child_ctx_args:
@@ -126,32 +120,21 @@ class IncludeLaunchDescription(Action):
                 pkg_share = ctx._state.resolve_pkg_share(pkg)
                 real_path = os.path.join(pkg_share, rest)
             except Exception:
-                return None
-        if os.path.isfile(real_path):
-            from launch_plus.resolver import resolve_included_file
+                return []
+        if not os.path.isfile(real_path):
+            return []
 
-            inc_dep = _extract_pkg_and_share_path(file_path)
-            pkg = inc_dep[0] if inc_dep else ""
-            share = inc_dep[1] if inc_dep else file_path
-            before = len(ctx._state.resolved_actions)
-            resolve_included_file(ctx, include_stack, real_path, file_path, child_ctx_args)
-            after = len(ctx._state.resolved_actions)
-            if after > before or ctx._state.show_empty_includes:
-                produced = ctx._state.resolved_actions[before:after]
-                ctx._state.resolved_actions[before:after] = [
-                    SourceMarker(pkg, share, child_ctx_args),
-                    *produced,
-                    EndSourceMarker(pkg, share),
-                ]
-        return None
+        inc_dep = _extract_pkg_and_share_path(file_path)
+        pkg = inc_dep[0] if inc_dep else ""
+        share = inc_dep[1] if inc_dep else file_path
+        children = resolve_included_file(ctx, include_stack, real_path, file_path, child_ctx_args)
+        return _wrap_with_markers(children, pkg, share, child_ctx_args, ctx._state)
 
-    def _execute_shim(self, context) -> list | None:
-        # Resolve path lazily using the real context (matches official ROS 2
-        # LaunchDescriptionSource.get_launch_description(context) pattern)
+    def _execute_shim(self, context) -> list:
+        """Execute for Python shim path: return resolved actions with markers."""
         if self._path is None and self._source is not None and context is not None:
             src = self._source
             if hasattr(src, "_resolve_location"):
-                # Our deferred source — resolve with real context
                 self._path = src._resolve_location(context)
             elif isinstance(src, Substitution):
                 try:
@@ -166,36 +149,42 @@ class IncludeLaunchDescription(Action):
             )
             _resolve_include_args(self._path, self._raw_launch_arguments, context, self._dep_idx)
 
-        if self._path and self._path.endswith(".py") and context is not None:
-            child_args = {}
-            if self._raw_launch_arguments:
-                for k, v in self._raw_launch_arguments:
-                    k_str = str(k)
-                    resolved = context.perform_substitution(v)
-                    v_str = resolved if resolved is not None else str(v)
-                    child_args[k_str] = v_str
-            inc_dep = _extract_pkg_and_share_path(self._path)
-            if inc_dep:
-                context._state.include_chain.append(list(inc_dep))
-            else:
-                context._state.include_chain.append(["", self._path])
-            pkg = inc_dep[0] if inc_dep else ""
-            share = inc_dep[1] if inc_dep else self._path
-            before = len(context._state.resolved_actions)
-            try:
-                _R._inline_resolve_python_launch(context._state, self._path, context, child_args)
-            finally:
-                context._state.include_chain.pop()
-            after = len(context._state.resolved_actions)
-            if after > before or context._state.show_empty_includes:
-                produced = context._state.resolved_actions[before:after]
-                context._state.resolved_actions[before:after] = [
-                    SourceMarker(pkg, share, child_args),
-                    *produced,
-                    EndSourceMarker(pkg, share),
-                ]
+        if not (self._path and self._path.endswith(".py") and context is not None):
+            return []
 
-        return None
+        child_args = {}
+        if self._raw_launch_arguments:
+            for k, v in self._raw_launch_arguments:
+                k_str = str(k)
+                resolved = context.perform_substitution(v)
+                v_str = resolved if resolved is not None else str(v)
+                child_args[k_str] = v_str
+        inc_dep = _extract_pkg_and_share_path(self._path)
+        if inc_dep:
+            context._state.include_chain.append(list(inc_dep))
+        else:
+            context._state.include_chain.append(["", self._path])
+        pkg = inc_dep[0] if inc_dep else ""
+        share = inc_dep[1] if inc_dep else self._path
+        try:
+            children = _R._inline_resolve_python_launch(
+                context._state, self._path, context, child_args
+            )
+        finally:
+            context._state.include_chain.pop()
+        return _wrap_with_markers(children, pkg, share, child_args, context._state)
+
+
+def _wrap_with_markers(children, pkg, share, args, state) -> list:
+    """Wrap resolved children with SourceMarker/EndSourceMarker.
+
+    Empty includes (all children are markers — no real content) are
+    suppressed unless show_empty_includes is set.
+    """
+    has_content = any(not isinstance(c, (SourceMarker, EndSourceMarker)) for c in children)
+    if has_content or state.show_empty_includes:
+        return [SourceMarker(pkg, share, args), *children, EndSourceMarker(pkg, share)]
+    return list(children)  # pass through nested markers (if any) without wrapping
 
 
 def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):

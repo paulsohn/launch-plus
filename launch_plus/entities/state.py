@@ -165,14 +165,15 @@ class ResolverState:
         lockfile → AMENT → rosdep resolution. Caches results in
         ``package_shares``.
 
-        Returns absolute path or portable syntax ``$(find-pkg-share pkg)``.
-        Raises ``LookupError`` in non-preview mode if package not found.
+        In preview mode, pyfakefs mounts source dirs at predicted install
+        paths, so the path exists on the virtual filesystem.
+
+        Returns an absolute filesystem path.
+        Raises ``LookupError`` if the package cannot be found.
         """
-        # Fast path: already cached
         if package in self.package_shares:
             return str(self.package_shares[package])
 
-        # Delegate to fetcher
         from pathlib import Path
 
         from launch_plus.fetcher import ensure_package_available
@@ -192,9 +193,7 @@ class ResolverState:
             self.fetched_packages.add(package)
             return resolved
 
-        if self.preview_mode:
-            return f"$(find-pkg-share {package})"
-        raise LookupError(f"package '{package}' not found in AMENT_PREFIX_PATH")
+        raise LookupError(f"package '{package}' not found")
 
     def _build_lockfile(self):
         """Reconstruct a minimal Lockfile from lockfile_data for fetcher API."""

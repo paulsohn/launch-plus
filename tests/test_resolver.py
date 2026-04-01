@@ -897,8 +897,9 @@ class TestResolveSubstitutions:
 
     def test_resolve_find_pkg_share_preview(self):
         ctx = _fresh_subst_ctx(preview_mode=True)
+        R.get_state().package_shares["my_pkg"] = "/ws/src/my_pkg"
         result = resolve_substitutions("$(find-pkg-share my_pkg)/config", ctx)
-        assert result == "$(find-pkg-share my_pkg)/config"
+        assert result == "/ws/src/my_pkg/config"
         assert "my_pkg" in R.get_state().tracked["packages"]
 
     def test_resolve_find_pkg_prefix(self):
@@ -912,8 +913,9 @@ class TestResolveSubstitutions:
             vars={"pkg_name": "vehicle_description"},
             preview_mode=True,
         )
+        R.get_state().package_shares["vehicle_description"] = "/ws/src/vehicle_description"
         result = resolve_substitutions("$(find-pkg-share $(var pkg_name))/config", ctx)
-        assert result == "$(find-pkg-share vehicle_description)/config"
+        assert result == "/ws/src/vehicle_description/config"
 
     def test_resolve_chained_vars(self):
         ctx = _fresh_subst_ctx(
@@ -1021,6 +1023,8 @@ class TestResolveSubstitutions:
 
     def test_resolve_multiple_packages_tracked(self):
         ctx = _fresh_subst_ctx(preview_mode=True)
+        R.get_state().package_shares["pkg1"] = "/ws/src/pkg1"
+        R.get_state().package_shares["pkg2"] = "/ws/src/pkg2"
         resolve_substitutions("$(find-pkg-share pkg1)/$(find-pkg-share pkg2)", ctx)
         assert "pkg1" in R.get_state().tracked["packages"]
         assert "pkg2" in R.get_state().tracked["packages"]
@@ -1419,10 +1423,12 @@ class TestResolvePkgShare:
         R.get_state().package_shares["my_pkg"] = "/ws/src/my_pkg"
         assert R.get_state().resolve_pkg_share("my_pkg") == "/ws/src/my_pkg"
 
-    def test_preview_unknown_pkg_returns_portable(self):
+    def test_preview_unknown_pkg_raises(self):
         R.get_state().preview_mode = True
-        result = R.get_state().resolve_pkg_share("unknown_pkg")
-        assert result == "$(find-pkg-share unknown_pkg)"
+        import pytest
+
+        with pytest.raises(LookupError, match="not found"):
+            R.get_state().resolve_pkg_share("unknown_pkg")
 
     def test_postbuild_returns_install_path_from_package_shares(self):
         R.get_state().preview_mode = False
@@ -1433,7 +1439,7 @@ class TestResolvePkgShare:
         R.get_state().preview_mode = False
         import pytest
 
-        with pytest.raises(LookupError, match="not found in AMENT_PREFIX_PATH"):
+        with pytest.raises(LookupError, match="not found"):
             R.get_state().resolve_pkg_share("unknown_pkg")
 
     def test_postbuild_skips_lockfile_fetch(self):
@@ -1450,18 +1456,28 @@ class TestResolvePkgShare:
         import pytest
 
         # Should raise, not attempt to fetch
-        with pytest.raises(LookupError, match="not found in AMENT_PREFIX_PATH"):
+        with pytest.raises(LookupError, match="not found"):
             R.get_state().resolve_pkg_share("lockfile_pkg")
 
 
 class TestTrackedFindPackageShare:
     """Tests for FindPackageShare mode-dependent perform()/str()."""
 
-    def test_preview_returns_portable(self):
+    def test_preview_known_pkg_returns_path(self):
         R.get_state().preview_mode = True
+        R.get_state().package_shares["my_pkg"] = "/ws/src/my_pkg"
         fps = FindPackageShare("my_pkg")
-        assert fps.perform(None) == "$(find-pkg-share my_pkg)"
+        assert fps.perform(None) == "/ws/src/my_pkg"
+        # str()/serialize() returns portable form
         assert str(fps) == "$(find-pkg-share my_pkg)"
+
+    def test_preview_unknown_pkg_raises(self):
+        R.get_state().preview_mode = True
+        fps = FindPackageShare("unknown_pkg")
+        import pytest
+
+        with pytest.raises(LookupError, match="not found"):
+            fps.perform(None)
 
     def test_postbuild_returns_install_path(self):
         R.get_state().preview_mode = False
@@ -1471,11 +1487,10 @@ class TestTrackedFindPackageShare:
         # str() returns portable form; perform() returns resolved path
         assert str(fps) == "$(find-pkg-share my_pkg)"
 
-    def test_postbuild_unresolvable_reports_error(self, caplog):
+    def test_postbuild_unresolvable_raises(self):
         R.get_state().preview_mode = False
         fps = FindPackageShare("missing_pkg")
-        with caplog.at_level(logging.WARNING):
-            result = fps.perform(None)
-        # Returns portable fallback but records an error
-        assert result == "$(find-pkg-share missing_pkg)"
-        assert "missing_pkg" in caplog.text
+        import pytest
+
+        with pytest.raises(LookupError, match="not found"):
+            fps.perform(None)

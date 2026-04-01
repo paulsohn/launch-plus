@@ -9,7 +9,7 @@ from launch_plus.entities.expose import expose_substitution
 from launch_plus.entities.substitution import Substitution
 
 if TYPE_CHECKING:
-    from launch_plus.entities.state import LaunchContext, ResolverState
+    from launch_plus.entities.state import LaunchContext
 
 logger = logging.getLogger("launch_plus")
 
@@ -18,8 +18,9 @@ logger = logging.getLogger("launch_plus")
 class FindPackageShareSubstitution(Substitution):
     """Resolve ``$(find-pkg-share <pkg>)`` to the package's share directory.
 
-    In preview mode, returns the portable form ``$(find-pkg-share <pkg>)``.
-    In resolved mode, returns the actual filesystem path.
+    Always returns a real filesystem path. In preview mode, pyfakefs makes
+    the predicted install path exist; in non-preview mode, the package is
+    actually installed.
     """
 
     def __init__(self, *, package: list[Substitution]) -> None:
@@ -32,19 +33,12 @@ class FindPackageShareSubstitution(Substitution):
         return cls, {"package": args[0] if isinstance(args[0], list) else [args[0]]}
 
     def perform(self, ctx: LaunchContext) -> str:
-        from launch_plus.entities.helpers import (
-            resolve_substitutions_from_tokens,
-        )
+        from launch_plus.entities.helpers import resolve_substitutions_from_tokens
 
         state = ctx._state
         pkg = resolve_substitutions_from_tokens(self.package, ctx)
         state.track_package(pkg)
-        if ctx.preview_mode:
-            return f"$(find-pkg-share {pkg})"
-        try:
-            return state.resolve_pkg_share(pkg)
-        except Exception:
-            return f"$(find-pkg-share {pkg})"
+        return state.resolve_pkg_share(pkg)
 
     def serialize(self) -> str:
         return f"$(find-pkg-share {''.join(t.serialize() for t in self.package)})"
@@ -54,7 +48,7 @@ class FindPackageShareSubstitution(Substitution):
 
 
 class FindPackageShare(Substitution):
-    """Tracks FindPackageShare; package may be a string or a list of substitutions."""
+    """Python shim for ``FindPackageShare`` — always returns a real path."""
 
     def __init__(self, package):
         self._package_subs = package
@@ -70,15 +64,6 @@ class FindPackageShare(Substitution):
                 return result, False
         return str(subs), True
 
-    def _try_ament_resolve(self, state: ResolverState, pkg: str) -> str:
-        """Resolve to a real path, return portable form on failure."""
-        try:
-            return state.resolve_pkg_share(pkg)
-        except Exception as e:
-            if not state.preview_mode:
-                logger.error("$(find-pkg-share %s): %s", pkg, e)
-            return f"$(find-pkg-share {pkg})"
-
     def perform(self, context, **kwargs):
         import launch_plus.resolver as _R
 
@@ -86,9 +71,7 @@ class FindPackageShare(Substitution):
         pkg, is_fallback = self._resolve_name(context)
         if not is_fallback:
             state.track_package(pkg)
-        if not state.preview_mode:
-            return self._try_ament_resolve(state, pkg)
-        return f"$(find-pkg-share {pkg})"
+        return state.resolve_pkg_share(pkg)
 
     def serialize(self) -> str:
         pkg, _ = self._resolve_name(None)

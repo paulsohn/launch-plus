@@ -238,8 +238,6 @@ def _build_patched_ament_index_python_packages():
 
     def get_package_prefix(package_name):
         share = _R.get_state().resolve_pkg_share(package_name)
-        if share.startswith("$("):
-            return _ROS_DISTRO_PREFIX
         p = Path(share)
         return str(p.parent) if p.parent != p else _ROS_DISTRO_PREFIX
 

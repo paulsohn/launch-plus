@@ -287,7 +287,7 @@ class TestComposablePluginResolution:
             package="my_pkg",
             plugin="my_pkg::Node",
         )
-        desc._raw_remappings = [
+        desc.remappings = [
             (LaunchConfiguration("remap_src"), LaunchConfiguration("remap_dst")),
         ]
         plugins = _resolve_plugins([desc], ctx)

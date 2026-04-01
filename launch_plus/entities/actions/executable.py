@@ -28,19 +28,19 @@ class ExecuteProcess(Action):
     def __init__(self, *, cmd=None, name=None, **kwargs):
         # Normalize cmd: list of argument lists, matching official Executable
         if cmd is None:
-            self.__cmd: list[list[Substitution]] = []
+            self.cmd: list[list[Substitution]] | str = []
+        elif isinstance(cmd, str):
+            # Already resolved string (from resolved object)
+            self.cmd = cmd
         elif isinstance(cmd, list) and cmd and isinstance(cmd[0], list):
             # Already list[list[Substitution]] (from parse)
-            self.__cmd = cmd
+            self.cmd = cmd
         else:
             # From Python shim: list of mixed str/Substitution items
-            self.__cmd = [normalize_to_list_of_substitutions(x) for x in cmd]
-        self.__name = normalize_to_list_of_substitutions(name) if name is not None else None
-        self.__additional_env = kwargs.pop("additional_env", None)
-        self._resolved = False
-        self._resolved_cmd: str = ""
-        self._resolved_name: str | None = None
-        self._resolved_env: dict = {}
+            self.cmd = [normalize_to_list_of_substitutions(x) for x in cmd]
+        self.name = normalize_to_list_of_substitutions(name) if name is not None else name
+        self.additional_env = kwargs.pop("additional_env", None)
+        self.env: dict = {}
 
     @classmethod
     def _parse_cmdline(cls, cmd: str, parser: _ActionParser) -> list[list[Substitution]]:
@@ -96,27 +96,31 @@ class ExecuteProcess(Action):
         """Resolve substitutions and return a clean resolved ExecuteProcess."""
         from launch_plus.entities.helpers import env_overrides, resolve_value
 
-        cmd_parts = [perform_substitutions(context, arg) for arg in self.__cmd]
-        name = perform_substitutions(context, self.__name) if self.__name is not None else None
+        cmd_parts = (
+            [perform_substitutions(context, arg) for arg in self.cmd]
+            if isinstance(self.cmd, list)
+            else [self.cmd]
+        )
+        name = (
+            perform_substitutions(context, self.name)
+            if self.name is not None and not isinstance(self.name, str)
+            else self.name
+        )
 
         env = env_overrides(context)
-        if self.__additional_env is not None:
-            for k_tokens, v_tokens in self.__additional_env:
+        if self.additional_env is not None:
+            for k_tokens, v_tokens in self.additional_env:
                 env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
 
-        resolved = ExecuteProcess()
-        resolved._resolved = True
-        resolved._resolved_cmd = " ".join(cmd_parts)
-        resolved._resolved_name = name
-        resolved._resolved_env = env
+        resolved = ExecuteProcess(cmd=" ".join(cmd_parts), name=name)
+        resolved.env = env
         return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:
-        if not getattr(self, "_resolved", False):
+        if not self.cmd:
             return []
         elem = ET.Element("executable")
-        elem.set("cmd", getattr(self, "_resolved_cmd", "") or "")
-        name = getattr(self, "_resolved_name", None)
-        if name:
-            elem.set("name", name)
+        elem.set("cmd", self.cmd if isinstance(self.cmd, str) else "")
+        if self.name:
+            elem.set("name", self.name if isinstance(self.name, str) else "")
         return [elem]

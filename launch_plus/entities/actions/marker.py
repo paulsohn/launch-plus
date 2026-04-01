@@ -6,13 +6,17 @@ They are inserted by IncludeLaunchDescription to mark source boundaries.
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
+
 from launch_plus.entities.action import Action
 
 
 class SourceMarker(Action):
     """Marks the start of an included file in the resolved tree.
 
-    Serializes to ``<!-- source: pkg://share_path -->`` followed by ``<group>``.
+    The renderer uses this to open a ``<!-- source: ... -->`` comment
+    and a ``<group>`` element.  Not serialized via ``serialize_resolved()``
+    — the renderer handles the structural nesting directly.
     """
 
     def __init__(self, package: str, share_path: str, include_args: dict | None = None):
@@ -23,21 +27,17 @@ class SourceMarker(Action):
     def execute(self, context) -> list:
         return []
 
-    def serialize_resolved(self, indent: str = "  ") -> str:
-        label = f"{self.package}://{self.share_path}" if self.package else self.share_path
-        out = f"{indent}<!-- source: {label} -->\n"
-        out += f"{indent}<group>\n"
-        # Render arg comments inside the group
-        for name in sorted(self.include_args):
-            value = self.include_args[name]
-            out += f'{indent}  <!-- arg name="{self._esc(name)}" value="{self._esc(value)}" -->\n'
-        return out
+    def label(self) -> str:
+        if self.package:
+            return f"{self.package}://{self.share_path}"
+        return self.share_path
 
 
 class EndSourceMarker(Action):
     """Marks the end of an included file in the resolved tree.
 
-    Serializes to ``</group>`` followed by ``<!-- end: pkg://share_path -->``.
+    The renderer uses this to close the ``</group>`` and emit
+    ``<!-- end: ... -->`` comment.
     """
 
     def __init__(self, package: str, share_path: str):
@@ -47,9 +47,10 @@ class EndSourceMarker(Action):
     def execute(self, context) -> list:
         return []
 
-    def serialize_resolved(self, indent: str = "  ") -> str:
-        label = f"{self.package}://{self.share_path}" if self.package else self.share_path
-        return f"{indent}</group>\n{indent}<!-- end: {label} -->\n"
+    def label(self) -> str:
+        if self.package:
+            return f"{self.package}://{self.share_path}"
+        return self.share_path
 
 
 class ArgComment(Action):
@@ -63,8 +64,6 @@ class ArgComment(Action):
     def execute(self, context) -> list:
         return []
 
-    def serialize_resolved(self, indent: str = "  ") -> str:
+    def serialize_resolved(self) -> list[ET.Element]:
         attr = "default" if self.is_default else "value"
-        name = self._esc(self.name)
-        value = self._esc(self.value)
-        return f'{indent}<!-- arg name="{name}" {attr}="{value}" -->\n'
+        return [ET.Comment(f' arg name="{self.name}" {attr}="{self.value}" ')]  # type: ignore[list-item]

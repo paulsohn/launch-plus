@@ -6,6 +6,8 @@ Covers: <on_process_start>, <on_process_exit>, <on_state_transition>,
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
+
 from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
@@ -105,40 +107,34 @@ class EventHandler(Action):
         context._state.resolved_actions.append(self)
         return None
 
-    def serialize_resolved(self, indent: str = "  ") -> str | None:
+    def serialize_resolved(self) -> list[ET.Element]:
         kind = getattr(self, "_resolved_handler_kind", None)
         if kind is None:
-            return None
-        esc = self._esc
-        child_ind = indent + "  "
-        tag_name = kind
+            return []
 
-        tag = f"{indent}<{tag_name}"
+        elem = ET.Element(kind)
         if self._resolved_target is not None:
-            tag += f' target="{esc(self._resolved_target)}"'
+            elem.set("target", self._resolved_target)
         if self._resolved_target_node is not None:
-            tag += f' target_node="{esc(self._resolved_target_node)}"'
+            elem.set("target_node", self._resolved_target_node)
         if self._resolved_namespace is not None:
-            tag += f' namespace="{esc(self._resolved_namespace)}"'
+            elem.set("namespace", self._resolved_namespace)
         if self._resolved_start_state is not None:
-            tag += f' start_state="{esc(self._resolved_start_state)}"'
+            elem.set("start_state", self._resolved_start_state)
         if self._resolved_goal_state is not None:
-            tag += f' goal_state="{esc(self._resolved_goal_state)}"'
+            elem.set("goal_state", self._resolved_goal_state)
 
-        actions = getattr(self, "_resolved_actions", [])
-        if not actions:
-            return f"{tag}/>\n"
-
-        out = [f"{tag}>\n"]
-        for a in actions:
-            event = esc(a.get("event", ""))
+        for a in getattr(self, "_resolved_actions", []):
+            emit = ET.SubElement(elem, "emit_event")
+            emit.set("event", a.get("event", ""))
             tn = a.get("target_node")
+            if tn:
+                emit.set("target_node", tn)
             ns = a.get("explicit_namespace")
-            tn_attr = f' target_node="{esc(tn)}"' if tn else ""
-            ns_attr = f' namespace="{esc(ns)}"' if ns else ""
-            out.append(f'{child_ind}<emit_event event="{event}"{tn_attr}{ns_attr}/>\n')
-        out.append(f"{indent}</{tag_name}>\n")
-        return "".join(out)
+            if ns:
+                emit.set("namespace", ns)
+
+        return [elem]
 
 
 @expose_action("emit_event")
@@ -189,16 +185,19 @@ class EmitEvent(Action):
         context._state.resolved_actions.append(self)
         return None
 
-    def serialize_resolved(self, indent: str = "  ") -> str | None:
+    def serialize_resolved(self) -> list[ET.Element]:
         event = getattr(self, "_resolved_event", None)
         if event is None:
-            return None
-        esc = self._esc
+            return []
+        elem = ET.Element("emit_event")
+        elem.set("event", event)
         tn = getattr(self, "_resolved_target_node", None)
+        if tn:
+            elem.set("target_node", tn)
         ns = getattr(self, "_resolved_namespace", None)
-        tn_attr = f' target_node="{esc(tn)}"' if tn else ""
-        ns_attr = f' namespace="{esc(ns)}"' if ns else ""
-        return f'{indent}<emit_event event="{esc(event)}"{tn_attr}{ns_attr}/>\n'
+        if ns:
+            elem.set("namespace", ns)
+        return [elem]
 
 
 # ─── Python-shim actions ─────────────────────────────────────────────────────

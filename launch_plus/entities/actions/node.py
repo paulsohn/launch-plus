@@ -6,6 +6,8 @@ Covers: <node>, <lifecycle_node>, <node_container>,
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
+
 from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import (
@@ -305,65 +307,64 @@ class Node(Action):
 
     _tag_name = "node"
 
-    def serialize_resolved(self, indent: str = "  ") -> str | None:
-        """Render this node as a resolved XML snippet."""
+    def serialize_resolved(self) -> list[ET.Element]:
+        """Render this node as resolved XML elements."""
         if not self._resolved:
-            return None
-        child_ind = indent + "  "
-        esc = self._esc
-        tag_name = self._tag_name
+            return []
 
-        pkg = esc(self._resolved_package)
-        exe = esc(self._resolved_executable)
-        tag = f'{indent}<{tag_name} pkg="{pkg}" exec="{exe}"'
+        elem = ET.Element(self._tag_name)
+        elem.set("pkg", self._resolved_package)
+        elem.set("exec", self._resolved_executable)
         if self._resolved_name:
-            tag += f' name="{esc(self._resolved_name)}"'
+            elem.set("name", self._resolved_name)
         if self._resolved_namespace:
-            tag += f' namespace="{esc(self._resolved_namespace)}"'
+            elem.set("namespace", self._resolved_namespace)
         if self._resolved_output:
-            tag += f' output="{esc(self._resolved_output)}"'
+            elem.set("output", self._resolved_output)
         if self._resolved_args:
-            tag += f' args="{esc(self._resolved_args)}"'
+            elem.set("args", self._resolved_args)
         if self._resolved_respawn:
-            tag += f' respawn="{esc(self._resolved_respawn)}"'
+            elem.set("respawn", self._resolved_respawn)
         if self._resolved_respawn_delay:
-            tag += f' respawn_delay="{esc(self._resolved_respawn_delay)}"'
+            elem.set("respawn_delay", self._resolved_respawn_delay)
 
-        children = self._serialize_children(child_ind)
-        if children:
-            return f"{tag}>\n{children}{indent}</{tag_name}>\n"
-        return f"{tag}/>\n"
+        self._add_children(elem)
+        return [elem]
 
-    def _serialize_children(self, indent: str) -> str:
-        """Render param_files, parameters, remappings, env as XML children."""
-        esc = self._esc
-        out: list[str] = []
-
+    def _add_children(self, parent: ET.Element) -> None:
+        """Add param_files, parameters, remappings, env as XML children."""
         for pf in getattr(self, "_resolved_param_files", []):
             path = pf.get("path", "")
             inlined = pf.get("params")
             if inlined is not None:
-                out.append(f"{indent}<!-- params from: {esc(path)} -->\n")
+                parent.append(ET.Comment(f" params from: {path} "))
                 for k, v in inlined:
-                    out.append(f'{indent}<param name="{esc(k)}" value="{esc(str(v))}"/>\n')
-                out.append(f"{indent}<!-- end params from: {esc(path)} -->\n")
+                    p = ET.SubElement(parent, "param")
+                    p.set("name", k)
+                    p.set("value", str(v))
+                parent.append(ET.Comment(f" end params from: {path} "))
             else:
-                out.append(f'{indent}<param from="{esc(path)}"/>\n')
+                p = ET.SubElement(parent, "param")
+                p.set("from", path)
 
         for key, value in sorted(getattr(self, "_resolved_parameters", {}).items()):
-            out.append(f'{indent}<param name="{esc(key)}" value="{esc(value)}"/>\n')
+            p = ET.SubElement(parent, "param")
+            p.set("name", key)
+            p.set("value", value)
 
         ns = getattr(self, "_resolved_namespace", None)
         for from_, to in getattr(self, "_resolved_remappings", []):
             # Only qualify 'to' — 'from' is a node-internal name
             if to and ns and not to.startswith("/") and not to.startswith("~/"):
                 to = f"{ns.rstrip('/')}/{to}"
-            out.append(f'{indent}<remap from="{esc(from_)}" to="{esc(to)}"/>\n')
+            r = ET.SubElement(parent, "remap")
+            r.set("from", from_)
+            r.set("to", to)
 
         for name, value in sorted(getattr(self, "_resolved_env", {}).items()):
-            out.append(f'{indent}<env name="{esc(name)}" value="{esc(value)}"/>\n')
-
-        return "".join(out)
+            e = ET.SubElement(parent, "env")
+            e.set("name", name)
+            e.set("value", value)
 
     def __repr__(self):
         return f"Node(package={self._raw_package!r})"
@@ -397,41 +398,42 @@ class ComposableNode(Action):
         self._raw_parameters = list(kwargs.get("parameters") or [])
         self._raw_remappings = list(kwargs.get("remappings") or [])
 
-    def serialize_resolved(self, indent: str = "  ") -> str | None:
+    def serialize_resolved(self) -> list[ET.Element]:
         """Render as <composable_node> element (called by parent container)."""
-        # Resolved data is set by _resolve_plugin() via _resolved_data attribute
         data = getattr(self, "_resolved_data", None)
         if data is None:
-            return None
-        esc = self._esc
-        child_ind = indent + "  "
+            return []
 
-        pkg = esc(data.get("package", ""))
-        plugin = esc(data.get("plugin", ""))
-        tag = f'{indent}<composable_node pkg="{pkg}" plugin="{plugin}"'
+        elem = ET.Element("composable_node")
+        elem.set("pkg", data.get("package", ""))
+        elem.set("plugin", data.get("plugin", ""))
         name = data.get("name")
         if name:
-            tag += f' name="{esc(name)}"'
+            elem.set("name", name)
 
-        children: list[str] = []
         for pf in data.get("param_files", []):
             path = pf.get("path", "")
             inlined = pf.get("params")
             if inlined is not None:
-                children.append(f"{child_ind}<!-- params from: {esc(path)} -->\n")
+                elem.append(ET.Comment(f" params from: {path} "))
                 for k, v in inlined:
-                    children.append(f'{child_ind}<param name="{esc(k)}" value="{esc(str(v))}"/>\n')
-                children.append(f"{child_ind}<!-- end params from: {esc(path)} -->\n")
+                    p = ET.SubElement(elem, "param")
+                    p.set("name", k)
+                    p.set("value", str(v))
+                elem.append(ET.Comment(f" end params from: {path} "))
             else:
-                children.append(f'{child_ind}<param from="{esc(path)}"/>\n')
+                p = ET.SubElement(elem, "param")
+                p.set("from", path)
         for k, v in sorted(data.get("parameters", {}).items()):
-            children.append(f'{child_ind}<param name="{esc(k)}" value="{esc(v)}"/>\n')
+            p = ET.SubElement(elem, "param")
+            p.set("name", k)
+            p.set("value", v)
         for from_, to in data.get("remappings", []):
-            children.append(f'{child_ind}<remap from="{esc(from_)}" to="{esc(to)}"/>\n')
+            r = ET.SubElement(elem, "remap")
+            r.set("from", from_)
+            r.set("to", to)
 
-        if children:
-            return f"{tag}>\n{''.join(children)}{indent}</composable_node>\n"
-        return f"{tag}/>\n"
+        return [elem]
 
     def __repr__(self):
         return f"ComposableNode(package={self._package!r}, plugin={self._plugin!r})"
@@ -574,45 +576,48 @@ class ComposableNodeContainer(Action):
 
         entry["plugins"] = _resolve_plugins(self._composable_node_descriptions, context)
 
-    def serialize_resolved(self, indent: str = "  ") -> str | None:
+    def serialize_resolved(self) -> list[ET.Element]:
         if not self._resolved:
-            return None
-        esc = self._esc
-        child_ind = indent + "  "
+            return []
 
-        pkg = esc(self._resolved_package)
-        exe = esc(self._resolved_executable)
-        tag = f'{indent}<node_container pkg="{pkg}" exec="{exe}"'
+        elem = ET.Element("node_container")
+        elem.set("pkg", self._resolved_package)
+        elem.set("exec", self._resolved_executable)
         if self._resolved_name:
-            tag += f' name="{esc(self._resolved_name)}"'
+            elem.set("name", self._resolved_name)
         if self._resolved_namespace:
-            tag += f' namespace="{esc(self._resolved_namespace)}"'
+            elem.set("namespace", self._resolved_namespace)
 
-        children: list[str] = []
         # Node children (params, remaps, env)
         for pf in self._resolved_param_files:
             path = pf.get("path", "")
             inlined = pf.get("params")
             if inlined is not None:
-                children.append(f"{child_ind}<!-- params from: {esc(path)} -->\n")
+                elem.append(ET.Comment(f" params from: {path} "))
                 for k, v in inlined:
-                    children.append(f'{child_ind}<param name="{esc(k)}" value="{esc(str(v))}"/>\n')
-                children.append(f"{child_ind}<!-- end params from: {esc(path)} -->\n")
+                    p = ET.SubElement(elem, "param")
+                    p.set("name", k)
+                    p.set("value", str(v))
+                elem.append(ET.Comment(f" end params from: {path} "))
         for k, v in sorted(self._resolved_parameters.items()):
-            children.append(f'{child_ind}<param name="{esc(k)}" value="{esc(v)}"/>\n')
+            p = ET.SubElement(elem, "param")
+            p.set("name", k)
+            p.set("value", v)
         for from_, to in self._resolved_remappings:
-            children.append(f'{child_ind}<remap from="{esc(from_)}" to="{esc(to)}"/>\n')
+            r = ET.SubElement(elem, "remap")
+            r.set("from", from_)
+            r.set("to", to)
         for name, value in sorted(self._resolved_env.items()):
-            children.append(f'{child_ind}<env name="{esc(name)}" value="{esc(value)}"/>\n')
+            e = ET.SubElement(elem, "env")
+            e.set("name", name)
+            e.set("value", value)
+
         # Composable plugins
         for desc in self._composable_node_descriptions:
-            snippet = desc.serialize_resolved(child_ind)
-            if snippet:
-                children.append(snippet)
+            for child_elem in desc.serialize_resolved():
+                elem.append(child_elem)
 
-        if children:
-            return f"{tag}>\n{''.join(children)}{indent}</node_container>\n"
-        return f"{tag}/>\n"
+        return [elem]
 
 
 @expose_action("load_composable_node")
@@ -702,24 +707,19 @@ class LoadComposableNodes(Action):
         self._resolved_target = target
         self._resolved_namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
 
-    def serialize_resolved(self, indent: str = "  ") -> str | None:
+    def serialize_resolved(self) -> list[ET.Element]:
         if not self._resolved:
-            return None
+            return []
         if not self._composable_node_descriptions:
-            return None
-        esc = self._esc
-        child_ind = indent + "  "
+            return []
 
+        elem = ET.Element("load_composable_node")
         target = self._resolved_target or ""
-        tag = f"{indent}<load_composable_node"
         if target:
-            tag += f' target="{esc(target)}"'
-        tag += ">\n"
+            elem.set("target", target)
 
-        children: list[str] = []
         for desc in self._composable_node_descriptions:
-            snippet = desc.serialize_resolved(child_ind)
-            if snippet:
-                children.append(snippet)
+            for child_elem in desc.serialize_resolved():
+                elem.append(child_elem)
 
-        return f"{tag}{''.join(children)}{indent}</load_composable_node>\n"
+        return [elem]

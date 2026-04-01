@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from launch_plus.entities.actions.executable import ExecuteProcess
+from launch_plus.entities.actions.marker import EndSourceMarker, SourceMarker
 from launch_plus.entities.actions.node import (
     ComposableNode,
     ComposableNodeContainer,
@@ -59,11 +60,14 @@ def test_node_with_namespace() -> None:
 
 
 def test_node_escapes_quotes() -> None:
+    import xml.etree.ElementTree as ET
+
     ctx = _make_ctx(global_params=[("key", 'val with "quotes"')])
     node = Node(package="p", executable="e", name="n")
     node.execute(ctx)
-    snippet = node.serialize_resolved("  ")
-    assert snippet is not None
+    elems = node.serialize_resolved()
+    assert len(elems) == 1
+    snippet = ET.tostring(elems[0], encoding="unicode")
     assert "&quot;" in snippet
     assert 'val with "quotes"' not in snippet
 
@@ -107,11 +111,14 @@ def test_load_composable() -> None:
 
 
 def test_executable() -> None:
+    import xml.etree.ElementTree as ET
+
     ctx = _make_ctx()
     ep = ExecuteProcess(cmd=["echo", "hello"])
     ep.execute(ctx)
-    snippet = ep.serialize_resolved("  ")
-    assert snippet is not None
+    elems = ep.serialize_resolved()
+    assert len(elems) == 1
+    snippet = ET.tostring(elems[0], encoding="unicode")
     assert "<executable" in snippet
     assert "echo hello" in snippet
 
@@ -125,11 +132,14 @@ def test_groups_by_source_file() -> None:
     n2 = Node(package="p2", executable="e2")
     n1.execute(ctx)
     n2.execute(ctx)
-    # Simulate different sources
-    n1._include_chain = [("sensor_launch", "launch/sensing.launch.xml")]
-    n2._include_chain = [("sensor_launch", "launch/sensing.launch.xml")]
 
-    xml = render_resolved_xml("my_pkg", "top.launch.xml", [n1, n2])
+    actions = [
+        SourceMarker("sensor_launch", "launch/sensing.launch.xml"),
+        n1,
+        n2,
+        EndSourceMarker("sensor_launch", "launch/sensing.launch.xml"),
+    ]
+    xml = render_resolved_xml("my_pkg", "top.launch.xml", actions)
     assert xml.count("<group>") == 1
     assert xml.count("</group>") == 1
     assert "sensor_launch://launch/sensing.launch.xml" in xml
@@ -139,13 +149,17 @@ def test_nested_groups() -> None:
     ctx = _make_ctx()
     n = Node(package="p", executable="e", name="n")
     n.execute(ctx)
-    n._include_chain = [
-        ("root_pkg", "launch/root.launch.xml"),
-        ("comp_pkg", "launch/comp.launch.xml"),
-        ("sensing_pkg", "launch/sensing.launch.xml"),
-    ]
 
-    xml = render_resolved_xml("my_pkg", "top.launch.xml", [n])
+    actions = [
+        SourceMarker("root_pkg", "launch/root.launch.xml"),
+        SourceMarker("comp_pkg", "launch/comp.launch.xml"),
+        SourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
+        n,
+        EndSourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
+        EndSourceMarker("comp_pkg", "launch/comp.launch.xml"),
+        EndSourceMarker("root_pkg", "launch/root.launch.xml"),
+    ]
+    xml = render_resolved_xml("my_pkg", "top.launch.xml", actions)
     assert xml.count("<group>") == 3
     assert xml.count("</group>") == 3
 

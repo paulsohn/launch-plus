@@ -478,6 +478,11 @@ def fetch(
 @click.option("--apply-opaque-file-access", is_flag=True)
 @click.option("--inline-params", is_flag=True)
 @click.option("--rosdep", is_flag=True, help="Install missing packages via rosdep")
+@click.option(
+    "--show-empty-includes",
+    is_flag=True,
+    help="Show source groups for includes with no resolved actions",
+)
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
@@ -497,6 +502,7 @@ def resolve(
     apply_opaque_file_access: bool,
     inline_params: bool,
     rosdep: bool,
+    show_empty_includes: bool,
     clean: bool,
     dirty: bool,
     shallow: bool,
@@ -514,6 +520,7 @@ def resolve(
         apply_opaque_file_access=apply_opaque_file_access,
         rosdep_fallback=rosdep,
         inline_params=inline_params,
+        show_empty_includes=show_empty_includes,
     )
 
     _cmd_resolve(

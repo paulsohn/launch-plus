@@ -54,6 +54,9 @@ class ResolveWorkflowOptions:
     inline_params: bool = False
     """Expand ``<param from="...">`` files at resolve time."""
 
+    show_empty_includes: bool = False
+    """Show source groups even for includes that produce no resolved actions."""
+
 
 # ---------------------------------------------------------------------------
 # Result

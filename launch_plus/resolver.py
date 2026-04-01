@@ -576,6 +576,7 @@ def _resolve_file_impl(
         state.allow_unportable_paths = bool(
             getattr(workflow_options, "allow_unportable_paths", False)
         )
+        state.show_empty_includes = bool(getattr(workflow_options, "show_empty_includes", False))
     else:
         state.apply_opaque_file_access = False
         state.preview_mode = True
@@ -583,6 +584,7 @@ def _resolve_file_impl(
         state.rosdep_fallback = False
         state.apply_arg_defaults = False
         state.allow_unportable_paths = False
+        state.show_empty_includes = False
 
     # Build lockfile data from the Lockfile dataclass
     if lockfile is not None:

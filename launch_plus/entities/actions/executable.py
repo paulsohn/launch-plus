@@ -7,6 +7,7 @@ Method definition order follows the official implementation.
 from __future__ import annotations
 
 import shlex
+import xml.etree.ElementTree as ET
 
 from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
@@ -144,14 +145,12 @@ class ExecuteProcess(Action):
         state.resolved_actions.append(self)
         return None
 
-    def serialize_resolved(self, indent: str = "  ") -> str | None:
+    def serialize_resolved(self) -> list[ET.Element]:
         if not getattr(self, "_resolved", False):
-            return None
-        esc = self._esc
-        cmd = getattr(self, "_resolved_cmd", "") or ""
-        tag = f'{indent}<executable cmd="{esc(cmd)}"'
+            return []
+        elem = ET.Element("executable")
+        elem.set("cmd", getattr(self, "_resolved_cmd", "") or "")
         name = getattr(self, "_resolved_name", None)
         if name:
-            tag += f' name="{esc(name)}"'
-        tag += "/>\n"
-        return tag
+            elem.set("name", name)
+        return [elem]

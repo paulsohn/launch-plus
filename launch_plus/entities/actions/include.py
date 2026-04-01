@@ -7,6 +7,7 @@ import os
 
 import launch_plus.resolver as _R
 from launch_plus.entities.action import Action
+from launch_plus.entities.actions.marker import EndSourceMarker, SourceMarker
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import (
     _extract_pkg_and_share_path,
@@ -129,7 +130,19 @@ class IncludeLaunchDescription(Action):
         if os.path.isfile(real_path):
             from launch_plus.resolver import resolve_included_file
 
+            inc_dep = _extract_pkg_and_share_path(file_path)
+            pkg = inc_dep[0] if inc_dep else ""
+            share = inc_dep[1] if inc_dep else file_path
+            before = len(ctx._state.resolved_actions)
             resolve_included_file(ctx, include_stack, real_path, file_path, child_ctx_args)
+            after = len(ctx._state.resolved_actions)
+            if after > before or ctx._state.show_empty_includes:
+                produced = ctx._state.resolved_actions[before:after]
+                ctx._state.resolved_actions[before:after] = [
+                    SourceMarker(pkg, share, child_ctx_args),
+                    *produced,
+                    EndSourceMarker(pkg, share),
+                ]
         return None
 
     def _execute_shim(self, context) -> list | None:
@@ -166,10 +179,21 @@ class IncludeLaunchDescription(Action):
                 context._state.include_chain.append(list(inc_dep))
             else:
                 context._state.include_chain.append(["", self._path])
+            pkg = inc_dep[0] if inc_dep else ""
+            share = inc_dep[1] if inc_dep else self._path
+            before = len(context._state.resolved_actions)
             try:
                 _R._inline_resolve_python_launch(context._state, self._path, context, child_args)
             finally:
                 context._state.include_chain.pop()
+            after = len(context._state.resolved_actions)
+            if after > before or context._state.show_empty_includes:
+                produced = context._state.resolved_actions[before:after]
+                context._state.resolved_actions[before:after] = [
+                    SourceMarker(pkg, share, child_args),
+                    *produced,
+                    EndSourceMarker(pkg, share),
+                ]
 
         return None
 

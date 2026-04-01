@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from launch_plus.types import IncludeArgContext
@@ -19,56 +20,13 @@ def _xml_escape(s: str) -> str:
     return s.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _qualify_topic(topic: str, namespace: str | None) -> str:
-    """Qualify a relative topic name with the node's namespace.
-
-    Absolute topics (starting with ``/``) and private topics (starting with
-    ``~/``) are returned as-is.  Relative topics are prefixed with the
-    node's namespace, matching how the ROS 2 runtime resolves them.
-    """
-    if not topic or not namespace or topic.startswith("/") or topic.startswith("~/"):
-        return topic
-    return f"{namespace.rstrip('/')}/{topic}"
-
-
-def _pad(depth: int) -> str:
-    """Indentation string for the given visual depth level."""
-    return "  " * (depth + 1)
-
-
-def _visual_src_depth(open_src_len: int) -> int:
-    """Visual source depth — drives indentation."""
-    return open_src_len
-
-
-def _format_source_label(pkg: str, path: Path) -> str:
-    """Format a source label for XML comments."""
-    if not pkg:
-        return str(path)
-    return f"{pkg}://{path}"
-
-
-def _common_prefix_len(
-    a: list[tuple[str, Path]],
-    b: list[tuple[str, Path]],
-) -> int:
-    """Length of the common prefix of two lists."""
-    n = 0
-    for x, y in zip(a, b, strict=False):
-        if x != y:
-            break
-        n += 1
-    return n
-
-
-def _render_show_args(
+def _add_show_args(
+    parent: ET.Element,
     key: tuple[str, Path],
     include_args: dict[tuple[str, Path], IncludeArgContext],
     declared_args_by_file: dict[tuple[str, Path], dict[str, str]],
-    indent: int,
-    out: list[str],
 ) -> None:
-    """Emit ``<!-- arg ... -->`` comments for a given include boundary."""
+    """Add ``<!-- arg ... -->`` comments to *parent* for a given include boundary."""
     ctx = include_args.get(key)
     explicit = dict(ctx.explicit) if ctx else {}
     declared = dict(declared_args_by_file.get(key, {}))
@@ -80,37 +38,10 @@ def _render_show_args(
         if name not in merged:
             merged[name] = (value, True)
 
-    if not merged:
-        return
-
-    ind = _pad(indent)
     for name in sorted(merged):
         value, is_default = merged[name]
-        if is_default:
-            out.append(f'{ind}<!-- arg name="{name}" default="{_xml_escape(value)}" -->\n')
-        else:
-            out.append(f'{ind}<!-- arg name="{name}" value="{_xml_escape(value)}" -->\n')
-
-
-# ---------------------------------------------------------------------------
-# Source-stack helper
-# ---------------------------------------------------------------------------
-
-
-def _action_source_stack(
-    action,
-    root_pkg: str,
-    root_path: Path,
-) -> list[tuple[str, Path]]:
-    """Compute the source-group nesting stack for an action."""
-    chain = getattr(action, "_include_chain", [])
-    if chain:
-        chain = [(pkg, Path(sp)) for pkg, sp in chain]
-        first_pkg, first_path = chain[0]
-        if first_pkg == root_pkg and first_path == root_path:
-            return list(chain[1:])
-        return list(chain)
-    return []
+        attr = "default" if is_default else "value"
+        parent.append(ET.Comment(f' arg name="{name}" {attr}="{_xml_escape(value)}" '))
 
 
 # ---------------------------------------------------------------------------
@@ -130,9 +61,12 @@ def render_resolved_xml(
 ) -> str:
     """Render resolved actions as a ``<launch>`` XML document.
 
-    Each action's ``serialize_resolved(indent)`` produces its XML snippet.
-    Source-group nesting uses ``action._include_chain``.
+    Builds an ``xml.etree.ElementTree`` and serializes it to string.
+    Source-group nesting is driven by ``SourceMarker`` / ``EndSourceMarker``
+    actions in the resolved list.
     """
+    from launch_plus.entities.actions.marker import EndSourceMarker, SourceMarker
+
     if include_args is None:
         include_args = {}
     if initial_args is None:
@@ -140,60 +74,38 @@ def render_resolved_xml(
     if declared_args_by_file is None:
         declared_args_by_file = {}
 
-    out: list[str] = []
-    out.append(f"<!-- resolved by launch-plus from {package}://launch/{launcher} -->\n")
-    out.append("<launch>\n")
+    root = ET.Element("launch")
 
+    # Initial args as comments
     if show_args and initial_args:
         for name in sorted(initial_args):
             value = initial_args[name]
-            out.append(f'  <!-- arg name="{name}" value="{_xml_escape(value)}" -->\n')
+            root.append(ET.Comment(f' arg name="{name}" value="{_xml_escape(value)}" '))
 
-    root_share_path = Path("launch") / launcher
-
-    # Stack of currently open source-level <group> boundaries.
-    open_src: list[tuple[str, Path]] = []
+    # Build tree — SourceMarker/EndSourceMarker drive <group> nesting
+    stack: list[ET.Element] = [root]
 
     for action in actions:
-        # Compute the target source stack.
-        full_stack = _action_source_stack(action, package, root_share_path)
-        target_src = full_stack
-
-        common = _common_prefix_len(open_src, target_src)
-
-        # Close excess source groups, innermost first.
-        while len(open_src) > common:
-            depth = len(open_src) - 1
-            pkg, path = open_src.pop()
-            vd = _visual_src_depth(depth)
-            out.append(f"{_pad(vd)}</group>\n")
-            out.append(f"{_pad(vd)}<!-- end: {_format_source_label(pkg, path)} -->\n")
-
-        # Open new source groups, outermost first.
-        while len(open_src) < len(target_src):
-            depth = len(open_src)
-            vd = _visual_src_depth(depth)
-            pkg, path = target_src[depth]
-            out.append(f"{_pad(vd)}<!-- source: {_format_source_label(pkg, path)} -->\n")
-            out.append(f"{_pad(vd)}<group>\n")
+        if isinstance(action, SourceMarker):
+            parent = stack[-1]
+            parent.append(ET.Comment(f" source: {action.label()} "))
+            group = ET.SubElement(parent, "group")
             if show_args:
-                _render_show_args((pkg, path), include_args, declared_args_by_file, vd + 1, out)
-            open_src.append((pkg, path))
+                key = (action.package, Path(action.share_path))
+                _add_show_args(group, key, include_args, declared_args_by_file)
+            stack.append(group)
+        elif isinstance(action, EndSourceMarker):
+            if len(stack) > 1:
+                stack.pop()
+            stack[-1].append(ET.Comment(f" end: {action.label()} "))
+        else:
+            for elem in action.serialize_resolved():
+                stack[-1].append(elem)
 
-        # Render with correct indentation.
-        vd = _visual_src_depth(len(open_src))
-        indent = _pad(vd)
-        snippet = action.serialize_resolved(indent)
-        if snippet is not None:
-            out.append(snippet)
+    ET.indent(root, space="  ")
+    xml_str = ET.tostring(root, encoding="unicode")
+    # Normalize self-closing tag style: <elem /> → <elem/>
+    xml_str = xml_str.replace(" />", "/>")
 
-    # Close remaining source groups.
-    while open_src:
-        depth = len(open_src) - 1
-        pkg, path = open_src.pop()
-        vd = _visual_src_depth(depth)
-        out.append(f"{_pad(vd)}</group>\n")
-        out.append(f"{_pad(vd)}<!-- end: {_format_source_label(pkg, path)} -->\n")
-
-    out.append("</launch>\n")
-    return "".join(out)
+    header = f"<!-- resolved by launch-plus from {package}://launch/{launcher} -->\n"
+    return header + xml_str

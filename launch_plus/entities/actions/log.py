@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
+
 from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
@@ -47,8 +49,10 @@ class LogInfo(Action):
         state.resolved_actions.append(self)
         return None
 
-    def serialize_resolved(self, indent: str = "  ") -> str | None:
+    def serialize_resolved(self) -> list[ET.Element]:
         msg = getattr(self, "_resolved_message", None)
         if msg is None:
-            return None
-        return f'{indent}<log message="{self._esc(msg)}"/>\n'
+            return []
+        elem = ET.Element("log")
+        elem.set("message", msg)
+        return [elem]

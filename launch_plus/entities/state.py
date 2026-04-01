@@ -45,6 +45,7 @@ class ResolverState:
         "rosdep_attempted",
         "root_source_key",
         "walk_depth",
+        "show_empty_includes",
     )
 
     def __init__(self) -> None:
@@ -83,6 +84,7 @@ class ResolverState:
         self.rosdep_attempted: set = set()
         self.root_source_key: str = ""
         self.walk_depth: int = 0
+        self.show_empty_includes: bool = False
 
     # ─── Package tracking and resolution ──────────────────────────────────
 

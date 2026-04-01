@@ -73,7 +73,7 @@ class GroupAction(Action):
                     if children:
                         results.extend(children)
                 else:
-                    _R._walk_untracked_action(context._state, child, context)
+                    logger.error("expected Action or Entity, got %s", type(child).__name__)
         finally:
             if self.scoped:
                 context._pop_environment()
@@ -99,13 +99,14 @@ class OpaqueFunction(Action):
         self.function = function
 
     def execute(self, context) -> list:
+        from launch_plus.entities.opaque_stubs import _call_opaque_with_stubs
+
         fn = self.function
         if fn and context:
-            state = context._state
             try:
-                result = _R._call_opaque_with_stubs(state, fn, context)
+                result = _call_opaque_with_stubs(context._state, fn, context)
                 if result:
-                    return _R._walk_actions(state, result, context)
+                    return _R._execute_actions(result, context)
             except Exception as e:
                 logger.error("OpaqueFunction failed: %s", e)
         return []

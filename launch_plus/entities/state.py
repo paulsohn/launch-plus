@@ -43,7 +43,6 @@ class ResolverState:
         "fetched_packages",
         "rosdep_attempted",
         "root_source_key",
-        "walk_depth",
         "show_empty_includes",
         "show_args",
     )
@@ -80,7 +79,6 @@ class ResolverState:
         self.fetched_packages: set = set()
         self.rosdep_attempted: set = set()
         self.root_source_key: str = ""
-        self.walk_depth: int = 0
         self.show_empty_includes: bool = False
         self.show_args: bool = False
 
@@ -157,11 +155,6 @@ class ResolverState:
             if key not in by_file:
                 by_file[key] = []
             by_file[key].append({"name": name, "default": default})
-
-    def track_node_from_action(self, package, executable=None, name=None) -> None:
-        """Track a node from an unpatched ROS 2 action for dependency tracking."""
-        self.track_package(package)
-        # executable and name are unused — kept for call-site compatibility
 
     # ─── Package resolution ───────────────────────────────────────────────
 

@@ -374,28 +374,6 @@ class TestInlinePythonInclude:
 
             assert ctx._launch_configurations["resolved_mode"] == "custom"
 
-    def test_depth_limit_prevents_infinite_recursion(self, caplog):
-        """Exceeding the depth limit should warn, not crash."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            child_path = _write_launch_py(
-                tmpdir,
-                "child.launch.py",
-                """\
-                from launch import LaunchDescription
-
-                def generate_launch_description():
-                    return LaunchDescription([])
-            """,
-            )
-
-            ctx = _make_context({})
-            R.get_state().walk_depth = 21  # Simulate deep nesting
-            with caplog.at_level(logging.WARNING):
-                R._inline_resolve_python_launch(R.get_state(), child_path, ctx, {})
-            # Should not raise; just warns
-            assert "depth" in caplog.text.lower()
-            R.get_state().walk_depth = 0  # Reset
-
     def test_missing_file_silently_skipped(self):
         """A non-existent include file should not raise."""
         ctx = _make_context({})

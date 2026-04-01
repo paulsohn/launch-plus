@@ -119,7 +119,6 @@ def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
 import launch_plus.entities.actions  # noqa: F401, E402
 
 # ─── Internal imports (used by resolver logic) ───────────────────────────────
-from launch_plus.entities.action import Action  # noqa: E402
 from launch_plus.entities.actions.arg import (  # noqa: E402
     DeclareLaunchArgument,
     _apply_declared_arg,
@@ -128,7 +127,6 @@ from launch_plus.entities.helpers import (  # noqa: E402
     _extract_pkg_and_share_path,
     _parse_portable_path,
 )
-from launch_plus.entities.opaque_stubs import _call_opaque_with_stubs  # noqa: E402
 from launch_plus.entities.parsing import _ActionParser  # noqa: E402
 
 # ─── LaunchContext factory ────────────────────────────────────────────────────
@@ -167,7 +165,7 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
 
     try:
         spec = importlib.util.spec_from_file_location(
-            f"_inline_launch_{state.walk_depth}", real_path
+            f"_inline_launch_{len(state.include_chain)}", real_path
         )
         if spec is None or spec.loader is None:
             logger.warning("cannot load included launch file: %s", real_path)
@@ -198,7 +196,7 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
             if isinstance(entity, DeclareLaunchArgument):
                 _apply_declared_arg(entity, parent_context)
 
-        return _walk_actions(state, entities, parent_context)
+        return _execute_actions(entities, parent_context)
     finally:
         state.declared_arg_names.clear()
         state.declared_arg_names.update(saved_declared_arg_names)
@@ -287,171 +285,22 @@ def resolve_included_file(
     return results
 
 
-# ─── Action walker ────────────────────────────────────────────────────────────
+def _execute_actions(actions, context) -> list:
+    """Execute a list of actions and collect resolved results."""
+    from launch_plus.entities.action import Action
 
-
-def _walk_actions(state, actions, context) -> list:
-    """Walk actions, return resolved results.
-
-    Each action's ``execute()`` returns its resolved children.
-    Untracked actions (real ROS 2 objects) are handled separately.
-    """
-    if actions is None:
-        return []
-    state.walk_depth += 1
-    if state.walk_depth > 20:
-        state.walk_depth -= 1
-        logger.warning("Max include depth reached while walking Python launch description")
-        return []
     results: list = []
-    try:
-        for action in actions:
-            if action is None:
-                continue
-            try:
-                if isinstance(action, Action):
-                    children = action.execute(context)
-                    if children:
-                        results.extend(children)
-                else:
-                    _walk_untracked_action(state, action, context)
-            except Exception as e:
-                logger.error("Error walking action %s: %s", type(action).__name__, e)
-    finally:
-        state.walk_depth -= 1
+    for action in actions or []:
+        if action is None:
+            continue
+        if not isinstance(action, Action):
+            logger.error("expected Action, got %s", type(action).__name__)
+            continue
+        children = action.execute(context)
+        if children:
+            results.extend(children)
     return results
 
-
-def _walk_untracked_action(state, action, context):
-    """Handle real (unpatched) ROS 2 action objects.
-
-    These come from OpaqueFunction returns that produce real ``launch_ros``
-    classes instead of our shimmed ``_Tracked*`` wrappers.
-    """
-    cls_name = type(action).__name__
-
-    # OpaqueFunction: execute its function and walk the result
-    if cls_name == "OpaqueFunction" or (
-        hasattr(action, "function") and callable(getattr(action, "function", None))
-    ):
-        fn = getattr(action, "function", None)
-        if fn and context:
-            try:
-                result = _call_opaque_with_stubs(state, fn, context)
-                if result:
-                    _walk_actions(state, result, context)
-            except Exception as e:
-                logger.error("OpaqueFunction failed: %s", e)
-        return
-
-    # Walk nested actions/entities from generic action objects
-    if hasattr(action, "entities"):
-        try:
-            _walk_actions(state, action.entities, context)
-        except Exception as e:
-            logger.warning("failed to walk %s.entities: %s", cls_name, e)
-    if hasattr(action, "_actions"):
-        try:
-            _walk_actions(state, action._actions, context)
-        except Exception as e:
-            logger.warning("failed to walk %s._actions: %s", cls_name, e)
-
-    # Real Node/LifecycleNode from launch_ros (unpatched, e.g. from OpaqueFunction return)
-    if cls_name in ("Node", "LifecycleNode") and hasattr(action, "_package"):
-        pkg = getattr(action, "_package", None)
-        exe = getattr(action, "_node_executable", getattr(action, "_node_name", None))
-        state.track_node_from_action(pkg, exe)
-    elif cls_name == "ComposableNodeContainer" and hasattr(action, "_package"):
-        pkg = getattr(action, "_package", None)
-        exe = getattr(action, "_node_executable", getattr(action, "_node_name", None))
-        name = getattr(action, "_name", None)
-        state.track_node_from_action(pkg, exe, name)
-        descs = (
-            getattr(
-                action,
-                "composable_node_descriptions",
-                getattr(action, "_composable_node_descriptions", None),
-            )
-            or []
-        )
-        for desc in descs:
-            state.track_node_from_action(
-                getattr(desc, "package", None),
-                getattr(desc, "plugin", None),
-                getattr(desc, "node_name", getattr(desc, "name", None)),
-            )
-    elif cls_name == "LoadComposableNodes":
-        descs = (
-            getattr(
-                action,
-                "_composable_node_descriptions",
-                getattr(action, "composable_node_descriptions", None),
-            )
-            or []
-        )
-        for desc in descs:
-            state.track_node_from_action(
-                getattr(desc, "package", None),
-                getattr(desc, "plugin", None),
-                getattr(desc, "node_name", getattr(desc, "name", None)),
-            )
-
-    # IncludeLaunchDescription (real)
-    if cls_name == "IncludeLaunchDescription":
-        src = getattr(action, "_launch_description_source", None)
-        if src:
-            loc = getattr(src, "location", None)
-            if callable(loc) and context:
-                try:
-                    loc = loc(context)
-                except Exception:
-                    loc = None
-            if loc:
-                ros_ns = context._launch_configurations.get("ros_namespace") if context else None
-                state.track_include(loc, ros_namespace=ros_ns)
-
-    # Warn about action classes we do not recognise.
-    if cls_name not in _KNOWN_UNTRACKED_CLASSES:
-        logger.warning(
-            "Unrecognised action type '%s' — any nodes or includes it "
-            "declares may not appear in the resolved output",
-            cls_name,
-        )
-
-
-# ─── Known untracked action class names ──────────────────────────────────────
-
-# Real ROS 2 class names that _walk_untracked_action handles or that are safe
-# to skip.  Our Action subclasses are dispatched via execute() and
-# don't need to be listed here.
-_KNOWN_UNTRACKED_CLASSES: frozenset = frozenset(
-    {
-        # Real launch_ros classes handled via cls_name duck-typing
-        "Node",
-        "LifecycleNode",
-        "ComposableNodeContainer",
-        "LoadComposableNodes",
-        "IncludeLaunchDescription",
-        # ROS 2 infrastructure — safe to skip (no nodes/includes produced)
-        "LogInfo",
-        "RegisterEventHandler",
-        "EmitEvent",
-        "Shutdown",
-        "ExecuteProcess",
-        "DeclareLaunchArgument",
-        "SetLaunchConfiguration",
-        "SetParameter",
-        "PushRosNamespace",
-        "ResetLaunchConfigurations",
-        "AppendEnvironmentVariable",
-        "SetEnvironmentVariable",
-        "UnsetEnvironmentVariable",
-        "OpaqueCoroutine",
-        "OpaqueFunction",
-        "GroupAction",
-        "TimerAction",
-    }
-)
 
 # ─── Import system patcher (extracted to entities/import_patcher.py) ──────────
 from launch_plus.entities.import_patcher import (  # noqa: E402, F401
@@ -664,7 +513,7 @@ def _resolve_file_impl(
         if isinstance(entity, DeclareLaunchArgument):
             _apply_declared_arg(entity, ctx)
 
-    resolved = _walk_actions(state, entities, ctx)
+    resolved = _execute_actions(entities, ctx)
 
     return _tracked_to_parsed_launch_file(state.tracked), resolved
 

@@ -17,8 +17,9 @@ logger = logging.getLogger("launch_plus")
 class GroupAction(Action):
     """Groups child actions with optional scoped launch_configurations and environment.
 
-    Matching official ``GroupAction``: push/pop launch_configurations and
-    environment when ``scoped=True``.
+    Children can be Entity objects (from XML parse), Action objects (from Python
+    shim), or real ROS 2 objects (from OpaqueFunction). All are handled uniformly
+    at execute time.
     """
 
     @classmethod
@@ -33,47 +34,45 @@ class GroupAction(Action):
         else:
             scoped = str(scoped_raw).lower() not in ("false", "0", "no")
         return cls(
+            actions=list(entity.children),
             scoped=scoped,
-            _xml_children=list(entity.children),
-            _xml_include_stack=list(parser.include_stack),
+            _include_stack=list(parser.include_stack),
         )
 
     def __init__(self, actions=None, **kwargs):
-        self._actions = list(actions or [])
-        self._scoped = kwargs.get("scoped", True)
-        self._condition = kwargs.get("condition")
-        # XML path: child entities to parse at execute time
-        self._xml_children = kwargs.get("_xml_children")
-        self._xml_include_stack = kwargs.get("_xml_include_stack")
+        self.actions: list = list(actions or [])
+        self.scoped: bool = kwargs.get("scoped", True)
+        self.condition = kwargs.get("condition")
+        self._include_stack: list = kwargs.get("_include_stack", [])
 
     def execute(self, context) -> list:
-        """Execute group: push/pop scope around children.
-
-        Handles both XML children (Entity objects parsed at execute time)
-        and shim children (Action objects from Python import-patching).
-        """
-        if self._condition is not None and context is not None:
+        """Execute group: push/pop scope, execute children, return results."""
+        if self.condition is not None and context is not None:
             try:
-                if not self._condition.evaluate(context):
+                if not self.condition.evaluate(context):
                     return []
             except Exception as e:
                 logger.warning("GroupAction condition evaluation failed: %s", e)
                 return []
 
-        if self._scoped:
+        if self.scoped:
             context._push_launch_configurations()
             context._push_environment()
         results: list = []
         try:
-            if self._xml_children:
-                for child in self._xml_children:
-                    results.extend(
-                        _R._resolve_element(child, context, self._xml_include_stack or [])
-                    )
-            if self._actions:
-                results.extend(_R._walk_actions(context._state, self._actions, context))
+            for child in self.actions:
+                if child is None:
+                    continue
+                if isinstance(child, Entity):
+                    results.extend(_R._resolve_element(child, context, self._include_stack))
+                elif isinstance(child, Action):
+                    children = child.execute(context)
+                    if children:
+                        results.extend(children)
+                else:
+                    _R._walk_untracked_action(context._state, child, context)
         finally:
-            if self._scoped:
+            if self.scoped:
                 context._pop_environment()
                 context._pop_launch_configurations()
 
@@ -81,10 +80,7 @@ class GroupAction(Action):
 
 
 class OpaqueFunction(Action):
-    """Stores an OpaqueFunction's callable so the walker can invoke it.
-
-    Walks returned actions internally rather than deferring to the parent walker.
-    """
+    """Stores an OpaqueFunction's callable so the walker can invoke it."""
 
     def __init__(self, *, function=None, **kwargs):
         self.function = function
@@ -110,7 +106,7 @@ class TimerAction(Action):
     """
 
     def __init__(self, *, period=None, actions=None, **kwargs):
-        self._actions = list(actions or [])
+        self.actions: list = list(actions or [])
 
     def execute(self, context) -> list:
         logger.error(

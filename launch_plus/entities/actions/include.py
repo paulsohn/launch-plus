@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 
-import launch_plus.resolver as _R
 from launch_plus.entities.action import Action
 from launch_plus.entities.actions.marker import EndSourceMarker, SourceMarker
 from launch_plus.entities.expose import expose_action
@@ -22,7 +21,11 @@ logger = logging.getLogger("launch_plus")
 
 @expose_action("include")
 class IncludeLaunchDescription(Action):
-    """Tracks IncludeLaunchDescription for both XML and Python shim paths."""
+    """Include another launch file — XML, YAML, or Python.
+
+    Handles both XML parse path (``file=`` attribute with substitution tokens)
+    and Python shim path (``launch_description_source`` object).
+    """
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
@@ -30,149 +33,149 @@ class IncludeLaunchDescription(Action):
             return None
         raw_file = entity.get_attr("file", optional=True) or ""
         file_tokens = parser.parse_substitution(raw_file)
-        # Extract raw <arg> children (name → value_tokens pairs)
         arg_items = entity.get_attr("arg", data_type=list, optional=True) or []
-        xml_args = []
+        args = []
         for a in arg_items:
             arg_name = a.get_attr("name", optional=True) or ""
             arg_value = a.get_attr("value", optional=True)
             if arg_value is not None:
-                xml_args.append((arg_name, parser.parse_substitution(arg_value)))
+                args.append((arg_name, parser.parse_substitution(arg_value)))
         return cls(
             launch_description_source=None,
-            _xml_file_tokens=file_tokens,
-            _xml_raw_file=raw_file,
-            _xml_args=xml_args,
-            _xml_include_stack=list(parser.include_stack),
-            _xml_ctx=parser.ctx,
+            file_tokens=file_tokens,
+            raw_file=raw_file,
+            launch_arguments=args,
+            include_stack=list(parser.include_stack),
         )
 
-    def __init__(self, launch_description_source, launch_arguments=None, **kwargs):
-        self._source = launch_description_source
-        self._raw_launch_arguments = launch_arguments
-        # XML path data
-        self._xml_file_tokens = kwargs.get("_xml_file_tokens")
-        self._xml_raw_file = kwargs.get("_xml_raw_file")
-        self._xml_args = kwargs.get("_xml_args")
-        self._xml_include_stack = kwargs.get("_xml_include_stack")
-        self._xml_ctx = kwargs.get("_xml_ctx")
-        # Python shim path — path resolved lazily in _execute_shim()
-        # Only set if it's a plain string (no substitutions to resolve)
-        self._path = None
+    def __init__(self, launch_description_source=None, launch_arguments=None, **kwargs):
+        self.source = launch_description_source
+        self.launch_arguments = launch_arguments
+        self.file_tokens = kwargs.get("file_tokens")
+        self.raw_file: str = kwargs.get("raw_file", "")
+        self.include_stack: list = kwargs.get("include_stack", [])
+        # Lazily resolved path (for Python shim sources)
+        self.path: str | None = None
         if launch_description_source is not None:
             loc = getattr(launch_description_source, "_location", None)
             if isinstance(loc, str):
-                self._path = loc
-        self._dep_idx = -1
+                self.path = loc
 
     def execute(self, context) -> list:
-        if self._xml_file_tokens is not None:
-            return self._execute_xml(context)
-        return self._execute_shim(context)
-
-    def _execute_xml(self, ctx) -> list:
-        """Execute for XML path: resolve file, return resolved actions with markers."""
-        from launch_plus.entities.helpers import resolve_value
+        """Resolve the included file and return resolved actions wrapped with markers."""
         from launch_plus.resolver import resolve_included_file
 
-        file_path = resolve_value(self._xml_file_tokens, ctx) or ""
+        state = context._state
 
+        # Step 1: Resolve file path
+        file_path = self._resolve_file_path(context)
+        if not file_path:
+            return []
+
+        # Step 2: Validate
+        if file_path in self.include_stack:
+            logger.error("circular include detected: %s", file_path)
+            return []
+        if len(self.include_stack) > 20:
+            logger.warning("max include depth exceeded for %s", file_path)
+            return []
+
+        # Step 3: Check unportable paths (XML path only)
         if (
-            ctx._state.preview_mode
+            self.raw_file
+            and state.preview_mode
             and os.path.isabs(file_path)
-            and "$(find-pkg-share" not in (self._xml_raw_file or "")
-            and "$(dirname)" not in (self._xml_raw_file or "")
+            and "$(find-pkg-share" not in self.raw_file
+            and "$(dirname)" not in self.raw_file
         ):
-            if ctx._state.allow_unportable_paths:
+            if state.allow_unportable_paths:
                 logger.warning("unportable absolute path in include: %s", file_path)
             else:
                 logger.error("unportable absolute path in include: %s", file_path)
 
-        include_stack = self._xml_include_stack or []
-        if file_path in include_stack:
-            logger.error("circular include detected: %s", file_path)
-            return []
-        if len(include_stack) > 20:
-            logger.warning("max include depth exceeded for %s", file_path)
-            return []
-
-        dep_idx = ctx._state.track_include(
+        # Step 4: Track include
+        dep_idx = state.track_include(
             file_path,
-            ros_namespace=ctx._launch_configurations.get("ros_namespace"),
+            ros_namespace=context._launch_configurations.get("ros_namespace"),
         )
-        saved_lc = dict(ctx._launch_configurations)
-        child_ctx_args: dict[str, str] = {}
-        for arg_name, value_tokens in self._xml_args or []:
-            child_ctx_args[arg_name] = resolve_value(value_tokens, ctx) or ""
-            ctx._launch_configurations[arg_name] = child_ctx_args[arg_name]
-        ctx._launch_configurations.clear()
-        ctx._launch_configurations.update(saved_lc)
-        if dep_idx >= 0 and child_ctx_args:
-            ctx._state.tracked["include_deps"][dep_idx]["include_args"] = child_ctx_args
-        if child_ctx_args:
-            ctx._state.tracked["include_args"][file_path] = child_ctx_args
 
+        # Step 5: Resolve include arguments
+        child_args = self._resolve_args(context, file_path, dep_idx)
+
+        # Step 6: Resolve real filesystem path
         real_path = file_path
         parsed_path = _parse_portable_path(file_path)
         if parsed_path:
             pkg, rest = parsed_path
             try:
-                pkg_share = ctx._state.resolve_pkg_share(pkg)
+                pkg_share = state.resolve_pkg_share(pkg)
                 real_path = os.path.join(pkg_share, rest)
             except Exception:
                 return []
         if not os.path.isfile(real_path):
             return []
 
+        # Step 7: Resolve children
+        children = resolve_included_file(
+            context, self.include_stack, real_path, file_path, child_args
+        )
+
+        # Step 8: Wrap with markers
         inc_dep = _extract_pkg_and_share_path(file_path)
         pkg = inc_dep[0] if inc_dep else ""
         share = inc_dep[1] if inc_dep else file_path
-        children = resolve_included_file(ctx, include_stack, real_path, file_path, child_ctx_args)
-        return _wrap_with_markers(children, pkg, share, child_ctx_args, ctx._state)
+        return _wrap_with_markers(children, pkg, share, child_args, state)
 
-    def _execute_shim(self, context) -> list:
-        """Execute for Python shim path: return resolved actions with markers."""
-        if self._path is None and self._source is not None and context is not None:
-            src = self._source
+    def _resolve_file_path(self, context) -> str | None:
+        """Resolve the file path from tokens (XML) or source object (Python shim)."""
+        from launch_plus.entities.helpers import resolve_value
+
+        # XML path: resolve substitution tokens
+        if self.file_tokens is not None:
+            return resolve_value(self.file_tokens, context) or ""
+
+        # Python shim path: resolve location lazily
+        if self.path is None and self.source is not None and context is not None:
+            src = self.source
             if hasattr(src, "_resolve_location"):
-                self._path = src._resolve_location(context)
+                self.path = src._resolve_location(context)
             elif isinstance(src, Substitution):
                 try:
-                    self._path = src.perform(context)
+                    self.path = src.perform(context)
                 except Exception as e:
                     logger.warning("failed to resolve IncludeLaunchDescription source: %s", e)
 
-        if self._path and self._dep_idx < 0:
-            self._dep_idx = context._state.track_include(
-                self._path,
-                ros_namespace=context._launch_configurations.get("ros_namespace"),
-            )
-            _resolve_include_args(self._path, self._raw_launch_arguments, context, self._dep_idx)
+        return self.path
 
-        if not (self._path and self._path.endswith(".py") and context is not None):
-            return []
+    def _resolve_args(self, context, file_path: str, dep_idx: int) -> dict[str, str]:
+        """Resolve include arguments from tokens (XML) or launch_arguments (Python shim)."""
+        from launch_plus.entities.helpers import resolve_value
 
-        child_args = {}
-        if self._raw_launch_arguments:
-            for k, v in self._raw_launch_arguments:
+        state = context._state
+        child_args: dict[str, str] = {}
+
+        if self.file_tokens is not None:
+            # XML path: resolve tokens sequentially
+            saved_lc = dict(context._launch_configurations)
+            for arg_name, value_tokens in self.launch_arguments or []:
+                child_args[arg_name] = resolve_value(value_tokens, context) or ""
+                context._launch_configurations[arg_name] = child_args[arg_name]
+            context._launch_configurations.clear()
+            context._launch_configurations.update(saved_lc)
+        else:
+            # Python shim path: resolve substitutions
+            for k, v in self.launch_arguments or []:
                 k_str = str(k)
                 resolved = context.perform_substitution(v)
-                v_str = resolved if resolved is not None else str(v)
-                child_args[k_str] = v_str
-        inc_dep = _extract_pkg_and_share_path(self._path)
-        if inc_dep:
-            context._state.include_chain.append(list(inc_dep))
-        else:
-            context._state.include_chain.append(["", self._path])
-        pkg = inc_dep[0] if inc_dep else ""
-        share = inc_dep[1] if inc_dep else self._path
-        try:
-            children = _R._inline_resolve_python_launch(
-                context._state, self._path, context, child_args
-            )
-        finally:
-            context._state.include_chain.pop()
-        return _wrap_with_markers(children, pkg, share, child_args, context._state)
+                child_args[k_str] = resolved if resolved is not None else str(v)
+
+        # Record args for --show-args
+        if dep_idx >= 0 and child_args:
+            state.tracked["include_deps"][dep_idx]["include_args"] = child_args
+        if child_args:
+            state.tracked["include_args"][file_path] = child_args
+
+        return child_args
 
 
 def _wrap_with_markers(children, pkg, share, args, state) -> list:
@@ -184,48 +187,4 @@ def _wrap_with_markers(children, pkg, share, args, state) -> list:
     has_content = any(not isinstance(c, (SourceMarker, EndSourceMarker)) for c in children)
     if has_content or state.show_empty_includes:
         return [SourceMarker(pkg, share, args), *children, EndSourceMarker(pkg, share)]
-    return list(children)  # pass through nested markers (if any) without wrapping
-
-
-def _resolve_include_args(path, launch_arguments, context, dep_idx=-1):
-    """Capture launch_arguments for an include site."""
-    if not launch_arguments or not path:
-        return
-    state = context._state
-    path = str(path)
-    if dep_idx >= 0 and state.tracked["include_deps"][dep_idx].get("include_args"):
-        return
-    if dep_idx < 0 and path in state.tracked["include_args"]:
-        return
-    try:
-        captured = {}
-        for k, v in launch_arguments:
-            k_str = str(k)
-            if isinstance(v, list):
-                parts = []
-                for sub in v:
-                    if isinstance(sub, Substitution):
-                        try:
-                            result = sub.perform(context)
-                            parts.append(str(result) if result is not None else str(sub))
-                        except Exception:
-                            parts.append(str(sub))
-                    else:
-                        parts.append(str(sub))
-                v_str = "".join(parts)
-            elif isinstance(v, Substitution):
-                try:
-                    result = v.perform(context)
-                    v_str = str(result) if result is not None else str(v)
-                except Exception:
-                    v_str = str(v)
-            else:
-                v_str = str(v)
-            captured[k_str] = v_str
-        if captured:
-            if dep_idx >= 0:
-                state.tracked["include_deps"][dep_idx]["include_args"] = captured
-            else:
-                state.tracked["include_args"][path] = captured
-    except Exception as e:
-        logger.warning("failed to resolve include args for '%s': %s", path, e)
+    return list(children)

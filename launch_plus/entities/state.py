@@ -64,7 +64,6 @@ class ResolverState:
             "set_launch_configurations": {},
             "include_deps": [],
             "param_file_deps": [],
-            "event_handlers": [],
         }
         self.resolved_actions: list = []  # Actions with serialize_resolved()
         self.declared_arg_names: set = set()
@@ -108,10 +107,6 @@ class ResolverState:
             pkg, path = self.include_chain[-1]
             return f"{pkg}://{path}" if pkg else path
         return str(self.root_source_key)
-
-    def track_event_handler(self, eh_dict: dict) -> None:
-        """Record an event handler for dependency tracking."""
-        self.tracked["event_handlers"].append(eh_dict)
 
     def track_include(self, path, *, ros_namespace=None) -> int:
         """Record an included file for dependency tracking. Returns dep index."""

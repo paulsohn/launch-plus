@@ -546,7 +546,6 @@ def _resolve_file_impl(
     state.tracked["set_launch_configurations"] = {}
     state.tracked["include_deps"] = []
     state.tracked["param_file_deps"] = []
-    state.tracked["event_handlers"] = []
 
     # Workflow flags
     if workflow_options is not None:

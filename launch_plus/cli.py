@@ -936,7 +936,7 @@ def _cmd_resolve(
         xml = render_resolved_xml(
             package,
             launcher,
-            result.resolved_actions,
+            result.actions,
             show_args=show_args,
             initial_args=result.initial_args,
         )

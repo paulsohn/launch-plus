@@ -80,7 +80,7 @@ class ResolveResult:
     declared_args_by_file: dict[tuple[str, Path], dict[str, str]] = field(default_factory=dict)
     global_params: list[list] = field(default_factory=list)
     initial_args: dict[str, str] = field(default_factory=dict)
-    resolved_actions: list = field(default_factory=list)
+    actions: list = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -152,8 +152,6 @@ def _process_parsed_file(
 
     result.global_params.extend(parsed.global_params)
     result.parsed_files.append(file_path)
-
-    result.resolved_actions.extend(parsed.resolved_actions)
 
     # Store declared args for --show-args
     root_key = (package, share_path)
@@ -257,7 +255,7 @@ def _resolve_python_file_recursive(
     from launch_plus.resolver import resolve_file as _py_resolve_file
 
     try:
-        parsed = _py_resolve_file(
+        parsed, actions = _py_resolve_file(
             launch_file=file_path,
             args=initial_args,
             package_shares=package_shares,
@@ -272,6 +270,7 @@ def _resolve_python_file_recursive(
         return
 
     _process_parsed_file(parsed, package, share_path, file_path, result)
+    result.actions.extend(actions)
 
 
 # ---------------------------------------------------------------------------

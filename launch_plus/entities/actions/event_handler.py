@@ -82,9 +82,9 @@ class EventHandler(Action):
     def execute(self, context) -> list:
         from launch_plus.entities.helpers import resolve_value
 
-        resolved_actions: list[dict] = []
+        child_actions: list[dict] = []
         for ce in self.child_events:
-            resolved_actions.append(
+            child_actions.append(
                 {
                     "event": resolve_value(ce["event"], context) or "",
                     "target_node": resolve_value(ce["target_node"], context),
@@ -98,7 +98,7 @@ class EventHandler(Action):
         resolved.start_state = resolve_value(self.start_state, context)
         resolved.goal_state = resolve_value(self.goal_state, context)
         resolved.namespace = resolve_value(self.namespace, context)
-        resolved.actions = resolved_actions
+        resolved.actions = child_actions
         return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:

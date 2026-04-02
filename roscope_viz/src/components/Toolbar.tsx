@@ -9,24 +9,6 @@ export function Toolbar({ cyRef }: Props) {
     cyRef.current?.fit(undefined, 40);
   };
 
-  const handleCollapseAll = () => {
-    const cy = cyRef.current;
-    if (!cy) return;
-    cy.nodes('[type="group"]').forEach((g) => {
-      g.data("_expanded", true);
-      (g.children() as unknown as { hide(): void }).hide();
-    });
-  };
-
-  const handleExpandAll = () => {
-    const cy = cyRef.current;
-    if (!cy) return;
-    cy.nodes('[type="group"]').forEach((g) => {
-      g.data("_expanded", false);
-      (g.children() as unknown as { show(): void }).show();
-    });
-  };
-
   const handleSearch = (query: string) => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -67,12 +49,6 @@ export function Toolbar({ cyRef }: Props) {
       />
       <button onClick={handleFit} title="Fit to viewport">
         Fit
-      </button>
-      <button onClick={handleCollapseAll} title="Collapse all groups">
-        Collapse All
-      </button>
-      <button onClick={handleExpandAll} title="Expand all groups">
-        Expand All
       </button>
     </div>
   );

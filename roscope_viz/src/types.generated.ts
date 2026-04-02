@@ -12,6 +12,12 @@ export interface RemapEntry {
   to: string;
 }
 
+export interface ArgEntry {
+  name: string;
+  value: string;
+  isDefault: boolean;
+}
+
 export interface GraphNode {
   id: string;
   type: "node" | "lifecycle_node" | "container" | "composable_node" | "load_composable_node" | "executable";
@@ -33,6 +39,9 @@ export interface GraphGroup {
   id: string;
   source?: string | null;
   parent?: string | null;
+  groupType: "include" | "lcn_wrapper";
+  args: ArgEntry[];
+  includeArgs?: Record<string, string> | null;
 }
 
 export interface GraphTopic {

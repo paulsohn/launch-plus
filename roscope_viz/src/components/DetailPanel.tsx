@@ -1,4 +1,4 @@
-import type { ParamEntry, RemapEntry } from "../types.generated";
+import type { ArgEntry, ParamEntry, RemapEntry } from "../types.generated";
 
 interface NodeDetail {
   type?: string;
@@ -11,8 +11,11 @@ interface NodeDetail {
   cmd?: string;
   target?: string;
   fullName?: string;
+  source?: string;
   params?: ParamEntry[];
   remaps?: RemapEntry[];
+  args?: ArgEntry[];
+  includeArgs?: Record<string, string> | null;
 }
 
 interface Props {
@@ -23,12 +26,15 @@ interface Props {
 export function DetailPanel({ detail, onClose }: Props) {
   if (!detail) return null;
 
+  const title =
+    detail.type === "group"
+      ? detail.source || "Group"
+      : detail.fqn || detail.fullName || detail.name || "Vertex";
+
   return (
     <div id="detail-panel">
       <div id="detail-header">
-        <span id="detail-title">
-          {detail.fqn || detail.fullName || detail.name || "Node"}
-        </span>
+        <span id="detail-title">{title}</span>
         <button id="detail-close" onClick={onClose}>
           &times;
         </button>
@@ -36,6 +42,7 @@ export function DetailPanel({ detail, onClose }: Props) {
       <div id="detail-body">
         <h3>Info</h3>
         {detail.type && <Field label="Type" value={detail.type} />}
+        {detail.source && <Field label="Source" value={detail.source} />}
         {detail.package && <Field label="Package" value={detail.package} />}
         {detail.executable && (
           <Field label="Executable" value={detail.executable} />
@@ -49,6 +56,54 @@ export function DetailPanel({ detail, onClose }: Props) {
         {detail.cmd && <Field label="Command" value={detail.cmd} />}
         {detail.target && <Field label="Target" value={detail.target} />}
         {detail.fullName && <Field label="Topic" value={detail.fullName} />}
+
+        {detail.includeArgs && Object.keys(detail.includeArgs).length > 0 && (
+          <>
+            <h3>Include Args ({Object.keys(detail.includeArgs).length})</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(detail.includeArgs).map(([k, v]) => (
+                  <tr key={k}>
+                    <td>{k}</td>
+                    <td>{v}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {detail.args && detail.args.length > 0 && (
+          <>
+            <h3>Declared Args ({detail.args.length})</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Value</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.args.map((a, i) => (
+                  <tr key={i}>
+                    <td>{a.name}</td>
+                    <td>{a.value}</td>
+                    <td className="arg-badge">
+                      {a.isDefault ? "default" : "set"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
 
         {detail.params && detail.params.length > 0 && (
           <>

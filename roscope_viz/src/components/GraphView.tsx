@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import cytoscape from "cytoscape";
 import type { GraphData } from "../types.generated";
 import { buildElements } from "../graph-elements";
+import { compoundLayout } from "../layout/compound-layout";
 
 /** Cytoscape style definitions */
 const cyStyles: cytoscape.StylesheetStyle[] = [
@@ -26,6 +27,24 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       color: "#8888aa",
       "text-margin-y": 8,
       padding: "16px",
+      "text-wrap": "wrap",
+    },
+  },
+  {
+    selector: 'node[type="lcn_wrapper"]',
+    style: {
+      shape: "round-rectangle",
+      "background-color": "rgba(93, 173, 226, 0.08)",
+      "border-color": "#5dade2",
+      "border-width": 1,
+      "border-style": "dashed",
+      label: "data(label)",
+      "text-valign": "top",
+      "text-halign": "center",
+      "font-size": "9px",
+      color: "#5dade2",
+      "text-margin-y": 6,
+      padding: "12px",
       "text-wrap": "wrap",
     },
   },
@@ -87,19 +106,18 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
   {
     selector: 'node[type="load_composable_node"]',
     style: {
-      shape: "round-rectangle",
-      "background-color": "rgba(93, 173, 226, 0.15)",
+      shape: "ellipse",
+      "background-color": "transparent",
       "border-color": "#5dade2",
       "border-width": 2,
       "border-style": "dashed",
       label: "data(label)",
-      "text-valign": "top",
+      "text-valign": "center",
       "text-halign": "center",
-      "font-size": "10px",
+      "font-size": "9px",
       color: "#5dade2",
-      "text-margin-y": 8,
-      padding: "10px",
-      "text-wrap": "wrap",
+      width: 24,
+      height: 24,
     },
   },
   {
@@ -166,6 +184,10 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
     style: { "border-color": "#e94560", "border-width": 3 },
   },
   {
+    selector: "edge.highlighted",
+    style: { opacity: 1, width: 3, "line-color": "#e94560" },
+  },
+  {
     selector: "node.faded",
     style: { opacity: 0.2 },
   },
@@ -206,39 +228,55 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
 
     cyRef.current = cy;
 
-    // Use grid layout as a baseline — places every non-compound
-    // node in a grid so nothing overlaps.
+    // Custom compound-aware layout: positions children inside parents
     setLoading(true);
-    cy.layout({
-      name: "grid",
-      fit: true,
-      padding: 40,
-      avoidOverlap: true,
-      condense: true,
-      nodeDimensionsIncludeLabels: true,
-    } as cytoscape.LayoutOptions).run();
+    compoundLayout(cy);
+
+    // Lock compound node dimensions so they don't auto-resize
+    cy.nodes()
+      .filter((n) => n.isParent())
+      .forEach((n) => {
+        const bb = n.boundingBox();
+        n.style({ width: bb.w, height: bb.h });
+      });
+
+    cy.fit(undefined, 40);
     setLoading(false);
 
-    // Event handlers
+    // Event handlers — single tap selects + highlights connected elements
     cy.on("tap", "node", (evt) => {
-      const d = evt.target.data();
-      if (d.type === "group") return;
-      onNodeTap(d);
+      const tapped = evt.target;
+      onNodeTap(tapped.data());
+
+      // Highlight tapped node and its connected elements
+      cy.elements().removeClass("highlighted").addClass("faded");
+      tapped.removeClass("faded").addClass("highlighted");
+      const edges = tapped.connectedEdges();
+      edges.removeClass("faded").addClass("highlighted");
+      edges.connectedNodes().removeClass("faded").addClass("highlighted");
+      // Keep ancestor compounds visible
+      tapped.ancestors().removeClass("faded");
+      edges.connectedNodes().ancestors().removeClass("faded");
     });
 
     cy.on("tap", (evt) => {
-      if (evt.target === cy) onBackgroundTap();
+      if (evt.target === cy) {
+        cy.elements().removeClass("highlighted faded");
+        onBackgroundTap();
+      }
     });
 
-    // Double-click group to toggle collapse
-    cy.on("dblclick", 'node[type="group"]', (evt) => {
+    // Double-click compound node to toggle content visibility
+    cy.on("dblclick", "node", (evt) => {
       const node = evt.target;
-      const expanded = !node.data("_expanded");
-      node.data("_expanded", expanded);
-      if (expanded) {
-        node.children().hide();
+      if (!node.isParent()) return;
+      const collapsed = node.data("_collapsed");
+      if (collapsed) {
+        node.children().style({ opacity: 1, events: "yes" });
+        node.data("_collapsed", false);
       } else {
-        node.children().show();
+        node.children().style({ opacity: 0, events: "no" });
+        node.data("_collapsed", true);
       }
     });
 

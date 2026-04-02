@@ -147,6 +147,12 @@ body {
   font-weight: 500;
 }
 
+.arg-badge {
+  font-size: 10px;
+  color: #8888aa;
+  font-style: italic;
+}
+
 /* Loading overlay */
 .loading-overlay {
   position: fixed;

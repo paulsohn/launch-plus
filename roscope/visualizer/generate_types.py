@@ -109,6 +109,7 @@ def generate() -> str:
     ordered: list[type] = [
         schema.ParamEntry,
         schema.RemapEntry,
+        schema.ArgEntry,
         schema.GraphNode,
         schema.GraphGroup,
         schema.GraphTopic,

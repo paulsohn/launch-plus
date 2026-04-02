@@ -51,10 +51,20 @@ class GraphNode:
 
 
 @dataclass
+class ArgEntry:
+    name: str
+    value: str
+    is_default: bool
+
+
+@dataclass
 class GraphGroup:
     id: str
     source: str | None
     parent: str | None
+    group_type: Literal["include", "lcn_wrapper"] = "include"
+    args: list[ArgEntry] = field(default_factory=list)
+    include_args: dict[str, str] | None = None
 
 
 @dataclass

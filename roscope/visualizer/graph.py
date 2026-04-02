@@ -41,6 +41,8 @@ class _GraphBuilder:
         # For resolving LoadComposableNodes targets
         self._containers: dict[str, str] = {}  # container FQN/name -> node_id
         self._pending_load_targets: list[tuple[str, str]] = []  # (lcn_id, target_name)
+        # Deferred composable node children: (lcn_id, target_name, desc, fallback_parent)
+        self._pending_composable_children: list[tuple[str, str, object, str | None]] = []
 
         self._uid_counters: dict[str, int] = {}
 
@@ -96,7 +98,7 @@ class _GraphBuilder:
                 self._handle_executable(action, parent_id)
 
     def _handle_group(self, action, parent_id: str | None) -> None:
-        from roscope.entities.actions.marker import SourceMarker
+        from roscope.entities.actions.marker import ArgComment, SourceMarker
 
         children = action.resolved_children or []
         if not children:
@@ -107,6 +109,18 @@ class _GraphBuilder:
         if children and isinstance(children[0], SourceMarker):
             source = children[0].label()
 
+        # Collect ArgComment entries from children
+        args = []
+        for child in children:
+            if isinstance(child, ArgComment):
+                args.append(
+                    {"name": child.name, "value": child.value, "is_default": child.is_default}
+                )
+
+        # Capture include_args from the first-child SourceMarker
+        first = children[0] if children else None
+        include_args = dict(first.include_args) if isinstance(first, SourceMarker) else None
+
         gid = self._uid("group", source or "")
 
         self._groups.append(
@@ -114,6 +128,8 @@ class _GraphBuilder:
                 "id": gid,
                 "source": source,
                 "parent": parent_id,
+                "args": args,
+                "include_args": include_args,
             }
         )
 
@@ -122,9 +138,10 @@ class _GraphBuilder:
     def _handle_node(self, action, parent_id: str | None) -> None:
         if not action.package:
             return
-        ns = action.namespace or ""
-        name = action.name or ""
-        fqn = f"{ns.rstrip('/')}/{name}" if ns else name
+        ns = action.namespace or "/"
+        # Fallback to executable is best-effort; users should set name= explicitly.
+        name = action.name or action.executable or ""
+        fqn = f"{ns.rstrip('/')}/{name}"
         nid = self._uid("node", action.package, fqn)
 
         node_entry = {
@@ -146,9 +163,10 @@ class _GraphBuilder:
     def _handle_container(self, action, parent_id: str | None) -> None:
         if not action.package:
             return
-        ns = action.namespace or ""
-        name = action.name or ""
-        fqn = f"{ns.rstrip('/')}/{name}" if ns else name
+        ns = action.namespace or "/"
+        # Fallback to executable is best-effort; users should set name= explicitly.
+        name = action.name or action.executable or ""
+        fqn = f"{ns.rstrip('/')}/{name}"
         cid = self._uid("container", action.package, fqn)
 
         container_entry = {
@@ -166,15 +184,8 @@ class _GraphBuilder:
         }
         self._nodes.append(container_entry)
 
-        # Register for LoadComposableNodes target resolution
-        # Register both with and without leading slash for flexible matching
+        # Register for LoadComposableNodes target resolution (exact FQN match)
         self._containers[fqn] = cid
-        if name:
-            self._containers[name] = cid
-        if fqn.startswith("/"):
-            self._containers[fqn.lstrip("/")] = cid
-        else:
-            self._containers["/" + fqn] = cid
 
         # Add composable node children
         for desc in action.composable_node_descriptions or []:
@@ -187,6 +198,8 @@ class _GraphBuilder:
         pkg = data.get("package", "")
         plugin = data.get("plugin", "")
         cname = data.get("name", "")
+        cns = data.get("namespace", "/") or "/"
+        cfqn = f"{cns.rstrip('/')}/{cname}" if cname else cns
         cnid = self._uid("composable", parent_id, plugin, cname)
         node_entry = {
             "id": cnid,
@@ -194,8 +207,8 @@ class _GraphBuilder:
             "package": pkg,
             "plugin": plugin,
             "name": cname,
-            "namespace": "",
-            "fqn": cname,
+            "namespace": cns,
+            "fqn": cfqn,
             "parent": parent_id,
             "color": self._package_color(pkg),
             "params": [
@@ -234,9 +247,10 @@ class _GraphBuilder:
         # Defer target resolution (container may not exist yet)
         self._pending_load_targets.append((lcn_id, action.target))
 
-        # Add composable node children inside the LCN compound node
+        # Defer composable node children — they will be placed inside a
+        # wrapper group in the resolved target container.
         for desc in action.composable_node_descriptions or []:
-            self._handle_composable_node(desc, parent_id=lcn_id)
+            self._pending_composable_children.append((lcn_id, action.target, desc, parent_id))
 
     def _handle_executable(self, action, parent_id: str | None) -> None:
         cmd = action.cmd if isinstance(action.cmd, str) else ""
@@ -258,21 +272,50 @@ class _GraphBuilder:
         )
 
     def resolve_load_targets(self) -> None:
-        """Second pass: resolve LCN target names to container IDs."""
-        for lcn_id, target_name in self._pending_load_targets:
-            container_id = self._containers.get(target_name)
-            if container_id is None:
-                # Try stripping/adding leading slash
-                alt = target_name.lstrip("/") if target_name.startswith("/") else "/" + target_name
-                container_id = self._containers.get(alt)
+        """Second pass: resolve LCN targets, create wrapper groups inside containers."""
+        from collections import defaultdict
 
+        # Group deferred composable children by lcn_id
+        lcn_groups: dict[str, list[tuple[str, object, str | None]]] = defaultdict(list)
+        for lcn_id, target_name, desc, fallback_parent in self._pending_composable_children:
+            lcn_groups[lcn_id].append((target_name, desc, fallback_parent))
+
+        # LCN ids that have children (will get a wrapper + edge to wrapper)
+        lcn_with_children: set[str] = set()
+
+        for lcn_id, children in lcn_groups.items():
+            target_name = children[0][0]
+            fallback_parent = children[0][2]
+            container_id = self._containers.get(target_name)
+            actual_parent = container_id or fallback_parent or ""
+
+            # Create a wrapper group inside the container for this LCN
+            wrapper_id = self._uid("lcn_wrapper", lcn_id)
+            self._groups.append(
+                {
+                    "id": wrapper_id,
+                    "source": None,
+                    "parent": actual_parent,
+                    "group_type": "lcn_wrapper",
+                    "args": [],
+                    "include_args": None,
+                }
+            )
+            # Edge from the LCN leaf node to the wrapper inside the container
+            self._edges.append({"source": lcn_id, "target": wrapper_id, "type": "load_target"})
+            lcn_with_children.add(lcn_id)
+
+            for _target, desc, _fallback in children:
+                self._handle_composable_node(desc, parent_id=wrapper_id)
+
+        # LCN nodes without children: edge directly to container
+        for lcn_id, target_name in self._pending_load_targets:
+            if lcn_id in lcn_with_children:
+                continue
+            container_id = self._containers.get(target_name)
             if container_id:
                 self._edges.append(
-                    {
-                        "source": lcn_id,
-                        "target": container_id,
-                        "type": "load_target",
-                    }
+                    {"source": lcn_id, "target": container_id, "type": "load_target"}
                 )
 
     def _extract_params(self, action) -> list[dict]:

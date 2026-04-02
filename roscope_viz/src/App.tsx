@@ -44,7 +44,10 @@ export function App() {
       />
       <DetailPanel
         detail={detail as Parameters<typeof DetailPanel>[0]["detail"]}
-        onClose={() => setDetail(null)}
+        onClose={() => {
+          setDetail(null);
+          cyRef.current?.elements().removeClass("highlighted faded");
+        }}
       />
     </>
   );

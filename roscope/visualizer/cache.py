@@ -16,9 +16,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_CACHE_ROOT = Path(os.environ.get("LAUNCH_PLUS_VIZ_CACHE", "")) or (
-    Path.home() / ".cache" / "launch-plus-viz"
-)
+_env_cache = os.environ.get("LAUNCH_PLUS_VIZ_CACHE", "")
+_CACHE_ROOT = Path(_env_cache) if _env_cache else (Path.home() / ".cache" / "launch-plus-viz")
 
 
 def cache_root() -> Path:

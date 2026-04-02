@@ -412,7 +412,6 @@ class ComposableNodeContainer(Action):
         self.remappings: list = []
         self.ros_namespace: str | None = None
         self.explicit_namespace: str | None = None
-        self.fqn: str = ""
 
     def execute(self, context) -> list:
         """Resolve substitutions and return a clean resolved Container."""
@@ -449,6 +448,9 @@ class ComposableNodeContainer(Action):
         resolved.env = env
         resolved.composable_node_descriptions = self.composable_node_descriptions
 
+        # Store FQN on the original object for LoadComposableNodes.
+        # Matching official: the container internally stores its fully qualified
+        # node name so that load actions in different scopes can reference it.
         self.fqn = _ros2_namespace_join(resolved.namespace, resolved.name) or ""
 
         return [resolved]
@@ -529,15 +531,20 @@ class LoadComposableNodes(Action):
             if raw_pkg:
                 state.track_package(raw_pkg)
 
+        ns = context.perform_substitution(self.namespace) if self.namespace else None
+        ros_ns = context._launch_configurations.get("ros_namespace")
+
         target = ""
         if self.target_container is not None:
             if isinstance(self.target_container, ComposableNodeContainer):
                 target = getattr(self.target_container, "fqn", "")
             else:
-                target = context.perform_substitution(self.target_container) or ""
-
-        ns = context.perform_substitution(self.namespace) if self.namespace else None
-        ros_ns = context._launch_configurations.get("ros_namespace")
+                raw_target = context.perform_substitution(self.target_container) or ""
+                if raw_target and not raw_target.startswith("/"):
+                    full_ns = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
+                    target = _ros2_namespace_join(full_ns, raw_target) or raw_target
+                else:
+                    target = raw_target
 
         _resolve_plugins(self.composable_node_descriptions, context)
 

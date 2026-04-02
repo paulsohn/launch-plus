@@ -105,7 +105,7 @@ def test_load_composable() -> None:
     resolved = load.execute(ctx)
     xml = render_resolved_xml("p", "l.xml", resolved)
     assert "<load_composable_node" in xml
-    assert 'target="my_container"' in xml
+    assert 'target="/my_container"' in xml
 
 
 # ─── ExecuteProcess rendering ───────────────────────────────────────────────

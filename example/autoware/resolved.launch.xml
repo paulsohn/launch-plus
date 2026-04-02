@@ -1432,7 +1432,7 @@
             <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
             <!-- arg name="use_intra_process" value="true" -->
             <!-- arg name="use_multithread" value="true" -->
-            <load_composable_node target="/sensing/lidar/pointcloud_container">
+            <load_composable_node target="/pointcloud_container">
               <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::PointCloudConcatenateDataSynchronizerComponent" name="concatenate_data" namespace="/sensing/lidar">
                 <!-- params from: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/config/concatenate_and_time_sync_node.param.yaml -->
                 <param name="debug_mode" value="false"/>
@@ -2405,7 +2405,7 @@
         <!-- arg name="use_multithread" value="true" -->
         <!-- arg name="use_single_frame_filter" value="false" -->
         <!-- arg name="use_time_series_filter" value="true" -->
-        <load_composable_node target="/perception/obstacle_segmentation/pointcloud_container">
+        <load_composable_node target="/pointcloud_container">
           <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter" namespace="/perception/obstacle_segmentation">
             <param name="input_frame" value="base_link"/>
             <param name="margin_max_z" value="0.0"/>
@@ -2540,7 +2540,7 @@
               <remap from="~/output/occupancy_grid_map" to="/perception/occupancy_grid_map/map"/>
             </composable_node>
           </node_container>
-          <load_composable_node target="/perception/occupancy_grid_map/pointcloud_container">
+          <load_composable_node target="/pointcloud_container">
             <composable_node pkg="autoware_probabilistic_occupancy_grid_map" plugin="autoware::occupancy_grid_map::PointcloudBasedOccupancyGridMapNode" name="occupancy_grid_map_node" namespace="/perception/occupancy_grid_map">
               <param name="OccupancyGridMapFixedBlindSpot" value="{'distance_margin': 1.0}"/>
               <param name="OccupancyGridMapProjectiveBlindSpot" value="{'projection_dz_threshold': 0.01, 'obstacle_separation_threshold': 1.0, 'pub_debug_grid': False}"/>
@@ -2679,7 +2679,7 @@
             <!-- arg name="output/objects" value="/perception/object_recognition/detection/centerpoint/objects" -->
             <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
             <!-- arg name="use_pointcloud_container" value="true" -->
-            <load_composable_node target="/perception/object_recognition/detection/centerpoint/pointcloud_container">
+            <load_composable_node target="/pointcloud_container">
               <composable_node pkg="autoware_lidar_centerpoint" plugin="autoware::lidar_centerpoint::LidarCenterPointNode" name="lidar_centerpoint" namespace="/perception/object_recognition/detection/centerpoint">
                 <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/lidar_model/centerpoint_tiny.param.yaml -->
                 <param name="encoder_onnx_path" value="{home}/autoware_data/lidar_centerpoint/pts_voxel_encoder_centerpoint_tiny.onnx"/>
@@ -2772,7 +2772,7 @@
                 <param name="wheel_tread" value="1.64"/>
                 <param name="wheel_width" value="0.235"/>
               </node_container>
-              <load_composable_node target="/perception/object_recognition/detection/clustering/pointcloud_container">
+              <load_composable_node target="/pointcloud_container">
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="low_height_crop_box_filter" namespace="/perception/object_recognition/detection/clustering">
                   <param name="input_frame" value="base_link"/>
                   <param name="max_cluster_size" value="3000"/>
@@ -2818,7 +2818,7 @@
                   <remap from="output" to="/perception/object_recognition/detection/clustering/clusters"/>
                 </composable_node>
               </load_composable_node>
-              <load_composable_node target="/perception/object_recognition/detection/clustering/pointcloud_container">
+              <load_composable_node target="/pointcloud_container">
                 <composable_node pkg="autoware_euclidean_cluster" plugin="autoware::euclidean_cluster::VoxelGridBasedEuclideanClusterNode" name="euclidean_cluster" namespace="/perception/object_recognition/detection/clustering">
                   <param name="input_frame" value="base_link"/>
                   <param name="max_cluster_size" value="3000"/>
@@ -2964,7 +2964,7 @@
           <!-- arg name="use_intra_process" value="true" -->
           <!-- arg name="use_multithread" value="true" -->
           <!-- arg name="use_pointcloud_map" value="true" -->
-          <load_composable_node target="/perception/object_recognition/detection/pointcloud_container">
+          <load_composable_node target="/pointcloud_container">
             <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::VoxelGridDownsampleFilterComponent" name="voxel_grid_downsample_filter" namespace="/perception/object_recognition/detection">
               <param name="voxel_size_x" value="0.1"/>
               <param name="voxel_size_y" value="0.1"/>

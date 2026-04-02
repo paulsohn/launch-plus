@@ -537,12 +537,14 @@ class LoadComposableNodes(Action):
         target = ""
         if self.target_container is not None:
             if isinstance(self.target_container, ComposableNodeContainer):
+                # Python shim: container stores its FQN (matching official)
                 target = getattr(self.target_container, "fqn", "")
             else:
                 raw_target = context.perform_substitution(self.target_container) or ""
+                # Non-FQN targets resolve under root namespace (matching official:
+                # create_client uses the launcher node's namespace which is /)
                 if raw_target and not raw_target.startswith("/"):
-                    full_ns = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
-                    target = _ros2_namespace_join(full_ns, raw_target) or raw_target
+                    target = "/" + raw_target
                 else:
                     target = raw_target
 

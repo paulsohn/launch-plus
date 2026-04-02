@@ -45,6 +45,8 @@ roscope = "roscope.cli:main"
 [project.entry-points."ros2cli.command"]
 roscope = "roscope.verb:RoscopeCommand"
 
+[tool.hatch.build.hooks.custom]
+
 [tool.hatch.build.targets.wheel]
 packages = ["roscope"]
 

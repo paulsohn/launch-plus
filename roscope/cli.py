@@ -897,7 +897,7 @@ def _cmd_resolve(
 
     # Visualize mode: open graph in browser instead of printing XML
     if visualize:
-        from launch_plus.visualizer import serve as _visualizer_serve
+        from roscope.visualizer import serve as _visualizer_serve
 
         _visualizer_serve(result.actions, package, launcher)
         return

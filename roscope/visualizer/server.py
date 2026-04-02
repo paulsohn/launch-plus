@@ -1,4 +1,4 @@
-"""Minimal HTTP server for the launch-plus visualizer.
+"""Minimal HTTP server for the roscope visualizer.
 
 Serves the single-page app with graph data embedded as JSON.
 Uses only stdlib — no external dependencies.
@@ -16,11 +16,11 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from importlib.resources import files
 from pathlib import Path
 
-from launch_plus.visualizer.graph import actions_to_graph
+from roscope.visualizer.graph import actions_to_graph
 
 logger = logging.getLogger(__name__)
 
-_STATIC_DIR = Path(str(files("launch_plus.visualizer") / "static"))
+_STATIC_DIR = Path(str(files("roscope.visualizer") / "static"))
 
 
 class _Handler(SimpleHTTPRequestHandler):
@@ -110,7 +110,7 @@ def serve(
     server = HTTPServer(("127.0.0.1", port), handler_class)
     url = f"http://127.0.0.1:{port}"
 
-    print(f"launch-plus visualizer: {url}", file=sys.stderr)
+    print(f"roscope visualizer: {url}", file=sys.stderr)
     print("Press Ctrl+C to stop.", file=sys.stderr)
 
     if open_browser:

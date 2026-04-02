@@ -63,28 +63,23 @@ class _GraphBuilder:
         return f"hsl({hue}, 60%, 70%)"
 
     def walk(self, actions: list, parent_id: str | None) -> None:
-        from launch_plus.entities.actions.executable import ExecuteProcess
-        from launch_plus.entities.actions.group import GroupAction
-        from launch_plus.entities.actions.marker import ArgComment, EndSourceMarker, SourceMarker
-        from launch_plus.entities.actions.node import (
+        from roscope.entities.actions.executable import ExecuteProcess
+        from roscope.entities.actions.group import GroupAction
+        from roscope.entities.actions.marker import ArgComment, SourceMarker
+        from roscope.entities.actions.node import (
             ComposableNodeContainer,
             LoadComposableNodes,
             Node,
         )
 
-        # Track last-seen SourceMarker so the following GroupAction can use it.
-        # Pattern in resolved list: SourceMarker -> GroupAction -> EndSourceMarker
-        pending_source: SourceMarker | None = None
-
+        # SourceMarker is now the first child of the GroupAction (not a sibling).
+        # ArgComment children are also inside the group; skip them at this level.
         for action in actions:
-            if isinstance(action, SourceMarker):
-                pending_source = action
-                continue
-            if isinstance(action, (EndSourceMarker, ArgComment)):
+            if isinstance(action, (SourceMarker, ArgComment)):
                 continue
 
             if isinstance(action, GroupAction):
-                self._handle_group(action, parent_id, pending_source)
+                self._handle_group(action, parent_id)
             elif isinstance(action, ComposableNodeContainer):
                 self._handle_container(action, parent_id)
             elif isinstance(action, LoadComposableNodes):
@@ -94,10 +89,8 @@ class _GraphBuilder:
             elif isinstance(action, ExecuteProcess):
                 self._handle_executable(action, parent_id)
 
-            pending_source = None
-
-    def _handle_group(self, action, parent_id: str | None, sibling_source=None) -> None:
-        from launch_plus.entities.actions.marker import SourceMarker
+    def _handle_group(self, action, parent_id: str | None) -> None:
+        from roscope.entities.actions.marker import SourceMarker
 
         children = action.resolved_children or []
         if not children:
@@ -105,12 +98,9 @@ class _GraphBuilder:
 
         gid = self._next_id("group")
 
-        # Source label: prefer sibling SourceMarker (preceding the group in
-        # the flat list), fall back to first child if it's a SourceMarker.
+        # SourceMarker is the first child of the GroupAction.
         source = None
-        if sibling_source is not None:
-            source = sibling_source.label()
-        elif children and isinstance(children[0], SourceMarker):
+        if children and isinstance(children[0], SourceMarker):
             source = children[0].label()
 
         self._groups.append(

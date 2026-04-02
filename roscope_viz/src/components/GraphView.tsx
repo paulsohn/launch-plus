@@ -1,19 +1,14 @@
 /**
  * Cytoscape.js graph visualization component.
  *
- * Converts GraphData into Cytoscape elements, runs ELK layout,
+ * Converts GraphData into Cytoscape elements, runs cose layout,
  * and handles interaction (click for detail, double-click to collapse groups).
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import cytoscape from "cytoscape";
-import elk from "cytoscape-elk";
-import ELK from "elkjs/lib/elk.bundled.js";
 import type { GraphData } from "../types.generated";
 import { buildElements } from "../graph-elements";
-
-// Register ELK layout
-cytoscape.use(elk as cytoscape.Ext);
 
 /** Cytoscape style definitions */
 const cyStyles: cytoscape.StylesheetStyle[] = [
@@ -41,8 +36,8 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       "background-color": "data(nodeColor)",
       "border-color": "#555",
       "border-width": 1,
-      width: "label",
-      height: "label",
+      "min-width": "40px",
+      "min-height": "20px",
       padding: "8px",
       label: "data(label)",
       "text-valign": "center",
@@ -78,8 +73,8 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       "background-opacity": 0.8,
       "border-color": "#5dade2",
       "border-width": 1,
-      width: "label",
-      height: "label",
+      "min-width": "40px",
+      "min-height": "20px",
       padding: "6px",
       label: "data(label)",
       "text-valign": "center",
@@ -114,8 +109,8 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       "background-color": "data(nodeColor)",
       "border-color": "#555",
       "border-width": 1,
-      width: "label",
-      height: "label",
+      "min-width": "40px",
+      "min-height": "20px",
       padding: "8px",
       label: "data(label)",
       "text-valign": "center",
@@ -132,8 +127,8 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       "background-color": "#e67e22",
       "border-color": "#d35400",
       "border-width": 1,
-      width: "label",
-      height: "label",
+      "min-width": "40px",
+      "min-height": "20px",
       padding: "6px",
       label: "data(label)",
       "text-valign": "center",
@@ -204,40 +199,24 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
       elements,
       style: cyStyles,
       layout: { name: "preset" },
-      wheelSensitivity: 0.3,
+      // Use default wheelSensitivity (1.0)
       minZoom: 0.05,
       maxZoom: 3,
     });
 
     cyRef.current = cy;
 
-    // Run ELK layout
+    // Use grid layout as a baseline — places every non-compound
+    // node in a grid so nothing overlaps.
     setLoading(true);
-    try {
-      cy.layout({
-        name: "elk",
-        elk: new ELK(),
-        elkLayoutOptions: {
-          "elk.algorithm": "layered",
-          "elk.direction": "DOWN",
-          "elk.spacing.nodeNode": "20",
-          "elk.layered.spacing.nodeNodeBetweenLayers": "40",
-          "elk.layered.spacing.edgeNodeBetweenLayers": "20",
-          "elk.padding": "[top=30,left=20,bottom=20,right=20]",
-          "elk.hierarchyHandling": "INCLUDE_CHILDREN",
-        },
-        fit: true,
-        padding: 40,
-      } as cytoscape.LayoutOptions).run();
-    } catch (e) {
-      console.error("ELK layout failed, falling back to cose:", e);
-      cy.layout({
-        name: "cose",
-        animate: false,
-        fit: true,
-        padding: 40,
-      }).run();
-    }
+    cy.layout({
+      name: "grid",
+      fit: true,
+      padding: 40,
+      avoidOverlap: true,
+      condense: true,
+      nodeDimensionsIncludeLabels: true,
+    } as cytoscape.LayoutOptions).run();
     setLoading(false);
 
     // Event handlers

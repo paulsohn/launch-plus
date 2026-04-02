@@ -34,6 +34,8 @@ export function useGraphStore(): GraphStore {
     null,
   );
   const [connected, setConnected] = useState(false);
+  // Fingerprint of the last catalog response — skip setState if unchanged
+  const prevFingerprint = useRef("");
   const prevSnapshotCount = useRef(0);
 
   // Poll /api/catalog
@@ -44,8 +46,19 @@ export function useGraphStore(): GraphStore {
       try {
         const resp = await fetch("/api/catalog");
         if (!resp.ok) return;
-        const data: Record<string, Snapshot[]> = await resp.json();
+        const text = await resp.text();
         if (!active) return;
+
+        // Build a fingerprint from viz-ids + timestamps to avoid
+        // re-rendering when the catalog hasn't changed.
+        const data: Record<string, Snapshot[]> = JSON.parse(text);
+        const fingerprint = Object.entries(data)
+          .flatMap(([vid, snaps]) => snaps.map((s) => `${vid}@${s.timestamp}`))
+          .sort()
+          .join("|");
+
+        if (fingerprint === prevFingerprint.current) return;
+        prevFingerprint.current = fingerprint;
 
         const newCatalog = new Map<string, Snapshot[]>();
         let totalSnapshots = 0;
@@ -59,7 +72,6 @@ export function useGraphStore(): GraphStore {
 
         // Auto-select latest snapshot when new data arrives
         if (totalSnapshots > prevSnapshotCount.current) {
-          // Pick the viz-id with the most recent snapshot
           let latestVizId: string | null = null;
           let latestTs = "";
           for (const [vizId, snapshots] of newCatalog) {

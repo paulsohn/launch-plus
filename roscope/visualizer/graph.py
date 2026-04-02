@@ -42,17 +42,23 @@ class _GraphBuilder:
         self._containers: dict[str, str] = {}  # container FQN/name -> node_id
         self._pending_load_targets: list[tuple[str, str]] = []  # (lcn_id, target_name)
 
-        self._id_counters: dict[str, int] = {}
+        self._uid_counters: dict[str, int] = {}
 
-    def _next_id(self, prefix: str) -> str:
-        count = self._id_counters.get(prefix, 0)
-        self._id_counters[prefix] = count + 1
-        return f"{prefix}-{count}"
+    def _uid(self, *parts: str) -> str:
+        """Build a deterministic, stable ID from identity parts.
+
+        If the same identity appears more than once (e.g. two groups
+        from the same source file), a counter suffix is appended.
+        """
+        base = "/".join(p for p in parts if p)
+        count = self._uid_counters.get(base, 0)
+        self._uid_counters[base] = count + 1
+        return base if count == 0 else f"{base}#{count}"
 
     def _get_or_create_topic(self, topic_name: str) -> str:
         if topic_name in self._topics:
             return self._topics[topic_name]
-        tid = self._next_id("topic")
+        tid = self._uid("topic", topic_name)
         self._topics[topic_name] = tid
         return tid
 
@@ -96,12 +102,12 @@ class _GraphBuilder:
         if not children:
             return
 
-        gid = self._next_id("group")
-
         # SourceMarker is the first child of the GroupAction.
         source = None
         if children and isinstance(children[0], SourceMarker):
             source = children[0].label()
+
+        gid = self._uid("group", source or "")
 
         self._groups.append(
             {
@@ -116,10 +122,10 @@ class _GraphBuilder:
     def _handle_node(self, action, parent_id: str | None) -> None:
         if not action.package:
             return
-        nid = self._next_id("node")
         ns = action.namespace or ""
         name = action.name or ""
         fqn = f"{ns.rstrip('/')}/{name}" if ns else name
+        nid = self._uid("node", action.package, fqn)
 
         node_entry = {
             "id": nid,
@@ -140,10 +146,10 @@ class _GraphBuilder:
     def _handle_container(self, action, parent_id: str | None) -> None:
         if not action.package:
             return
-        cid = self._next_id("container")
         ns = action.namespace or ""
         name = action.name or ""
         fqn = f"{ns.rstrip('/')}/{name}" if ns else name
+        cid = self._uid("container", action.package, fqn)
 
         container_entry = {
             "id": cid,
@@ -178,17 +184,20 @@ class _GraphBuilder:
         data = getattr(desc, "_resolved_data", None)
         if data is None:
             return
-        cnid = self._next_id("composable")
+        pkg = data.get("package", "")
+        plugin = data.get("plugin", "")
+        cname = data.get("name", "")
+        cnid = self._uid("composable", parent_id, plugin, cname)
         node_entry = {
             "id": cnid,
             "type": "composable_node",
-            "package": data.get("package", ""),
-            "plugin": data.get("plugin", ""),
-            "name": data.get("name", ""),
+            "package": pkg,
+            "plugin": plugin,
+            "name": cname,
             "namespace": "",
-            "fqn": data.get("name", ""),
+            "fqn": cname,
             "parent": parent_id,
-            "color": self._package_color(data.get("package", "")),
+            "color": self._package_color(pkg),
             "params": [
                 {"name": k, "value": v} for k, v in sorted(data.get("parameters", {}).items())
             ],
@@ -208,7 +217,7 @@ class _GraphBuilder:
         if not action.target:
             return
 
-        lcn_id = self._next_id("lcn")
+        lcn_id = self._uid("lcn", action.target, action.namespace or "")
         self._nodes.append(
             {
                 "id": lcn_id,
@@ -233,8 +242,8 @@ class _GraphBuilder:
         cmd = action.cmd if isinstance(action.cmd, str) else ""
         if not cmd:
             return
-        eid = self._next_id("exec")
         name = action.name if isinstance(action.name, str) else ""
+        eid = self._uid("exec", name or cmd.split()[0] if cmd else "")
         self._nodes.append(
             {
                 "id": eid,

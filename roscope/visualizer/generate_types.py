@@ -103,12 +103,6 @@ def _emit_interface(cls: type, *, indent: str = "  ") -> str:
     return "\n".join(lines)
 
 
-def _emit_union(name: str, members: tuple[type, ...], discriminant: str = "type") -> str:
-    """Emit a TypeScript discriminated union type."""
-    parts = [m.__name__ for m in members]
-    return f"export type {name} =\n  | " + "\n  | ".join(parts) + ";"
-
-
 def generate() -> str:
     """Generate the full TypeScript file content."""
     # Collect all dataclasses in dependency order
@@ -122,10 +116,6 @@ def generate() -> str:
         schema.GraphMetadata,
         schema.GraphData,
         schema.Snapshot,
-        schema.CatalogMessage,
-        schema.SnapshotMessage,
-        schema.RemovedMessage,
-        schema.RemoveRequest,
     ]
 
     parts: list[str] = [
@@ -137,14 +127,6 @@ def generate() -> str:
     for cls in ordered:
         parts.append(_emit_interface(cls))
         parts.append("")
-
-    # Discriminated unions
-    parts.append("/** WebSocket protocol: server -> client */")
-    parts.append(_emit_union("ServerMessage", schema.SERVER_MESSAGES))
-    parts.append("")
-    parts.append("/** WebSocket protocol: client -> server */")
-    parts.append(_emit_union("ClientMessage", schema.CLIENT_MESSAGES))
-    parts.append("")
 
     return "\n".join(parts)
 

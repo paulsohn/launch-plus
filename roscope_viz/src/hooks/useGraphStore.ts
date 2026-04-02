@@ -1,14 +1,14 @@
 /**
  * Central state management for graph snapshots.
  *
- * Manages the catalog of viz-ids and their snapshots,
- * tracks which snapshot is currently selected for display,
- * and handles WebSocket messages.
+ * Polls /api/catalog to discover cached snapshots, tracks which
+ * snapshot is currently selected for display.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GraphData, ServerMessage, Snapshot } from "../types.generated";
-import { VizWebSocket, getWsUrl } from "../ws";
+import type { GraphData, Snapshot } from "../types.generated";
+
+const POLL_INTERVAL_MS = 2000;
 
 export interface GraphStore {
   /** All snapshots grouped by viz-id */
@@ -19,7 +19,7 @@ export interface GraphStore {
   activeVizId: string | null;
   /** Currently selected snapshot index within the viz-id */
   activeSnapshotIndex: number | null;
-  /** Whether we're connected to the server */
+  /** Whether we've received data from the server */
   connected: boolean;
   /** Select a snapshot to display */
   selectSnapshot: (vizId: string, index: number) => void;
@@ -34,71 +34,60 @@ export function useGraphStore(): GraphStore {
     null,
   );
   const [connected, setConnected] = useState(false);
-  const wsRef = useRef<VizWebSocket | null>(null);
+  const prevSnapshotCount = useRef(0);
 
-  const handleMessage = useCallback((msg: ServerMessage) => {
-    switch (msg.type) {
-      case "catalog": {
+  // Poll /api/catalog
+  useEffect(() => {
+    let active = true;
+
+    const poll = async () => {
+      try {
+        const resp = await fetch("/api/catalog");
+        if (!resp.ok) return;
+        const data: Record<string, Snapshot[]> = await resp.json();
+        if (!active) return;
+
         const newCatalog = new Map<string, Snapshot[]>();
-        for (const [vizId, snapshots] of Object.entries(msg.snapshots)) {
+        let totalSnapshots = 0;
+        for (const [vizId, snapshots] of Object.entries(data)) {
           newCatalog.set(vizId, snapshots);
+          totalSnapshots += snapshots.length;
         }
+
         setCatalog(newCatalog);
         setConnected(true);
 
-        // Auto-select the latest snapshot of the first viz-id
-        const firstVizId = newCatalog.keys().next().value;
-        if (firstVizId) {
-          const snapshots = newCatalog.get(firstVizId)!;
-          setActiveVizId(firstVizId);
-          setActiveSnapshotIndex(snapshots.length - 1);
-        }
-        break;
-      }
-      case "snapshot": {
-        setCatalog((prev) => {
-          const next = new Map(prev);
-          const existing = next.get(msg.vizId) || [];
-          next.set(msg.vizId, [...existing, msg.snapshot]);
-          return next;
-        });
-        // Auto-select newly pushed snapshot
-        setActiveVizId(msg.vizId);
-        setCatalog((prev) => {
-          const snapshots = prev.get(msg.vizId);
-          if (snapshots) {
-            setActiveSnapshotIndex(snapshots.length - 1);
-          }
-          return prev;
-        });
-        break;
-      }
-      case "removed": {
-        setCatalog((prev) => {
-          const next = new Map(prev);
-          const existing = next.get(msg.vizId);
-          if (existing) {
-            const filtered = existing.filter(
-              (s) => s.timestamp !== msg.timestamp,
-            );
-            if (filtered.length === 0) {
-              next.delete(msg.vizId);
-            } else {
-              next.set(msg.vizId, filtered);
+        // Auto-select latest snapshot when new data arrives
+        if (totalSnapshots > prevSnapshotCount.current) {
+          // Pick the viz-id with the most recent snapshot
+          let latestVizId: string | null = null;
+          let latestTs = "";
+          for (const [vizId, snapshots] of newCatalog) {
+            const last = snapshots[snapshots.length - 1];
+            if (last && last.timestamp > latestTs) {
+              latestTs = last.timestamp;
+              latestVizId = vizId;
             }
           }
-          return next;
-        });
-        break;
+          if (latestVizId) {
+            const snaps = newCatalog.get(latestVizId)!;
+            setActiveVizId(latestVizId);
+            setActiveSnapshotIndex(snaps.length - 1);
+          }
+        }
+        prevSnapshotCount.current = totalSnapshots;
+      } catch {
+        // Server not reachable — keep trying
       }
-    }
-  }, []);
+    };
 
-  useEffect(() => {
-    const ws = new VizWebSocket(getWsUrl(), handleMessage);
-    wsRef.current = ws;
-    return () => ws.close();
-  }, [handleMessage]);
+    poll();
+    const id = setInterval(poll, POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, []);
 
   const selectSnapshot = useCallback((vizId: string, index: number) => {
     setActiveVizId(vizId);
@@ -107,7 +96,11 @@ export function useGraphStore(): GraphStore {
 
   const removeSnapshot = useCallback(
     (vizId: string, timestamp: string) => {
-      wsRef.current?.send({ type: "remove", vizId, timestamp });
+      fetch("/api/remove", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vizId, timestamp }),
+      }).catch(() => {});
     },
     [],
   );

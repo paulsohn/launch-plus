@@ -65,36 +65,3 @@ export interface Snapshot {
   timestamp: string;
   graph: GraphData;
 }
-
-export interface CatalogMessage {
-  type: "catalog";
-  snapshots: Record<string, Snapshot[]>;
-}
-
-export interface SnapshotMessage {
-  vizId: string;
-  snapshot: Snapshot;
-  type: "snapshot";
-}
-
-export interface RemovedMessage {
-  vizId: string;
-  timestamp: string;
-  type: "removed";
-}
-
-export interface RemoveRequest {
-  vizId: string;
-  timestamp: string;
-  type: "remove";
-}
-
-/** WebSocket protocol: server -> client */
-export type ServerMessage =
-  | CatalogMessage
-  | SnapshotMessage
-  | RemovedMessage;
-
-/** WebSocket protocol: client -> server */
-export type ClientMessage =
-  | RemoveRequest;

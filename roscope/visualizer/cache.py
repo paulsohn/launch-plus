@@ -42,30 +42,31 @@ def load_catalog() -> dict[str, list[dict]]:
     """Load all cached snapshots, grouped by viz-id.
 
     Returns ``{ viz_id: [snapshot_dict, ...] }`` sorted by timestamp.
+    Viz-ids may contain ``/`` (e.g. ``package/launcher``), producing
+    nested directories under the cache root.
     """
     catalog: dict[str, list[dict]] = {}
     if not _CACHE_ROOT.is_dir():
         return catalog
 
-    for viz_dir in sorted(_CACHE_ROOT.iterdir()):
-        if not viz_dir.is_dir() or viz_dir.name.startswith("."):
+    # Walk all .json files (except server.json at root) and reconstruct
+    # the viz-id from the relative path of the parent directory.
+    for f in sorted(_CACHE_ROOT.rglob("*.json")):
+        if f.parent == _CACHE_ROOT:
+            continue  # skip server.json and other root-level files
+        viz_id = str(f.parent.relative_to(_CACHE_ROOT))
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Skipping invalid snapshot %s: %s", f, exc)
             continue
-        viz_id = viz_dir.name
-        snapshots = []
-        for f in sorted(viz_dir.glob("*.json")):
-            try:
-                data = json.loads(f.read_text(encoding="utf-8"))
-                snapshots.append(
-                    {
-                        "vizId": viz_id,
-                        "timestamp": f.stem,
-                        "graph": data,
-                    }
-                )
-            except (json.JSONDecodeError, OSError) as exc:
-                logger.warning("Skipping invalid snapshot %s: %s", f, exc)
-        if snapshots:
-            catalog[viz_id] = snapshots
+        catalog.setdefault(viz_id, []).append(
+            {
+                "vizId": viz_id,
+                "timestamp": f.stem,
+                "graph": data,
+            }
+        )
     return catalog
 
 

@@ -1,37 +1,22 @@
-"""Visualizer server: WebSocket + HTTP static file serving.
+"""Visualizer server: stdlib HTTP serving + REST API.
 
 Serves the built SPA from ``roscope/visualizer/static/`` and
-provides a WebSocket endpoint at ``/ws`` for pushing graph snapshots
-to connected browsers.
-
-Server lifecycle:
-    IDLE      (0 clients, never had any)  -> keep running, waiting for browser
-    ACTIVE    (>0 clients)                -> serving
-    DRAINING  (0 clients, had >0)         -> start shutdown grace period
-    SHUTDOWN                              -> clean up, exit
-
-The grace period (default 5 s) prevents shutdown during page reloads.
+provides ``/api/catalog`` for the frontend to poll cached snapshots.
+No external dependencies — uses only ``http.server``.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import mimetypes
 import os
-import signal
 import socket
 import sys
 import webbrowser
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from importlib.resources import files
 from pathlib import Path
-
-import websockets.asyncio.server
-import websockets.datastructures
-import websockets.http11
-from websockets.asyncio.server import ServerConnection
-from websockets.asyncio.server import serve as ws_serve
 
 from roscope.visualizer import cache
 
@@ -39,152 +24,95 @@ logger = logging.getLogger(__name__)
 
 _STATIC_DIR = Path(str(files("roscope.visualizer") / "static"))
 
-_SHUTDOWN_GRACE_SECONDS = 5
 
+class _Handler(BaseHTTPRequestHandler):
+    """Serves static files and the catalog API."""
 
-# ── Server state ──────────────────────────────────────────────────────
+    def do_GET(self) -> None:
+        path = self.path.split("?")[0]  # strip query string
 
+        if path == "/api/catalog":
+            self._serve_catalog()
+        elif path == "/api/remove":
+            self.send_error(405, "Use DELETE")
+        elif path == "/" or path == "/index.html":
+            self._serve_file(_STATIC_DIR / "index.html")
+        elif path.startswith("/assets/"):
+            self._serve_file(_STATIC_DIR / path.lstrip("/"))
+        else:
+            self.send_error(404)
 
-class _VizServer:
-    """Manages WebSocket connections and the auto-shutdown lifecycle."""
+    def do_DELETE(self) -> None:
+        path = self.path.split("?")[0]
+        if path == "/api/remove":
+            self._handle_remove()
+        else:
+            self.send_error(404)
 
-    def __init__(self) -> None:
-        self.clients: set[ServerConnection] = set()
-        self._ever_had_clients = False
-        self._shutdown_task: asyncio.Task | None = None
-        self._stop_event = asyncio.Event()
-
-    async def register(self, ws: ServerConnection) -> None:
-        self.clients.add(ws)
-        self._ever_had_clients = True
-        if self._shutdown_task is not None:
-            self._shutdown_task.cancel()
-            self._shutdown_task = None
-            logger.debug("Cancelled shutdown — new client connected.")
-
-    async def unregister(self, ws: ServerConnection) -> None:
-        self.clients.discard(ws)
-        if self._ever_had_clients and len(self.clients) == 0:
-            logger.debug(
-                "All clients disconnected. Shutting down in %ds...",
-                _SHUTDOWN_GRACE_SECONDS,
-            )
-            self._shutdown_task = asyncio.create_task(self._drain())
-
-    async def _drain(self) -> None:
-        await asyncio.sleep(_SHUTDOWN_GRACE_SECONDS)
-        logger.info("Grace period elapsed — shutting down.")
-        self._stop_event.set()
-
-    async def broadcast(self, message: dict) -> None:
-        if not self.clients:
-            return
-        data = json.dumps(message, ensure_ascii=False)
-        await asyncio.gather(
-            *(ws.send(data) for ws in self.clients),
-            return_exceptions=True,
-        )
-
-    async def wait_for_stop(self) -> None:
-        await self._stop_event.wait()
-
-
-# ── WebSocket handler ─────────────────────────────────────────────────
-
-
-async def _ws_handler(ws: ServerConnection, server: _VizServer) -> None:
-    await server.register(ws)
-    try:
-        # Send current catalog on connect
+    def _serve_catalog(self) -> None:
         catalog = cache.load_catalog()
-        await ws.send(
-            json.dumps(
-                {"type": "catalog", "snapshots": catalog},
-                ensure_ascii=False,
-            )
-        )
+        body = json.dumps(catalog, ensure_ascii=False).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
 
-        # Listen for client messages
-        async for raw in ws:
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
+    def _handle_remove(self) -> None:
+        length = int(self.headers.get("Content-Length", 0))
+        if length == 0:
+            self.send_error(400, "Missing body")
+            return
+        try:
+            body = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+            return
 
-            msg_type = msg.get("type")
+        viz_id = body.get("vizId", "")
+        timestamp = body.get("timestamp", "")
+        if not viz_id or not timestamp:
+            self.send_error(400, "Missing vizId or timestamp")
+            return
 
-            if msg_type == "remove":
-                viz_id = msg.get("vizId", "")
-                timestamp = msg.get("timestamp", "")
-                if cache.remove_snapshot(viz_id, timestamp):
-                    await server.broadcast(
-                        {
-                            "type": "removed",
-                            "vizId": viz_id,
-                            "timestamp": timestamp,
-                        }
-                    )
-            elif msg_type == "snapshot":
-                # Forwarded from another CLI instance — broadcast to all browsers
-                await server.broadcast(msg)
-    finally:
-        await server.unregister(ws)
+        removed = cache.remove_snapshot(viz_id, timestamp)
+        resp = json.dumps({"removed": removed}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(resp)))
+        self.end_headers()
+        self.wfile.write(resp)
 
+    def _serve_file(self, file_path: Path) -> None:
+        # Security: ensure path doesn't escape static dir
+        try:
+            resolved = file_path.resolve()
+            if not str(resolved).startswith(str(_STATIC_DIR.resolve())):
+                self.send_error(403)
+                return
+        except (OSError, ValueError):
+            self.send_error(404)
+            return
 
-# ── HTTP handler (aiohttp-free, using websockets' built-in) ──────────
+        if not resolved.is_file():
+            self.send_error(404)
+            return
 
+        content = resolved.read_bytes()
+        content_type, _ = mimetypes.guess_type(str(resolved))
+        if content_type is None:
+            content_type = "application/octet-stream"
 
-async def _http_handler(
-    connection: ServerConnection,
-    request: websockets.http11.Request,
-) -> websockets.http11.Response | None:
-    """Process handler for websockets library — serves static files.
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
 
-    Returning a Response rejects the WebSocket upgrade and sends HTTP instead.
-    Returning None allows the WebSocket handshake to proceed.
-    """
-    path = request.path
-
-    # Let WebSocket connections through
-    if path == "/ws":
-        return None
-
-    # Serve static files
-    if path == "/" or path == "/index.html":
-        file_path = _STATIC_DIR / "index.html"
-    elif path.startswith("/assets/"):
-        file_path = _STATIC_DIR / path.lstrip("/")
-    else:
-        return websockets.http11.Response(
-            404, "Not Found", websockets.datastructures.Headers(), b"Not Found"
-        )
-
-    # Security: ensure path doesn't escape static dir
-    try:
-        file_path = file_path.resolve()
-        if not str(file_path).startswith(str(_STATIC_DIR.resolve())):
-            return websockets.http11.Response(
-                403, "Forbidden", websockets.datastructures.Headers(), b"Forbidden"
-            )
-    except (OSError, ValueError):
-        return websockets.http11.Response(
-            404, "Not Found", websockets.datastructures.Headers(), b"Not Found"
-        )
-
-    if not file_path.is_file():
-        return websockets.http11.Response(
-            404, "Not Found", websockets.datastructures.Headers(), b"Not Found"
-        )
-
-    content = file_path.read_bytes()
-    content_type, _ = mimetypes.guess_type(str(file_path))
-    if content_type is None:
-        content_type = "application/octet-stream"
-
-    headers = websockets.datastructures.Headers()
-    headers["Content-Type"] = content_type
-    headers["Content-Length"] = str(len(content))
-    return websockets.http11.Response(200, "OK", headers, content)
+    def log_message(self, format: str, *args: object) -> None:
+        # Suppress default per-request stderr logging
+        pass
 
 
 # ── Public API ────────────────────────────────────────────────────────
@@ -197,44 +125,6 @@ def _find_free_port() -> int:
         return port
 
 
-async def _run_server(port: int, *, open_browser: bool = True) -> None:
-    server_state = _VizServer()
-
-    async with ws_serve(
-        lambda ws: _ws_handler(ws, server_state),
-        "127.0.0.1",
-        port,
-        process_request=_http_handler,
-    ):
-        url = f"http://127.0.0.1:{port}"
-        pid = os.getpid()
-
-        cache.write_server_info(port, pid)
-        print(f"roscope visualizer: {url}", file=sys.stderr)
-        print("Press Ctrl+C to stop.", file=sys.stderr)
-
-        if open_browser:
-            webbrowser.open(url)
-
-        # Wait for either auto-shutdown or signal
-        loop = asyncio.get_running_loop()
-        stop_signal = asyncio.Event()
-
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, stop_signal.set)
-
-        done, _ = await asyncio.wait(
-            [
-                asyncio.create_task(server_state.wait_for_stop()),
-                asyncio.create_task(stop_signal.wait()),
-            ],
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-
-    cache.clear_server_info()
-    print("\nVisualizer shut down.", file=sys.stderr)
-
-
 def serve(
     actions: list,
     package: str,
@@ -244,7 +134,7 @@ def serve(
     port: int = 0,
     open_browser: bool = True,
 ) -> None:
-    """Save graph to cache, start server if needed, open browser.
+    """Save graph to cache, start server if not already running, open browser.
 
     This is the main entry point called by the CLI.
     """
@@ -265,8 +155,11 @@ def serve(
         existing_port = info.get("port")
         existing_pid = info.get("pid")
         if existing_port and _is_server_alive(existing_pid):
-            # Notify the running server via WebSocket
-            _notify_running_server(existing_port, viz_id, timestamp, graph)
+            # Server is running — browser will pick up new snapshot via polling
+            print(
+                f"Visualizer server already running at http://127.0.0.1:{existing_port}",
+                file=sys.stderr,
+            )
             if open_browser:
                 webbrowser.open(f"http://127.0.0.1:{existing_port}")
             return
@@ -275,7 +168,25 @@ def serve(
     if port == 0:
         port = _find_free_port()
 
-    asyncio.run(_run_server(port, open_browser=open_browser))
+    pid = os.getpid()
+    cache.write_server_info(port, pid)
+
+    server = HTTPServer(("127.0.0.1", port), _Handler)
+    url = f"http://127.0.0.1:{port}"
+
+    print(f"roscope visualizer: {url}", file=sys.stderr)
+    print("Press Ctrl+C to stop.", file=sys.stderr)
+
+    if open_browser:
+        webbrowser.open(url)
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down visualizer.", file=sys.stderr)
+    finally:
+        cache.clear_server_info()
+        server.server_close()
 
 
 def _is_server_alive(pid: int | None) -> bool:
@@ -287,28 +198,3 @@ def _is_server_alive(pid: int | None) -> bool:
         return True
     except (OSError, ProcessLookupError):
         return False
-
-
-def _notify_running_server(
-    port: int,
-    viz_id: str,
-    timestamp: str,
-    graph: dict,
-) -> None:
-    """Connect to the running server's WS and push a snapshot notification."""
-    import websockets.sync.client
-
-    snapshot = {"vizId": viz_id, "timestamp": timestamp, "graph": graph}
-    msg = json.dumps(
-        {"type": "snapshot", "vizId": viz_id, "snapshot": snapshot},
-        ensure_ascii=False,
-    )
-    try:
-        with websockets.sync.client.connect(f"ws://127.0.0.1:{port}/ws") as ws:
-            ws.send(msg)
-    except Exception as exc:
-        logger.warning("Could not notify running server: %s", exc)
-        print(
-            f"Warning: could not notify running visualizer server: {exc}",
-            file=sys.stderr,
-        )

@@ -86,51 +86,13 @@ class GraphData:
     edges: list[GraphEdge]
 
 
-# ── WebSocket protocol ────────────────────────────────────────────────
+# ── REST API types ────────────────────────────────────────────────────
 
 
 @dataclass
 class Snapshot:
+    """A single graph snapshot as stored in cache and returned by /api/catalog."""
+
     viz_id: str
     timestamp: str
     graph: GraphData
-
-
-@dataclass
-class CatalogMessage:
-    """Server -> client: full state on connect."""
-
-    type: Literal["catalog"] = "catalog"
-    snapshots: dict[str, list[Snapshot]] = field(default_factory=dict)
-
-
-@dataclass
-class SnapshotMessage:
-    """Server -> client: new snapshot pushed."""
-
-    viz_id: str
-    snapshot: Snapshot
-    type: Literal["snapshot"] = "snapshot"
-
-
-@dataclass
-class RemovedMessage:
-    """Server -> client: snapshot deleted."""
-
-    viz_id: str
-    timestamp: str
-    type: Literal["removed"] = "removed"
-
-
-@dataclass
-class RemoveRequest:
-    """Client -> server: request deletion."""
-
-    viz_id: str
-    timestamp: str
-    type: Literal["remove"] = "remove"
-
-
-# Groups for the code generator
-SERVER_MESSAGES = (CatalogMessage, SnapshotMessage, RemovedMessage)
-CLIENT_MESSAGES = (RemoveRequest,)

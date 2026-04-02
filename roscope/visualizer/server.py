@@ -3,6 +3,9 @@
 Serves the built SPA from ``roscope/visualizer/static/`` and
 provides ``/api/catalog`` for the frontend to poll cached snapshots.
 No external dependencies — uses only ``http.server``.
+
+The server runs as a background (daemon) process. A watchdog thread
+shuts it down automatically when no browser has polled for a while.
 """
 
 from __future__ import annotations
@@ -13,6 +16,8 @@ import mimetypes
 import os
 import socket
 import sys
+import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from importlib.resources import files
@@ -23,6 +28,28 @@ from roscope.visualizer import cache
 logger = logging.getLogger(__name__)
 
 _STATIC_DIR = Path(str(files("roscope.visualizer") / "static"))
+
+# Auto-shutdown: if no /api/catalog poll for this many seconds
+# after at least one poll has been received, the server exits.
+_IDLE_TIMEOUT_SECONDS = 10
+_WATCHDOG_CHECK_INTERVAL = 3
+
+
+# ── Shared state for the watchdog ─────────────────────────────────────
+
+_last_poll_time: float = 0.0
+_ever_polled: bool = False
+_poll_lock = threading.Lock()
+
+
+def _record_poll() -> None:
+    global _last_poll_time, _ever_polled
+    with _poll_lock:
+        _last_poll_time = time.monotonic()
+        _ever_polled = True
+
+
+# ── HTTP handler ──────────────────────────────────────────────────────
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -50,6 +77,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def _serve_catalog(self) -> None:
+        _record_poll()
         catalog = cache.load_catalog()
         body = json.dumps(catalog, ensure_ascii=False).encode("utf-8")
         self.send_response(200)
@@ -115,6 +143,20 @@ class _Handler(BaseHTTPRequestHandler):
         pass
 
 
+# ── Watchdog thread ───────────────────────────────────────────────────
+
+
+def _watchdog(server: HTTPServer) -> None:
+    """Shut down the server when no browser has polled for a while."""
+    while True:
+        time.sleep(_WATCHDOG_CHECK_INTERVAL)
+        with _poll_lock:
+            if _ever_polled and (time.monotonic() - _last_poll_time) > _IDLE_TIMEOUT_SECONDS:
+                break
+    cache.clear_server_info()
+    server.shutdown()
+
+
 # ── Public API ────────────────────────────────────────────────────────
 
 
@@ -123,6 +165,28 @@ def _find_free_port() -> int:
         s.bind(("", 0))
         port: int = s.getsockname()[1]
         return port
+
+
+def _run_server(port: int) -> None:
+    """Entry point for the background server process."""
+    # Detach stdio so the parent shell isn't held open
+    devnull = os.open(os.devnull, os.O_RDWR)
+    os.dup2(devnull, 0)
+    os.dup2(devnull, 1)
+    os.dup2(devnull, 2)
+    os.close(devnull)
+
+    server = HTTPServer(("127.0.0.1", port), _Handler)
+
+    # Start watchdog thread (daemon — dies with the process)
+    wd = threading.Thread(target=_watchdog, args=(server,), daemon=True)
+    wd.start()
+
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+        cache.clear_server_info()
 
 
 def serve(
@@ -134,9 +198,9 @@ def serve(
     port: int = 0,
     open_browser: bool = True,
 ) -> None:
-    """Save graph to cache, start server if not already running, open browser.
+    """Save graph to cache, start background server if needed, open browser.
 
-    This is the main entry point called by the CLI.
+    Returns immediately — the server runs in a forked child process.
     """
     from roscope.visualizer.graph import actions_to_graph
 
@@ -155,38 +219,32 @@ def serve(
         existing_port = info.get("port")
         existing_pid = info.get("pid")
         if existing_port and _is_server_alive(existing_pid):
-            # Server is running — browser will pick up new snapshot via polling
-            print(
-                f"Visualizer server already running at http://127.0.0.1:{existing_port}",
-                file=sys.stderr,
-            )
+            url = f"http://127.0.0.1:{existing_port}"
+            print(f"Visualizer: {url} (server already running)", file=sys.stderr)
             if open_browser:
-                webbrowser.open(f"http://127.0.0.1:{existing_port}")
+                webbrowser.open(url)
             return
 
-    # Start new server
+    # Pick a port before forking so the parent can report it
     if port == 0:
         port = _find_free_port()
 
-    pid = os.getpid()
-    cache.write_server_info(port, pid)
-
-    server = HTTPServer(("127.0.0.1", port), _Handler)
     url = f"http://127.0.0.1:{port}"
 
-    print(f"roscope visualizer: {url}", file=sys.stderr)
-    print("Press Ctrl+C to stop.", file=sys.stderr)
-
-    if open_browser:
-        webbrowser.open(url)
-
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nShutting down visualizer.", file=sys.stderr)
-    finally:
-        cache.clear_server_info()
-        server.server_close()
+    # Fork a child process for the server
+    pid = os.fork()
+    if pid == 0:
+        # ── Child: become a daemon ──
+        os.setsid()  # new session, detach from terminal
+        cache.write_server_info(port, os.getpid())
+        _run_server(port)
+        os._exit(0)
+    else:
+        # ── Parent: report and return to shell ──
+        print(f"Visualizer: {url} (server pid {pid})", file=sys.stderr)
+        if open_browser:
+            webbrowser.open(url)
+        # Don't waitpid — let the child run independently
 
 
 def _is_server_alive(pid: int | None) -> bool:

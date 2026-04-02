@@ -117,11 +117,13 @@ class _ActionParser:
             if not self.evaluate_condition(cn):
                 continue
             name_raw = cn.get_attr("name", optional=True)
+            ns_raw = cn.get_attr("namespace", optional=True)
             plugins.append(
                 ComposableNode(
                     package=self.parse_substitution(cn.get_attr("pkg", optional=True) or ""),
                     plugin=self.parse_substitution(cn.get_attr("plugin", optional=True) or ""),
                     name=self.parse_substitution(name_raw) if name_raw else None,
+                    namespace=self.parse_substitution(ns_raw) if ns_raw else None,
                     parameters=self.parse_params(cn),
                     remappings=self.parse_remaps(cn),
                 )

@@ -41,6 +41,12 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
         pkg = context.perform_substitution(desc.package) or str(desc.package or "")
         plugin_name = context.perform_substitution(desc.plugin) or str(desc.plugin or "")
         name = context.perform_substitution(desc.name) or None
+        # Compute effective namespace for remap qualification
+        ros_ns = context._launch_configurations.get("ros_namespace")
+        node_ns = None
+        if getattr(desc, "namespace", None):
+            node_ns = context.perform_substitution(desc.namespace)
+        full_ns = _ros2_namespace_join(ros_ns, node_ns) if node_ns else ros_ns
         for p in desc.parameters:
             if isinstance(p, ParameterFile):
                 path = p.evaluate(context)
@@ -58,22 +64,22 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
                 for k, v in p.items():
                     resolved_v = context.perform_substitution(v)
                     params[str(k)] = resolved_v if resolved_v is not None else ""
-        # Remaps
+        # Remaps — qualify 'to' with namespace
         for r in desc.remappings:
             if isinstance(r, (tuple, list)) and len(r) == 2:
                 src = context.perform_substitution(r[0])
                 dst = context.perform_substitution(r[1])
-                remaps.append(
-                    [
-                        src if src is not None else str(r[0]),
-                        dst if dst is not None else str(r[1]),
-                    ]
-                )
+                src = src if src is not None else str(r[0])
+                dst = dst if dst is not None else str(r[1])
+                if dst and full_ns and not dst.startswith("/") and not dst.startswith("~/"):
+                    dst = f"{full_ns.rstrip('/')}/{dst}"
+                remaps.append([src, dst])
     else:
         # Unknown description object — best effort
         pkg = str(getattr(desc_or_dict, "package", "") or "")
         plugin_name = str(getattr(desc_or_dict, "plugin", "") or "")
         name = None
+        full_ns = None
 
     if pkg:
         state.track_package(pkg)
@@ -82,6 +88,7 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
         "package": pkg,
         "plugin": plugin_name,
         "name": name,
+        "namespace": full_ns,
         "parameters": params,
         "remappings": remaps,
     }
@@ -299,10 +306,11 @@ class ComposableNode(Action):
     container's ``plugins`` list when the container is resolved in ``execute()``.
     """
 
-    def __init__(self, *, package=None, plugin=None, name=None, **kwargs):
+    def __init__(self, *, package=None, plugin=None, name=None, namespace=None, **kwargs):
         self.package = package
         self.plugin = plugin
         self.name = name
+        self.namespace = namespace
         self.parameters: list | dict = list(kwargs.get("parameters") or [])
         self.remappings: list = list(kwargs.get("remappings") or [])
         self.param_files: list = []
@@ -320,6 +328,9 @@ class ComposableNode(Action):
         name = data.get("name")
         if name:
             elem.set("name", name)
+        ns = data.get("namespace")
+        if ns:
+            elem.set("namespace", ns)
 
         for pf in data.get("param_files", []):
             path = pf.get("path", "")

@@ -479,6 +479,7 @@ def fetch(
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
+@click.option("--visualize", is_flag=True, help="Open graph visualizer in browser")
 @click.pass_context
 def resolve(
     ctx: click.Context,
@@ -496,6 +497,7 @@ def resolve(
     clean: bool,
     dirty: bool,
     shallow: bool,
+    visualize: bool,
 ) -> None:
     """Resolve launch file (no build)."""
     from roscope.orchestrator import ResolveWorkflowOptions
@@ -525,6 +527,7 @@ def resolve(
         workspace_state=workspace_state,
         workflow_options=workflow_options,
         shallow=shallow,
+        visualize=visualize,
     )
 
 
@@ -861,6 +864,7 @@ def _cmd_resolve(
     workspace_state: WorkspaceState,
     workflow_options: ResolveWorkflowOptions,
     shallow: bool,
+    visualize: bool = False,
 ) -> None:
     """Shared resolve/check implementation."""
     from roscope.fetcher import FetchOptions
@@ -890,6 +894,13 @@ def _cmd_resolve(
         )
     finally:
         logging.getLogger("roscope").removeHandler(collector)
+
+    # Visualize mode: open graph in browser instead of printing XML
+    if visualize:
+        from launch_plus.visualizer import serve as _visualizer_serve
+
+        _visualizer_serve(result.actions, package, launcher)
+        return
 
     # Render XML to stdout
     if not suppress_xml:

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>launch-plus visualizer</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="toolbar">
+    <span id="title">launch-plus visualizer</span>
+    <input type="text" id="search" placeholder="Search nodes by name or package..." />
+    <button id="fit-btn" title="Fit to viewport">Fit</button>
+    <button id="collapse-btn" title="Collapse all groups">Collapse All</button>
+    <button id="expand-btn" title="Expand all groups">Expand All</button>
+  </div>
+  <div id="cy"></div>
+  <div id="detail-panel" class="hidden">
+    <div id="detail-header">
+      <span id="detail-title"></span>
+      <button id="detail-close">&times;</button>
+    </div>
+    <div id="detail-body"></div>
+  </div>
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>Computing layout...</p>
+  </div>
+
+  <script id="graph-data" type="application/json">__GRAPH_JSON__</script>
+  <script src="/static/vendor/cytoscape.min.js"></script>
+  <script src="/static/vendor/elk.bundled.js"></script>
+  <script src="/static/vendor/cytoscape-elk.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -19,7 +19,7 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       shape: "round-rectangle",
       "background-color": "rgba(40, 40, 80, 0.4)",
       "border-color": "#334",
-      "border-width": 1,
+      "border-width": 2,
       label: "data(label)",
       "text-valign": "top",
       "text-halign": "center",
@@ -34,9 +34,9 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
     selector: 'node[type="lcn_wrapper"]',
     style: {
       shape: "round-rectangle",
-      "background-color": "rgba(93, 173, 226, 0.08)",
+      "background-color": "rgba(93, 173, 226, 0.15)",
       "border-color": "#5dade2",
-      "border-width": 1,
+      "border-width": 2,
       "border-style": "dashed",
       label: "data(label)",
       "text-valign": "top",
@@ -73,7 +73,7 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       shape: "round-rectangle",
       "background-color": "rgba(15, 52, 96, 0.5)",
       "border-color": "#2980b9",
-      "border-width": 2,
+      "border-width": 3,
       label: "data(label)",
       "text-valign": "top",
       "text-halign": "center",
@@ -164,6 +164,7 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       "curve-style": "bezier",
       "target-arrow-shape": "none",
       opacity: 0.5,
+      events: "no",
     },
   },
   {
@@ -243,40 +244,44 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
     cy.fit(undefined, 40);
     setLoading(false);
 
-    // Event handlers — single tap selects + highlights connected elements
+    // Event handlers — single tap selects + highlights
     cy.on("tap", "node", (evt) => {
       const tapped = evt.target;
       onNodeTap(tapped.data());
 
-      // Highlight tapped node and its connected elements
       cy.elements().removeClass("highlighted").addClass("faded");
       tapped.removeClass("faded").addClass("highlighted");
-      const edges = tapped.connectedEdges();
-      edges.removeClass("faded").addClass("highlighted");
-      edges.connectedNodes().removeClass("faded").addClass("highlighted");
-      // Keep ancestor compounds visible
       tapped.ancestors().removeClass("faded");
-      edges.connectedNodes().ancestors().removeClass("faded");
+
+      if (tapped.isParent()) {
+        // Box selected: highlight all descendants and their external connections
+        const desc = tapped.descendants();
+        desc.removeClass("faded").addClass("highlighted");
+        // Edges connected to descendant leaf nodes
+        const descLeaves = desc.filter((n: cytoscape.NodeSingular) => !n.isParent());
+        const extEdges = descLeaves.connectedEdges();
+        extEdges.removeClass("faded").addClass("highlighted");
+        extEdges.connectedNodes().removeClass("faded");
+        extEdges.connectedNodes().ancestors().removeClass("faded");
+        // LCN wrapper: also highlight the corresponding LCN marker
+        if (tapped.data("type") === "lcn_wrapper") {
+          const lcnEdges = tapped.connectedEdges('[type="load_target"]');
+          lcnEdges.removeClass("faded").addClass("highlighted");
+          lcnEdges.connectedNodes().removeClass("faded").addClass("highlighted");
+        }
+      } else {
+        // Leaf node / topic: highlight connected edges + nodes
+        const edges = tapped.connectedEdges();
+        edges.removeClass("faded").addClass("highlighted");
+        edges.connectedNodes().removeClass("faded").addClass("highlighted");
+        edges.connectedNodes().ancestors().removeClass("faded");
+      }
     });
 
     cy.on("tap", (evt) => {
       if (evt.target === cy) {
         cy.elements().removeClass("highlighted faded");
         onBackgroundTap();
-      }
-    });
-
-    // Double-click compound node to toggle content visibility
-    cy.on("dblclick", "node", (evt) => {
-      const node = evt.target;
-      if (!node.isParent()) return;
-      const collapsed = node.data("_collapsed");
-      if (collapsed) {
-        node.children().style({ opacity: 1, events: "yes" });
-        node.data("_collapsed", false);
-      } else {
-        node.children().style({ opacity: 0, events: "no" });
-        node.data("_collapsed", true);
       }
     });
 

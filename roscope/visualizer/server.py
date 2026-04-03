@@ -209,7 +209,8 @@ def serve(
     timestamp = graph["metadata"]["timestamp"]
 
     if not viz_id:
-        viz_id = f"{package}/{launcher}"
+        viz_id = "default"
+    viz_id = cache.sanitize_viz_id(viz_id)
 
     cache.save_snapshot(viz_id, graph, timestamp)
 

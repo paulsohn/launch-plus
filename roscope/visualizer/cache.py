@@ -1,7 +1,7 @@
 """Local disk cache for visualizer snapshots.
 
 Layout:
-    ~/.cache/launch-plus-viz/
+    ~/.cache/roscope-viz/
         server.json              # Running server info: { "port": ..., "pid": ... }
         <viz-id>/
             <timestamp>.json     # Snapshot: { "metadata": ..., "nodes": ..., ... }
@@ -12,12 +12,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_env_cache = os.environ.get("LAUNCH_PLUS_VIZ_CACHE", "")
-_CACHE_ROOT = Path(_env_cache) if _env_cache else (Path.home() / ".cache" / "launch-plus-viz")
+_env_cache = os.environ.get("ROSCOPE_VIZ_CACHE", "")
+_CACHE_ROOT = Path(_env_cache) if _env_cache else (Path.home() / ".cache" / "roscope-viz")
 
 
 def cache_root() -> Path:
@@ -26,6 +27,11 @@ def cache_root() -> Path:
 
 def server_json_path() -> Path:
     return _CACHE_ROOT / "server.json"
+
+
+def sanitize_viz_id(viz_id: str) -> str:
+    """Replace unsafe characters so viz-id is a valid flat directory name."""
+    return re.sub(r"[^a-zA-Z0-9._-]", "_", viz_id)
 
 
 def save_snapshot(viz_id: str, graph: dict, timestamp: str) -> Path:

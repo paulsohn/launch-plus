@@ -237,10 +237,11 @@ def _resolve_python_file_recursive(
             )
             return
 
-    # Collect package shares
-    package_shares = (
-        locator.all_package_shares() if workflow_options.preview else locator.all_install_shares()
-    )
+    # Collect pre-known package shares.
+    # In preview mode, only AMENT packages are pre-populated; lockfile
+    # packages are resolved on-demand through ensure_package_available
+    # which handles SHA verification (DEFAULT) and reset (CLEAN).
+    package_shares = locator.all_install_shares()
 
     # Snapshot global params for this file
     current_global_params = list(result.global_params)

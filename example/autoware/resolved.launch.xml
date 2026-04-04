@@ -336,6 +336,428 @@
             <param name="topic_monitor_names" value="topic_state_monitor_vector_map: map_topic_statustopic_state_monitor_pointcloud_map: map_topic_statustopic_state_monitor_pose_twist_fusion_filter_pose: localization_topic_statustopic_state_monitor_obstacle_segmentation_pointcloud: perception_topic_statustopic_state_monitor_object_recognition_objects: perception_topic_statustopic_state_monitor_traffic_light_recognition_traffic_signals: perception_topic_statustopic_state_monitor_mission_planning_route: planning_topic_statustopic_state_monitor_scenario_planning_trajectory: planning_topic_statustopic_state_monitor_trajectory_follower_control_cmd: control_topic_statustopic_state_monitor_control_command_control_cmd: control_topic_statustopic_state_monitor_vehicle_status_velocity_status: vehicle_topic_statustopic_state_monitor_vehicle_status_steering_status: vehicle_topic_statustopic_state_monitor_system_emergency_control_cmd: system_topic_statustopic_state_monitor_transform_map_to_base_link: localization_topic_status"/>
           </composable_node>
         </node_container>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="map_topic_status" -->
+          <!-- arg name="error_rate" value="0.0" -->
+          <!-- arg name="node_name_suffix" value="vector_map" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="0.0" -->
+          <!-- arg name="topic" value="/map/vector_map" -->
+          <!-- arg name="topic_type" value="autoware_map_msgs/msg/LaneletMapBin" -->
+          <!-- arg name="transient_local" value="True" -->
+          <!-- arg name="warn_rate" value="0.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_vector_map" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="map_topic_status"/>
+              <param name="error_rate" value="0.0"/>
+              <param name="timeout" value="0.0"/>
+              <param name="topic" value="/map/vector_map"/>
+              <param name="topic_type" value="autoware_map_msgs/msg/LaneletMapBin"/>
+              <param name="transient_local" value="True"/>
+              <param name="warn_rate" value="0.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="map_topic_status" -->
+          <!-- arg name="error_rate" value="0.0" -->
+          <!-- arg name="node_name_suffix" value="pointcloud_map" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="0.0" -->
+          <!-- arg name="topic" value="/map/pointcloud_map" -->
+          <!-- arg name="topic_type" value="sensor_msgs/msg/PointCloud2" -->
+          <!-- arg name="transient_local" value="True" -->
+          <!-- arg name="warn_rate" value="0.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_pointcloud_map" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="map_topic_status"/>
+              <param name="error_rate" value="0.0"/>
+              <param name="timeout" value="0.0"/>
+              <param name="topic" value="/map/pointcloud_map"/>
+              <param name="topic_type" value="sensor_msgs/msg/PointCloud2"/>
+              <param name="transient_local" value="True"/>
+              <param name="warn_rate" value="0.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="localization_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="node_name_suffix" value="pose_twist_fusion_filter_pose" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/localization/pose_twist_fusion_filter/pose" -->
+          <!-- arg name="topic_type" value="geometry_msgs/msg/PoseStamped" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_pose_twist_fusion_filter_pose" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="localization_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/localization/pose_twist_fusion_filter/pose"/>
+              <param name="topic_type" value="geometry_msgs/msg/PoseStamped"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="True" -->
+          <!-- arg name="diag_name" value="perception_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="node_name_suffix" value="obstacle_segmentation_pointcloud" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/perception/obstacle_segmentation/pointcloud" -->
+          <!-- arg name="topic_type" value="sensor_msgs/msg/PointCloud2" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_obstacle_segmentation_pointcloud" namespace="/system">
+              <param name="best_effort" value="True"/>
+              <param name="diag_name" value="perception_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/perception/obstacle_segmentation/pointcloud"/>
+              <param name="topic_type" value="sensor_msgs/msg/PointCloud2"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="perception_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="node_name_suffix" value="object_recognition_objects" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/perception/object_recognition/objects" -->
+          <!-- arg name="topic_type" value="autoware_perception_msgs/msg/PredictedObjects" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_object_recognition_objects" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="perception_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/perception/object_recognition/objects"/>
+              <param name="topic_type" value="autoware_perception_msgs/msg/PredictedObjects"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="perception_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="node_name_suffix" value="traffic_light_recognition_traffic_signals" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/perception/traffic_light_recognition/traffic_signals" -->
+          <!-- arg name="topic_type" value="autoware_perception_msgs/msg/TrafficLightGroupArray" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_traffic_light_recognition_traffic_signals" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="perception_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/perception/traffic_light_recognition/traffic_signals"/>
+              <param name="topic_type" value="autoware_perception_msgs/msg/TrafficLightGroupArray"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="planning_topic_status" -->
+          <!-- arg name="error_rate" value="0.0" -->
+          <!-- arg name="node_name_suffix" value="mission_planning_route" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="0.0" -->
+          <!-- arg name="topic" value="/planning/mission_planning/route" -->
+          <!-- arg name="topic_type" value="autoware_planning_msgs/msg/LaneletRoute" -->
+          <!-- arg name="transient_local" value="True" -->
+          <!-- arg name="warn_rate" value="0.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_mission_planning_route" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="planning_topic_status"/>
+              <param name="error_rate" value="0.0"/>
+              <param name="timeout" value="0.0"/>
+              <param name="topic" value="/planning/mission_planning/route"/>
+              <param name="topic_type" value="autoware_planning_msgs/msg/LaneletRoute"/>
+              <param name="transient_local" value="True"/>
+              <param name="warn_rate" value="0.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="planning_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="node_name_suffix" value="scenario_planning_trajectory" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/planning/trajectory" -->
+          <!-- arg name="topic_type" value="autoware_planning_msgs/msg/Trajectory" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_scenario_planning_trajectory" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="planning_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/planning/trajectory"/>
+              <param name="topic_type" value="autoware_planning_msgs/msg/Trajectory"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="control_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="node_name_suffix" value="trajectory_follower_control_cmd" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/control/trajectory_follower/control_cmd" -->
+          <!-- arg name="topic_type" value="autoware_control_msgs/msg/Control" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_trajectory_follower_control_cmd" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="control_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/control/trajectory_follower/control_cmd"/>
+              <param name="topic_type" value="autoware_control_msgs/msg/Control"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="control_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="node_name_suffix" value="control_command_control_cmd" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/control/command/control_cmd" -->
+          <!-- arg name="topic_type" value="autoware_control_msgs/msg/Control" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_control_command_control_cmd" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="control_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/control/command/control_cmd"/>
+              <param name="topic_type" value="autoware_control_msgs/msg/Control"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="vehicle_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="node_name_suffix" value="vehicle_status_velocity_status" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/vehicle/status/velocity_status" -->
+          <!-- arg name="topic_type" value="autoware_vehicle_msgs/msg/VelocityReport" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_vehicle_status_velocity_status" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="vehicle_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/vehicle/status/velocity_status"/>
+              <param name="topic_type" value="autoware_vehicle_msgs/msg/VelocityReport"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="vehicle_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="node_name_suffix" value="vehicle_status_steering_status" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/vehicle/status/steering_status" -->
+          <!-- arg name="topic_type" value="autoware_vehicle_msgs/msg/SteeringReport" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_vehicle_status_steering_status" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="vehicle_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/vehicle/status/steering_status"/>
+              <param name="topic_type" value="autoware_vehicle_msgs/msg/SteeringReport"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="diag_name" value="system_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="node_name_suffix" value="system_emergency_control_cmd" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/system/emergency/control_cmd" -->
+          <!-- arg name="topic_type" value="autoware_control_msgs/msg/Control" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_system_emergency_control_cmd" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="system_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/system/emergency/control_cmd"/>
+              <param name="topic_type" value="autoware_control_msgs/msg/Control"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor_tf.launch.xml -->
+        <group>
+          <!-- arg name="best_effort" value="False" -->
+          <!-- arg name="child_frame_id" value="base_link" -->
+          <!-- arg name="diag_name" value="localization_topic_status" -->
+          <!-- arg name="error_rate" value="1.0" -->
+          <!-- arg name="frame_id" value="map" -->
+          <!-- arg name="node_name_suffix" value="transform_map_to_base_link" -->
+          <!-- arg name="pub_topic_name" default="/diagnostics" -->
+          <!-- arg name="target_container" value="/system/component_state_monitor/container" -->
+          <!-- arg name="timeout" value="1.0" -->
+          <!-- arg name="topic" value="/tf" -->
+          <!-- arg name="transient_local" value="False" -->
+          <!-- arg name="warn_rate" value="5.0" -->
+          <!-- arg name="window_size" default="10" -->
+          <load_composable_node target="/system/component_state_monitor/container">
+            <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_transform_map_to_base_link" namespace="/system">
+              <param name="best_effort" value="False"/>
+              <param name="child_frame_id" value="base_link"/>
+              <param name="diag_name" value="localization_topic_status"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="frame_id" value="map"/>
+              <param name="timeout" value="1.0"/>
+              <param name="topic" value="/tf"/>
+              <param name="transient_local" value="False"/>
+              <param name="warn_rate" value="5.0"/>
+              <param name="window_size" value="10"/>
+              <remap from="/diagnostics" to="/diagnostics"/>
+            </composable_node>
+          </load_composable_node>
+        </group>
+        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor_tf.launch.xml -->
       </group>
       <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_component_state_monitor/launch/component_state_monitor.launch.py -->
       <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_mrm_comfortable_stop_operator/launch/mrm_comfortable_stop_operator.launch.py -->
@@ -408,6 +830,7 @@
         <node pkg="autoware_diagnostic_graph_aggregator" exec="aggregator_node" namespace="/system">
           <!-- params from: {workspace}/src/universe/autoware_universe/system/autoware_diagnostic_graph_aggregator/config/default.param.yaml -->
           <param name="use_operation_mode_availability" value="true"/>
+          <param name="initial_latch_suppression" value="true"/>
           <param name="rate" value="10.0"/>
           <param name="input_qos_depth" value="1000"/>
           <param name="graph_qos_depth" value="1"/>
@@ -2219,6 +2642,8 @@
     <!-- arg name="camera_2d_detector/color_map_path" default="{home}/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
     <!-- arg name="camera_2d_detector/label_path" default="{home}/autoware_data/tensorrt_yolox/label.txt" -->
     <!-- arg name="camera_2d_detector/model_path" default="{home}/autoware_data/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
+    <!-- arg name="camera_2d_detector/roi_remap_path" default="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_label_remap.csv" -->
+    <!-- arg name="camera_2d_detector/roi_to_semseg_remap_path" default="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_to_semseg_label_remap.csv" -->
     <!-- arg name="camera_vru_detector_rois_ids" default="[0]" -->
     <!-- arg name="data_path" value="{home}/autoware_data" -->
     <!-- arg name="detected_objects_filter_method" default="lanelet_filter" -->
@@ -2260,6 +2685,8 @@
       <!-- arg name="camera_2d_detector/color_map_path" value="{home}/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
       <!-- arg name="camera_2d_detector/label_path" value="{home}/autoware_data/tensorrt_yolox/label.txt" -->
       <!-- arg name="camera_2d_detector/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
+      <!-- arg name="camera_2d_detector/roi_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_label_remap.csv" -->
+      <!-- arg name="camera_2d_detector/roi_to_semseg_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_to_semseg_label_remap.csv" -->
       <!-- arg name="camera_info0" default="/sensing/camera/camera0/camera_info" -->
       <!-- arg name="camera_info1" default="/sensing/camera/camera1/camera_info" -->
       <!-- arg name="camera_info2" default="/sensing/camera/camera2/camera_info" -->
@@ -2368,6 +2795,7 @@
       <!-- arg name="traffic_light_recognition/use_high_accuracy_detection" value="true" -->
       <!-- arg name="traffic_light_recognition/whole_image_detection/label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
       <!-- arg name="traffic_light_recognition/whole_image_detection/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
+      <!-- arg name="traffic_light_recognition/whole_image_detection/yolox_roi_label_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv" -->
       <!-- arg name="traffic_light_roi_visualizer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_visualization/traffic_light_roi_visualizer.param.yaml" -->
       <!-- arg name="transfusion_model_path" default="{home}/autoware_data/lidar_transfusion" -->
       <!-- arg name="use_camera_vru_detector" value="false" -->
@@ -2576,6 +3004,8 @@
         <!-- arg name="camera_2d_detector/color_map_path" value="{home}/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
         <!-- arg name="camera_2d_detector/label_path" value="{home}/autoware_data/tensorrt_yolox/label.txt" -->
         <!-- arg name="camera_2d_detector/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
+        <!-- arg name="camera_2d_detector/roi_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_label_remap.csv" -->
+        <!-- arg name="camera_2d_detector/roi_to_semseg_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_to_semseg_label_remap.csv" -->
         <!-- arg name="camera_vru_detector_rois_ids" value="[0]" -->
         <!-- arg name="detection_by_tracker_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detection_by_tracker/detection_by_tracker.param.yaml" -->
         <!-- arg name="euclidean_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/clustering/euclidean_cluster.param.yaml" -->
@@ -3106,13 +3536,13 @@
           <!-- arg name="tracker_setting_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/multi_object_tracker_node.param.yaml" -->
           <node pkg="autoware_multi_object_tracker" exec="multi_object_tracker_node" name="multi_object_tracker" namespace="/perception/object_recognition/tracking" output="both">
             <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/multi_object_tracker_node.param.yaml -->
-            <param name="car_tracker" value="multi_vehicle_tracker"/>
-            <param name="truck_tracker" value="multi_vehicle_tracker"/>
-            <param name="bus_tracker" value="multi_vehicle_tracker"/>
-            <param name="trailer_tracker" value="multi_vehicle_tracker"/>
-            <param name="pedestrian_tracker" value="pedestrian_and_bicycle_tracker"/>
-            <param name="bicycle_tracker" value="pedestrian_and_bicycle_tracker"/>
-            <param name="motorcycle_tracker" value="pedestrian_and_bicycle_tracker"/>
+            <param name="initial_tracker.car" value="multi_vehicle_tracker"/>
+            <param name="initial_tracker.truck" value="multi_vehicle_tracker"/>
+            <param name="initial_tracker.bus" value="multi_vehicle_tracker"/>
+            <param name="initial_tracker.trailer" value="multi_vehicle_tracker"/>
+            <param name="initial_tracker.pedestrian" value="pedestrian_and_bicycle_tracker"/>
+            <param name="initial_tracker.bicycle" value="pedestrian_and_bicycle_tracker"/>
+            <param name="initial_tracker.motorcycle" value="pedestrian_and_bicycle_tracker"/>
             <param name="publish_rate" value="10.0"/>
             <param name="world_frame_id" value="map"/>
             <param name="ego_frame_id" value="base_link"/>
@@ -3123,11 +3553,25 @@
             <param name="tracker_lifetime" value="1.0"/>
             <param name="min_known_object_removal_iou" value="0.1"/>
             <param name="min_unknown_object_removal_iou" value="0.001"/>
-            <param name="pruning_generalized_iou_thresholds" value="[-0.3, -0.4, -0.6, -0.6, -0.6, -0.1, -0.1, -0.1]"/>
+            <param name="pruning_generalized_iou_thresholds.unknown" value="-0.3"/>
+            <param name="pruning_generalized_iou_thresholds.car" value="-0.4"/>
+            <param name="pruning_generalized_iou_thresholds.truck" value="-0.6"/>
+            <param name="pruning_generalized_iou_thresholds.bus" value="-0.6"/>
+            <param name="pruning_generalized_iou_thresholds.trailer" value="-0.6"/>
+            <param name="pruning_generalized_iou_thresholds.motorcycle" value="-0.1"/>
+            <param name="pruning_generalized_iou_thresholds.bicycle" value="-0.1"/>
+            <param name="pruning_generalized_iou_thresholds.pedestrian" value="-0.1"/>
+            <param name="pruning_distance_thresholds.unknown" value="9.0"/>
+            <param name="pruning_distance_thresholds.car" value="5.0"/>
+            <param name="pruning_distance_thresholds.truck" value="9.0"/>
+            <param name="pruning_distance_thresholds.bus" value="9.0"/>
+            <param name="pruning_distance_thresholds.trailer" value="9.0"/>
+            <param name="pruning_distance_thresholds.motorcycle" value="4.0"/>
+            <param name="pruning_distance_thresholds.bicycle" value="3.0"/>
+            <param name="pruning_distance_thresholds.pedestrian" value="2.0"/>
             <param name="pruning_static_object_speed" value="1.38"/>
             <param name="pruning_moving_object_speed" value="5.5"/>
             <param name="pruning_static_iou_threshold" value="0.0"/>
-            <param name="pruning_distance_thresholds" value="[9.0, 5.0, 9.0, 9.0, 9.0, 4.0, 3.0, 2.0]"/>
             <param name="publish_processing_time" value="true"/>
             <param name="publish_processing_time_detail" value="false"/>
             <param name="publish_tentative_objects" value="false"/>
@@ -3138,11 +3582,54 @@
             <param name="diagnostics_error_extrapolation" value="1.0"/>
             <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/multi_object_tracker_node.param.yaml -->
             <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/data_association_matrix.param.yaml -->
-            <param name="can_assign_matrix" value="[1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1]"/>
-            <param name="max_dist_matrix" value="[4.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 4.0, 5.0, 5.0, 5.0, 5.0, 1.0, 1.0, 1.0, 4.0, 5.0, 5.0, 5.0, 5.0, 1.0, 1.0, 1.0, 4.0, 5.0, 5.0, 5.0, 5.0, 1.0, 1.0, 1.0, 4.0, 5.0, 5.0, 5.0, 5.0, 1.0, 1.0, 1.0, 3.0, 1.0, 1.0, 1.0, 1.0, 3.0, 3.0, 2.0, 3.0, 1.0, 1.0, 1.0, 1.0, 3.0, 3.0, 2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 3.0, 3.0, 2.0]"/>
-            <param name="max_area_matrix" value="[100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 12.1, 12.1, 36.0, 60.0, 60.0, 10000.0, 10000.0, 10000.0, 36.0, 12.1, 36.0, 60.0, 60.0, 10000.0, 10000.0, 10000.0, 60.0, 12.1, 36.0, 60.0, 60.0, 10000.0, 10000.0, 10000.0, 60.0, 12.1, 36.0, 60.0, 60.0, 10000.0, 10000.0, 10000.0, 2.5, 10000.0, 10000.0, 10000.0, 10000.0, 2.5, 2.5, 2.5, 2.5, 10000.0, 10000.0, 10000.0, 10000.0, 2.5, 2.5, 2.5, 2.0, 10000.0, 10000.0, 10000.0, 10000.0, 2.0, 2.0, 2.0]"/>
-            <param name="min_area_matrix" value="[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 3.6, 3.6, 6.0, 10.0, 10.0, 0.0, 0.0, 0.0, 6.0, 3.6, 6.0, 10.0, 10.0, 0.0, 0.0, 0.0, 10.0, 3.6, 6.0, 10.0, 10.0, 0.0, 0.0, 0.0, 10.0, 3.6, 6.0, 10.0, 10.0, 0.0, 0.0, 0.0, 0.001, 0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.1, 0.001, 0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.1, 0.001, 0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.1]"/>
-            <param name="min_iou_matrix" value="[0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.1, 0.1, 0.1, 0.0001, 0.0001, 0.0001, 0.0001, 0.1, 0.1, 0.1, 0.1, 0.0001, 0.0001, 0.0001, 0.0001, 0.1, 0.1, 0.1, 0.1, 0.0001, 0.0001, 0.0001, 0.0001, 0.1, 0.1, 0.1, 0.1, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, -0.3, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001, 0.0001]"/>
+            <param name="association.can_assign.unknown" value="[polygon_tracker, multi_vehicle_tracker, pedestrian_and_bicycle_tracker]"/>
+            <param name="association.can_assign.car" value="[multi_vehicle_tracker]"/>
+            <param name="association.can_assign.truck" value="[multi_vehicle_tracker]"/>
+            <param name="association.can_assign.bus" value="[multi_vehicle_tracker]"/>
+            <param name="association.can_assign.trailer" value="[multi_vehicle_tracker]"/>
+            <param name="association.can_assign.motorcycle" value="[pedestrian_and_bicycle_tracker]"/>
+            <param name="association.can_assign.bicycle" value="[pedestrian_and_bicycle_tracker]"/>
+            <param name="association.can_assign.pedestrian" value="[pedestrian_and_bicycle_tracker]"/>
+            <param name="association.max_dist.unknown.polygon_tracker" value="4.0"/>
+            <param name="association.max_dist.unknown.multi_vehicle_tracker" value="4.0"/>
+            <param name="association.max_dist.unknown.pedestrian_and_bicycle_tracker" value="3.0"/>
+            <param name="association.max_dist.car.multi_vehicle_tracker" value="5.0"/>
+            <param name="association.max_dist.truck.multi_vehicle_tracker" value="5.0"/>
+            <param name="association.max_dist.bus.multi_vehicle_tracker" value="5.0"/>
+            <param name="association.max_dist.trailer.multi_vehicle_tracker" value="5.0"/>
+            <param name="association.max_dist.motorcycle.pedestrian_and_bicycle_tracker" value="3.0"/>
+            <param name="association.max_dist.bicycle.pedestrian_and_bicycle_tracker" value="3.0"/>
+            <param name="association.max_dist.pedestrian.pedestrian_and_bicycle_tracker" value="2.0"/>
+            <param name="association.max_area.unknown.polygon_tracker" value="100.0"/>
+            <param name="association.max_area.unknown.multi_vehicle_tracker" value="60.0"/>
+            <param name="association.max_area.unknown.pedestrian_and_bicycle_tracker" value="2.5"/>
+            <param name="association.max_area.car.multi_vehicle_tracker" value="12.1"/>
+            <param name="association.max_area.truck.multi_vehicle_tracker" value="36.0"/>
+            <param name="association.max_area.bus.multi_vehicle_tracker" value="60.0"/>
+            <param name="association.max_area.trailer.multi_vehicle_tracker" value="60.0"/>
+            <param name="association.max_area.motorcycle.pedestrian_and_bicycle_tracker" value="2.5"/>
+            <param name="association.max_area.bicycle.pedestrian_and_bicycle_tracker" value="2.5"/>
+            <param name="association.max_area.pedestrian.pedestrian_and_bicycle_tracker" value="2.0"/>
+            <param name="association.min_area.unknown.polygon_tracker" value="0.0"/>
+            <param name="association.min_area.unknown.multi_vehicle_tracker" value="3.6"/>
+            <param name="association.min_area.unknown.pedestrian_and_bicycle_tracker" value="0.001"/>
+            <param name="association.min_area.car.multi_vehicle_tracker" value="3.6"/>
+            <param name="association.min_area.truck.multi_vehicle_tracker" value="6.0"/>
+            <param name="association.min_area.bus.multi_vehicle_tracker" value="10.0"/>
+            <param name="association.min_area.trailer.multi_vehicle_tracker" value="10.0"/>
+            <param name="association.min_area.motorcycle.pedestrian_and_bicycle_tracker" value="0.1"/>
+            <param name="association.min_area.bicycle.pedestrian_and_bicycle_tracker" value="0.1"/>
+            <param name="association.min_area.pedestrian.pedestrian_and_bicycle_tracker" value="0.1"/>
+            <param name="association.min_iou.unknown.polygon_tracker" value="0.0001"/>
+            <param name="association.min_iou.unknown.multi_vehicle_tracker" value="0.0001"/>
+            <param name="association.min_iou.unknown.pedestrian_and_bicycle_tracker" value="0.0001"/>
+            <param name="association.min_iou.car.multi_vehicle_tracker" value="0.0001"/>
+            <param name="association.min_iou.truck.multi_vehicle_tracker" value="0.1"/>
+            <param name="association.min_iou.bus.multi_vehicle_tracker" value="0.1"/>
+            <param name="association.min_iou.trailer.multi_vehicle_tracker" value="0.1"/>
+            <param name="association.min_iou.motorcycle.pedestrian_and_bicycle_tracker" value="-0.3"/>
+            <param name="association.min_iou.bicycle.pedestrian_and_bicycle_tracker" value="0.0001"/>
+            <param name="association.min_iou.pedestrian.pedestrian_and_bicycle_tracker" value="0.0001"/>
             <param name="unknown_association_giou_threshold" value="-0.8"/>
             <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/data_association_matrix.param.yaml -->
             <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/input_channels.param.yaml -->
@@ -3382,6 +3869,7 @@
         <!-- arg name="use_high_accuracy_detection" value="true" -->
         <!-- arg name="whole_image_detection/label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
         <!-- arg name="whole_image_detection/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
+        <!-- arg name="whole_image_detection/yolox_roi_label_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv" -->
         <!-- arg name="yolox_traffic_light_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml" -->
         <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_camera_info_relay.launch.py -->
         <group>
@@ -3414,6 +3902,97 @@
           </node>
         </group>
         <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_camera_info_relay.launch.py -->
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_map_based_detector.launch.py -->
+        <group>
+          <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
+          <!-- arg name="input/route" value="/planning/mission_planning/route" -->
+          <!-- arg name="input/vector_map" value="/map/vector_map" -->
+          <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/TRAFFIC_LIGHT_RECOGNITION_CAMERA_NAMESPACE_traffic_light_map_based_detector.param.yaml" -->
+          <!-- arg name="use_high_accuracy_detection" value="true" -->
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector/launch/traffic_light_map_based_detector.launch.xml -->
+          <group>
+            <!-- arg name="expect/rois" value="expect/rois" -->
+            <!-- arg name="input/camera_info" value="/sensing/camera/camera6/camera_info" -->
+            <!-- arg name="input/route" value="/planning/mission_planning/route" -->
+            <!-- arg name="input/vector_map" value="/map/vector_map" -->
+            <!-- arg name="output/rois" value="rough/rois" -->
+            <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/camera6_traffic_light_map_based_detector.param.yaml" -->
+            <node pkg="autoware_traffic_light_map_based_detector" exec="traffic_light_map_based_detector_node" name="traffic_light_map_based_detector" namespace="/perception/traffic_light_recognition/camera6/detection" output="both">
+              <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/camera6_traffic_light_map_based_detector.param.yaml -->
+              <param name="max_vibration_pitch" value="0.01745329251"/>
+              <param name="max_vibration_yaw" value="0.01745329251"/>
+              <param name="max_vibration_height" value="0.5"/>
+              <param name="max_vibration_width" value="0.5"/>
+              <param name="max_vibration_depth" value="0.5"/>
+              <param name="max_detection_range" value="200.0"/>
+              <param name="min_timestamp_offset" value="-0.3"/>
+              <param name="max_timestamp_offset" value="0.0"/>
+              <param name="timestamp_sample_len" value="0.02"/>
+              <param name="car_traffic_light_max_angle_range" value="40.0"/>
+              <param name="pedestrian_traffic_light_max_angle_range" value="80.0"/>
+              <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/camera6_traffic_light_map_based_detector.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
+              <remap from="~/input/vector_map" to="/map/vector_map"/>
+              <remap from="~/input/camera_info" to="/sensing/camera/camera6/camera_info"/>
+              <remap from="~/expect/rois" to="/perception/traffic_light_recognition/camera6/detection/expect/rois"/>
+              <remap from="~/input/route" to="/planning/mission_planning/route"/>
+              <remap from="~/output/rois" to="/perception/traffic_light_recognition/camera6/detection/rough/rois"/>
+            </node>
+          </group>
+          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector/launch/traffic_light_map_based_detector.launch.xml -->
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector/launch/traffic_light_map_based_detector.launch.xml -->
+          <group>
+            <!-- arg name="expect/rois" value="expect/rois" -->
+            <!-- arg name="input/camera_info" value="/sensing/camera/camera7/camera_info" -->
+            <!-- arg name="input/route" value="/planning/mission_planning/route" -->
+            <!-- arg name="input/vector_map" value="/map/vector_map" -->
+            <!-- arg name="output/rois" value="rough/rois" -->
+            <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/camera7_traffic_light_map_based_detector.param.yaml" -->
+            <node pkg="autoware_traffic_light_map_based_detector" exec="traffic_light_map_based_detector_node" name="traffic_light_map_based_detector" namespace="/perception/traffic_light_recognition/camera7/detection" output="both">
+              <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/camera7_traffic_light_map_based_detector.param.yaml -->
+              <param name="max_vibration_pitch" value="0.01745329251"/>
+              <param name="max_vibration_yaw" value="0.01745329251"/>
+              <param name="max_vibration_height" value="0.5"/>
+              <param name="max_vibration_width" value="0.5"/>
+              <param name="max_vibration_depth" value="0.5"/>
+              <param name="max_detection_range" value="200.0"/>
+              <param name="min_timestamp_offset" value="-0.04"/>
+              <param name="max_timestamp_offset" value="0.0"/>
+              <param name="timestamp_sample_len" value="0.02"/>
+              <param name="car_traffic_light_max_angle_range" value="40.0"/>
+              <param name="pedestrian_traffic_light_max_angle_range" value="80.0"/>
+              <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/camera7_traffic_light_map_based_detector.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
+              <remap from="~/input/vector_map" to="/map/vector_map"/>
+              <remap from="~/input/camera_info" to="/sensing/camera/camera7/camera_info"/>
+              <remap from="~/expect/rois" to="/perception/traffic_light_recognition/camera7/detection/expect/rois"/>
+              <remap from="~/input/route" to="/planning/mission_planning/route"/>
+              <remap from="~/output/rois" to="/perception/traffic_light_recognition/camera7/detection/rough/rois"/>
+            </node>
+          </group>
+          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector/launch/traffic_light_map_based_detector.launch.xml -->
+        </group>
+        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_map_based_detector.launch.py -->
         <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_node_container.launch.py -->
         <group>
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
@@ -3434,6 +4013,7 @@
           <!-- arg name="use_multithread" value="true" -->
           <!-- arg name="whole_image_detection/label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
           <!-- arg name="whole_image_detection/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
+          <!-- arg name="whole_image_detection/yolox_roi_label_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv" -->
           <!-- arg name="yolox_traffic_light_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml" -->
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera6">
             <param name="front_overhang" value="1.0"/>
@@ -3538,22 +4118,24 @@
               <param name="preprocess_on_gpu" value="true"/>
               <param name="gpu_id" value="0"/>
               <param name="calibration_image_list_path" value=""/>
-              <param name="is_roi_overlap_segment" value="false"/>
+              <param name="is_roi_overlap_segmentation" value="false"/>
               <param name="overlap_roi_score_threshold" value="0.3"/>
               <param name="is_publish_color_mask" value="false"/>
-              <param name="roi_overlay_segment_label.UNKNOWN" value="false"/>
-              <param name="roi_overlay_segment_label.CAR" value="false"/>
-              <param name="roi_overlay_segment_label.TRUCK" value="false"/>
-              <param name="roi_overlay_segment_label.BUS" value="false"/>
-              <param name="roi_overlay_segment_label.MOTORCYCLE" value="false"/>
-              <param name="roi_overlay_segment_label.BICYCLE" value="false"/>
-              <param name="roi_overlay_segment_label.PEDESTRIAN" value="false"/>
-              <param name="roi_overlay_segment_label.ANIMAL" value="false"/>
+              <param name="roi_overlay_segmentation_label.UNKNOWN" value="false"/>
+              <param name="roi_overlay_segmentation_label.CAR" value="false"/>
+              <param name="roi_overlay_segmentation_label.TRUCK" value="false"/>
+              <param name="roi_overlay_segmentation_label.BUS" value="false"/>
+              <param name="roi_overlay_segmentation_label.MOTORCYCLE" value="false"/>
+              <param name="roi_overlay_segmentation_label.BICYCLE" value="false"/>
+              <param name="roi_overlay_segmentation_label.PEDESTRIAN" value="false"/>
+              <param name="roi_overlay_segmentation_label.ANIMAL" value="false"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
               <param name="build_only" value="False"/>
-              <param name="color_map_path" value=""/>
               <param name="label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt"/>
               <param name="model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx"/>
+              <param name="roi_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv"/>
+              <param name="roi_to_semantic_segmentation_remap_path" value=""/>
+              <param name="semantic_segmentation_color_map_path" value=""/>
               <remap from="~/in/image" to="/sensing/camera/camera6/image_raw"/>
               <remap from="~/out/objects" to="/perception/traffic_light_recognition/camera6/detection/traffic_light_whole_image_detector/rois"/>
               <remap from="~/out/image" to="/perception/traffic_light_recognition/camera6/detection/traffic_light_whole_image_detector/debug/image"/>
@@ -3677,22 +4259,24 @@
               <param name="preprocess_on_gpu" value="true"/>
               <param name="gpu_id" value="0"/>
               <param name="calibration_image_list_path" value=""/>
-              <param name="is_roi_overlap_segment" value="false"/>
+              <param name="is_roi_overlap_segmentation" value="false"/>
               <param name="overlap_roi_score_threshold" value="0.3"/>
               <param name="is_publish_color_mask" value="false"/>
-              <param name="roi_overlay_segment_label.UNKNOWN" value="false"/>
-              <param name="roi_overlay_segment_label.CAR" value="false"/>
-              <param name="roi_overlay_segment_label.TRUCK" value="false"/>
-              <param name="roi_overlay_segment_label.BUS" value="false"/>
-              <param name="roi_overlay_segment_label.MOTORCYCLE" value="false"/>
-              <param name="roi_overlay_segment_label.BICYCLE" value="false"/>
-              <param name="roi_overlay_segment_label.PEDESTRIAN" value="false"/>
-              <param name="roi_overlay_segment_label.ANIMAL" value="false"/>
+              <param name="roi_overlay_segmentation_label.UNKNOWN" value="false"/>
+              <param name="roi_overlay_segmentation_label.CAR" value="false"/>
+              <param name="roi_overlay_segmentation_label.TRUCK" value="false"/>
+              <param name="roi_overlay_segmentation_label.BUS" value="false"/>
+              <param name="roi_overlay_segmentation_label.MOTORCYCLE" value="false"/>
+              <param name="roi_overlay_segmentation_label.BICYCLE" value="false"/>
+              <param name="roi_overlay_segmentation_label.PEDESTRIAN" value="false"/>
+              <param name="roi_overlay_segmentation_label.ANIMAL" value="false"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
               <param name="build_only" value="False"/>
-              <param name="color_map_path" value=""/>
               <param name="label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt"/>
               <param name="model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx"/>
+              <param name="roi_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv"/>
+              <param name="roi_to_semantic_segmentation_remap_path" value=""/>
+              <param name="semantic_segmentation_color_map_path" value=""/>
               <remap from="~/in/image" to="/sensing/camera/camera7/image_raw"/>
               <remap from="~/out/objects" to="/perception/traffic_light_recognition/camera7/detection/traffic_light_whole_image_detector/rois"/>
               <remap from="~/out/image" to="/perception/traffic_light_recognition/camera7/detection/traffic_light_whole_image_detector/debug/image"/>
@@ -3715,6 +4299,94 @@
           </load_composable_node>
         </group>
         <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_node_container.launch.py -->
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_occlusion_predictor.launch.py -->
+        <group>
+          <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
+          <!-- arg name="input/cloud" value="/sensing/lidar/top/pointcloud_raw_ex" -->
+          <!-- arg name="input/vector_map" value="/map/vector_map" -->
+          <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml" -->
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor/launch/traffic_light_occlusion_predictor.launch.xml -->
+          <group>
+            <!-- arg name="input/camera_info" value="/sensing/camera/camera6/camera_info" -->
+            <!-- arg name="input/car/traffic_signals" value="car/traffic_signals" -->
+            <!-- arg name="input/cloud" value="/sensing/lidar/top/pointcloud_raw_ex" -->
+            <!-- arg name="input/pedestrian/traffic_signals" value="pedestrian/traffic_signals" -->
+            <!-- arg name="input/rois" value="/perception/traffic_light_recognition/camera6/detection/rois" -->
+            <!-- arg name="input/vector_map" value="/map/vector_map" -->
+            <!-- arg name="output/traffic_signals" value="/perception/traffic_light_recognition/camera6/classification/traffic_signals" -->
+            <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml" -->
+            <node pkg="autoware_traffic_light_occlusion_predictor" exec="traffic_light_occlusion_predictor_node" name="traffic_light_occlusion_predictor" namespace="/perception/traffic_light_recognition/camera6/classification" output="screen">
+              <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml -->
+              <param name="azimuth_occlusion_resolution_deg" value="0.15"/>
+              <param name="elevation_occlusion_resolution_deg" value="0.08"/>
+              <param name="max_valid_pt_dist" value="50.0"/>
+              <param name="max_image_cloud_delay" value="0.5"/>
+              <param name="max_wait_t" value="0.05"/>
+              <param name="max_occlusion_ratio" value="50"/>
+              <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
+              <remap from="~/input/vector_map" to="/map/vector_map"/>
+              <remap from="~/input/camera_info" to="/sensing/camera/camera6/camera_info"/>
+              <remap from="~/input/cloud" to="/sensing/lidar/top/pointcloud_raw_ex"/>
+              <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
+              <remap from="~/input/car/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/car/traffic_signals"/>
+              <remap from="~/input/pedestrian/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/pedestrian/traffic_signals"/>
+              <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/traffic_signals"/>
+            </node>
+          </group>
+          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor/launch/traffic_light_occlusion_predictor.launch.xml -->
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor/launch/traffic_light_occlusion_predictor.launch.xml -->
+          <group>
+            <!-- arg name="input/camera_info" value="/sensing/camera/camera7/camera_info" -->
+            <!-- arg name="input/car/traffic_signals" value="car/traffic_signals" -->
+            <!-- arg name="input/cloud" value="/sensing/lidar/top/pointcloud_raw_ex" -->
+            <!-- arg name="input/pedestrian/traffic_signals" value="pedestrian/traffic_signals" -->
+            <!-- arg name="input/rois" value="/perception/traffic_light_recognition/camera7/detection/rois" -->
+            <!-- arg name="input/vector_map" value="/map/vector_map" -->
+            <!-- arg name="output/traffic_signals" value="/perception/traffic_light_recognition/camera7/classification/traffic_signals" -->
+            <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml" -->
+            <node pkg="autoware_traffic_light_occlusion_predictor" exec="traffic_light_occlusion_predictor_node" name="traffic_light_occlusion_predictor" namespace="/perception/traffic_light_recognition/camera7/classification" output="screen">
+              <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml -->
+              <param name="azimuth_occlusion_resolution_deg" value="0.15"/>
+              <param name="elevation_occlusion_resolution_deg" value="0.08"/>
+              <param name="max_valid_pt_dist" value="50.0"/>
+              <param name="max_image_cloud_delay" value="0.5"/>
+              <param name="max_wait_t" value="0.05"/>
+              <param name="max_occlusion_ratio" value="50"/>
+              <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml -->
+              <param name="front_overhang" value="1.0"/>
+              <param name="left_overhang" value="0.128"/>
+              <param name="max_steer_angle" value="0.7"/>
+              <param name="rear_overhang" value="1.1"/>
+              <param name="right_overhang" value="0.128"/>
+              <param name="use_sim_time" value="false"/>
+              <param name="vehicle_height" value="2.5"/>
+              <param name="wheel_base" value="2.79"/>
+              <param name="wheel_radius" value="0.383"/>
+              <param name="wheel_tread" value="1.64"/>
+              <param name="wheel_width" value="0.235"/>
+              <remap from="~/input/vector_map" to="/map/vector_map"/>
+              <remap from="~/input/camera_info" to="/sensing/camera/camera7/camera_info"/>
+              <remap from="~/input/cloud" to="/sensing/lidar/top/pointcloud_raw_ex"/>
+              <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
+              <remap from="~/input/car/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/car/traffic_signals"/>
+              <remap from="~/input/pedestrian/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/pedestrian/traffic_signals"/>
+              <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/traffic_signals"/>
+            </node>
+          </group>
+          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor/launch/traffic_light_occlusion_predictor.launch.xml -->
+        </group>
+        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_occlusion_predictor.launch.py -->
         <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_multi_camera_fusion/launch/traffic_light_multi_camera_fusion.launch.xml -->
         <group>
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
@@ -7260,6 +7932,7 @@
           <param name="mpc_converged_threshold_rps" value="0.01"/>
           <param name="steering_offset.enable_auto_steering_offset_removal" value="true"/>
           <param name="steering_offset.steer_offset_filter_cutoff_hz" value="0.3"/>
+          <param name="steering_offset.max_update_th" value="0.01"/>
           <param name="publish_debug_trajectories" value="true"/>
           <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/trajectory_follower//lateral/mpc.param.yaml -->
           <!-- params from: {workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/vehicle_info.param.yaml -->

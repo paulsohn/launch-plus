@@ -10,12 +10,9 @@ from __future__ import annotations
 
 import importlib
 import logging
-import os
 import sys
 import types
-from pathlib import Path
 
-import launch_plus.resolver as _R
 from launch_plus.entities.actions.arg import DeclareLaunchArgument
 from launch_plus.entities.actions.env import (
     PushRosNamespace,
@@ -68,11 +65,6 @@ from launch_plus.entities.substitutions.launch_config import LaunchConfiguration
 from launch_plus.entities.substitutions.path_join import PathJoinSubstitution
 
 logger = logging.getLogger("launch_plus")
-
-# ─── ROS prefix fallback ─────────────────────────────────────────────────────
-_ROS_DISTRO = os.environ.get("ROS_DISTRO", "")
-_ROS_DISTRO_PREFIX = f"/opt/ros/{_ROS_DISTRO}" if _ROS_DISTRO else ""
-
 
 # ─── Module builders ─────────────────────────────────────────────────────────
 
@@ -214,38 +206,6 @@ def _build_patched_launch_ros_parameter_descriptions():
     return mod
 
 
-def _build_patched_ament_index_python():
-    """Inline stub — ament_index_python has no entities/ counterpart."""
-    mod = types.ModuleType("ament_index_python")
-    mod.__path__ = []
-    mod.__package__ = "ament_index_python"
-    return mod
-
-
-def _build_patched_ament_index_python_packages():
-    mod = types.ModuleType("ament_index_python.packages")
-
-    def get_package_share_directory(package_name):
-        logger.warning(
-            "get_package_share_directory('%s') is non-idiomatic; "
-            "prefer FindPackageShare('%s') from launch_ros.substitutions",
-            package_name,
-            package_name,
-        )
-        state = _R.get_state()
-        state.track_package(package_name)
-        return state.resolve_pkg_share(package_name)
-
-    def get_package_prefix(package_name):
-        share = _R.get_state().resolve_pkg_share(package_name)
-        p = Path(share)
-        return str(p.parent) if p.parent != p else _ROS_DISTRO_PREFIX
-
-    mod.get_package_share_directory = get_package_share_directory
-    mod.get_package_prefix = get_package_prefix
-    return mod
-
-
 # ─── PatchingFinder ──────────────────────────────────────────────────────────
 
 
@@ -271,8 +231,6 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
         "launch.launch_description_sources": _build_patched_launch_launch_description_sources,
         "launch_ros.substitutions": _build_patched_launch_ros_substitutions,
         "launch_ros.parameter_descriptions": _build_patched_launch_ros_parameter_descriptions,
-        "ament_index_python": _build_patched_ament_index_python,
-        "ament_index_python.packages": _build_patched_ament_index_python_packages,
     }
 
     def find_module(self, fullname, path=None):

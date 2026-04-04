@@ -220,9 +220,7 @@ class LaunchContext:
 
     def __init__(self, state: ResolverState | None = None):
         if state is None:
-            from launch_plus.resolver import get_state
-
-            state = get_state()
+            state = ResolverState()
         self._state: ResolverState = state
 
         # Locals system (matching official __globals, __locals_stack, __locals)

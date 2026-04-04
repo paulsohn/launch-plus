@@ -11,7 +11,6 @@ The main entry point is :func:`resolve_file`, which returns a
 :class:`~launch_plus.types.ParsedLaunchFile`.
 """
 
-import contextvars
 import importlib
 import importlib.abc
 import importlib.machinery
@@ -26,55 +25,17 @@ from typing import Any
 logger = logging.getLogger("launch_plus")
 
 # Ensure substitution entity classes are registered before any parsing occurs.
+# ─── XML/YAML Launch File Parser ──────────────────────────────────────────────
+#
+# Parsing is delegated to Entity-based parsers in ``launch_plus.parsers``.
+# Resolution is dispatched through the action registry via _resolve_element().
+import xml.etree.ElementTree as ET  # noqa: F401 — still used by callers
+
 import launch_plus.entities  # noqa: F401
 from launch_plus.entities.state import (  # noqa: E402
     LaunchContext,
     ResolverState,
 )
-
-# ─── Scoped state via contextvars ────────────────────────────────────────────
-#
-# resolve_file() creates a fresh ResolverState and sets _current_state for the
-# duration of resolution.  All code that needs state uses get_state().
-# This is thread-safe and supports concurrent resolution.
-
-_current_state: contextvars.ContextVar[ResolverState] = contextvars.ContextVar(
-    "_current_state",
-)
-# Set a default state for test/REPL use before resolve_file() is called.
-_current_state.set(ResolverState())
-
-
-def get_state() -> ResolverState:
-    """Return the active ResolverState for the current execution context."""
-    return _current_state.get()
-
-
-# ─── Capture real ament_index_python BEFORE installing the import patcher ────
-# This allows FindPackageShare.perform() to return real installed paths when
-# the package is actually present in the build/install tree.
-
-_real_get_package_share_directory = None
-try:
-    from ament_index_python.packages import get_package_share_directory as _real_gps
-
-    _real_get_package_share_directory = _real_gps
-except Exception:
-    pass
-
-# ─── ROS prefix fallback ─────────────────────────────────────────────────────
-# Use $ROS_DISTRO env var so this works across distro versions (jazzy, rolling, etc.)
-_ROS_DISTRO = os.environ.get("ROS_DISTRO", "")
-_ROS_DISTRO_PREFIX = f"/opt/ros/{_ROS_DISTRO}" if _ROS_DISTRO else ""
-
-
-# ─── XML/YAML Launch File Parser ──────────────────────────────────────────────
-#
-# Parsing is delegated to Entity-based parsers in ``launch_plus.parsers``.
-# Resolution is dispatched through the action registry via _resolve_element().
-
-import xml.etree.ElementTree as ET  # noqa: F401 — still used by callers
-
 from launch_plus.parsers.entity import Entity
 from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
 from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
@@ -287,7 +248,7 @@ def resolve_file(
     global_params: list | None = None,
     fetch_options: Any = None,
 ) -> Any:
-    """Resolve a launch file and return a ParsedLaunchFile.
+    """Resolve a launch file and return (ParsedLaunchFile, actions).
 
     Parameters
     ----------
@@ -297,52 +258,18 @@ def resolve_file(
         Launch arguments (``name:=value`` pairs).
     package_shares : dict
         Package name → share directory path.
+    fetch_dir : Path
+        Absolute path to the source/fetch directory.
     workflow_options : ResolveWorkflowOptions
         Workflow flags.
     lockfile : Lockfile
         Lockfile with package/repo info.
-    fetch_dir : Path
-        Absolute path to the source/fetch directory.
     fetch_options : FetchOptions | None
         Options for inline git sparse-checkout.
     global_params : list | None
         Persisted global params from prior files.
-
-    Returns
-    -------
-    ParsedLaunchFile
-        The resolver result as a structured object (imported from types module).
     """
     state = ResolverState()
-    token = _current_state.set(state)
-    try:
-        return _resolve_file_impl(
-            state,
-            launch_file,
-            args,
-            package_shares,
-            fetch_dir,
-            workflow_options=workflow_options,
-            lockfile=lockfile,
-            global_params=global_params,
-            fetch_options=fetch_options,
-        )
-    finally:
-        _current_state.reset(token)
-
-
-def _resolve_file_impl(
-    state: ResolverState,
-    launch_file: "Path",
-    args: dict[str, str],
-    package_shares: dict[str, str],
-    fetch_dir: "Path",
-    *,
-    workflow_options: Any = None,
-    lockfile: Any = None,
-    global_params: list | None = None,
-    fetch_options: Any = None,
-) -> Any:
     launch_file_str = str(launch_file)
 
     root_dep = _extract_pkg_and_share_path(launch_file_str)

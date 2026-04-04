@@ -64,9 +64,7 @@ class FindPackageShare(Substitution):
         return str(subs), True
 
     def perform(self, context, **kwargs):
-        import launch_plus.resolver as _R
-
-        state = context._state if context is not None else _R.get_state()
+        state = context._state
         pkg, is_fallback = self._resolve_name(context)
         if not is_fallback:
             state.track_package(pkg)

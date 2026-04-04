@@ -76,7 +76,7 @@ Supported via shimmed imports.  Standard patterns work:
   `AnyLaunchDescriptionSource`
 - `DeclareLaunchArgument`, `LaunchConfiguration`
 - `GroupAction`, `PushROSNamespace`
-- `OpaqueFunction` (with `--apply-opaque-file-access`)
+- `OpaqueFunction`
 - `FindPackageShare`, `PathJoinSubstitution`
 - Conditions: `IfCondition`, `UnlessCondition`, `LaunchConfigurationEquals`
 - Event handlers: `OnProcessExit`, `OnProcessStart`, etc.
@@ -96,8 +96,7 @@ are captured by the shims and appear as static elements in the resolved XML
 
 ### YAML launch files (`*.launch.yaml`)
 
-Not yet supported.  XML and Python cover the vast majority of ROS 2 launch
-files in practice.
+Supported via the YAML parser.
 
 ### Xacro (`*.xacro`, `*.urdf.xacro`)
 
@@ -113,16 +112,50 @@ through the resolver's shimmed imports.
 
 ## Known limitations
 
+### `get_package_share_directory()` in preview mode
+
+`get_package_share_directory()` (from `ament_index_python`) looks up installed
+packages via `AMENT_PREFIX_PATH`.  In **preview mode** (`--preview`), source
+packages have not been built or installed yet, so the call will fail with a
+`PackageNotFoundError` for any package that exists only in the source tree.
+
+**Recommended replacement:** use the `FindPackageShare` substitution instead.
+`FindPackageShare` is resolved by launch-plus itself: in preview mode it points
+to the package's source directory (when the package is present in the lockfile
+source tree); after a build it points to the install directory.
+
+```python
+# Instead of:
+from ament_index_python.packages import get_package_share_directory
+pkg_share = get_package_share_directory("my_pkg")
+
+# Use:
+from launch.substitutions import FindPackageShare, PathJoinSubstitution
+pkg_share = FindPackageShare("my_pkg")
+config = PathJoinSubstitution([pkg_share, "config", "params.yaml"])
+```
+
+If a string path is required (e.g. to pass into a Python function that does not
+accept substitutions), wrap the lookup in an `OpaqueFunction` and call
+`get_package_share_directory()` there — `OpaqueFunction` bodies run after the
+environment is resolved, so installed packages are available.
+
+**Source/install path assumption:** launch-plus assumes that any resource file
+referenced by path in a launch file (launcher files, parameter files, etc.) is
+present at the **same relative path within the package share directory** in both
+the source tree and the install tree, and that the file contents are identical.
+This is the standard ROS 2 convention (resources are installed via CMake
+`install(DIRECTORY ...)` rules).  Resources that are generated or transformed
+during the build (e.g. files processed by `configure_file`) may not satisfy
+this assumption.
+
 ### OpaqueFunction constraints
 
-`OpaqueFunction` bodies are executed, not analyzed.  They work correctly when:
-- File reads use standard patterns (`open()`, `yaml.safe_load()`)
-- Package paths use `FindPackageShare` or `get_package_share_directory()`
-
-They may fail when:
+`OpaqueFunction` bodies are executed directly, not analyzed.  They may fail when:
 - The function performs network I/O or other side effects
 - The function imports non-standard packages not available on the resolver host
 - The function modifies global state that affects other launch actions
+- The function calls `get_package_share_directory()` in preview mode (see above)
 
 ### stdout in Python launch files
 

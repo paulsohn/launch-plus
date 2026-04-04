@@ -93,31 +93,28 @@ while remaining compatible with the broader ROS 2 launch ecosystem.
 ### What does "preview" mode mean?
 
 Preview mode (`--preview`) resolves the launch file against the **source
-workspace** without requiring packages to be built.  The output uses portable
-`$(find-pkg-share ...)` paths.  This is the fastest way to see the full launch
-graph.
+workspace** without requiring packages to be built.  For lockfile packages,
+`FindPackageShare` resolves to source directories (fetched on demand);
+packages not in the lockfile fall back to `AMENT_PREFIX_PATH`.  This is
+the fastest way to see the full launch graph.
 
-Without `--preview`, resolution uses `AMENT_PREFIX_PATH` (installed packages).
+Without `--preview`, all packages are resolved via `AMENT_PREFIX_PATH`
+(installed packages).  Both modes use real filesystem paths.
 
 ### Why do some flags have such long names?
 
-Flags like `--allow-global-arg-cascade` and `--apply-launch-arg-defaults` are
-intentionally verbose.  They enable behaviors that work around common anti-
-patterns in legacy launch files (implicit argument propagation, reliance on
-defaults).  The verbose names encourage fixing the root cause in the launch files
-rather than permanently depending on the workaround.
+Flags like `--apply-launch-arg-defaults` are intentionally verbose.  They enable
+behaviors that work around common anti-patterns in legacy launch files (reliance
+on defaults).  The verbose names encourage fixing the root cause in the launch
+files rather than permanently depending on the workaround.
 
 ### What happens with OpaqueFunction?
 
 `OpaqueFunction` is a ROS 2 launch construct that wraps an arbitrary Python
-callable.  launch-plus **executes** these callables with patched filesystem
-access so that:
-- `open()` calls are intercepted and resolved via portable paths
-- Missing packages are fetched on demand
-- Parameter YAML files are read and their contents captured
-
-Use `--apply-opaque-file-access` to enable this.  Without it, file access in
-OpaqueFunction bodies produces an error (strict mode).
+callable.  launch-plus **executes** these callables directly.  File reads that
+access package resources work because `FindPackageShare` resolves to real
+filesystem paths, and missing packages are fetched on demand.  No special flag
+is needed.
 
 ### Why is the resolver redirecting my print() output?
 

@@ -105,14 +105,8 @@ fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
 # Expand <param from="file.yaml"/> entries inline
 --inline-params
 
-# Allow OpaqueFunction bodies to read parameter files
---apply-opaque-file-access
-
 # Fill unset args from their declared defaults
 --apply-launch-arg-defaults
-
-# Propagate parent args into included files (legacy launch files)
---allow-global-arg-cascade
 
 # Install system deps via rosdep (requires sourced ROS 2)
 --rosdep
@@ -156,25 +150,19 @@ the post-build resolution:
 source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
 source install/setup.bash
 
-# Preview resolve (pre-build, portable paths)
+# Preview resolve (pre-build, source paths)
 launch-plus resolve --preview -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > preview.launch.xml
 
-# Post-build resolve (real install paths)
+# Post-build resolve (install paths)
 launch-plus resolve -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > postbuild.launch.xml
 
-# Compare preview vs postbuild (normalize paths first)
-INSTALL_DIR="$(pwd)/install"
-ROS_SHARE_DIR="/opt/ros/${ROS_DISTRO}/share"
-sed -E "s|${INSTALL_DIR}/[^/]+/share/([^/]+)|\$(find-pkg-share \1)|g" \
-  postbuild.launch.xml \
-  | sed -E "s|${ROS_SHARE_DIR}/([^/]+)|\$(find-pkg-share \1)|g" \
-  > postbuild_normalized.xml
+# Compare preview vs postbuild (strip the PREVIEW comment line)
 grep -v '^<!-- PREVIEW:' preview.launch.xml > preview_clean.xml
-diff preview_clean.xml postbuild_normalized.xml
+diff preview_clean.xml postbuild.launch.xml
 ```
 
 ## Directory layout
@@ -198,7 +186,7 @@ my_workspace/
 ## Next steps
 
 - Read [Core Concepts](concepts.md) for deeper understanding of lockfiles,
-  portable paths, and OpaqueFunction handling
+  package resolution, and OpaqueFunction handling
 - See [Architecture](architecture.md) for how the resolver works internally
 - Check [Supported Environments](supported-environments.md) for platform
   compatibility and known limitations

@@ -85,47 +85,45 @@ actually used accumulate on disk.
 
 The `--src` flag controls where packages are fetched (default: `src/`).
 
-## Portable paths
+## Package path resolution
 
-The resolver produces output using **portable paths** — substitution expressions
-like `$(find-pkg-share pkg)/config/params.yaml` that are valid across machines
-and environments.
+`FindPackageShare` (and `$(find-pkg-share ...)` in XML) resolves to real
+filesystem paths.
 
-In `--preview` mode, these paths remain as substitutions in the output XML.
-Without `--preview` (post-build), paths are expanded using `AMENT_PREFIX_PATH` to
-point at the installed package locations.
+- **Preview mode** (`--preview`) — For packages in the lockfile,
+  `FindPackageShare` resolves to the package's **source directory** in the
+  workspace (e.g. `src/my_pkg`), fetching on demand if needed.  Packages not
+  in the lockfile fall back to `AMENT_PREFIX_PATH`.  No build step is required.
+- **Post-build mode** (no `--preview`) — `FindPackageShare` resolves to the
+  installed share path via `AMENT_PREFIX_PATH` (e.g.
+  `install/my_pkg/share/my_pkg`).
 
-Portable paths are the canonical output format.  They ensure that:
-- Resolved XML can be shared between developers
-- CI artifacts are not tied to a specific filesystem layout
-- `diff` between preview and post-build resolutions shows only semantic differences
+### Source/install path equivalence assumption
 
-### Source/install path equivalence convention
-
-For preview mode to produce correct results, launch-plus assumes that **launch
-files and parameter files have the same relative path within a package in both
-the source directory and the install directory**.  Concretely:
+Preview mode resolves `FindPackageShare("my_pkg")` to the source directory
+(e.g. `src/my_pkg`); post-build mode resolves it to the installed share
+directory (e.g. `install/my_pkg/share/my_pkg`).  For this to produce
+equivalent results, all in-package resources — launch files, parameter files,
+config files — must exist at the **same relative path** in both locations:
 
 ```
-# Source path
+# Source
 src/my_pkg/launch/bringup.launch.xml
 src/my_pkg/config/params.yaml
 
-# Install path (after colcon build --symlink-install)
+# Install (after colcon build)
 install/my_pkg/share/my_pkg/launch/bringup.launch.xml
 install/my_pkg/share/my_pkg/config/params.yaml
 ```
 
-Both are reachable via `$(find-pkg-share my_pkg)/launch/bringup.launch.xml`.
-In preview mode, `$(find-pkg-share my_pkg)` is interpreted as `src/my_pkg`
-(the source directory); post-build, it resolves to the installed share path
-via `AMENT_PREFIX_PATH`.
+Standard `ament_cmake` and `ament_python` packages satisfy this — they
+install resource files to `share/<pkg>/` preserving the directory structure.
+In Autoware, every launch file and parameter file follows this convention.
 
-This means packages that **transform or generate** launch files or parameter
-files during the build (e.g. template expansion, code generation) are not
-supported in preview mode — the resolver needs to read the files as they exist
-in the source tree.  Standard `ament_cmake` / `ament_python` packages that
-simply install files to the share directory work correctly.
+Packages that **generate or transform** files during the build (e.g. template
+expansion, code generation) may not have the generated files in the source
+tree.  These packages are not fully supported in preview mode — the resolver
+reads files as they exist in the source directory.
 
 ## Workspace state: clean vs dirty
 
@@ -148,7 +146,7 @@ control how launch-plus treats the on-disk state of fetched repositories:
 
 With `--preview`, the resolver works against the **source workspace** (`src/`)
 without requiring packages to be built or installed.  The output carries a
-`<!-- PREVIEW -->` header and uses portable `$(find-pkg-share ...)` paths.
+`<!-- PREVIEW -->` header and paths resolve to source workspace locations.
 
 This is the primary mode for static analysis: you can see the full launch graph
 without building anything.
@@ -168,15 +166,10 @@ comparing the output.
 Python launch files can contain `OpaqueFunction` — arbitrary Python callables
 that generate launch actions at runtime.  These cannot be statically analyzed.
 
-launch-plus handles them by **executing the Python callable** with patched
-filesystem access:
-- `open()`, `yaml.safe_load()`, `os.path.*`, and `pathlib.Path.open` are
-  intercepted
-- File reads go through portable `$(find-pkg-share pkg)/...` paths
-- If a package hasn't been fetched yet, it is sparse-checked out on demand
-
-The `--apply-opaque-file-access` flag enables this.  Without it, file access in
-OpaqueFunction bodies is recorded as an error (strict mode).
+launch-plus handles them by **executing the Python callable** directly — calling
+`fn(context)` with the resolver's launch context.  If the function reads files
+or generates actions, those are captured through the normal resolution pipeline.
+If a package hasn't been fetched yet, it is sparse-checked out on demand.
 
 ## Python launch shims
 
@@ -253,9 +246,9 @@ Here is what the resolver can and cannot verify.
 - **Argument completeness** — every `$(var name)` / `$(arg name)` reference must
   have a corresponding `<arg name="...">` declaration or be supplied on the
   command line (in strict mode without `--apply-launch-arg-defaults`)
-- **Argument forwarding** — in strict mode (without `--allow-global-arg-cascade`),
-  arguments used in an included file must be explicitly forwarded via
-  `<arg name="..." value="..."/>` in the `<include>` tag
+- **Argument forwarding** — arguments used in an included file must be
+  explicitly forwarded via `<arg name="..." value="..."/>` in the `<include>`
+  tag
 - **Conditional evaluation** — `if="..."` and `unless="..."` attributes are
   fully evaluated, so only the active branches appear in the output
 - **Substitution resolution** — all `$(var)`, `$(arg)`, `$(env)`, `$(eval)`,

@@ -17,8 +17,8 @@ importable as a Python library.
 │  ├── fetcher    — git sparse-checkout on demand       │
 │  ├── resolver   — launch file resolution              │
 │  │   ├── shim modules for launch/launch_ros           │
-│  │   ├── OpaqueFunction execution with patched I/O    │
-│  │   └── portable path ($find-pkg-share) resolution   │
+│  │   ├── OpaqueFunction execution                     │
+│  │   └── package path resolution                      │
 │  ├── orchestrator — coordinates resolve + fetch loop  │
 │  ├── renderer  — resolved IR → XML output             │
 │  ├── builder   — colcon build orchestration           │
@@ -72,7 +72,7 @@ launch-plus resolve <pkg> <launcher>
          ├── import shimmed launch/launch_ros modules
          ├── call generate_launch_description()
          ├── walk the LaunchDescription tree
-         ├── execute OpaqueFunction bodies with patched filesystem
+         ├── execute OpaqueFunction bodies via fn(context)
          └── return structured ParsedLaunchFile directly
     │
     ├── fetch additional packages on demand (sparse-checkout)
@@ -146,8 +146,8 @@ It:
    includes, params, etc.)
 
 The shims require no ROS 2 Python packages to be installed.  `OpaqueFunction`
-bodies are executed directly with patched `open()`, `yaml.safe_load()`,
-`os.path.*`, and `pathlib.Path.open`.
+bodies are executed directly by calling `fn(context)` with the resolver's
+launch context.
 
 ### Orchestrator (`orchestrator.py`)
 

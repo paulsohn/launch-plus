@@ -302,14 +302,14 @@ All three colcon install conventions are handled transparently:
 | `--merge-install` | `install/` | `install/share/<pkg>/` |
 | `--symlink-install` | `install/<pkg>:...` | symlink → source file |
 
-This works because `_resolve_pkg_share` and `_real_get_package_share_directory`
+This works because `state.resolve_pkg_share()` and `_real_get_package_share_directory`
 resolve via `AMENT_PREFIX_PATH` directly.
 The `share/<pkg>/` tree structure is identical across all conventions.
 
 **Residual gap — source-first priority:**
 `all_package_shares()` fills the package map with **source paths first** (from lockfile),
 and AMENT_PREFIX_PATH entries only cover packages not already present (`or_insert_with`).
-So for workspace packages, `_resolve_pkg_share` returns the source path even when a build
+So for workspace packages, `state.resolve_pkg_share()` returns the source path even when a build
 is present, missing generated files that only exist in the install space.
 
 After M5 (Builder), we should add a `--post-build` mode (or `--install-base <path>`) that
@@ -325,7 +325,7 @@ inverts this priority: prefer installed paths so generated files are accessible.
 - Do NOT attempt to locate the file via `ament_index_python` at analysis time (the path
   resolution already went through `FindPackageShare`, so the package is tracked)
 - For `--post-build` / `--install-base` mode: prefer install path over source path in
-  `_resolve_pkg_share` and `all_package_shares()`, so generated files are accessible
+  `state.resolve_pkg_share()` and `all_package_shares()`, so generated files are accessible
 
 ### Workaround for Launch File Authors
 
@@ -995,7 +995,7 @@ autoware.launch.xml
 set by the parent is visible to all descendants without explicit forwarding.
 
 `launch-plus` resolves files independently, so this "cascade via context" is only
-honoured when `--allow-global-arg-cascade` is passed.
+honoured when the `with_cascade` arg context is populated (i.e. the parent's full arg context is forwarded to children).
 
 **Top XML targets in Autoware:**
 
@@ -1011,7 +1011,7 @@ honoured when `--allow-global-arg-cascade` is passed.
 
 | Situation | Recommended action |
 |---|---|
-| File tree that intentionally relies on `LaunchConfiguration` cascade | Pass `--allow-global-arg-cascade` to suppress these warnings |
+| File tree that intentionally relies on `LaunchConfiguration` cascade | The resolver automatically populates `with_cascade` to forward the parent arg context |
 | Migrating to explicit arg passing | Add `<arg name="X"/>` (no default) to each intermediate file so the chain is self-documenting |
 | Quick audit — only care about errors | Run without `--strict`; excessive-include-arg warnings are non-fatal by default |
 
@@ -1147,20 +1147,18 @@ Safe pattern with fallback:
 
 ### Design Decision
 
-`$(find-pkg-share <pkg>)` substitutions have two resolution modes:
+`$(find-pkg-share <pkg>)` substitutions always resolve to a real filesystem path via `state.resolve_pkg_share()`:
 
-| Mode | `ctx.preview_mode` | Behaviour |
-|------|--------------------|-----------|
-| **Full** | `false` (default) | Expands to a real filesystem path (workspace source path → AMENT_PREFIX_PATH → fallback). Used when a real path is needed to open a file. |
-| **Preview** | `true` | Keeps the portable `$(find-pkg-share pkg)` form. Used for all output values so the resolved XML/YAML is machine-independent. |
+1. Workspace source packages (from lockfile `package_shares`) → real path
+2. Installed packages via `AMENT_PREFIX_PATH` → real path
+3. Not found → error
 
-**API contract (`resolver.py`):**
+**API contract:**
 
-- `resolve_substitutions(text, ctx)` — mode-aware: in preview mode, `$(find-pkg-share pkg)` is preserved as a portable token; in full mode, it resolves to a real path.
-- `_ActionParser.resolve(text)` and `_ActionParser.resolve_optional(text)` delegate to `resolve_substitutions`.
-- For `<include file=...>` paths, the action handler resolves the substitution normally and then separately resolves the portable path to a real filesystem path via `_parse_portable_path` + `_resolve_pkg_share`, so the file can be opened.
+- `FindPackageShareSubstitution.perform(ctx)` calls `state.resolve_pkg_share(pkg)` and always returns a real filesystem path.
+- For `<include file=...>` paths, the action handler resolves the substitution normally via `state.resolve_pkg_share()`, which returns a real filesystem path so the file can be opened.
 
-When `_resolve_pkg_share` cannot find a package, it returns `$(find-pkg-share pkg)` — the portable form.  The output is never a wrong hardcoded path.
+When `state.resolve_pkg_share()` cannot find a package, it raises an error.  Paths are always real filesystem paths.
 
 ### Multi-value Strings
 
@@ -1170,40 +1168,26 @@ A single substitution string can contain multiple `$(find-pkg-share ...)` tokens
 "[$(find-pkg-share pkg1)/path/to/resource1, $(find-pkg-share pkg2)/path/to/resource2]"
 ```
 
-**Lark-based resolver:** `parse_substitution` parses the string via the Lark grammar into typed `Substitution` objects (e.g. `FindPkgShareSubstitution`). `resolve_substitutions_from_tokens` calls `.perform(ctx)` on each, accumulating the output string. The `preview_mode` flag on `ctx` controls whether `FindPkgShareSubstitution.perform()` returns a portable token or a real path.
+**Lark-based resolver:** `parse_substitution` parses the string via the Lark grammar into typed `Substitution` objects (e.g. `FindPkgShareSubstitution`). `resolve_substitutions_from_tokens` calls `.perform(ctx)` on each, accumulating the output string. `FindPkgShareSubstitution.perform()` always returns a real filesystem path via `state.resolve_pkg_share()`.
 
 The Lark grammar matches the official ROS 2 `grammar.lark` — all valid XML substitution expressions (including `$(eval ...)` with operators inside quoted templates) are handled without a fallback.
 
-**`_resolve_ros_substitutions` (for Python launch file output):** Uses `re.sub` with a global match, finding every `$(find-pkg-share ...)` independently:
-```python
-re.sub(r'\$\(find-pkg-share ([^)]+)\)', lambda m: _resolve_pkg_share(m.group(1).strip()), value)
-```
-For each match: if the package is found, the token is replaced with the real source path; if not found, `_resolve_pkg_share` returns `$(find-pkg-share pkg)` (the fallback introduced after M4), so the replacement equals the original token and the portable form is preserved in-place.
-
-**Result for partially-resolvable strings:** if `pkg1` is found and `pkg2` is not:
-```
-"[/workspace/src/pkg1/path/to/resource1, $(find-pkg-share pkg2)/path/to/resource2]"
-```
-This is the maximally-resolved form for that environment; the not-found token remains portable.
+**Result:** All `$(find-pkg-share ...)` tokens are resolved to real filesystem paths via `state.resolve_pkg_share()`. If a package cannot be found, resolution raises an error.
 
 ### Package Resolution Fallback
 
-`_resolve_pkg_share(package)` in `resolver.py` follows this chain:
+`state.resolve_pkg_share(package)` follows this chain:
 1. Workspace source packages (from lockfile `package_shares`) → real path
 2. Installed packages via `AMENT_PREFIX_PATH` → real path
-3. **Not found anywhere: returns `$(find-pkg-share {package})`** — the portable form
+3. **Not found anywhere: raises an error**
 
-In preview mode, `FindPkgShareSubstitution.perform()` always returns the portable form `$(find-pkg-share pkg)`. In full mode, it calls `_resolve_pkg_share` for a real path.
-
-### Known Limitation: Nested Substitutions in Python Regex
-
-`_resolve_ros_substitutions` uses `[^)]+` to match the package name, which stops at the first `)`.  Nested substitutions of the form `$(find-pkg-share $(var pkg_name))` would be mismatched.  In practice, `$(var ...)` is expanded before `_resolve_ros_substitutions` is called, so this pattern is not encountered.
+`FindPkgShareSubstitution.perform()` delegates to `state.resolve_pkg_share()` and always returns a real filesystem path.
 
 ### Where the Rule Is Applied
 
 | Location | Call | Mode |
 |----------|------|------|
-| `<include file=...>` open path | `resolve` + `_parse_portable_path` + `_resolve_pkg_share` | Mode-aware resolve, then separate real-path resolution |
+| `<include file=...>` open path | `resolve_substitutions` → `state.resolve_pkg_share()` | Always resolves to real path |
 | `<arg default=...>` | `resolve_substitutions` | Mode-aware |
 | `<let value=...>` | `resolve_substitutions` | Mode-aware |
 | `<node pkg=...>`, `exec=...`, etc. | `resolve_substitutions` | Mode-aware |
@@ -1212,7 +1196,7 @@ In preview mode, `FindPkgShareSubstitution.perform()` always returns the portabl
 | `<push-ros-namespace namespace=...>` | `resolve_substitutions` | Mode-aware |
 | `include_args` forwarded to child | `resolve_substitutions` | Mode-aware |
 | Condition expressions | `resolve_substitutions` | Mode-aware |
-| `_resolve_ros_substitutions` (Python launch output) | regex replace | Always resolves if found; portable fallback if not found |
+| Python launch output | `state.resolve_pkg_share()` | Always resolves to real path |
 
 ## 15. Unresolvable Constructs (static-analysis limitations)
 

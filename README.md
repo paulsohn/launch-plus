@@ -54,10 +54,8 @@ variables substituted — invaluable for debugging and CI validation.
 - **Static analysis** — resolve launch files without building packages or running ROS nodes
 - **Python launch support** — executes `generate_launch_description()` with shimmed
   `launch`/`launch_ros` imports; no ROS 2 Python packages needed on the resolver host
-- **OpaqueFunction handling** — executes arbitrary Python callables with patched
-  filesystem access, transparently fetching packages as they are accessed
-- **Portable output** — resolved XML uses `$(find-pkg-share pkg)/...` paths that
-  work across machines and environments
+- **OpaqueFunction handling** — executes arbitrary Python callables, transparently
+  fetching packages as they are accessed
 - **Lockfile pinning** — reproducible builds via commit-SHA-pinned lockfiles
 - **rosdep integration** — automatically installs system dependencies for the
   packages being built
@@ -105,9 +103,7 @@ launch-plus resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   "map_path:={map_path}" \
-  --allow-global-arg-cascade \
   --apply-launch-arg-defaults \
-  --apply-opaque-file-access \
   --show-args \
   --inline-params \
   --rosdep \
@@ -130,9 +126,7 @@ launch-plus build -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   "map_path:={map_path}" \
-  --allow-global-arg-cascade \
   --apply-launch-arg-defaults \
-  --apply-opaque-file-access \
   --rosdep \
   --colcon-flagfile colcon-flags.txt
 ```
@@ -178,7 +172,7 @@ Commands that refer to source code support workspace state flags:
 | Document | Description |
 |---|---|
 | [Motivation](docs/motivation.md) | Why launch-plus exists and what problems it solves |
-| [Core Concepts](docs/concepts.md) | Lockfiles, sparse checkout, portable paths, and more |
+| [Core Concepts](docs/concepts.md) | Lockfiles, sparse checkout, package resolution, and more |
 | [Getting Started](docs/getting-started.md) | Step-by-step tutorial for your own project |
 | [Architecture](docs/architecture.md) | How the resolver, fetcher, and builder work internally |
 | [Supported Environments](docs/supported-environments.md) | Platforms, ROS distros, and known limitations |

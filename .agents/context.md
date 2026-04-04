@@ -38,7 +38,7 @@ Key insight: **A launch file IS a build target** that declares its dependencies 
 │  │   ├── entities/actions/       — @expose_action handlers        │
 │  │   ├── parsers/                — XML/YAML → Entity object model │
 │  │   ├── shim modules            — launch/launch_ros interception │
-│  │   └── OpaqueFunction execution with patched I/O                │
+│  │   └── OpaqueFunction execution                                 │
 │  ├── orchestrator — coordinates resolve + fetch retry loop        │
 │  ├── renderer     — resolved IR → XML output                      │
 │  ├── fetcher      — git sparse-checkout on demand                 │
@@ -146,12 +146,11 @@ The XML/YAML resolver automatically tracks dependencies during parsing — no ma
 ### launch.py Support
 
 Python launch files are resolved by:
-1. Installing a `MetaPathFinder` that intercepts imports of `launch`, `launch_ros`, and `ament_index_python`
+1. Installing a `MetaPathFinder` (defined in `resolver.py`) that intercepts imports of `launch`, `launch_ros`, and `ament_index_python`
 2. Replacing them with shim modules that record constructor arguments
 3. Loading the target launch file via `importlib`
 4. Calling `generate_launch_description()`
-5. Walking the resulting `LaunchDescription` tree
-6. Executing `OpaqueFunction` bodies with patched filesystem access
+5. Walking the resulting `LaunchDescription` tree, executing `OpaqueFunction` bodies directly via `fn(context)`
 
 The shims require no ROS 2 Python packages to be installed.
 
@@ -223,15 +222,7 @@ launch-plus/
 
 ## Terminology
 
-### Portable Path
-
-A path string in `$(find-pkg-share <pkg>)/...` format — an *unresolved substitution* that
-references a package resource without binding to any specific filesystem layout.  Portable
-paths are valid inputs to the ROS 2 launch substitution engine and are the **canonical output
-format of launch-plus in all modes**.
-
 ### Verbose Flag
 
 Flags that enable non-default resolver behaviour that would otherwise discourage users from
-leaving upstream launch files as-is.  Examples: `--allow-global-arg-cascade`,
-`--apply-launch-arg-defaults`.
+leaving upstream launch files as-is.  Example: `--apply-launch-arg-defaults`.

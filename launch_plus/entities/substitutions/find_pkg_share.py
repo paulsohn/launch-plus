@@ -39,8 +39,8 @@ class FindPackageShareSubstitution(Substitution):
         state.track_package(pkg)
         return state.resolve_pkg_share(pkg)
 
-    def serialize(self) -> str:
-        return f"$(find-pkg-share {''.join(t.serialize() for t in self.package)})"
+    def __str__(self) -> str:
+        return f"$(find-pkg-share {''.join(str(t) for t in self.package)})"
 
 
 # ─── Python-shim substitution ────────────────────────────────────────────────
@@ -70,9 +70,6 @@ class FindPackageShare(Substitution):
             state.track_package(pkg)
         return state.resolve_pkg_share(pkg)
 
-    def serialize(self) -> str:
+    def __str__(self):
         pkg, _ = self._resolve_name(None)
         return f"$(find-pkg-share {pkg})"
-
-    def __str__(self):
-        return self.serialize()

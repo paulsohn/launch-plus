@@ -24,5 +24,5 @@ class DirnameSubstitution(Substitution):
             return ctx.launch_file_dir
         return "$(dirname)"
 
-    def serialize(self) -> str:
+    def __str__(self) -> str:
         return "$(dirname)"

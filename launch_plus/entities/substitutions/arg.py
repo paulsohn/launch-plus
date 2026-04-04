@@ -43,8 +43,8 @@ class ArgSubstitution(Substitution):
             value = resolved
         return resolve_substitutions_from_tokens(parse_to_tokens(value), ctx)
 
-    def serialize(self) -> str:
-        return f"$(arg {_serialize_tokens(self.name)})"
+    def __str__(self) -> str:
+        return f"$(arg {''.join(str(t) for t in self.name)})"
 
 
 def parse_to_tokens(text: str) -> list[Substitution]:
@@ -52,7 +52,3 @@ def parse_to_tokens(text: str) -> list[Substitution]:
     from launch_plus.parsers.parse_substitution import parse_substitution
 
     return parse_substitution(text)
-
-
-def _serialize_tokens(tokens: list[Substitution]) -> str:
-    return "".join(t.serialize() for t in tokens)

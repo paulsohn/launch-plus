@@ -35,5 +35,5 @@ class FindPackagePrefixSubstitution(Substitution):
         # Prefix is the parent of share/<pkg> — e.g. /opt/ros/humble
         return str(Path(share).parent.parent)
 
-    def serialize(self) -> str:
-        return f"$(find-pkg-prefix {''.join(t.serialize() for t in self.package)})"
+    def __str__(self) -> str:
+        return f"$(find-pkg-prefix {''.join(str(t) for t in self.package)})"

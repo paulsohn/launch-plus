@@ -18,5 +18,5 @@ class PathJoinSubstitution(Substitution):
             parts.append(result if result is not None else str(sub))
         return str(Path(*parts))
 
-    def serialize(self) -> str:
+    def __str__(self) -> str:
         return "/".join(str(s) for s in self._subs)

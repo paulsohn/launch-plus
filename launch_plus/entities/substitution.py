@@ -19,12 +19,8 @@ class Substitution(ABC):
         Returns a real filesystem path or resolved value.
         """
 
-    @abstractmethod
-    def serialize(self) -> str:
-        """Return the canonical serialized form (e.g. ``$(var name)``)."""
-
     def __repr__(self) -> str:
-        return f"{type(self).__name__}({self.serialize()!r})"
+        return f"{type(self).__name__}({str(self)!r})"
 
 
 class TextSubstitution(Substitution):
@@ -36,5 +32,5 @@ class TextSubstitution(Substitution):
     def perform(self, ctx: LaunchContext) -> str:
         return self.text
 
-    def serialize(self) -> str:
+    def __str__(self) -> str:
         return self.text

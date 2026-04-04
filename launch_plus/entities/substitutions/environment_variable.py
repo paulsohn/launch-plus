@@ -33,8 +33,5 @@ class DeferredEnvironmentVariable(Substitution):
         logger.error("EnvironmentVariable: '%s' is not set and no default", name)
         return ""
 
-    def serialize(self) -> str:
-        return f"$(env {self._name})"
-
     def __str__(self):
         return str(self._name) if self._name is not None else ""

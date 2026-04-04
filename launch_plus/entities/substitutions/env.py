@@ -53,9 +53,9 @@ class EnvSubstitution(Substitution):
             return f"$(env {name})"
         return str(value)
 
-    def serialize(self) -> str:
-        name_str = "".join(t.serialize() for t in self.name)
+    def __str__(self) -> str:
+        name_str = "".join(str(t) for t in self.name)
         if self.default is not None:
-            default_str = "".join(t.serialize() for t in self.default)
+            default_str = "".join(str(t) for t in self.default)
             return f"$(env {name_str} {default_str})"
         return f"$(env {name_str})"

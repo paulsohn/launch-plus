@@ -56,8 +56,8 @@ class NotSubstitution(Substitution):
         resolved = _resolve_tokens(self._value, ctx)
         return str(not _coerce_bool(resolved)).lower()
 
-    def serialize(self) -> str:
-        return f"$(not {''.join(t.serialize() for t in self._value)})"
+    def __str__(self) -> str:
+        return f"$(not {''.join(str(t) for t in self._value)})"
 
 
 @expose_substitution("and")
@@ -81,9 +81,9 @@ class AndSubstitution(Substitution):
         right = _coerce_bool(_resolve_tokens(self._right, ctx))
         return str(left and right).lower()
 
-    def serialize(self) -> str:
-        left_s = "".join(t.serialize() for t in self._left)
-        right_s = "".join(t.serialize() for t in self._right)
+    def __str__(self) -> str:
+        left_s = "".join(str(t) for t in self._left)
+        right_s = "".join(str(t) for t in self._right)
         return f"$(and {left_s} {right_s})"
 
 
@@ -108,7 +108,7 @@ class OrSubstitution(Substitution):
         right = _coerce_bool(_resolve_tokens(self._right, ctx))
         return str(left or right).lower()
 
-    def serialize(self) -> str:
-        left_s = "".join(t.serialize() for t in self._left)
-        right_s = "".join(t.serialize() for t in self._right)
+    def __str__(self) -> str:
+        left_s = "".join(str(t) for t in self._left)
+        right_s = "".join(str(t) for t in self._right)
         return f"$(or {left_s} {right_s})"

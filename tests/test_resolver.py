@@ -1443,7 +1443,7 @@ class TestTrackedFindPackageShare:
         ctx._state.package_shares["my_pkg"] = "/ws/src/my_pkg"
         fps = FindPackageShare("my_pkg")
         assert fps.perform(ctx) == "/ws/src/my_pkg"
-        # str()/serialize() returns portable form
+        # str() returns display form
         assert str(fps) == "$(find-pkg-share my_pkg)"
 
     def test_preview_unknown_pkg_raises(self):
@@ -1461,7 +1461,7 @@ class TestTrackedFindPackageShare:
         ctx._state.package_shares["my_pkg"] = "/install/share/my_pkg"
         fps = FindPackageShare("my_pkg")
         assert fps.perform(ctx) == "/install/share/my_pkg"
-        # str() returns portable form; perform() returns resolved path
+        # str() returns display form; perform() returns resolved path
         assert str(fps) == "$(find-pkg-share my_pkg)"
 
     def test_postbuild_unresolvable_raises(self):

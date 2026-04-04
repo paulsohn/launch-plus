@@ -52,10 +52,10 @@ class IfElseSubstitution(Substitution):
             return _resolve_tokens(self._else_value, ctx)
         return ""
 
-    def serialize(self) -> str:
-        c = "".join(t.serialize() for t in self._condition)
-        iv = "".join(t.serialize() for t in self._if_value)
+    def __str__(self) -> str:
+        c = "".join(str(t) for t in self._condition)
+        iv = "".join(str(t) for t in self._if_value)
         if self._else_value is not None:
-            ev = "".join(t.serialize() for t in self._else_value)
+            ev = "".join(str(t) for t in self._else_value)
             return f"$(if {c} {iv} {ev})"
         return f"$(if {c} {iv})"

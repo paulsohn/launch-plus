@@ -57,9 +57,9 @@ class EqualsSubstitution(Substitution):
         right = _resolve_tokens(self._right, ctx)
         return str(_equals(left, right)).lower()
 
-    def serialize(self) -> str:
-        left_s = "".join(t.serialize() for t in self._left)
-        right_s = "".join(t.serialize() for t in self._right)
+    def __str__(self) -> str:
+        left_s = "".join(str(t) for t in self._left)
+        right_s = "".join(str(t) for t in self._right)
         return f"$(equals {left_s} {right_s})"
 
 
@@ -84,7 +84,7 @@ class NotEqualsSubstitution(Substitution):
         right = _resolve_tokens(self._right, ctx)
         return str(not _equals(left, right)).lower()
 
-    def serialize(self) -> str:
-        left_s = "".join(t.serialize() for t in self._left)
-        right_s = "".join(t.serialize() for t in self._right)
+    def __str__(self) -> str:
+        left_s = "".join(str(t) for t in self._left)
+        right_s = "".join(str(t) for t in self._right)
         return f"$(not-equals {left_s} {right_s})"

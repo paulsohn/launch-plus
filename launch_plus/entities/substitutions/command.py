@@ -11,18 +11,6 @@ if TYPE_CHECKING:
     from launch_plus.entities.state import LaunchContext
 
 
-def _needs_quoting(tokens: list[Substitution]) -> bool:
-    """Return True if the argument contains spaces or substitutions that need quoting."""
-    from launch_plus.entities.substitution import TextSubstitution
-
-    for t in tokens:
-        if not isinstance(t, TextSubstitution):
-            return True
-        if " " in t.text:
-            return True
-    return False
-
-
 @expose_substitution("command")
 class CommandSubstitution(Substitution):
     """Preserve ``$(command <cmd> [on_stderr])`` — cannot be evaluated at static analysis time.
@@ -64,11 +52,11 @@ class CommandSubstitution(Substitution):
                 parts.append(resolved)
         return f"$(command {' '.join(parts)})"
 
-    def serialize(self) -> str:
+    def __str__(self) -> str:
         parts: list[str] = []
-        for arg in self.arguments:
-            inner = "".join(t.serialize() for t in arg)
-            if _needs_quoting(arg):
+        for arg_tokens in self.arguments:
+            inner = "".join(str(t) for t in arg_tokens)
+            if " " in inner:
                 parts.append(f"'{inner}'")
             else:
                 parts.append(inner)

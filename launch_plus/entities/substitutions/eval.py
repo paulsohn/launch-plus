@@ -55,5 +55,5 @@ class EvalSubstitution(Substitution):
                 return f"$(eval {expr})"
             return ""
 
-    def serialize(self) -> str:
-        return f"$(eval {''.join(t.serialize() for t in self.expression)})"
+    def __str__(self) -> str:
+        return f"$(eval {''.join(str(t) for t in self.expression)})"

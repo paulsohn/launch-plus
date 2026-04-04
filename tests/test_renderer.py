@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from launch_plus.entities.actions.executable import ExecuteProcess
 from launch_plus.entities.actions.group import GroupAction
-from launch_plus.entities.actions.marker import EndSourceMarker, SourceMarker
+from launch_plus.entities.actions.marker import SourceMarker
 from launch_plus.entities.actions.node import (
     ComposableNode,
     ComposableNodeContainer,
@@ -133,9 +133,13 @@ def test_groups_by_source_file() -> None:
     r2 = Node(package="p2", executable="e2").execute(ctx)
 
     actions = [
-        SourceMarker("sensor_launch", "launch/sensing.launch.xml"),
-        GroupAction(resolved_children=[*r1, *r2]),
-        EndSourceMarker("sensor_launch", "launch/sensing.launch.xml"),
+        GroupAction(
+            resolved_children=[
+                SourceMarker("sensor_launch", "launch/sensing.launch.xml"),
+                *r1,
+                *r2,
+            ]
+        ),
     ]
     xml = render_resolved_xml("my_pkg", "top.launch.xml", actions)
     assert xml.count("<group>") == 1
@@ -147,24 +151,25 @@ def test_nested_groups() -> None:
     ctx = _make_ctx()
     resolved_n = Node(package="p", executable="e", name="n").execute(ctx)
 
-    inner = GroupAction(resolved_children=list(resolved_n))
-    mid = GroupAction(
+    inner = GroupAction(
         resolved_children=[
             SourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
+            *resolved_n,
+        ]
+    )
+    mid = GroupAction(
+        resolved_children=[
+            SourceMarker("comp_pkg", "launch/comp.launch.xml"),
             inner,
-            EndSourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
         ]
     )
     actions = [
-        SourceMarker("root_pkg", "launch/root.launch.xml"),
         GroupAction(
             resolved_children=[
-                SourceMarker("comp_pkg", "launch/comp.launch.xml"),
+                SourceMarker("root_pkg", "launch/root.launch.xml"),
                 mid,
-                EndSourceMarker("comp_pkg", "launch/comp.launch.xml"),
             ]
         ),
-        EndSourceMarker("root_pkg", "launch/root.launch.xml"),
     ]
     xml = render_resolved_xml("my_pkg", "top.launch.xml", actions)
     assert xml.count("<group>") == 3

@@ -7,7 +7,7 @@ import os
 
 from launch_plus.entities.action import Action
 from launch_plus.entities.actions.group import GroupAction
-from launch_plus.entities.actions.marker import ArgComment, EndSourceMarker, SourceMarker
+from launch_plus.entities.actions.marker import ArgComment, SourceMarker
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.helpers import _extract_pkg_and_share_path
 from launch_plus.entities.parsing import _ActionParser
@@ -153,14 +153,13 @@ class IncludeLaunchDescription(Action):
 
 
 def _wrap_with_markers(children, pkg, share, args, state) -> list:
-    """Wrap resolved children in [SourceMarker, GroupAction, EndSourceMarker].
+    """Wrap resolved children in a GroupAction with SourceMarker as first child.
 
-    The GroupAction holds ArgComment markers (explicit + declared defaults)
-    followed by the resolved children.
+    The GroupAction holds [SourceMarker, ArgComment..., ...children].
     """
-    has_content = any(not isinstance(c, (SourceMarker, EndSourceMarker)) for c in children)
+    has_content = any(not isinstance(c, SourceMarker) for c in children)
     if has_content or state.show_empty_includes:
-        group_children: list = []
+        group_children: list = [SourceMarker(pkg, share, args)]
 
         # Conditionally add arg markers (--show-args)
         if state.show_args:
@@ -172,13 +171,13 @@ def _wrap_with_markers(children, pkg, share, args, state) -> list:
             for entry in declared:
                 if entry["name"] not in merged:
                     merged[entry["name"]] = (entry["default"], True)
-            group_children = [
+            group_children.extend(
                 ArgComment(name=k, value=v, is_default=is_def)
                 for k, (v, is_def) in sorted(merged.items())
-            ]
+            )
 
         group = GroupAction(resolved_children=group_children + list(children))
-        return [SourceMarker(pkg, share, args), group, EndSourceMarker(pkg, share)]
+        return [group]
     return list(children)
 
 

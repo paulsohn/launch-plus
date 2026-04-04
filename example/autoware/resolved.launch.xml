@@ -4,8 +4,8 @@
   <!-- arg name="map_path" value="{map_path}" -->
   <!-- arg name="sensor_model" value="sample_sensor_kit" -->
   <!-- arg name="vehicle_model" value="sample_vehicle" -->
-  <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/pointcloud_container.launch.py -->
   <group>
+    <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/pointcloud_container.launch.py -->
     <!-- arg name="container_name" value="pointcloud_container" -->
     <!-- arg name="use_multithread" value="true" -->
     <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="pointcloud_container" namespace="/">
@@ -23,9 +23,8 @@
       <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
     </node_container>
   </group>
-  <!-- end: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/pointcloud_container.launch.py -->
-  <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_vehicle_launch/launch/vehicle.launch.xml -->
   <group>
+    <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_vehicle_launch/launch/vehicle.launch.xml -->
     <!-- arg name="config_dir" value="{workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description/config" -->
     <!-- arg name="initial_engage_state" default="false" -->
     <!-- arg name="launch_vehicle_interface" value="true" -->
@@ -50,14 +49,13 @@
       <param name="wheel_width" value="0.235"/>
     </node>
   </group>
-  <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_vehicle_launch/launch/vehicle.launch.xml -->
-  <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_system_component.launch.xml -->
   <group>
+    <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_system_component.launch.xml -->
     <!-- arg name="diagnostic_graph_aggregator_graph_path" default="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/diagnostics/autoware-main.yaml" -->
     <!-- arg name="diagnostic_graph_aggregator_param_path" default="{workspace}/src/universe/autoware_universe/system/autoware_diagnostic_graph_aggregator/config/default.param.yaml" -->
     <!-- arg name="use_sim_time" default="false" -->
-    <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_system_launch/launch/system.launch.xml -->
     <group>
+      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_system_launch/launch/system.launch.xml -->
       <!-- arg name="availability_converter_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/command_mode/converter.param.yaml" -->
       <!-- arg name="change_autoware_control_srv" default="/system/operation_mode/change_autoware_control" -->
       <!-- arg name="change_operation_mode_srv" default="/system/operation_mode/change_operation_mode" -->
@@ -97,8 +95,8 @@
       <!-- arg name="system_monitor_process_monitor_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/system_monitor/process_monitor.param.yaml" -->
       <!-- arg name="system_monitor_voltage_monitor_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/system_monitor/voltage_monitor.param.yaml" -->
       <!-- arg name="use_control_command_gate" default="false" -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_system_monitor/launch/system_monitor.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_system_monitor/launch/system_monitor.launch.xml -->
         <!-- arg name="cpu_monitor_config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/system_monitor/cpu_monitor.param.yaml" -->
         <!-- arg name="gpu_monitor_config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/system_monitor/gpu_monitor.param.yaml" -->
         <!-- arg name="hdd_monitor_config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/system_monitor/hdd_monitor.param.yaml" -->
@@ -204,9 +202,8 @@
           </composable_node>
         </node_container>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_system_monitor/launch/system_monitor.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_duplicated_node_checker/launch/duplicated_node_checker.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_duplicated_node_checker/launch/duplicated_node_checker.launch.xml -->
         <!-- arg name="config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml" -->
         <node pkg="autoware_duplicated_node_checker" exec="autoware_duplicated_node_checker_node" name="duplicated_node_checker" namespace="/system" output="screen">
           <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/system/duplicated_node_checker/duplicated_node_checker.param.yaml -->
@@ -227,9 +224,8 @@
           <param name="wheel_width" value="0.235"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_duplicated_node_checker/launch/duplicated_node_checker.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_processing_time_checker/launch/processing_time_checker.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_processing_time_checker/launch/processing_time_checker.launch.xml -->
         <!-- arg name="config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/processing_time_checker/processing_time_checker.param.yaml" -->
         <!-- arg name="output_metrics" default="false" -->
         <node pkg="autoware_processing_time_checker" exec="processing_time_checker_node" name="processing_time_checker" namespace="/system" output="screen">
@@ -251,9 +247,8 @@
           <param name="wheel_width" value="0.235"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_processing_time_checker/launch/processing_time_checker.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_pipeline_latency_monitor/launch/pipeline_latency_monitor.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_pipeline_latency_monitor/launch/pipeline_latency_monitor.launch.xml -->
         <!-- arg name="config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/pipeline_latency_monitor/pipeline_latency_monitor.param.yaml" -->
         <node pkg="autoware_pipeline_latency_monitor" exec="autoware_pipeline_latency_monitor_node" name="pipeline_latency_monitor" namespace="/system" output="screen">
           <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/system/pipeline_latency_monitor/pipeline_latency_monitor.param.yaml -->
@@ -296,9 +291,8 @@
           <param name="wheel_width" value="0.235"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_pipeline_latency_monitor/launch/pipeline_latency_monitor.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/common/autoware_component_interface_tools/launch/service_log_checker.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/common/autoware_component_interface_tools/launch/service_log_checker.launch.xml -->
         <node pkg="autoware_component_interface_tools" exec="service_log_checker_node" namespace="/system">
           <param name="front_overhang" value="1.0"/>
           <param name="left_overhang" value="0.128"/>
@@ -313,9 +307,8 @@
           <param name="wheel_width" value="0.235"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/common/autoware_component_interface_tools/launch/service_log_checker.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_component_state_monitor/launch/component_state_monitor.launch.py -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_component_state_monitor/launch/component_state_monitor.launch.py -->
         <!-- arg name="file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/component_state_monitor/topics.yaml" -->
         <!-- arg name="mode" value="online" -->
         <node_container pkg="rclcpp_components" exec="component_container" name="container" namespace="/system/component_state_monitor">
@@ -336,8 +329,8 @@
             <param name="topic_monitor_names" value="topic_state_monitor_vector_map: map_topic_statustopic_state_monitor_pointcloud_map: map_topic_statustopic_state_monitor_pose_twist_fusion_filter_pose: localization_topic_statustopic_state_monitor_obstacle_segmentation_pointcloud: perception_topic_statustopic_state_monitor_object_recognition_objects: perception_topic_statustopic_state_monitor_traffic_light_recognition_traffic_signals: perception_topic_statustopic_state_monitor_mission_planning_route: planning_topic_statustopic_state_monitor_scenario_planning_trajectory: planning_topic_statustopic_state_monitor_trajectory_follower_control_cmd: control_topic_statustopic_state_monitor_control_command_control_cmd: control_topic_statustopic_state_monitor_vehicle_status_velocity_status: vehicle_topic_statustopic_state_monitor_vehicle_status_steering_status: vehicle_topic_statustopic_state_monitor_system_emergency_control_cmd: system_topic_statustopic_state_monitor_transform_map_to_base_link: localization_topic_status"/>
           </composable_node>
         </node_container>
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="map_topic_status" -->
           <!-- arg name="error_rate" value="0.0" -->
@@ -365,9 +358,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="map_topic_status" -->
           <!-- arg name="error_rate" value="0.0" -->
@@ -395,9 +387,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="localization_topic_status" -->
           <!-- arg name="error_rate" value="1.0" -->
@@ -425,9 +416,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="True" -->
           <!-- arg name="diag_name" value="perception_topic_status" -->
           <!-- arg name="error_rate" value="1.0" -->
@@ -455,9 +445,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="perception_topic_status" -->
           <!-- arg name="error_rate" value="1.0" -->
@@ -485,9 +474,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="perception_topic_status" -->
           <!-- arg name="error_rate" value="1.0" -->
@@ -515,9 +503,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="planning_topic_status" -->
           <!-- arg name="error_rate" value="0.0" -->
@@ -545,9 +532,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="planning_topic_status" -->
           <!-- arg name="error_rate" value="1.0" -->
@@ -575,9 +561,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="control_topic_status" -->
           <!-- arg name="error_rate" value="1.0" -->
@@ -605,9 +590,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="control_topic_status" -->
           <!-- arg name="error_rate" value="1.0" -->
@@ -635,9 +619,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="vehicle_topic_status" -->
           <!-- arg name="error_rate" value="1.0" -->
@@ -665,9 +648,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="vehicle_topic_status" -->
           <!-- arg name="error_rate" value="1.0" -->
@@ -695,9 +677,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="diag_name" value="system_topic_status" -->
           <!-- arg name="error_rate" value="1.0" -->
@@ -725,9 +706,8 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor_tf.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor_tf.launch.xml -->
           <!-- arg name="best_effort" value="False" -->
           <!-- arg name="child_frame_id" value="base_link" -->
           <!-- arg name="diag_name" value="localization_topic_status" -->
@@ -757,11 +737,9 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_topic_state_monitor/launch/load_topic_state_monitor_tf.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_component_state_monitor/launch/component_state_monitor.launch.py -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_mrm_comfortable_stop_operator/launch/mrm_comfortable_stop_operator.launch.py -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_mrm_comfortable_stop_operator/launch/mrm_comfortable_stop_operator.launch.py -->
         <!-- arg name="config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/mrm_comfortable_stop_operator/mrm_comfortable_stop_operator.param.yaml" -->
         <node_container pkg="rclcpp_components" exec="component_container" name="mrm_comfortable_stop_operator_container" namespace="/system/mrm_comfortable_stop_operator">
           <param name="front_overhang" value="1.0"/>
@@ -787,9 +765,8 @@
           </composable_node>
         </node_container>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_mrm_comfortable_stop_operator/launch/mrm_comfortable_stop_operator.launch.py -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_mrm_emergency_stop_operator/launch/mrm_emergency_stop_operator.launch.py -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_mrm_emergency_stop_operator/launch/mrm_emergency_stop_operator.launch.py -->
         <!-- arg name="config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/mrm_emergency_stop_operator/mrm_emergency_stop_operator.param.yaml" -->
         <node_container pkg="rclcpp_components" exec="component_container" name="mrm_emergency_stop_operator_container" namespace="/system/mrm_emergency_stop_operator">
           <param name="front_overhang" value="1.0"/>
@@ -814,9 +791,8 @@
           </composable_node>
         </node_container>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_mrm_emergency_stop_operator/launch/mrm_emergency_stop_operator.launch.py -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_diagnostic_graph_aggregator/launch/aggregator.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_diagnostic_graph_aggregator/launch/aggregator.launch.xml -->
         <!-- arg name="converter_param_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/command_mode/converter.param.yaml" -->
         <!-- arg name="graph_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/diagnostics/autoware-main.yaml" -->
         <!-- arg name="graph_vars" value="" -->
@@ -882,9 +858,8 @@
           <remap from="~/operation_mode/availability" to="/system/operation_mode/availability"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_diagnostic_graph_aggregator/launch/aggregator.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_hazard_status_converter/launch/hazard_status_converter.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_hazard_status_converter/launch/hazard_status_converter.launch.xml -->
         <node pkg="autoware_hazard_status_converter" exec="autoware_hazard_status_converter_node" name="hazard_status_converter" namespace="/system">
           <!-- params from: {workspace}/src/universe/autoware_universe/system/autoware_hazard_status_converter/config/hazard_status_converter.param.yaml -->
           <param name="include_latent_fault_in_emergency" value="true"/>
@@ -906,9 +881,8 @@
           <remap from="~/input/emergency_holding" to="/system/emergency_holding"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_hazard_status_converter/launch/hazard_status_converter.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_mrm_handler/launch/mrm_handler.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_mrm_handler/launch/mrm_handler.launch.xml -->
         <!-- arg name="config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/mrm_handler/mrm_handler.param.yaml" -->
         <!-- arg name="input_api_operation_mode_state" default="/api/operation_mode/state" -->
         <!-- arg name="input_control_mode" default="/vehicle/status/control_mode" -->
@@ -968,11 +942,9 @@
           <remap from="~/output/mrm/emergency_stop/operate" to="/system/mrm/emergency_stop/operate"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_mrm_handler/launch/mrm_handler.launch.xml -->
     </group>
-    <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_system_launch/launch/system.launch.xml -->
-    <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_diagnostic_graph_utils/launch/logging.launch.xml -->
     <group>
+      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_diagnostic_graph_utils/launch/logging.launch.xml -->
       <!-- arg name="enable_terminal_log" value="true" -->
       <!-- arg name="ignore_dependent_error" default="false" -->
       <!-- arg name="max_depth" value="3" -->
@@ -997,13 +969,11 @@
         <param name="wheel_width" value="0.235"/>
       </node>
     </group>
-    <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_diagnostic_graph_utils/launch/logging.launch.xml -->
   </group>
-  <!-- end: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_system_component.launch.xml -->
-  <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_map_component.launch.xml -->
   <group>
-    <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_map_launch/launch/map.launch.xml -->
+    <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_map_component.launch.xml -->
     <group>
+      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_map_launch/launch/map.launch.xml -->
       <!-- arg name="lanelet2_map_loader_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/map/lanelet2_map_loader.param.yaml" -->
       <!-- arg name="lanelet2_map_path" value="{map_path}/lanelet2_map.osm" -->
       <!-- arg name="map_projection_loader_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/map/map_projection_loader.param.yaml" -->
@@ -1079,8 +1049,8 @@
         <param name="wheel_tread" value="1.64"/>
         <param name="wheel_width" value="0.235"/>
       </node>
-      <!-- source: {workspace}/src/core/autoware_core/map/autoware_map_projection_loader/launch/map_projection_loader.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/core/autoware_core/map/autoware_map_projection_loader/launch/map_projection_loader.launch.xml -->
         <!-- arg name="lanelet2_map_path" value="{map_path}/lanelet2_map.osm" -->
         <!-- arg name="map_projector_info_path" value="{map_path}/map_projector_info.yaml" -->
         <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/map/map_projection_loader.param.yaml" -->
@@ -1102,42 +1072,39 @@
           <param name="wheel_width" value="0.235"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/core/autoware_core/map/autoware_map_projection_loader/launch/map_projection_loader.launch.xml -->
     </group>
-    <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_map_launch/launch/map.launch.xml -->
   </group>
-  <!-- end: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_map_component.launch.xml -->
-  <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_sensing_component.launch.xml -->
   <group>
+    <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_sensing_component.launch.xml -->
     <!-- arg name="launch_pointcloud_container" default="false" -->
     <!-- arg name="launch_sensing_driver" default="true" -->
     <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
     <!-- arg name="sensor_model" default="sample_sensor_kit" -->
     <!-- arg name="use_sim_time" default="false" -->
     <!-- arg name="vehicle_model" default="sample_vehicle" -->
-    <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch/launch/sensing.launch.xml -->
     <group>
+      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch/launch/sensing.launch.xml -->
       <!-- arg name="launch_driver" value="true" -->
       <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
       <!-- arg name="sensor_model" value="sample_sensor_kit" -->
       <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
       <!-- arg name="vehicle_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/vehicle_info.param.yaml" -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/sensing.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/sensing.launch.xml -->
         <!-- arg name="launch_driver" value="true" -->
         <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
         <!-- arg name="vehicle_id" default="default" -->
         <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/lidar.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/lidar.launch.xml -->
           <!-- arg name="host_ip" default="192.168.1.10" -->
           <!-- arg name="launch_driver" value="true" -->
           <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
           <!-- arg name="use_concat_filter" default="true" -->
           <!-- arg name="vehicle_id" default="default" -->
           <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-          <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLS128.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLS128.launch.xml -->
             <!-- arg name="cloud_max_angle" default="360" -->
             <!-- arg name="cloud_min_angle" default="0" -->
             <!-- arg name="container_name" value="pointcloud_container" -->
@@ -1153,8 +1120,8 @@
             <!-- arg name="sensor_ip" value="192.168.1.201" -->
             <!-- arg name="udp_only" default="false" -->
             <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-            <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
             <group>
+              <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
               <!-- arg name="base_frame" default="base_link" -->
               <!-- arg name="cloud_max_angle" value="360" -->
               <!-- arg name="cloud_min_angle" value="0" -->
@@ -1282,9 +1249,8 @@
                 </composable_node>
               </node_container>
             </group>
-            <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
-            <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
             <group>
+              <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
               <!-- arg name="ip_address" value="192.168.1.201" -->
               <!-- arg name="velodyne_monitor_param_file" default="{workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/config/VLP-16.param.yaml" -->
               <node pkg="autoware_velodyne_monitor" exec="autoware_velodyne_monitor_node" name="velodyne_monitor" namespace="/sensing/lidar/top" output="log" respawn="true" respawn_delay="5.0">
@@ -1311,11 +1277,9 @@
                 <param name="wheel_width" value="0.235"/>
               </node>
             </group>
-            <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
           </group>
-          <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLS128.launch.xml -->
-          <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLP16.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLP16.launch.xml -->
             <!-- arg name="cloud_max_angle" value="60" -->
             <!-- arg name="cloud_min_angle" value="300" -->
             <!-- arg name="container_name" value="pointcloud_container" -->
@@ -1331,8 +1295,8 @@
             <!-- arg name="sensor_ip" value="192.168.1.202" -->
             <!-- arg name="udp_only" default="false" -->
             <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-            <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
             <group>
+              <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
               <!-- arg name="base_frame" default="base_link" -->
               <!-- arg name="cloud_max_angle" value="60" -->
               <!-- arg name="cloud_min_angle" value="300" -->
@@ -1460,9 +1424,8 @@
                 </composable_node>
               </node_container>
             </group>
-            <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
-            <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
             <group>
+              <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
               <!-- arg name="ip_address" value="192.168.1.202" -->
               <!-- arg name="velodyne_monitor_param_file" default="{workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/config/VLP-16.param.yaml" -->
               <node pkg="autoware_velodyne_monitor" exec="autoware_velodyne_monitor_node" name="velodyne_monitor" namespace="/sensing/lidar/left" output="log" respawn="true" respawn_delay="5.0">
@@ -1489,11 +1452,9 @@
                 <param name="wheel_width" value="0.235"/>
               </node>
             </group>
-            <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
           </group>
-          <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLP16.launch.xml -->
-          <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLP16.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLP16.launch.xml -->
             <!-- arg name="cloud_max_angle" value="60" -->
             <!-- arg name="cloud_min_angle" value="300" -->
             <!-- arg name="container_name" value="pointcloud_container" -->
@@ -1509,8 +1470,8 @@
             <!-- arg name="sensor_ip" value="192.168.1.203" -->
             <!-- arg name="udp_only" default="false" -->
             <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-            <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
             <group>
+              <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
               <!-- arg name="base_frame" default="base_link" -->
               <!-- arg name="cloud_max_angle" value="60" -->
               <!-- arg name="cloud_min_angle" value="300" -->
@@ -1638,9 +1599,8 @@
                 </composable_node>
               </node_container>
             </group>
-            <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
-            <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
             <group>
+              <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
               <!-- arg name="ip_address" value="192.168.1.203" -->
               <!-- arg name="velodyne_monitor_param_file" default="{workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/config/VLP-16.param.yaml" -->
               <node pkg="autoware_velodyne_monitor" exec="autoware_velodyne_monitor_node" name="velodyne_monitor" namespace="/sensing/lidar/right" output="log" respawn="true" respawn_delay="5.0">
@@ -1667,11 +1627,9 @@
                 <param name="wheel_width" value="0.235"/>
               </node>
             </group>
-            <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
           </group>
-          <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLP16.launch.xml -->
-          <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLP16.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLP16.launch.xml -->
             <!-- arg name="cloud_max_angle" value="60" -->
             <!-- arg name="cloud_min_angle" value="300" -->
             <!-- arg name="container_name" value="pointcloud_container" -->
@@ -1687,8 +1645,8 @@
             <!-- arg name="sensor_ip" value="192.168.1.204" -->
             <!-- arg name="udp_only" default="false" -->
             <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-            <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
             <group>
+              <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
               <!-- arg name="base_frame" default="base_link" -->
               <!-- arg name="cloud_max_angle" value="60" -->
               <!-- arg name="cloud_min_angle" value="300" -->
@@ -1816,9 +1774,8 @@
                 </composable_node>
               </node_container>
             </group>
-            <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/nebula_node_container.launch.py -->
-            <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
             <group>
+              <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
               <!-- arg name="ip_address" value="192.168.1.204" -->
               <!-- arg name="velodyne_monitor_param_file" default="{workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/config/VLP-16.param.yaml" -->
               <node pkg="autoware_velodyne_monitor" exec="autoware_velodyne_monitor_node" name="velodyne_monitor" namespace="/sensing/lidar/rear" output="log" respawn="true" respawn_delay="5.0">
@@ -1845,11 +1802,9 @@
                 <param name="wheel_width" value="0.235"/>
               </node>
             </group>
-            <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_velodyne_monitor/launch/velodyne_monitor.launch.xml -->
           </group>
-          <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/launch/velodyne_VLP16.launch.xml -->
-          <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/pointcloud_preprocessor.launch.py -->
           <group>
+            <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/pointcloud_preprocessor.launch.py -->
             <!-- arg name="base_frame" value="base_link" -->
             <!-- arg name="concatenate_and_time_sync_node_param_path" default="{workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/config/concatenate_and_time_sync_node.param.yaml" -->
             <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
@@ -1880,16 +1835,14 @@
               </composable_node>
             </load_composable_node>
           </group>
-          <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/pointcloud_preprocessor.launch.py -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/lidar.launch.xml -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/imu.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/imu.launch.xml -->
           <!-- arg name="imu_corrector_param_file" default="{workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description/config/imu_corrector.param.yaml" -->
           <!-- arg name="imu_raw_name" default="tamagawa/imu_raw" -->
           <!-- arg name="launch_driver" value="true" -->
-          <!-- source: {workspace}/src/universe/autoware_universe/sensing/autoware_imu_corrector/launch/imu_corrector.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/sensing/autoware_imu_corrector/launch/imu_corrector.launch.xml -->
             <!-- arg name="input_gyro_bias_topic" default="gyro_bias" -->
             <!-- arg name="input_gyro_scale_topic" default="gyro_scale" -->
             <!-- arg name="input_topic" value="tamagawa/imu_raw" -->
@@ -1959,9 +1912,8 @@
               <remap from="output" to="/sensing/imu/imu_data"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/sensing/autoware_imu_corrector/launch/imu_corrector.launch.xml -->
-          <!-- source: {workspace}/src/universe/autoware_universe/sensing/autoware_imu_corrector/launch/gyro_bias_estimator.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/sensing/autoware_imu_corrector/launch/gyro_bias_estimator.launch.xml -->
             <!-- arg name="gyro_bias_estimator_param_file" default="{workspace}/src/universe/autoware_universe/sensing/autoware_imu_corrector/config/gyro_bias_estimator.param.yaml" -->
             <!-- arg name="gyro_scale_estimator_param_file" default="{workspace}/src/universe/autoware_universe/sensing/autoware_imu_corrector/config/gyro_scale_estimator.param.yaml" -->
             <!-- arg name="imu_corrector_param_file" value="{workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description/config/imu_corrector.param.yaml" -->
@@ -2042,11 +1994,9 @@
               <remap from="~/output/imu_scaled" to="/sensing/imu/imu_scaled"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/sensing/autoware_imu_corrector/launch/gyro_bias_estimator.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/imu.launch.xml -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/gnss.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/gnss.launch.xml -->
           <!-- arg name="gnss_receiver" default="ublox" -->
           <!-- arg name="launch_driver" value="true" -->
           <node pkg="ublox_gps" exec="ublox_gps_node" name="ublox" namespace="/sensing/gnss" respawn="true" respawn_delay="1.0">
@@ -2077,8 +2027,8 @@
             <param name="wheel_width" value="0.235"/>
             <remap from="~/fix" to="~/nav_sat_fix"/>
           </node>
-          <!-- source: {workspace}/src/core/autoware_core/sensing/autoware_gnss_poser/launch/gnss_poser.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/core/autoware_core/sensing/autoware_gnss_poser/launch/gnss_poser.launch.xml -->
             <!-- arg name="input_topic_fix" value="ublox/nav_sat_fix" -->
             <!-- arg name="input_topic_orientation" value="/autoware_orientation" -->
             <!-- arg name="output_topic_gnss_fixed" value="fixed" -->
@@ -2113,11 +2063,9 @@
               <remap from="gnss_fixed" to="/sensing/gnss/fixed"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/core/autoware_core/sensing/autoware_gnss_poser/launch/gnss_poser.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/gnss.launch.xml -->
-        <!-- source: {workspace}/src/core/autoware_core/sensing/autoware_vehicle_velocity_converter/launch/vehicle_velocity_converter.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/core/autoware_core/sensing/autoware_vehicle_velocity_converter/launch/vehicle_velocity_converter.launch.xml -->
           <!-- arg name="config_file" default="{workspace}/src/core/autoware_core/sensing/autoware_vehicle_velocity_converter/config/vehicle_velocity_converter.param.yaml" -->
           <!-- arg name="input_vehicle_velocity_topic" value="/vehicle/status/velocity_status" -->
           <!-- arg name="output_twist_with_covariance" value="/sensing/vehicle_velocity_converter/twist_with_covariance" -->
@@ -2143,15 +2091,11 @@
             <remap from="twist_with_covariance" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/core/autoware_core/sensing/autoware_vehicle_velocity_converter/launch/vehicle_velocity_converter.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_launch/launch/sensing.launch.xml -->
     </group>
-    <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_sensing_launch/launch/sensing.launch.xml -->
   </group>
-  <!-- end: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_sensing_component.launch.xml -->
-  <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_localization_component.launch.xml -->
   <group>
+    <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_localization_component.launch.xml -->
     <!-- arg name="initial_pose" default="[]" -->
     <!-- arg name="input_pointcloud" default="/sensing/lidar/concatenated/pointcloud" -->
     <!-- arg name="launch_pointcloud_container" default="false" -->
@@ -2161,8 +2105,8 @@
     <!-- arg name="twist_source" default="gyro_odom" -->
     <!-- arg name="use_sim_time" default="false" -->
     <!-- arg name="vehicle_model" default="sample_vehicle" -->
-    <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/localization.launch.xml -->
     <group>
+      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/localization.launch.xml -->
       <!-- arg name="ar_tag_based_localizer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/ar_tag_based_localizer.param.yaml" -->
       <!-- arg name="camera_particle_corrector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/yabloc/camera_particle_corrector.param.yaml" -->
       <!-- arg name="camera_pose_initializer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/yabloc/camera_pose_initializer.param.yaml" -->
@@ -2193,16 +2137,16 @@
       <!-- arg name="twist2accel_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/twist2accel.param.yaml" -->
       <!-- arg name="twist_source" value="gyro_odom" -->
       <!-- arg name="undistort_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/yabloc/undistort.param.yaml" -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_estimator/pose_twist_estimator.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_estimator/pose_twist_estimator.launch.xml -->
         <!-- arg name="gnss_enabled" default="true" -->
         <!-- arg name="localization_pointcloud_container_name" value="/pointcloud_container" -->
         <!-- arg name="use_autoware_pose_covariance_modifier" default="false" -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_estimator/ndt_scan_matcher.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_estimator/ndt_scan_matcher.launch.xml -->
           <!-- arg name="output_pose_with_covariance_topic" value="/localization/pose_estimator/pose_with_covariance" -->
-          <!-- source: {workspace}/src/core/autoware_core/localization/autoware_ndt_scan_matcher/launch/ndt_scan_matcher.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/core/autoware_core/localization/autoware_ndt_scan_matcher/launch/ndt_scan_matcher.launch.xml -->
             <!-- arg name="client_map_loader" value="/map/get_differential_pointcloud_map" -->
             <!-- arg name="input_initial_pose_topic" value="/localization/pose_twist_fusion_filter/biased_pose_with_covariance" -->
             <!-- arg name="input_pointcloud" value="/localization/util/downsample/pointcloud" -->
@@ -2268,13 +2212,11 @@
               <remap from="pcd_loader_service" to="/map/get_differential_pointcloud_map"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/core/autoware_core/localization/autoware_ndt_scan_matcher/launch/ndt_scan_matcher.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_estimator/ndt_scan_matcher.launch.xml -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_estimator/gyro_odometer.launch.xml -->
         <group>
-          <!-- source: {workspace}/src/core/autoware_core/localization/autoware_gyro_odometer/launch/gyro_odometer.launch.xml -->
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_estimator/gyro_odometer.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/core/autoware_core/localization/autoware_gyro_odometer/launch/gyro_odometer.launch.xml -->
             <!-- arg name="config_file" default="{workspace}/src/core/autoware_core/localization/autoware_gyro_odometer/config/gyro_odometer.param.yaml" -->
             <!-- arg name="input_imu_topic" default="/sensing/imu/imu_data" -->
             <!-- arg name="input_vehicle_twist_with_covariance_topic" value="/sensing/vehicle_velocity_converter/twist_with_covariance" -->
@@ -2306,11 +2248,9 @@
               <remap from="twist_with_covariance" to="/localization/twist_estimator/twist_with_covariance"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/core/autoware_core/localization/autoware_gyro_odometer/launch/gyro_odometer.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_estimator/gyro_odometer.launch.xml -->
-        <!-- source: {workspace}/src/core/autoware_core/localization/autoware_pose_initializer/launch/pose_initializer.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/core/autoware_core/localization/autoware_pose_initializer/launch/pose_initializer.launch.xml -->
           <!-- arg name="config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/pose_initializer.param.yaml" -->
           <!-- arg name="ekf_enabled" value="true" -->
           <!-- arg name="gnss_enabled" value="true" -->
@@ -2362,9 +2302,8 @@
             <remap from="~/vector_map" to="/map/vector_map"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/core/autoware_core/localization/autoware_pose_initializer/launch/pose_initializer.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_default_adapi_helpers/autoware_automatic_pose_initializer/launch/automatic_pose_initializer.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_default_adapi_helpers/autoware_automatic_pose_initializer/launch/automatic_pose_initializer.launch.xml -->
           <node pkg="autoware_automatic_pose_initializer" exec="autoware_automatic_pose_initializer_node" namespace="/localization/util/default_adapi/helpers">
             <param name="front_overhang" value="1.0"/>
             <param name="left_overhang" value="0.128"/>
@@ -2379,9 +2318,8 @@
             <param name="wheel_width" value="0.235"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_default_adapi_helpers/autoware_automatic_pose_initializer/launch/automatic_pose_initializer.launch.xml -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/util/util.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/util/util.launch.xml -->
           <!-- arg name="input_pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
           <!-- arg name="localization_pointcloud_container_name" value="/pointcloud_container" -->
           <!-- arg name="output/pointcloud" default="downsample/pointcloud" -->
@@ -2421,13 +2359,11 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/util/util.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_estimator/pose_twist_estimator.launch.xml -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_fusion_filter/pose_twist_fusion_filter.launch.xml -->
       <group>
-        <!-- source: {workspace}/src/core/autoware_core/localization/autoware_ekf_localizer/launch/ekf_localizer.launch.xml -->
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_fusion_filter/pose_twist_fusion_filter.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/core/autoware_core/localization/autoware_ekf_localizer/launch/ekf_localizer.launch.xml -->
           <!-- arg name="input_initial_pose_name" value="/initialpose3d" -->
           <!-- arg name="input_pose_with_cov_name" value="/localization/pose_estimator/pose_with_covariance" -->
           <!-- arg name="input_trigger_node_service_name" default="trigger_node" -->
@@ -2500,9 +2436,8 @@
             <remap from="debug/processing_time_ms" to="/localization/pose_twist_fusion_filter/debug/processing_time_ms"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/core/autoware_core/localization/autoware_ekf_localizer/launch/ekf_localizer.launch.xml -->
-        <!-- source: {workspace}/src/core/autoware_core/localization/autoware_stop_filter/launch/stop_filter.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/core/autoware_core/localization/autoware_stop_filter/launch/stop_filter.launch.xml -->
           <!-- arg name="debug_stop_flag" default="debug/stop_flag" -->
           <!-- arg name="input_odom_name" value="/localization/pose_twist_fusion_filter/kinematic_state" -->
           <!-- arg name="input_twist_with_covariance_name" value="/localization/pose_twist_fusion_filter/twist_with_covariance" -->
@@ -2530,9 +2465,8 @@
             <remap from="debug/stop_flag" to="/localization/pose_twist_fusion_filter/debug/stop_flag"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/core/autoware_core/localization/autoware_stop_filter/launch/stop_filter.launch.xml -->
-        <!-- source: {workspace}/src/core/autoware_core/localization/autoware_twist2accel/launch/twist2accel.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/core/autoware_core/localization/autoware_twist2accel/launch/twist2accel.launch.xml -->
           <!-- arg name="in_odom" value="/localization/kinematic_state" -->
           <!-- arg name="in_twist" value="/localization/twist_estimator/twist_with_covariance" -->
           <!-- arg name="out_accel" value="/localization/acceleration" -->
@@ -2558,9 +2492,8 @@
             <remap from="output/accel" to="/localization/acceleration"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/core/autoware_core/localization/autoware_twist2accel/launch/twist2accel.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/localization/autoware_pose_instability_detector/launch/pose_instability_detector.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/localization/autoware_pose_instability_detector/launch/pose_instability_detector.launch.xml -->
           <!-- arg name="input_odometry" value="/localization/kinematic_state" -->
           <!-- arg name="input_twist" value="/localization/twist_estimator/twist_with_covariance" -->
           <!-- arg name="node_name" default="pose_instability_detector" -->
@@ -2599,13 +2532,11 @@
             <remap from="~/input/twist" to="/localization/twist_estimator/twist_with_covariance"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/localization/autoware_pose_instability_detector/launch/pose_instability_detector.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/pose_twist_fusion_filter/pose_twist_fusion_filter.launch.xml -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/localization_error_monitor/localization_error_monitor.launch.xml -->
       <group>
-        <!-- source: {workspace}/src/universe/autoware_universe/localization/autoware_localization_error_monitor/launch/localization_error_monitor.launch.xml -->
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/localization_error_monitor/localization_error_monitor.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/localization/autoware_localization_error_monitor/launch/localization_error_monitor.launch.xml -->
           <!-- arg name="input/odom" value="/localization/kinematic_state" -->
           <!-- arg name="param_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/localization_error_monitor.param.yaml" -->
           <node pkg="autoware_localization_error_monitor" exec="autoware_localization_error_monitor_node" namespace="/localization" output="both">
@@ -2630,15 +2561,11 @@
             <remap from="input/odom" to="/localization/kinematic_state"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/localization/autoware_localization_error_monitor/launch/localization_error_monitor.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/localization_error_monitor/localization_error_monitor.launch.xml -->
     </group>
-    <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_localization_launch/launch/localization.launch.xml -->
   </group>
-  <!-- end: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_localization_component.launch.xml -->
-  <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_perception_component.launch.xml -->
   <group>
+    <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_perception_component.launch.xml -->
     <!-- arg name="camera_2d_detector/color_map_path" default="{home}/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
     <!-- arg name="camera_2d_detector/label_path" default="{home}/autoware_data/tensorrt_yolox/label.txt" -->
     <!-- arg name="camera_2d_detector/model_path" default="{home}/autoware_data/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
@@ -2679,8 +2606,8 @@
     <!-- arg name="use_traffic_light_recognition" default="true" -->
     <!-- arg name="use_vector_map" default="true" -->
     <!-- arg name="vehicle_model" default="sample_vehicle" -->
-    <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/perception.launch.xml -->
     <group>
+      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/perception.launch.xml -->
       <!-- arg name="bevfusion_model_path" default="{home}/autoware_data/bevfusion" -->
       <!-- arg name="camera_2d_detector/color_map_path" value="{home}/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
       <!-- arg name="camera_2d_detector/label_path" value="{home}/autoware_data/tensorrt_yolox/label.txt" -->
@@ -2820,8 +2747,8 @@
       <!-- arg name="use_vector_map" value="true" -->
       <!-- arg name="vehicle_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/vehicle_info.param.yaml" -->
       <!-- arg name="yolox_traffic_light_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml" -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/obstacle_segmentation/ground_segmentation/ground_segmentation.launch.py -->
       <group>
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/obstacle_segmentation/ground_segmentation/ground_segmentation.launch.py -->
         <!-- arg name="base_frame" value="base_link" -->
         <!-- arg name="cuda_ground_segmentation_node_param_path" default="{workspace}/src/universe/autoware_universe/perception/autoware_ground_segmentation_cuda/config/cuda_scan_ground_segmentation_filter.param.yaml" -->
         <!-- arg name="input/pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
@@ -2901,9 +2828,8 @@
           </composable_node>
         </load_composable_node>
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/obstacle_segmentation/ground_segmentation/ground_segmentation.launch.py -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/occupancy_grid_map/probabilistic_occupancy_grid_map.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/occupancy_grid_map/probabilistic_occupancy_grid_map.launch.xml -->
         <!-- arg name="input/obstacle_pointcloud" value="/perception/obstacle_segmentation/single_frame/pointcloud" -->
         <!-- arg name="input/raw_pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
         <!-- arg name="input_obstacle_and_raw_pointcloud" default="true" -->
@@ -2917,8 +2843,8 @@
         <!-- arg name="use_intra_process" value="true" -->
         <!-- arg name="use_multithread" value="true" -->
         <!-- arg name="use_pointcloud_container" default="true" -->
-        <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_probabilistic_occupancy_grid_map/launch/pointcloud_based_occupancy_grid_map.launch.py -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_probabilistic_occupancy_grid_map/launch/pointcloud_based_occupancy_grid_map.launch.py -->
           <!-- arg name="individual_container_name" default="occupancy_grid_map_container" -->
           <!-- arg name="input/obstacle_pointcloud" value="/perception/obstacle_segmentation/single_frame/pointcloud" -->
           <!-- arg name="input/raw_pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
@@ -2996,11 +2922,9 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_probabilistic_occupancy_grid_map/launch/pointcloud_based_occupancy_grid_map.launch.py -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/occupancy_grid_map/probabilistic_occupancy_grid_map.launch.xml -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detection.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detection.launch.xml -->
         <!-- arg name="camera_2d_detector/color_map_path" value="{home}/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
         <!-- arg name="camera_2d_detector/label_path" value="{home}/autoware_data/tensorrt_yolox/label.txt" -->
         <!-- arg name="camera_2d_detector/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
@@ -3078,8 +3002,8 @@
         <!-- arg name="use_short_range_detection" value="false" -->
         <!-- arg name="use_validator" value="true" -->
         <!-- arg name="voxel_grid_based_euclidean_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/clustering/voxel_grid_based_euclidean_cluster.param.yaml" -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/lidar_dnn_detector.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/lidar_dnn_detector.launch.xml -->
           <!-- arg name="bevfusion_model_path" default="{home}/autoware_data/bevfusion" -->
           <!-- arg name="centerpoint_model_path" default="{home}/autoware_data/lidar_centerpoint" -->
           <!-- arg name="input/pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
@@ -3094,8 +3018,8 @@
           <!-- arg name="short_range_centerpoint_model_path" default="{home}/autoware_data/lidar_short_range_centerpoint" -->
           <!-- arg name="transfusion_model_path" default="{home}/autoware_data/lidar_transfusion" -->
           <!-- arg name="use_short_range_detection" value="false" -->
-          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_lidar_centerpoint/launch/lidar_centerpoint.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_lidar_centerpoint/launch/lidar_centerpoint.launch.xml -->
             <!-- arg name="build_only" default="false" -->
             <!-- arg name="class_remapper_param_path" value="{home}/autoware_data/lidar_centerpoint/detection_class_remapper.param.yaml" -->
             <!-- arg name="common_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/lidar_model/centerpoint_common.param.yaml" -->
@@ -3154,11 +3078,9 @@
               </composable_node>
             </load_composable_node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_lidar_centerpoint/launch/lidar_centerpoint.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/lidar_dnn_detector.launch.xml -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/lidar_rule_detector.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/lidar_rule_detector.launch.xml -->
           <!-- arg name="input/obstacle_segmentation/pointcloud" value="/perception/obstacle_segmentation/pointcloud" -->
           <!-- arg name="input/pointcloud_map/pointcloud" value="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud" -->
           <!-- arg name="node/pointcloud_container" value="pointcloud_container" -->
@@ -3167,8 +3089,8 @@
           <!-- arg name="output/objects" value="/perception/object_recognition/detection/clustering/objects" -->
           <!-- arg name="use_low_height_cropbox" value="false" -->
           <!-- arg name="voxel_grid_based_euclidean_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/clustering/voxel_grid_based_euclidean_cluster.param.yaml" -->
-          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_euclidean_cluster/launch/voxel_grid_based_euclidean_cluster.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_euclidean_cluster/launch/voxel_grid_based_euclidean_cluster.launch.xml -->
             <!-- arg name="agnocast_heaphook_path" default="/opt/ros/humble/lib/libagnocast_heaphook.so" -->
             <!-- arg name="input_map" default="/map/pointcloud_map" -->
             <!-- arg name="input_pointcloud" value="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud" -->
@@ -3177,8 +3099,8 @@
             <!-- arg name="use_low_height_cropbox" value="false" -->
             <!-- arg name="use_pointcloud_container" value="true" -->
             <!-- arg name="voxel_grid_based_euclidean_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/clustering/voxel_grid_based_euclidean_cluster.param.yaml" -->
-            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_euclidean_cluster/launch/voxel_grid_based_euclidean_cluster.launch.py -->
             <group>
+              <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_euclidean_cluster/launch/voxel_grid_based_euclidean_cluster.launch.py -->
               <!-- arg name="container_executable" value="agnocast_component_container_cie" -->
               <!-- arg name="container_package" value="agnocast_components" -->
               <!-- arg name="input_map" value="/map/pointcloud_map" -->
@@ -3273,11 +3195,9 @@
                 </composable_node>
               </load_composable_node>
             </group>
-            <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_euclidean_cluster/launch/voxel_grid_based_euclidean_cluster.launch.py -->
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_euclidean_cluster/launch/voxel_grid_based_euclidean_cluster.launch.xml -->
-          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_shape_estimation/launch/shape_estimation.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_shape_estimation/launch/shape_estimation.launch.xml -->
             <!-- arg name="config_file" default="{workspace}/src/universe/autoware_universe/perception/autoware_shape_estimation/config/shape_estimation.param.yaml" -->
             <!-- arg name="data_path" default="{home}/autoware_data" -->
             <!-- arg name="input/objects" value="/perception/object_recognition/detection/clustering/clusters" -->
@@ -3315,9 +3235,8 @@
               <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_shape_estimation/launch/shape_estimation.launch.xml -->
-          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_detected_object_feature_remover/launch/detected_object_feature_remover.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_detected_object_feature_remover/launch/detected_object_feature_remover.launch.xml -->
             <!-- arg name="input" value="/perception/object_recognition/detection/clustering/objects_with_feature" -->
             <!-- arg name="node_name" default="detected_object_feature_remover" -->
             <!-- arg name="output" value="/perception/object_recognition/detection/clustering/objects" -->
@@ -3340,17 +3259,15 @@
               <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_detected_object_feature_remover/launch/detected_object_feature_remover.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/lidar_rule_detector.launch.xml -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/tracker_based_detector.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/tracker_based_detector.launch.xml -->
           <!-- arg name="detection_by_tracker_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detection_by_tracker/detection_by_tracker.param.yaml" -->
           <!-- arg name="input/clusters" value="/perception/object_recognition/detection/clustering/objects_with_feature" -->
           <!-- arg name="input/tracked_objects" value="/perception/object_recognition/tracking/objects" -->
           <!-- arg name="output/objects" value="/perception/object_recognition/detection/detection_by_tracker/objects" -->
-          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_detection_by_tracker/launch/detection_by_tracker.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_detection_by_tracker/launch/detection_by_tracker.launch.xml -->
             <!-- arg name="detection_by_tracker_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detection_by_tracker/detection_by_tracker.param.yaml" -->
             <!-- arg name="input/initial_objects" value="/perception/object_recognition/detection/clustering/objects_with_feature" -->
             <!-- arg name="input/tracked_objects" value="/perception/object_recognition/tracking/objects" -->
@@ -3383,11 +3300,9 @@
               <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_detection_by_tracker/launch/detection_by_tracker.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/tracker_based_detector.launch.xml -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/filter/pointcloud_map_filter.launch.py -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/filter/pointcloud_map_filter.launch.py -->
           <!-- arg name="input_topic" value="/perception/obstacle_segmentation/pointcloud" -->
           <!-- arg name="output_topic" value="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud" -->
           <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
@@ -3421,15 +3336,14 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/filter/pointcloud_map_filter.launch.py -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/filter/object_validator.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/filter/object_validator.launch.xml -->
           <!-- arg name="input/objects" value="/perception/object_recognition/detection/centerpoint/objects" -->
           <!-- arg name="input/obstacle_pointcloud" value="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud" -->
           <!-- arg name="objects_validation_method" value="obstacle_pointcloud" -->
           <!-- arg name="output/objects" value="/perception/object_recognition/detection/centerpoint/validation/objects" -->
-          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_detected_object_validation/launch/obstacle_pointcloud_based_validator.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_detected_object_validation/launch/obstacle_pointcloud_based_validator.launch.xml -->
             <!-- arg name="input/detected_objects" value="/perception/object_recognition/detection/centerpoint/objects" -->
             <!-- arg name="input/obstacle_pointcloud" value="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud" -->
             <!-- arg name="obstacle_pointcloud_based_validator_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detected_object_validation/obstacle_pointcloud_based_validator.param.yaml" -->
@@ -3459,13 +3373,10 @@
               <remap from="~/output/objects" to="/perception/object_recognition/detection/centerpoint/validation/objects"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_detected_object_validation/launch/obstacle_pointcloud_based_validator.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/filter/object_validator.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detection.launch.xml -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/tracking/tracking.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/tracking/tracking.launch.xml -->
         <!-- arg name="input/camera_lidar_rule_detector/channel" default="camera_lidar_fusion" -->
         <!-- arg name="input/camera_lidar_rule_detector/objects" default="/perception/object_recognition/detection/clustering/camera_lidar_fusion/objects" -->
         <!-- arg name="input/camera_only/channel" default="camera_streampetr" -->
@@ -3502,8 +3413,8 @@
         <!-- arg name="use_radar_tracking_fusion" value="true" -->
         <!-- arg name="use_short_range_detection" value="false" -->
         <!-- arg name="use_validator" value="true" -->
-        <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_multi_object_tracker/launch/multi_object_tracker.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_multi_object_tracker/launch/multi_object_tracker.launch.xml -->
           <!-- arg name="data_association_matrix_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/data_association_matrix.param.yaml" -->
           <!-- arg name="input/detection01/channel" value="lidar_centerpoint" -->
           <!-- arg name="input/detection01/objects" value="/perception/object_recognition/detection/centerpoint/validation/objects" -->
@@ -3753,16 +3664,14 @@
             <remap from="~/output/merged_objects" to="/perception/object_recognition/detection/objects"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_multi_object_tracker/launch/multi_object_tracker.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/tracking/tracking.launch.xml -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/prediction/prediction.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/prediction/prediction.launch.xml -->
         <!-- arg name="input/objects" default="/perception/object_recognition/tracking/objects" -->
         <!-- arg name="prediction_model_type" default="map_based" -->
         <!-- arg name="use_vector_map" value="true" -->
-        <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_map_based_prediction/launch/map_based_prediction.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_map_based_prediction/launch/map_based_prediction.launch.xml -->
           <!-- arg name="input_topic" value="/perception/object_recognition/tracking/objects" -->
           <!-- arg name="output_topic" value="/perception/object_recognition/objects" -->
           <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/prediction/map_based_prediction.param.yaml" -->
@@ -3835,11 +3744,9 @@
             <remap from="~/input/objects" to="/perception/object_recognition/tracking/objects"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_map_based_prediction/launch/map_based_prediction.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/prediction/prediction.launch.xml -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light.launch.xml -->
         <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
         <!-- arg name="car_traffic_light_classifier_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml" -->
         <!-- arg name="classification/car/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt" -->
@@ -3871,8 +3778,8 @@
         <!-- arg name="whole_image_detection/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
         <!-- arg name="whole_image_detection/yolox_roi_label_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv" -->
         <!-- arg name="yolox_traffic_light_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml" -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_camera_info_relay.launch.py -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_camera_info_relay.launch.py -->
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
           <node pkg="topic_tools" exec="relay" name="traffic_light_camera_info_relay" namespace="/perception/traffic_light_recognition/camera6" args="/sensing/camera/camera6/camera_infocamera_info">
             <param name="front_overhang" value="1.0"/>
@@ -3901,16 +3808,15 @@
             <param name="wheel_width" value="0.235"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_camera_info_relay.launch.py -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_map_based_detector.launch.py -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_map_based_detector.launch.py -->
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
           <!-- arg name="input/route" value="/planning/mission_planning/route" -->
           <!-- arg name="input/vector_map" value="/map/vector_map" -->
           <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/TRAFFIC_LIGHT_RECOGNITION_CAMERA_NAMESPACE_traffic_light_map_based_detector.param.yaml" -->
           <!-- arg name="use_high_accuracy_detection" value="true" -->
-          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector/launch/traffic_light_map_based_detector.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector/launch/traffic_light_map_based_detector.launch.xml -->
             <!-- arg name="expect/rois" value="expect/rois" -->
             <!-- arg name="input/camera_info" value="/sensing/camera/camera6/camera_info" -->
             <!-- arg name="input/route" value="/planning/mission_planning/route" -->
@@ -3949,9 +3855,8 @@
               <remap from="~/output/rois" to="/perception/traffic_light_recognition/camera6/detection/rough/rois"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector/launch/traffic_light_map_based_detector.launch.xml -->
-          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector/launch/traffic_light_map_based_detector.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector/launch/traffic_light_map_based_detector.launch.xml -->
             <!-- arg name="expect/rois" value="expect/rois" -->
             <!-- arg name="input/camera_info" value="/sensing/camera/camera7/camera_info" -->
             <!-- arg name="input/route" value="/planning/mission_planning/route" -->
@@ -3990,11 +3895,9 @@
               <remap from="~/output/rois" to="/perception/traffic_light_recognition/camera7/detection/rough/rois"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_map_based_detector/launch/traffic_light_map_based_detector.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_map_based_detector.launch.py -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_node_container.launch.py -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_node_container.launch.py -->
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
           <!-- arg name="car_traffic_light_classifier_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml" -->
           <!-- arg name="classification/car/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt" -->
@@ -4298,15 +4201,14 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_node_container.launch.py -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_occlusion_predictor.launch.py -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_occlusion_predictor.launch.py -->
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
           <!-- arg name="input/cloud" value="/sensing/lidar/top/pointcloud_raw_ex" -->
           <!-- arg name="input/vector_map" value="/map/vector_map" -->
           <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml" -->
-          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor/launch/traffic_light_occlusion_predictor.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor/launch/traffic_light_occlusion_predictor.launch.xml -->
             <!-- arg name="input/camera_info" value="/sensing/camera/camera6/camera_info" -->
             <!-- arg name="input/car/traffic_signals" value="car/traffic_signals" -->
             <!-- arg name="input/cloud" value="/sensing/lidar/top/pointcloud_raw_ex" -->
@@ -4344,9 +4246,8 @@
               <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/traffic_signals"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor/launch/traffic_light_occlusion_predictor.launch.xml -->
-          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor/launch/traffic_light_occlusion_predictor.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor/launch/traffic_light_occlusion_predictor.launch.xml -->
             <!-- arg name="input/camera_info" value="/sensing/camera/camera7/camera_info" -->
             <!-- arg name="input/car/traffic_signals" value="car/traffic_signals" -->
             <!-- arg name="input/cloud" value="/sensing/lidar/top/pointcloud_raw_ex" -->
@@ -4384,11 +4285,9 @@
               <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/traffic_signals"/>
             </node>
           </group>
-          <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_occlusion_predictor/launch/traffic_light_occlusion_predictor.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_occlusion_predictor.launch.py -->
-        <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_multi_camera_fusion/launch/traffic_light_multi_camera_fusion.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_multi_camera_fusion/launch/traffic_light_multi_camera_fusion.launch.xml -->
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
           <!-- arg name="input/vector_map" value="/map/vector_map" -->
           <!-- arg name="output/traffic_signals" value="/perception/traffic_light_recognition/internal/traffic_signals" -->
@@ -4415,9 +4314,8 @@
             <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/internal/traffic_signals"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_multi_camera_fusion/launch/traffic_light_multi_camera_fusion.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_arbiter/launch/traffic_light_arbiter.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_arbiter/launch/traffic_light_arbiter.launch.xml -->
           <!-- arg name="external_traffic_signals" value="/perception/traffic_light_recognition/external/traffic_signals" -->
           <!-- arg name="output_traffic_signals" value="/perception/traffic_light_recognition/judged/traffic_signals" -->
           <!-- arg name="param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_arbiter/traffic_light_arbiter.param.yaml" -->
@@ -4447,9 +4345,8 @@
             <remap from="~/pub/traffic_signals" to="/perception/traffic_light_recognition/judged/traffic_signals"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_arbiter/launch/traffic_light_arbiter.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_crosswalk_traffic_light_estimator/launch/crosswalk_traffic_light_estimator.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_crosswalk_traffic_light_estimator/launch/crosswalk_traffic_light_estimator.launch.xml -->
           <!-- arg name="input/route" value="/planning/mission_planning/route" -->
           <!-- arg name="input/traffic_signals" value="/perception/traffic_light_recognition/judged/traffic_signals" -->
           <!-- arg name="input/vector_map" value="/map/vector_map" -->
@@ -4478,9 +4375,8 @@
             <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/traffic_signals"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_crosswalk_traffic_light_estimator/launch/crosswalk_traffic_light_estimator.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_visualization/launch/traffic_light_map_visualizer.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_visualization/launch/traffic_light_map_visualizer.launch.xml -->
           <!-- arg name="input/tl_state" default="traffic_signals" -->
           <!-- arg name="input/vector_map" default="/map/vector_map" -->
           <!-- arg name="output/traffic_light" default="traffic_signals/markers" -->
@@ -4501,11 +4397,9 @@
             <remap from="~/output/traffic_light" to="/perception/traffic_light_recognition/traffic_signals/markers"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/perception/autoware_traffic_light_visualization/launch/traffic_light_map_visualizer.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/evaluator/autoware_perception_online_evaluator/launch/perception_analytics_publisher.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/evaluator/autoware_perception_online_evaluator/launch/perception_analytics_publisher.launch.xml -->
         <!-- arg name="input/objects" default="/perception/object_recognition/objects" -->
         <node pkg="autoware_perception_online_evaluator" exec="autoware_perception_analytics_publisher_node">
           <!-- params from: {workspace}/src/universe/autoware_universe/evaluator/autoware_perception_online_evaluator/param/perception_analytics_publisher.defaults.yaml -->
@@ -4527,13 +4421,10 @@
           <remap from="~/perception_analytics" to="/perception/perception_analytics_publisher/perception_analytics"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/evaluator/autoware_perception_online_evaluator/launch/perception_analytics_publisher.launch.xml -->
     </group>
-    <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/perception.launch.xml -->
   </group>
-  <!-- end: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_perception_component.launch.xml -->
-  <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_planning_component.launch.xml -->
   <group>
+    <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_planning_component.launch.xml -->
     <!-- arg name="enable_all_modules_auto_mode" value="false" -->
     <!-- arg name="is_simulation" value="false" -->
     <!-- arg name="module_preset" value="default" -->
@@ -4541,8 +4432,8 @@
     <!-- arg name="planning_input_pointcloud_topic_name" default="/perception/obstacle_segmentation/pointcloud" -->
     <!-- arg name="use_sim_time" value="false" -->
     <!-- arg name="vehicle_model" value="sample_vehicle" -->
-    <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/planning.launch.xml -->
     <group>
+      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/planning.launch.xml -->
       <!-- arg name="behavior_path_bidirectional_traffic_module_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_bidirectional_traffic_module/bidirectional_traffic.param.yaml" -->
       <!-- arg name="behavior_path_config_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner" -->
       <!-- arg name="behavior_path_planner_avoidance_by_lc_module_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/avoidance_by_lane_change/avoidance_by_lane_change.param.yaml" -->
@@ -4612,8 +4503,8 @@
       <!-- arg name="vehicle_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/vehicle_info.param.yaml" -->
       <!-- arg name="velocity_smoother_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/autoware_velocity_smoother/velocity_smoother.param.yaml" -->
       <!-- arg name="velocity_smoother_type_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/autoware_velocity_smoother/JerkFiltered.param.yaml" -->
-      <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_manual_lane_change_handler/launch/manual_lane_change_handler.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_manual_lane_change_handler/launch/manual_lane_change_handler.launch.xml -->
         <!-- arg name="manual_lane_change_handler_param_path" default="{workspace}/src/universe/autoware_universe/planning/autoware_manual_lane_change_handler/config/manual_lane_change_handler.param.yaml" -->
         <!-- arg name="map_topic_name" default="/map/vector_map" -->
         <!-- arg name="mission_planner_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/mission_planning/mission_planner/mission_planner.param.yaml" -->
@@ -4641,12 +4532,11 @@
           <remap from="~/input/reroute_availability" to="/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/output/is_reroute_available"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/planning/autoware_manual_lane_change_handler/launch/manual_lane_change_handler.launch.xml -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/mission_planning/mission_planning.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/mission_planning/mission_planning.launch.xml -->
         <!-- arg name="mission_planner_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/mission_planning/mission_planner/mission_planner.param.yaml" -->
-        <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_mission_planner_universe/launch/mission_planner.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_mission_planner_universe/launch/mission_planner.launch.xml -->
           <!-- arg name="clear_route_service_name" default="/planning/clear_route" -->
           <!-- arg name="map_topic_name" default="/map/vector_map" -->
           <!-- arg name="mission_planner_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/mission_planning/mission_planner/mission_planner.param.yaml" -->
@@ -4708,9 +4598,8 @@
             </composable_node>
           </node_container>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/planning/autoware_mission_planner_universe/launch/mission_planner.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_mission_planner_universe/launch/goal_pose_visualizer.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_mission_planner_universe/launch/goal_pose_visualizer.launch.xml -->
           <!-- arg name="echo_back_goal_pose_topic_name" default="/planning/mission_planning/echo_back_goal_pose" -->
           <!-- arg name="route_topic_name" default="/planning/mission_planning/route" -->
           <node pkg="autoware_mission_planner_universe" exec="goal_pose_visualizer" name="goal_pose_visualizer" namespace="/planning/mission_planning" output="screen">
@@ -4729,17 +4618,15 @@
             <remap from="output/goal_pose" to="/planning/mission_planning/echo_back_goal_pose"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/planning/autoware_mission_planner_universe/launch/goal_pose_visualizer.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/mission_planning/mission_planning.launch.xml -->
-      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/scenario_planning.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/scenario_planning.launch.xml -->
         <!-- arg name="enable_all_modules_auto_mode" value="false" -->
         <!-- arg name="input_objects_topic_name" value="/perception/object_recognition/objects" -->
         <!-- arg name="input_pointcloud_topic_name" value="/perception/obstacle_segmentation/pointcloud" -->
         <!-- arg name="is_simulation" value="false" -->
-        <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_scenario_selector/launch/scenario_selector.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_scenario_selector/launch/scenario_selector.launch.xml -->
           <!-- arg name="config_file" default="{workspace}/src/universe/autoware_universe/planning/autoware_scenario_selector/config/scenario_selector.param.yaml" -->
           <!-- arg name="input_lane_driving_trajectory" value="/planning/scenario_planning/lane_driving/trajectory" -->
           <!-- arg name="input_lanelet_map" value="/map/vector_map" -->
@@ -4781,9 +4668,8 @@
             <remap from="output/trajectory" to="/planning/scenario_planning/scenario_selector/trajectory"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/planning/autoware_scenario_selector/launch/scenario_selector.launch.xml -->
-        <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_external_velocity_limit_selector/launch/external_velocity_limit_selector.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_external_velocity_limit_selector/launch/external_velocity_limit_selector.launch.xml -->
           <!-- arg name="common_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/common.param.yaml" -->
           <!-- arg name="input_velocity_limit_clear_command_from_internal" default="/planning/scenario_planning/clear_velocity_limit" -->
           <!-- arg name="input_velocity_limit_from_api" default="/planning/scenario_planning/max_velocity_default" -->
@@ -4863,7 +4749,6 @@
             <remap from="output/debug" to="/planning/scenario_planning/external_velocity_limit_selector/debug"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/planning/autoware_external_velocity_limit_selector/launch/external_velocity_limit_selector.launch.xml -->
         <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="velocity_smoother_container" namespace="/planning/scenario_planning">
           <param name="front_overhang" value="1.0"/>
           <param name="left_overhang" value="0.128"/>
@@ -4951,8 +4836,8 @@
             <remap from="~/output/current_velocity_limit_mps" to="/planning/scenario_planning/current_max_velocity"/>
           </composable_node>
         </node_container>
-        <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_hazard_lights_selector/launch/hazard_lights_selector.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_hazard_lights_selector/launch/hazard_lights_selector.launch.xml -->
           <!-- arg name="hazard_lights_selector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/autoware_hazard_lights_selector/hazard_lights_selector.param.yaml" -->
           <!-- arg name="input_hazard_lights_cmd_from_mrm_operator" default="/system/hazard_lights_cmd" -->
           <!-- arg name="input_hazard_lights_cmd_from_path_planner" default="/planning/behavior_path_planner/hazard_lights_cmd" -->
@@ -4977,15 +4862,14 @@
             <remap from="output/hazard_lights_command" to="/planning/hazard_lights_cmd"/>
           </node>
         </group>
-        <!-- end: {workspace}/src/universe/autoware_universe/planning/autoware_hazard_lights_selector/launch/hazard_lights_selector.launch.xml -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/lane_driving.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/lane_driving.launch.xml -->
           <!-- arg name="enable_all_modules_auto_mode" value="false" -->
           <!-- arg name="input_objects_topic_name" value="/perception/object_recognition/objects" -->
           <!-- arg name="input_pointcloud_topic_name" value="/perception/obstacle_segmentation/pointcloud" -->
           <!-- arg name="is_simulation" value="false" -->
-          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/lane_driving/behavior_planning/behavior_planning.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/lane_driving/behavior_planning/behavior_planning.launch.xml -->
             <!-- arg name="behavior_path_planner_launch_modules" default="[" -->
             <!-- arg name="behavior_path_planner_type" default="behavior_path_planner" -->
             <!-- arg name="behavior_velocity_planner_launch_modules" default="[" -->
@@ -6410,9 +6294,8 @@
               </composable_node>
             </load_composable_node>
           </group>
-          <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/lane_driving/behavior_planning/behavior_planning.launch.xml -->
-          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/lane_driving/motion_planning/motion_planning.launch.xml -->
           <group>
+            <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/lane_driving/motion_planning/motion_planning.launch.xml -->
             <!-- arg name="container_type" value="component_container_mt" -->
             <!-- arg name="input_objects_topic_name" value="/perception/object_recognition/objects" -->
             <!-- arg name="input_pointcloud_topic_name" value="/perception/obstacle_segmentation/pointcloud" -->
@@ -7159,11 +7042,9 @@
               </composable_node>
             </load_composable_node>
           </group>
-          <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/lane_driving/motion_planning/motion_planning.launch.xml -->
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/lane_driving.launch.xml -->
-        <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/parking.launch.xml -->
         <group>
+          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/parking.launch.xml -->
           <!-- arg name="container_type" value="component_container_mt" -->
           <!-- arg name="input_objects_topic_name" default="/perception/object_recognition/objects" -->
           <!-- arg name="input_pointcloud_topic_name" default="/perception/obstacle_segmentation/pointcloud" -->
@@ -7282,11 +7163,9 @@
             </composable_node>
           </node_container>
         </group>
-        <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/parking.launch.xml -->
       </group>
-      <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/scenario_planning/scenario_planning.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/planning/planning_validator/autoware_planning_validator/launch/planning_validator.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/planning/planning_validator/autoware_planning_validator/launch/planning_validator.launch.xml -->
         <!-- arg name="container_type" value="component_container_mt" -->
         <!-- arg name="input_objects_topic_name" value="/perception/object_recognition/objects" -->
         <!-- arg name="input_pointcloud_topic_name" value="/perception/obstacle_segmentation/pointcloud" -->
@@ -7478,9 +7357,8 @@
           </composable_node>
         </node_container>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/planning/planning_validator/autoware_planning_validator/launch/planning_validator.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/evaluator/autoware_planning_evaluator/launch/planning_evaluator.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/evaluator/autoware_planning_evaluator/launch/planning_evaluator.launch.xml -->
         <!-- arg name="input/acceleration" default="/localization/acceleration" -->
         <!-- arg name="input/map_topic" default="/map/vector_map" -->
         <!-- arg name="input/modified_goal" default="/planning/scenario_planning/modified_goal" -->
@@ -7551,9 +7429,8 @@
           <remap from="~/input/steering_status" to="/vehicle/status/steering_status"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/evaluator/autoware_planning_evaluator/launch/planning_evaluator.launch.xml -->
-      <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_remaining_distance_time_calculator/launch/remaining_distance_time_calculator.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_remaining_distance_time_calculator/launch/remaining_distance_time_calculator.launch.xml -->
         <!-- arg name="input_map" default="/map/vector_map" -->
         <!-- arg name="input_odometry" default="/localization/kinematic_state" -->
         <!-- arg name="input_route" default="/planning/mission_planning/route" -->
@@ -7581,11 +7458,8 @@
           <remap from="~/output/mission_remaining_distance_time" to="/planning/mission_remaining_distance_time"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/planning/autoware_remaining_distance_time_calculator/launch/remaining_distance_time_calculator.launch.xml -->
     </group>
-    <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_planning_launch/launch/planning.launch.xml -->
   </group>
-  <!-- end: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_planning_component.launch.xml -->
   <node pkg="topic_tools" exec="relay" name="trajectory_relay">
     <param name="front_overhang" value="1.0"/>
     <param name="input_topic" value="/planning/trajectory"/>
@@ -7601,8 +7475,8 @@
     <param name="wheel_tread" value="1.64"/>
     <param name="wheel_width" value="0.235"/>
   </node>
-  <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_control_component.launch.xml -->
   <group>
+    <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_control_component.launch.xml -->
     <!-- arg name="control_input_objects_topic_name" default="/perception/object_recognition/objects" -->
     <!-- arg name="control_input_pointcloud_topic_name" default="/perception/obstacle_segmentation/pointcloud" -->
     <!-- arg name="lateral_controller_mode" default="mpc" -->
@@ -7612,8 +7486,8 @@
     <!-- arg name="use_individual_control_param" default="false" -->
     <!-- arg name="use_sim_time" value="false" -->
     <!-- arg name="vehicle_model" value="sample_vehicle" -->
-    <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_control_launch/launch/control.launch.xml -->
     <group>
+      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_control_launch/launch/control.launch.xml -->
       <!-- arg name="aeb_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/control/autoware_autonomous_emergency_braking/autonomous_emergency_braking.param.yaml" -->
       <!-- arg name="check_external_emergency_heartbeat" value="false" -->
       <!-- arg name="collision_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/control/autoware_collision_detector/collision_detector.param.yaml" -->
@@ -7963,8 +7837,8 @@
           <remap from="~/output/control_cmd" to="/control/trajectory_follower/control_cmd"/>
         </composable_node>
       </load_composable_node>
-      <!-- source: {workspace}/src/universe/autoware_universe/control/autoware_external_cmd_selector/launch/external_cmd_selector.launch.py -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/control/autoware_external_cmd_selector/launch/external_cmd_selector.launch.py -->
         <!-- arg name="external_cmd_selector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/control/external_cmd_selector/external_cmd_selector.param.yaml" -->
         <!-- arg name="input/local/gear_cmd" default="/external/local/gear_cmd" -->
         <!-- arg name="input/local/hazard_lights_cmd" default="/external/local/hazard_lights_cmd" -->
@@ -8015,9 +7889,8 @@
           </composable_node>
         </load_composable_node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/control/autoware_external_cmd_selector/launch/external_cmd_selector.launch.py -->
-      <!-- source: {workspace}/src/universe/autoware_universe/vehicle/autoware_external_cmd_converter/launch/external_cmd_converter.launch.py -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/vehicle/autoware_external_cmd_converter/launch/external_cmd_converter.launch.py -->
         <!-- arg name="control_command_timeout" default="1.0" -->
         <!-- arg name="csv_path_accel_map" default="{workspace}/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter/data/default/accel_map.csv" -->
         <!-- arg name="csv_path_brake_map" default="{workspace}/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter/data/default/brake_map.csv" -->
@@ -8053,7 +7926,6 @@
           </composable_node>
         </load_composable_node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/vehicle/autoware_external_cmd_converter/launch/external_cmd_converter.launch.py -->
       <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="control_check_container" namespace="/control">
         <param name="front_overhang" value="1.0"/>
         <param name="left_overhang" value="0.128"/>
@@ -8221,8 +8093,8 @@
           <remap from="~/input/objects" to="/perception/object_recognition/objects"/>
         </composable_node>
       </load_composable_node>
-      <!-- source: {workspace}/src/universe/autoware_universe/evaluator/autoware_control_evaluator/launch/control_evaluator.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/evaluator/autoware_control_evaluator/launch/control_evaluator.launch.xml -->
         <!-- arg name="input/acceleration" default="/localization/acceleration" -->
         <!-- arg name="input/behavior_path" default="/planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id" -->
         <!-- arg name="input/objects" value="/perception/object_recognition/objects" -->
@@ -8262,24 +8134,21 @@
           <remap from="~/input/objects" to="/perception/object_recognition/objects"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/evaluator/autoware_control_evaluator/launch/control_evaluator.launch.xml -->
     </group>
-    <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_control_launch/launch/control.launch.xml -->
   </group>
-  <!-- end: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_control_component.launch.xml -->
-  <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_autoware_api_component.launch.xml -->
   <group>
+    <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_autoware_api_component.launch.xml -->
     <!-- arg name="scenario_simulation" default="false" -->
     <!-- arg name="use_sim_time" value="false" -->
     <!-- arg name="vehicle_model" value="sample_vehicle" -->
-    <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_autoware_api_launch/launch/autoware_api.launch.xml -->
     <group>
+      <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_autoware_api_launch/launch/autoware_api.launch.xml -->
       <!-- arg name="default_adapi_param_path" default="{workspace}/src/universe/autoware_universe/system/autoware_default_adapi_universe/config/default_adapi.param.yaml" -->
       <!-- arg name="launch_default_adapi" default="true" -->
       <!-- arg name="launch_evaluation_adapter" value="false" -->
       <!-- arg name="launch_rviz_adaptors" default="true" -->
-      <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_default_adapi_universe/launch/default_adapi.launch.py -->
       <group>
+        <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_default_adapi_universe/launch/default_adapi.launch.py -->
         <!-- arg name="config" value="{workspace}/src/universe/autoware_universe/system/autoware_default_adapi_universe/config/default_adapi.param.yaml" -->
         <node_container pkg="rclcpp_components" exec="component_container_mt" name="container" namespace="/adapi">
           <param name="front_overhang" value="1.0"/>
@@ -8732,9 +8601,8 @@
           </composable_node>
         </node_container>
       </group>
-      <!-- end: {workspace}/src/universe/autoware_universe/system/autoware_default_adapi_universe/launch/default_adapi.launch.py -->
-      <!-- source: {workspace}/src/core/autoware_core/api/autoware_adapi_adaptors/launch/rviz_adaptors.launch.xml -->
       <group>
+        <!-- source: {workspace}/src/core/autoware_core/api/autoware_adapi_adaptors/launch/rviz_adaptors.launch.xml -->
         <!-- arg name="rviz_initial_pose_auto_fix_target" default="pointcloud_map" -->
         <node pkg="autoware_adapi_adaptors" exec="initial_pose_adaptor_node" namespace="/default_adapi/helpers">
           <!-- params from: {workspace}/src/core/autoware_core/api/autoware_adapi_adaptors/config/initial_pose.param.yaml -->
@@ -8776,11 +8644,8 @@
           <remap from="~/input/waypoint" to="/planning/mission_planning/checkpoint"/>
         </node>
       </group>
-      <!-- end: {workspace}/src/core/autoware_core/api/autoware_adapi_adaptors/launch/rviz_adaptors.launch.xml -->
     </group>
-    <!-- end: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_autoware_api_launch/launch/autoware_api.launch.xml -->
   </group>
-  <!-- end: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_autoware_api_component.launch.xml -->
   <node pkg="rviz2" exec="rviz2" name="rviz2" output="screen" args="-d {workspace}/src/launcher/autoware_launch/autoware_launch/rviz/autoware.rviz -s {workspace}/src/launcher/autoware_launch/autoware_launch/rviz/image/autoware.png" respawn="true">
     <param name="front_overhang" value="1.0"/>
     <param name="left_overhang" value="0.128"/>

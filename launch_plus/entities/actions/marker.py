@@ -35,28 +35,6 @@ class SourceMarker(Action):
         return [ET.Comment(f" source: {self.label()} ")]  # type: ignore[list-item]
 
 
-class EndSourceMarker(Action):
-    """Marks the end of an included file in the resolved tree.
-
-    Serializes to ``<!-- end: pkg://share_path -->``.
-    """
-
-    def __init__(self, package: str, share_path: str):
-        self.package = package
-        self.share_path = share_path
-
-    def execute(self, context) -> list:
-        return []
-
-    def label(self) -> str:
-        if self.package:
-            return f"{self.package}://{self.share_path}"
-        return self.share_path
-
-    def serialize_resolved(self) -> list[ET.Element]:
-        return [ET.Comment(f" end: {self.label()} ")]  # type: ignore[list-item]
-
-
 class ArgComment(Action):
     """Renders as ``<!-- arg name="..." value/default="..." -->`` comment."""
 

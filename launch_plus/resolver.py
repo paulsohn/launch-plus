@@ -11,30 +11,252 @@ The main entry point is :func:`resolve_file`, which returns a
 :class:`~launch_plus.types.ParsedLaunchFile`.
 """
 
+from __future__ import annotations
+
+import importlib.abc
 import importlib.util
 import json
 import logging
 import os
 import sys
+import types
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("launch_plus")
-
-# Ensure substitution entity classes are registered before any parsing occurs.
-# ─── XML/YAML Launch File Parser ──────────────────────────────────────────────
-#
-# Parsing is delegated to Entity-based parsers in ``launch_plus.parsers``.
-# Resolution is dispatched through the action registry via _resolve_element().
-
-import launch_plus.entities  # noqa: F401
-from launch_plus.entities.state import (  # noqa: E402
-    LaunchContext,
-    ResolverState,
+from launch_plus.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
+from launch_plus.entities.actions.env import (
+    PushRosNamespace,
+    SetEnvironmentVariable,
+    UnsetEnvironmentVariable,
 )
+from launch_plus.entities.actions.event_handler import (
+    OnProcessExit,
+    OnProcessStart,
+    OnShutdown,
+    OnStateTransition,
+    RegisterEventHandler,
+    Shutdown,
+    TrackedEmitEvent,
+)
+from launch_plus.entities.actions.executable import ExecuteProcess
+from launch_plus.entities.actions.group import GroupAction, OpaqueFunction, TimerAction
+from launch_plus.entities.actions.include import IncludeLaunchDescription
+from launch_plus.entities.actions.node import (
+    ComposableNode,
+    ComposableNodeContainer,
+    LifecycleNode,
+    LoadComposableNodes,
+    Node,
+)
+from launch_plus.entities.actions.param import ParameterFile, SetLaunchConfiguration, SetParameter
+from launch_plus.entities.conditions import (
+    IfCondition,
+    LaunchConfigurationEquals,
+    LaunchConfigurationNotEquals,
+    UnlessCondition,
+)
+from launch_plus.entities.helpers import _extract_pkg_and_share_path
+from launch_plus.entities.launch_description import LaunchDescription as _LaunchDescription
+from launch_plus.entities.launch_description_source import (
+    AnyLaunchDescriptionSource,
+    PythonLaunchDescriptionSource,
+)
+from launch_plus.entities.parsing import _ActionParser
+from launch_plus.entities.state import LaunchContext, ResolverState
+from launch_plus.entities.substitutions.environment_variable import DeferredEnvironmentVariable
+from launch_plus.entities.substitutions.find_pkg_share import FindPackageShare
+from launch_plus.entities.substitutions.launch_config import LaunchConfiguration
+from launch_plus.entities.substitutions.path_join import PathJoinSubstitution
 from launch_plus.parsers.entity import Entity
 from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
 from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
+
+logger = logging.getLogger("launch_plus")
+
+
+# ─── Import system patcher ──────────────────────────────��─────────────────────
+#
+# Intercept ``import launch`` / ``import launch_ros`` and provide shim modules
+# that redirect to our entity implementations.
+
+
+def _build_patched_launch():
+    mod = types.ModuleType("launch")
+    mod.__path__ = []
+    mod.__package__ = "launch"
+    mod.LaunchDescription = _LaunchDescription
+    mod.LaunchContext = LaunchContext
+    return mod
+
+
+def _build_patched_launch_ros():
+    mod = types.ModuleType("launch_ros")
+    mod.__path__ = []
+    mod.__package__ = "launch_ros"
+    return mod
+
+
+def _build_patched_launch_ros_actions():
+    mod = types.ModuleType("launch_ros.actions")
+    mod.Node = Node
+    mod.LifecycleNode = LifecycleNode
+    mod.ComposableNodeContainer = ComposableNodeContainer
+    mod.LoadComposableNodes = LoadComposableNodes
+    mod.SetParameter = SetParameter
+    mod.SetRemap = lambda *a, **kw: None
+    mod.PushRosNamespace = PushRosNamespace
+    mod.SetParametersCallback = lambda *a, **kw: None
+    return mod
+
+
+def _build_patched_launch_ros_utilities():
+    from launch_plus.entities.utilities.namespace_utils import (
+        make_namespace_absolute,
+        prefix_namespace,
+    )
+
+    mod = types.ModuleType("launch_ros.utilities")
+    mod.make_namespace_absolute = make_namespace_absolute
+    mod.prefix_namespace = prefix_namespace
+    mod.get_node_name_count = lambda *a, **kw: 0
+    mod.evaluate_parameters = lambda *a, **kw: []
+    mod.normalize_parameters = lambda *a, **kw: []
+    mod.add_node_name_count_to_name = lambda name, **kw: name
+    return mod
+
+
+def _build_patched_launch_ros_descriptions():
+    mod = types.ModuleType("launch_ros.descriptions")
+    mod.ComposableNode = ComposableNode
+    mod.ParameterFile = ParameterFile
+    return mod
+
+
+def _build_patched_launch_substitutions():
+    mod = types.ModuleType("launch.substitutions")
+    mod.__path__ = []
+    mod.FindPackageShare = FindPackageShare
+    mod.PathJoinSubstitution = PathJoinSubstitution
+    mod.LaunchConfiguration = LaunchConfiguration
+    mod.EnvironmentVariable = DeferredEnvironmentVariable
+    mod.TextSubstitution = lambda text="", **kw: str(text)
+    mod.PythonExpression = lambda expression=None, **kw: None
+    return mod
+
+
+def _build_patched_launch_substitutions_environment_variable():
+    parent = sys.modules.get("launch.substitutions")
+    if parent is None:
+        parent = _build_patched_launch_substitutions()
+    mod = types.ModuleType("launch.substitutions.environment_variable")
+    mod.EnvironmentVariable = parent.EnvironmentVariable
+    return mod
+
+
+def _build_patched_launch_actions():
+    mod = types.ModuleType("launch.actions")
+    mod.IncludeLaunchDescription = IncludeLaunchDescription
+    mod.DeclareLaunchArgument = DeclareLaunchArgument
+    mod.OpaqueFunction = OpaqueFunction
+    mod.GroupAction = GroupAction
+    mod.SetLaunchConfiguration = SetLaunchConfiguration
+    mod.LogInfo = lambda *a, **kw: None
+    mod.TimerAction = TimerAction
+    mod.RegisterEventHandler = RegisterEventHandler
+    mod.EmitEvent = TrackedEmitEvent
+    mod.Shutdown = Shutdown
+    mod.PushLaunchConfigurations = lambda *a, **kw: None
+    mod.PopLaunchConfigurations = lambda *a, **kw: None
+    mod.SetEnvironmentVariable = SetEnvironmentVariable
+    mod.UnsetEnvironmentVariable = UnsetEnvironmentVariable
+    mod.ExecuteProcess = ExecuteProcess
+    mod.ExecuteLocal = lambda *a, **kw: None
+    mod.OnProcessExit = OnProcessExit
+    mod.OnProcessStart = OnProcessStart
+    return mod
+
+
+def _build_patched_launch_event_handlers():
+    mod = types.ModuleType("launch.event_handlers")
+    mod.OnProcessExit = OnProcessExit
+    mod.OnProcessStart = OnProcessStart
+    mod.OnProcessIO = lambda *a, **kw: None
+    mod.OnShutdown = OnShutdown
+    mod.OnStateTransition = OnStateTransition
+    mod.OnExecutionComplete = lambda *a, **kw: None
+    return mod
+
+
+def _build_patched_launch_conditions():
+    mod = types.ModuleType("launch.conditions")
+    mod.IfCondition = IfCondition
+    mod.UnlessCondition = UnlessCondition
+    mod.LaunchConfigurationEquals = LaunchConfigurationEquals
+    mod.LaunchConfigurationNotEquals = LaunchConfigurationNotEquals
+    return mod
+
+
+def _build_patched_launch_launch_description_sources():
+    mod = types.ModuleType("launch.launch_description_sources")
+    mod.PythonLaunchDescriptionSource = PythonLaunchDescriptionSource
+    mod.AnyLaunchDescriptionSource = AnyLaunchDescriptionSource
+    return mod
+
+
+def _build_patched_launch_ros_substitutions():
+    mod = types.ModuleType("launch_ros.substitutions")
+    mod.FindPackageShare = FindPackageShare
+    return mod
+
+
+def _build_patched_launch_ros_parameter_descriptions():
+    mod = types.ModuleType("launch_ros.parameter_descriptions")
+    mod.ParameterFile = ParameterFile
+    mod.ParameterDescription = lambda *a, **kw: None
+    mod.ParameterValue = lambda *a, **kw: None
+    return mod
+
+
+_PATCHED_MODULES: dict[str, types.ModuleType] = {}
+
+
+class _PatchingFinder(importlib.abc.MetaPathFinder):
+    """Meta-path finder that returns pre-built shim modules for ROS 2 packages."""
+
+    PATCHED: dict = {
+        "launch": _build_patched_launch,
+        "launch_ros": _build_patched_launch_ros,
+        "launch_ros.actions": _build_patched_launch_ros_actions,
+        "launch_ros.utilities": _build_patched_launch_ros_utilities,
+        "launch_ros.descriptions": _build_patched_launch_ros_descriptions,
+        "launch.substitutions": _build_patched_launch_substitutions,
+        "launch.substitutions.environment_variable": (
+            _build_patched_launch_substitutions_environment_variable
+        ),
+        "launch.actions": _build_patched_launch_actions,
+        "launch.event_handlers": _build_patched_launch_event_handlers,
+        "launch.conditions": _build_patched_launch_conditions,
+        "launch.launch_description_sources": _build_patched_launch_launch_description_sources,
+        "launch_ros.substitutions": _build_patched_launch_ros_substitutions,
+        "launch_ros.parameter_descriptions": _build_patched_launch_ros_parameter_descriptions,
+    }
+
+    def find_module(self, fullname, path=None):
+        if fullname in self.PATCHED:
+            return self
+        return None
+
+    def load_module(self, fullname):
+        if fullname in sys.modules:
+            return sys.modules[fullname]
+        if fullname not in _PATCHED_MODULES:
+            _PATCHED_MODULES[fullname] = self.PATCHED[fullname]()
+        mod = _PATCHED_MODULES[fullname]
+        sys.modules[fullname] = mod
+        return mod
+
+
+# ─── XML/YAML parsing ────────────────────────────────────────────────────────
 
 
 def parse_xml_launch(content: str, file_path: str) -> list[Entity]:
@@ -47,31 +269,7 @@ def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
     return list(_parse_yaml_launch_entity(content, file_path))
 
 
-# ── Action handler registration ───────────────────────────────────────────────
-#
-# Action handlers live in launch_plus.entities.actions.*.  Importing the
-# package triggers @expose_action registration into action_parse_methods.
-import launch_plus.entities.actions  # noqa: F401, E402
-
-# ─── Internal imports (used by resolver logic) ───────────────────────────────
-from launch_plus.entities.actions.arg import (  # noqa: E402
-    DeclareLaunchArgument,
-    _apply_declared_arg,
-)
-from launch_plus.entities.helpers import _extract_pkg_and_share_path  # noqa: E402
-from launch_plus.entities.parsing import _ActionParser  # noqa: E402
-
-# ─── LaunchContext factory ────────────────────────────────────────────────────
-
-
-def _make_launch_context(args_dict):
-    """Create a LaunchContext pre-populated with provided args."""
-    ctx = LaunchContext()
-    ctx._launch_configurations = dict(args_dict)
-    return ctx
-
-
-# ─── XML/YAML element resolution ─────────────────────────────────────────────
+# ─── XML/YAML element resolution ────────��────────────────────────────────────
 
 
 def resolve_xml_elements(
@@ -125,18 +323,14 @@ def _execute_actions(actions, context) -> list:
     return results
 
 
-# ─── Import system patcher (extracted to entities/import_patcher.py) ──────────
-from launch_plus.entities.import_patcher import (  # noqa: E402, F401
-    _PATCHED_MODULES,
-    _PatchingFinder,
-)
+# ─── Main entry point ─────────────────────────────────────────────���──────────
 
 
 def resolve_file(
-    launch_file: "Path",
+    launch_file: Path,
     args: dict[str, str],
     package_shares: dict[str, str],
-    fetch_dir: "Path",
+    fetch_dir: Path,
     *,
     workflow_options: Any = None,
     lockfile: Any = None,
@@ -220,7 +414,7 @@ def resolve_file(
         state.lockfile_data = {}
 
     state.fetch_dir = str(fetch_dir)
-    state.fetch_options = fetch_options  # FetchOptions from CLI/orchestrator
+    state.fetch_options = fetch_options
 
     args_dict = dict(args)
 
@@ -278,7 +472,8 @@ def resolve_file(
         except Exception:
             pass
 
-    ctx = _make_launch_context(args_dict)
+    ctx = LaunchContext()
+    ctx._launch_configurations = dict(args_dict)
 
     if persisted_global_params:
         gp_tuples = [(entry[0], entry[1]) for entry in persisted_global_params if len(entry) == 2]
@@ -296,15 +491,15 @@ def resolve_file(
         if isinstance(entity, DeclareLaunchArgument):
             _apply_declared_arg(entity, ctx)
 
-    resolved = _execute_actions(entities, ctx)
+    from launch_plus.entities.actions.group import GroupAction as _GroupAction
+
+    resolved = _GroupAction(actions=list(entities), scoped=False).execute(ctx)
 
     return _tracked_to_parsed_launch_file(state.tracked), resolved
 
 
 def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
-    """Build a ParsedLaunchFile from tracked state and resolved actions."""
-    from pathlib import Path as _Path
-
+    """Build a ParsedLaunchFile from tracked state."""
     from launch_plus.types import (
         DependencyKind as _DependencyKind,
     )
@@ -318,7 +513,7 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
         ParsedLaunchFile as _ParsedLaunchFile,
     )
 
-    # ── Include deps ──────────────────────────────────────────────────
+    # ── Include deps ────���─────────────────────────────────────────────
     launch_includes: list[_LaunchInclude] = []
     include_args_map = tracked.get("include_args", {})
     for dep in tracked.get("include_deps", []):
@@ -328,35 +523,35 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
         launch_includes.append(
             _LaunchInclude(
                 package=dep["package"],
-                share_path=_Path(dep["share_path"]),
+                share_path=Path(dep["share_path"]),
                 explicit_args=dep_include_args,
                 namespace_stack=[dep["ros_namespace"]] if dep.get("ros_namespace") else [],
             )
         )
 
-    # ── Declared args ─────────────────────────────────────────────────
+    # ── Declared args ───────────���─────────────────────────────────────
     declared_arg_defaults = {a["name"]: a["default"] for a in tracked.get("declared_args", [])}
 
-    # ── Param file deps ───────────────────────────────────────────────
+    # ── Param file deps ────────���──────────────────────────────────────
     param_file_deps = [
         _FileDependency(
             package=dep["package"],
-            share_path=_Path(dep["share_path"]),
+            share_path=Path(dep["share_path"]),
             kind=_DependencyKind.PARAM,
         )
         for dep in tracked.get("param_file_deps", [])
     ]
 
-    # ── Per-file declared args ────────────────────────────────────────
-    declared_args_by_file: dict[tuple[str, _Path], dict[str, str]] = {}
+    # ── Per-file declared args ────────────��───────────────────────────
+    declared_args_by_file: dict[tuple[str, Path], dict[str, str]] = {}
     for key_str, args_list in tracked.get("declared_args_by_file", {}).items():
         if "://" in key_str:
             idx = key_str.index("://")
             pkg = key_str[:idx]
-            sp = _Path(key_str[idx + 3 :])
+            sp = Path(key_str[idx + 3 :])
         else:
             pkg = ""
-            sp = _Path(key_str)
+            sp = Path(key_str)
         declared_args_by_file[(pkg, sp)] = {a["name"]: a["default"] for a in args_list}
 
     return _ParsedLaunchFile(

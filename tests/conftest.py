@@ -4,17 +4,17 @@ import sys
 
 import pytest
 
-from launch_plus import resolver as R
+from launch_plus.resolver import _PATCHED_MODULES, _PatchingFinder
 
 
 def _install_import_patching():
     """Install the import patcher so child launch files can import shim modules."""
-    if not any(isinstance(f, R._PatchingFinder) for f in sys.meta_path):
-        sys.meta_path.insert(0, R._PatchingFinder())
-    for mod_name, builder in R._PatchingFinder.PATCHED.items():
-        if mod_name not in R._PATCHED_MODULES:
-            R._PATCHED_MODULES[mod_name] = builder()
-        sys.modules[mod_name] = R._PATCHED_MODULES[mod_name]
+    if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
+        sys.meta_path.insert(0, _PatchingFinder())
+    for mod_name, builder in _PatchingFinder.PATCHED.items():
+        if mod_name not in _PATCHED_MODULES:
+            _PATCHED_MODULES[mod_name] = builder()
+        sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
 
 
 _install_import_patching()

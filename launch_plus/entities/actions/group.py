@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import xml.etree.ElementTree as ET
 
-import launch_plus.resolver as _R
 from launch_plus.entities.action import Action
 from launch_plus.entities.expose import expose_action
 from launch_plus.entities.parsing import _ActionParser
@@ -67,7 +66,9 @@ class GroupAction(Action):
                 if child is None:
                     continue
                 if isinstance(child, Entity):
-                    results.extend(_R._resolve_element(child, context, self._include_stack))
+                    from launch_plus.resolver import _resolve_element
+
+                    results.extend(_resolve_element(child, context, self._include_stack))
                 elif isinstance(child, Action):
                     children = child.execute(context)
                     if children:
@@ -104,7 +105,9 @@ class OpaqueFunction(Action):
             try:
                 result = fn(context)
                 if result:
-                    return _R._execute_actions(result, context)
+                    from launch_plus.resolver import _execute_actions
+
+                    return _execute_actions(result, context)
             except Exception as e:
                 logger.error("OpaqueFunction failed: %s", e)
         return []

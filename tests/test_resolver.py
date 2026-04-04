@@ -6,7 +6,6 @@ import os
 import tempfile
 import textwrap
 
-from launch_plus import resolver as R
 from launch_plus.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
 from launch_plus.entities.actions.env import (
     SetEnvironmentVariable,
@@ -32,6 +31,7 @@ from launch_plus.entities.substitutions.launch_config import (
     DeferredDefault,
     LaunchConfiguration,
 )
+from launch_plus.resolver import parse_xml_launch, parse_yaml_launch, resolve_xml_elements
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -555,7 +555,7 @@ class TestParseXmlLaunch:
 
     def test_parse_arg(self):
         xml = '<launch><arg name="x" default="val" description="desc"/></launch>'
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         assert len(elems) == 1
         e = elems[0]
         assert e.type_name == "arg"
@@ -565,12 +565,12 @@ class TestParseXmlLaunch:
 
     def test_parse_arg_no_default(self):
         xml = '<launch><arg name="x"/></launch>'
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         assert elems[0].get_attr("default", optional=True) is None
 
     def test_parse_let(self):
         xml = '<launch><let name="v" value="123"/></launch>'
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         e = elems[0]
         assert e.type_name == "let"
         assert e.get_attr("name") == "v"
@@ -578,7 +578,7 @@ class TestParseXmlLaunch:
 
     def test_parse_let_with_condition(self):
         xml = '<launch><let name="v" value="1" if="$(arg flag)"/></launch>'
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         e = elems[0]
         assert e.get_attr("if") == "$(arg flag)"
 
@@ -592,7 +592,7 @@ class TestParseXmlLaunch:
                 </node>
             </launch>
         """)
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         e = elems[0]
         assert e.type_name == "node"
         assert e.get_attr("pkg") == "my_pkg"
@@ -618,7 +618,7 @@ class TestParseXmlLaunch:
                 </group>
             </launch>
         """)
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         e = elems[0]
         assert e.type_name == "group"
         assert e.get_attr("scoped") == "false"
@@ -636,7 +636,7 @@ class TestParseXmlLaunch:
                 </include>
             </launch>
         """)
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         e = elems[0]
         assert e.type_name == "include"
         assert "$(find-pkg-share pkg)" in e.get_attr("file")
@@ -651,7 +651,7 @@ class TestParseXmlLaunch:
                 <unset_env name="Y" unless="$(arg flag)"/>
             </launch>
         """)
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         assert elems[0].type_name == "set_env"
         assert elems[0].get_attr("name") == "X"
         assert elems[1].type_name == "unset_env"
@@ -660,7 +660,7 @@ class TestParseXmlLaunch:
 
     def test_parse_push_ros_namespace(self):
         xml = '<launch><push-ros-namespace namespace="/my_ns"/></launch>'
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         assert elems[0].type_name == "push-ros-namespace"
         assert elems[0].get_attr("namespace") == "/my_ns"
 
@@ -675,7 +675,7 @@ class TestParseXmlLaunch:
                 </node_container>
             </launch>
         """)
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         e = elems[0]
         assert e.type_name == "node_container"
         assert e.get_attr("pkg") == "rclcpp"
@@ -695,7 +695,7 @@ class TestParseXmlLaunch:
                 </load_composable_node>
             </launch>
         """)
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         e = elems[0]
         assert e.type_name == "load_composable_node"
         assert e.get_attr("target") == "container"
@@ -709,7 +709,7 @@ class TestParseXmlLaunch:
                 <set_remap from="/a" to="/b"/>
             </launch>
         """)
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         assert elems[0].type_name == "set_parameter"
         assert elems[0].get_attr("name") == "p"
         assert elems[1].type_name == "set_remap"
@@ -717,13 +717,13 @@ class TestParseXmlLaunch:
 
     def test_parse_lifecycle_node(self):
         xml = '<launch><lifecycle_node pkg="p" exec="e" name="n"/></launch>'
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         assert elems[0].type_name == "lifecycle_node"
         assert elems[0].get_attr("pkg") == "p"
 
     def test_parse_unknown_element(self):
         xml = "<launch><foobar/></launch>"
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         assert elems[0].type_name == "foobar"
 
     def test_parse_event_handler(self):
@@ -734,7 +734,7 @@ class TestParseXmlLaunch:
                 </on_process_exit>
             </launch>
         """)
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         e = elems[0]
         assert e.type_name == "on_process_exit"
         assert e.get_attr("target") == "my_node"
@@ -745,14 +745,14 @@ class TestParseXmlLaunch:
 
     def test_parse_param_from(self):
         xml = '<launch><node pkg="p" exec="e"><param from="file.yaml"/></node></launch>'
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         params = elems[0].get_attr("param", data_type=list)
         assert params[0].get_attr("from") == "file.yaml"
         assert params[0].get_attr("name", optional=True) is None
 
     def test_substitutions_preserved_as_raw_strings(self):
         xml = '<launch><node pkg="$(arg pkg)" exec="$(var exe)"/></launch>'
-        elems = R.parse_xml_launch(xml, "test.xml")
+        elems = parse_xml_launch(xml, "test.xml")
         assert elems[0].get_attr("pkg") == "$(arg pkg)"
         assert elems[0].get_attr("exec") == "$(var exe)"
 
@@ -774,7 +774,7 @@ class TestParseYamlLaunch:
                   exec: my_exec
                   name: my_node
         """)
-        elems = R.parse_yaml_launch(yaml_content, "test.yaml")
+        elems = parse_yaml_launch(yaml_content, "test.yaml")
         assert len(elems) == 2
         assert elems[0].type_name == "arg"
         assert elems[0].get_attr("name") == "my_arg"
@@ -787,7 +787,7 @@ class TestParseYamlLaunch:
               - push_ros_namespace:
                   namespace: /my_ns
         """)
-        elems = R.parse_yaml_launch(yaml_content, "test.yaml")
+        elems = parse_yaml_launch(yaml_content, "test.yaml")
         assert elems[0].type_name == "push-ros-namespace"
         assert elems[0].get_attr("namespace") == "/my_ns"
 
@@ -799,7 +799,7 @@ class TestParseYamlLaunch:
                   exec: container
                   name: c
         """)
-        elems = R.parse_yaml_launch(yaml_content, "test.yaml")
+        elems = parse_yaml_launch(yaml_content, "test.yaml")
         assert elems[0].type_name == "node_container"
 
     def test_parse_yaml_with_children(self):
@@ -812,7 +812,7 @@ class TestParseYamlLaunch:
                         name: nested
                         default: val
         """)
-        elems = R.parse_yaml_launch(yaml_content, "test.yaml")
+        elems = parse_yaml_launch(yaml_content, "test.yaml")
         e = elems[0]
         assert e.type_name == "group"
         assert e.get_attr("scoped", data_type=bool) is False
@@ -823,7 +823,7 @@ class TestParseYamlLaunch:
 
     def test_parse_yaml_missing_launch_key(self):
         yaml_content = "foo: bar"
-        elems = R.parse_yaml_launch(yaml_content, "test.yaml")
+        elems = parse_yaml_launch(yaml_content, "test.yaml")
         assert elems == []
 
 
@@ -1065,8 +1065,8 @@ def _parse_and_walk(xml_str, ctx=None, **ctx_kwargs):
     """Parse XML string and walk it.  Returns (ctx, tracked)."""
     if ctx is None:
         ctx = _fresh_walker_ctx(**ctx_kwargs)
-    elements = R.parse_xml_launch(xml_str, "test.launch.xml")
-    R.resolve_xml_elements(elements, ctx)
+    elements = parse_xml_launch(xml_str, "test.launch.xml")
+    resolve_xml_elements(elements, ctx)
     return ctx, ctx._state.tracked
 
 
@@ -1174,11 +1174,11 @@ class TestResolveXmlElements:
                 f.write(f'<launch><include file="{self_path}"/></launch>')
 
             ctx = _fresh_walker_ctx()
-            elements = R.parse_xml_launch(
+            elements = parse_xml_launch(
                 f'<launch><include file="{self_path}"/></launch>', "test.launch.xml"
             )
             with caplog.at_level(logging.WARNING):
-                R.resolve_xml_elements(elements, ctx)
+                resolve_xml_elements(elements, ctx)
             assert "circular" in caplog.text
 
     # ── Unknown element ──
@@ -1225,8 +1225,8 @@ class TestResolveXmlElements:
 def _parse_to_tracked(xml_str, **ctx_kwargs):
     """Parse XML string, resolve via action registry, return _tracked."""
     ctx = _fresh_walker_ctx(**ctx_kwargs)
-    elements = R.parse_xml_launch(xml_str, "test.launch.xml")
-    R.resolve_xml_elements(elements, ctx)
+    elements = parse_xml_launch(xml_str, "test.launch.xml")
+    resolve_xml_elements(elements, ctx)
     return ctx._state.tracked
 
 
@@ -1353,27 +1353,23 @@ class TestStrictnessFlags:
     def test_apply_arg_defaults_true_applies_default(self):
         ctx = LaunchContext()
         ctx._state.apply_arg_defaults = True
-        elements = R.parse_xml_launch(
-            '<launch><arg name="x" default="hello"/></launch>', "test.xml"
-        )
-        R.resolve_xml_elements(elements, ctx)
+        elements = parse_xml_launch('<launch><arg name="x" default="hello"/></launch>', "test.xml")
+        resolve_xml_elements(elements, ctx)
         # Default is stored as DeferredDefault; resolve via $(arg x)
         assert resolve_substitutions("$(arg x)", ctx) == "hello"
 
     def test_apply_arg_defaults_false_skips_default(self):
         ctx = LaunchContext()
         ctx._state.apply_arg_defaults = False
-        elements = R.parse_xml_launch(
-            '<launch><arg name="x" default="hello"/></launch>', "test.xml"
-        )
-        R.resolve_xml_elements(elements, ctx)
+        elements = parse_xml_launch('<launch><arg name="x" default="hello"/></launch>', "test.xml")
+        resolve_xml_elements(elements, ctx)
         # Default not applied — arg stays absent
         assert "x" not in ctx._launch_configurations
 
     def test_apply_arg_defaults_false_undefined_ref_errors(self, caplog):
         ctx = LaunchContext()
         ctx._state.apply_arg_defaults = False
-        elements = R.parse_xml_launch(
+        elements = parse_xml_launch(
             """<launch>
                 <arg name="x" default="hello"/>
                 <let name="y" value="$(arg x)"/>
@@ -1381,7 +1377,7 @@ class TestStrictnessFlags:
             "test.xml",
         )
         with caplog.at_level(logging.WARNING):
-            R.resolve_xml_elements(elements, ctx)
+            resolve_xml_elements(elements, ctx)
         assert "undefined" in caplog.text
 
 

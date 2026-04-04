@@ -12,6 +12,7 @@ from launch_plus.entities.actions.env import (
     SetEnvironmentVariable,
     UnsetEnvironmentVariable,
 )
+from launch_plus.entities.actions.include import _inline_resolve_python_launch
 from launch_plus.entities.actions.node import (
     ComposableNode,
     ComposableNodeContainer,
@@ -322,7 +323,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({"parent_var": "parent_value"})
-            R._inline_resolve_python_launch(ctx._state, child_path, ctx, {})
+            _inline_resolve_python_launch(ctx._state, child_path, ctx, {})
 
             assert ctx._launch_configurations["child_var"] == "child_value"
             assert ctx._launch_configurations["parent_var"] == "parent_value"
@@ -348,7 +349,7 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            R._inline_resolve_python_launch(ctx._state, child_path, ctx, {})
+            _inline_resolve_python_launch(ctx._state, child_path, ctx, {})
 
             assert ctx._launch_configurations["sticky_var"] == "persists"
 
@@ -375,14 +376,14 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            R._inline_resolve_python_launch(ctx._state, child_path, ctx, {"mode": "custom"})
+            _inline_resolve_python_launch(ctx._state, child_path, ctx, {"mode": "custom"})
 
             assert ctx._launch_configurations["resolved_mode"] == "custom"
 
     def test_missing_file_silently_skipped(self):
         """A non-existent include file should not raise."""
         ctx = _make_context({})
-        R._inline_resolve_python_launch(ctx._state, "/nonexistent/path.py", ctx, {})
+        _inline_resolve_python_launch(ctx._state, "/nonexistent/path.py", ctx, {})
         # No error, no crash
 
     def test_inline_include_keeps_global_params(self):
@@ -406,7 +407,7 @@ class TestInlinePythonInclude:
 
             ctx = _make_context({})
             gp_before = len(ctx._state.tracked["global_params"])
-            R._inline_resolve_python_launch(ctx._state, child_path, ctx, {})
+            _inline_resolve_python_launch(ctx._state, child_path, ctx, {})
 
             # Global params from inline include are kept
             assert len(ctx._state.tracked["global_params"]) > gp_before
@@ -454,7 +455,7 @@ class TestInlinePythonInclude:
 
             ctx = _make_context({})
             deps_before = len(ctx._state.tracked["include_deps"])
-            R._inline_resolve_python_launch(ctx._state, child_path, ctx, {})
+            _inline_resolve_python_launch(ctx._state, child_path, ctx, {})
 
             # No new include deps
             assert len(ctx._state.tracked["include_deps"]) == deps_before
@@ -511,7 +512,7 @@ class TestEnvStack:
                 """)
                 )
             ctx = _make_context()
-            R._inline_resolve_python_launch(ctx._state, child_path, ctx, {})
+            _inline_resolve_python_launch(ctx._state, child_path, ctx, {})
             assert ctx.environment.get("CHILD_VAR") == "child_val"
 
     def test_env_overrides_returns_only_overrides(self):

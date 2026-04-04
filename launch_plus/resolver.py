@@ -11,9 +11,6 @@ The main entry point is :func:`resolve_file`, which returns a
 :class:`~launch_plus.types.ParsedLaunchFile`.
 """
 
-import importlib
-import importlib.abc
-import importlib.machinery
 import importlib.util
 import json
 import logging
@@ -29,7 +26,6 @@ logger = logging.getLogger("launch_plus")
 #
 # Parsing is delegated to Entity-based parsers in ``launch_plus.parsers``.
 # Resolution is dispatched through the action registry via _resolve_element().
-import xml.etree.ElementTree as ET  # noqa: F401 — still used by callers
 
 import launch_plus.entities  # noqa: F401
 from launch_plus.entities.state import (  # noqa: E402
@@ -51,7 +47,6 @@ def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
     return list(_parse_yaml_launch_entity(content, file_path))
 
 
-# ─── XML/YAML resolution engine (extracted to entities/xml_resolver.py) ──────
 # ── Action handler registration ───────────────────────────────────────────────
 #
 # Action handlers live in launch_plus.entities.actions.*.  Importing the
@@ -76,65 +71,7 @@ def _make_launch_context(args_dict):
     return ctx
 
 
-# ─── Inline Python include resolution ─────────────────────────────────────────
-
-
-def _inline_resolve_python_launch(state, launch_file, parent_context, child_args) -> list:
-    """Load a Python launch file and walk its actions in the parent context.
-
-    This mirrors real ROS 2 behavior where ``IncludeLaunchDescription``
-    synchronously executes the child, so ``SetLaunchConfiguration`` calls in
-    the child mutate the shared ``LaunchContext``.
-    """
-
-    real_path = launch_file
-    if not os.path.isfile(real_path):
-        return []
-
-    try:
-        spec = importlib.util.spec_from_file_location(
-            f"_inline_launch_{len(state.include_chain)}", real_path
-        )
-        if spec is None or spec.loader is None:
-            logger.warning("cannot load included launch file: %s", real_path)
-            return []
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-    except Exception as e:
-        logger.warning("failed to load included launch file %s: %s", real_path, e)
-        return []
-
-    if not hasattr(mod, "generate_launch_description"):
-        return []
-
-    saved_declared_arg_names = set(state.declared_arg_names)
-    try:
-        try:
-            ld = mod.generate_launch_description()
-        except Exception as e:
-            logger.warning("generate_launch_description() failed in %s: %s", launch_file, e)
-            return []
-
-        entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
-
-        for k, v in child_args.items():
-            parent_context._launch_configurations[k] = v
-
-        for entity in entities:
-            if isinstance(entity, DeclareLaunchArgument):
-                _apply_declared_arg(entity, parent_context)
-
-        return _execute_actions(entities, parent_context)
-    finally:
-        state.declared_arg_names.clear()
-        state.declared_arg_names.update(saved_declared_arg_names)
-
-
-# ─── XML/YAML AST Walker ────────────────────────────────────────────────────
-#
-# Walks the element list produced by parse_xml_launch / parse_yaml_launch,
-# resolves substitutions, evaluates conditions, and populates _state.tracked.
-# This is the XML/YAML counterpart of the Python _walk_actions mechanism.
+# ─── XML/YAML element resolution ─────────────────────────────────────────────
 
 
 def resolve_xml_elements(
@@ -169,48 +106,6 @@ def _resolve_element(
         return []
     logger.warning("unknown element: <%s>", tag)
     return []
-
-
-def resolve_included_file(
-    ctx,
-    include_stack: list[str],
-    real_path: str,
-    file_path: str,
-    child_ctx_args: dict[str, str],
-) -> list:
-    """Parse an included launch file and return resolved actions."""
-    from launch_plus.entities.helpers import _extract_pkg_and_share_path
-    from launch_plus.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
-    from launch_plus.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
-
-    state = ctx._state
-    inc_dep = _extract_pkg_and_share_path(file_path)
-    if inc_dep:
-        state.include_chain.append(list(inc_dep))
-    else:
-        state.include_chain.append(["", file_path])
-    new_stack = include_stack + [file_path]
-    for k, v in child_ctx_args.items():
-        ctx._launch_configurations[k] = v
-    saved_launch_file_dir = ctx.launch_file_dir
-    ctx.launch_file_dir = os.path.dirname(real_path)
-    results: list = []
-    try:
-        if real_path.endswith((".launch.xml", ".xml", ".yaml", ".yml")):
-            with open(real_path) as f:
-                content = f.read()
-            child_entities: list
-            if real_path.endswith((".yaml", ".yml")):
-                child_entities = list(_parse_yaml_launch_entity(content, real_path))
-            else:
-                child_entities = list(_parse_xml_launch_entity(content, real_path))
-            results = resolve_xml_elements(child_entities, ctx, include_stack=new_stack)
-        elif real_path.endswith((".launch.py", ".py")):
-            results = _inline_resolve_python_launch(state, file_path, ctx, child_ctx_args)
-    finally:
-        ctx.launch_file_dir = saved_launch_file_dir
-        state.include_chain.pop()
-    return results
 
 
 def _execute_actions(actions, context) -> list:

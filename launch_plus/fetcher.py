@@ -536,7 +536,13 @@ def ensure_package_available(
         pkg_lock = lockfile.packages.get(package)
         if pkg_lock is not None:
             pkg_path = (fetch_dir / pkg_lock.repo / pkg_lock.path).resolve()
-            if (pkg_path / "package.xml").exists():
+            # Only skip fetch when DIRTY and package exists on disk.
+            # DEFAULT and CLEAN modes must go through fetch_repo_sparse
+            # for SHA verification / reset.
+            if (
+                options.workspace_state == WorkspaceState.DIRTY
+                and (pkg_path / "package.xml").exists()
+            ):
                 return pkg_path
             try:
                 fetch_packages([package], lockfile, fetch_dir, options)

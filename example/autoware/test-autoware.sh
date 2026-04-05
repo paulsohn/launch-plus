@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Integration test for launch-plus against the Autoware example.
+# Integration test for roscope against the Autoware example.
 #
 # Usage:
 #   bash test-autoware.sh        # default: verify SHA + clean tree, error if wrong
 #   bash test-autoware.sh -c     # test --clean: reset repos to lockfile SHAs (stash dirty)
 #   bash test-autoware.sh -d     # test --dirty: use whatever is on disk
 #
-# The -c/-d flags only select which launch-plus workspace mode to test;
+# The -c/-d flags only select which roscope workspace mode to test;
 # they do NOT perform any extra cleanup themselves.
 #
 # Requires:
-#   - launch-plus on PATH (pip install -e . from repo root)
+#   - roscope on PATH (pip install -e . from repo root)
 #   - ROS 2 sourced (for rosdep + ament)
 #   - colcon installed (for the build step)
 
@@ -36,15 +36,15 @@ else
     MODE=""  # default mode: no flag
 fi
 
-# ── Locate launch-plus ───────────────────────────────────────────────────────
+# ── Locate roscope ───────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-if command -v launch-plus &>/dev/null; then
-    LP=launch-plus
+if command -v roscope &>/dev/null; then
+    LP=roscope
 else
-    echo "ERROR: launch-plus not found. Install with: pip install -e . (from repo root)"
+    echo "ERROR: roscope not found. Install with: pip install -e . (from repo root)"
     exit 1
 fi
 

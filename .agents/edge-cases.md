@@ -1,6 +1,6 @@
 # Launch File Edge Cases
 
-Based on analysis of Autoware reference codebase. These patterns must be supported by launch-plus.
+Based on analysis of Autoware reference codebase. These patterns must be supported by roscope.
 
 ## 1. Complex Substitution Patterns
 
@@ -351,7 +351,7 @@ This makes the launch file work both with and without a pre-built install tree.
 
 During migration or debugging, teams may want to:
 
-1. Use `launch-plus resolve` to produce a flattened launch file
+1. Use `roscope resolve` to produce a flattened launch file
 2. Run that file directly with `ros2 launch flat.launch.xml`
 
 This "resolve then run" workflow is valuable during migration phases — it simplifies a
@@ -360,7 +360,7 @@ against the original runtime behavior.
 
 ### Path Resolution Concern
 
-`launch-plus resolve` resolves `$(find-pkg-share pkg)` to **source paths** by default:
+`roscope resolve` resolves `$(find-pkg-share pkg)` to **source paths** by default:
 
 ```
 $(find-pkg-share autoware_launch) → /workspace/src/autoware_launch
@@ -394,10 +394,10 @@ instead of the source workspace:
 
 ```bash
 # Source paths (default) — for inspection, dependency analysis
-launch-plus resolve autoware_launch autoware.launch.xml > inspect.launch.xml
+roscope resolve autoware_launch autoware.launch.xml > inspect.launch.xml
 
 # Install paths — for direct execution with ros2 launch
-launch-plus resolve autoware_launch autoware.launch.xml --output-paths=install > run.launch.xml
+roscope resolve autoware_launch autoware.launch.xml --output-paths=install > run.launch.xml
 ros2 launch run.launch.xml
 ```
 
@@ -413,7 +413,7 @@ AMENT_PREFIX_PATH-first priority (inverse of the current source-first order in
 | Phase | Behaviour |
 |-------|-----------|
 | M4 (current) | Source paths only.  Works with `--symlink-install`; may fail for generated files with copy-install. |
-| M5 (planned) | Add `--output-paths=install` flag.  Integrate with the Builder so the resolved XML is immediately runnable after `launch-plus build`. |
+| M5 (planned) | Add `--output-paths=install` flag.  Integrate with the Builder so the resolved XML is immediately runnable after `roscope build`. |
 
 ---
 
@@ -445,14 +445,14 @@ These patterns are common when:
 
 ```bash
 # Default: fail if launcher not found
-launch-plus resolve my_pkg launcher.launch.xml
+roscope resolve my_pkg launcher.launch.xml
 
 # Build if needed (resolve mode with build fallback)
-launch-plus resolve my_pkg launcher.launch.xml --build-if-missing
+roscope resolve my_pkg launcher.launch.xml --build-if-missing
 
 # Or use build/run which always builds first
-launch-plus build my_pkg launcher.launch.xml
-launch-plus run my_pkg launcher.launch.xml
+roscope build my_pkg launcher.launch.xml
+roscope run my_pkg launcher.launch.xml
 ```
 
 ### Detection Heuristics
@@ -467,7 +467,7 @@ To detect if a package might generate launch files:
 ```
 Warning: Launch file 'generated.launch.py' not found in source.
   Package 'my_pkg' may generate this file during build.
-  Use --build-if-missing to build first, or use 'launch-plus build' command.
+  Use --build-if-missing to build first, or use 'roscope build' command.
 ```
 
 ## 12. Build Modes
@@ -478,7 +478,7 @@ Two distinct build commands with dedicated verbs:
 Build only what's required for a specific launcher:
 
 ```bash
-launch-plus build my_pkg my_launcher.launch.xml
+roscope build my_pkg my_launcher.launch.xml
 ```
 
 **Process:**
@@ -497,13 +497,13 @@ Build everything in one or more packages:
 
 ```bash
 # Build entire package
-launch-plus build-pkg my_pkg
+roscope build-pkg my_pkg
 
 # Build multiple packages
-launch-plus build-pkg pkg1 pkg2 pkg3
+roscope build-pkg pkg1 pkg2 pkg3
 
 # Build all packages in lockfile
-launch-plus build-pkg --all
+roscope build-pkg --all
 ```
 
 **Use cases:**
@@ -765,9 +765,9 @@ using node-level attributes — keeping the output readable and avoiding new ele
 </on_state_transition>
 ```
 
-These are launch-plus XML extensions — `ros2 launch` does not support them. They serve as
+These are roscope XML extensions — `ros2 launch` does not support them. They serve as
 documentation in the resolved output. Actual lifecycle management (calling `/change_state`
-services) is deferred to a future `launch-plus run` implementation.
+services) is deferred to a future `roscope run` implementation.
 
 For Pattern B (exit-propagates-shutdown):
 ```xml
@@ -802,7 +802,7 @@ for `<on_*>` wrappers containing `<emit_event />` children.
 
 Event handlers affect **runtime behaviour** only — when nodes become active, what happens when
 they exit. They do **not** affect the dependency graph (which packages are needed, which nodes
-exist, which topics are remapped). For the primary purpose of `launch-plus` (dependency
+exist, which topics are remapped). For the primary purpose of `roscope` (dependency
 indexing and workspace management), the current silent-drop behaviour is correct and complete.
 
 The event-handler elements in the resolved XML are **informational**: they make the output
@@ -815,7 +815,7 @@ is deferred to future work.
 
 ### Feature Overview
 
-`launch-plus resolve` always flattens namespace stacks: the full namespace is
+`roscope resolve` always flattens namespace stacks: the full namespace is
 applied as a `namespace=` attribute directly on each `<node>` element, and
 `<push-ros-namespace>` is omitted entirely from the output.
 
@@ -994,7 +994,7 @@ autoware.launch.xml
 `LaunchConfiguration` global context — when `ros2 launch` is used, any configuration
 set by the parent is visible to all descendants without explicit forwarding.
 
-`launch-plus` resolves files independently, so this "cascade via context" is only
+`roscope` resolves files independently, so this "cascade via context" is only
 honoured when the `with_cascade` arg context is populated (i.e. the parent's full arg context is forwarded to children).
 
 **Top XML targets in Autoware:**
@@ -1201,7 +1201,7 @@ The Lark grammar matches the official ROS 2 `grammar.lark` — all valid XML sub
 ## 15. Unresolvable Constructs (static-analysis limitations)
 
 Several launch-file constructs execute code at ROS 2 launch runtime and cannot be evaluated
-during static analysis.  launch-plus now reports each as an error or warning rather than
+during static analysis.  roscope now reports each as an error or warning rather than
 silently discarding the value.
 
 ### `$(command 'shell cmd' ['on_error'])` — **error**
@@ -1276,7 +1276,7 @@ The correct `package.xml` tag should be `<depend>` (which expands to `build_depe
 `build_export_depend` + `exec_depend`), since the semantic intent is that the
 sub-packages must be present in the install space when the metapackage is installed.
 
-**launch-plus stance:** This is an upstream packaging issue.  launch-plus uses
+**roscope stance:** This is an upstream packaging issue.  roscope uses
 `DependencyMode::Build` which walks `build_depend`, `build_export_depend`,
 `buildtool_depend`, and `<depend>` — matching the standard ROS 2 build dependency
 model.  Packages that use only `exec_depend` for sub-packages that must be built
@@ -1299,5 +1299,5 @@ respectively.  This causes two classes of failures:
    that `find_package` a test-only dependency outside `if(BUILD_TESTING)` cause CMake
    to fail when the test package is not in the build set.
 
-Both are upstream CMakeLists.txt bugs.  launch-plus recommends `-DBUILD_TESTING=OFF`
+Both are upstream CMakeLists.txt bugs.  roscope recommends `-DBUILD_TESTING=OFF`
 in the colcon flagfile for production builds, which is standard Autoware CI practice.

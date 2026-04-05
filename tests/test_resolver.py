@@ -6,32 +6,32 @@ import os
 import tempfile
 import textwrap
 
-from launch_plus.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
-from launch_plus.entities.actions.env import (
+from roscope.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
+from roscope.entities.actions.env import (
     SetEnvironmentVariable,
     UnsetEnvironmentVariable,
 )
-from launch_plus.entities.actions.include import _inline_resolve_python_launch
-from launch_plus.entities.actions.node import (
+from roscope.entities.actions.include import _inline_resolve_python_launch
+from roscope.entities.actions.node import (
     ComposableNode,
     ComposableNodeContainer,
     Node,
     _resolve_plugins,
 )
-from launch_plus.entities.helpers import (
+from roscope.entities.helpers import (
     _effective_namespace,
     _is_substitution,
     _is_truthy,
     env_overrides,
     resolve_substitutions,
 )
-from launch_plus.entities.state import LaunchContext, ResolverState
-from launch_plus.entities.substitutions.find_pkg_share import FindPackageShare
-from launch_plus.entities.substitutions.launch_config import (
+from roscope.entities.state import LaunchContext, ResolverState
+from roscope.entities.substitutions.find_pkg_share import FindPackageShare
+from roscope.entities.substitutions.launch_config import (
     DeferredDefault,
     LaunchConfiguration,
 )
-from launch_plus.resolver import parse_xml_launch, parse_yaml_launch, resolve_xml_elements
+from roscope.resolver import parse_xml_launch, parse_yaml_launch, resolve_xml_elements
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -172,7 +172,7 @@ class TestPerformSubstitution:
         assert ctx.perform_substitution(None) == ""
 
     def test_perform_substitutions_list(self):
-        from launch_plus.entities.utilities import perform_substitutions
+        from roscope.entities.utilities import perform_substitutions
 
         parts = [
             LaunchConfiguration("prefix"),
@@ -182,7 +182,7 @@ class TestPerformSubstitution:
         assert perform_substitutions(ctx, parts) == "foobar"
 
     def test_perform_substitutions_with_unresolved(self):
-        from launch_plus.entities.utilities import perform_substitutions
+        from roscope.entities.utilities import perform_substitutions
 
         parts = [
             LaunchConfiguration("resolved_var"),

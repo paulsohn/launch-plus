@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide walks through using launch-plus with your own ROS 2 project.
+This guide walks through using roscope with your own ROS 2 project.
 
 ## Prerequisites
 
@@ -14,14 +14,14 @@ This guide walks through using launch-plus with your own ROS 2 project.
 ## Installation
 
 ```bash
-pip install git+https://github.com/paulsohn/launch-plus.git
+pip install git+https://github.com/paulsohn/roscope.git
 ```
 
 Or for development:
 
 ```bash
-git clone https://github.com/paulsohn/launch-plus.git
-cd launch-plus
+git clone https://github.com/paulsohn/roscope.git
+cd roscope
 pip install -e .
 ```
 
@@ -55,7 +55,7 @@ you can use it directly.
 ## Step 2: Generate a lockfile
 
 ```bash
-launch-plus index my_project.repos
+roscope index my_project.repos
 ```
 
 This resolves every version reference to a concrete commit SHA, scans each
@@ -72,14 +72,14 @@ source code.
 To update the lockfile when upstream repos change:
 
 ```bash
-launch-plus update              # re-resolve all refs
-launch-plus update core/my_msgs # update a specific repo (uses lockfile key)
+roscope update              # re-resolve all refs
+roscope update core/my_msgs # update a specific repo (uses lockfile key)
 ```
 
 ## Step 3: Resolve a launch file
 
 ```bash
-launch-plus resolve -d my_bringup robot.launch.xml \
+roscope resolve -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   --preview \
   > resolved.launch.xml
@@ -93,7 +93,7 @@ This will:
 5. Output a single flattened XML with all includes inlined, variables
    substituted, and conditionals evaluated
 
-The `-d` (dirty) flag tells launch-plus to use whatever is on disk and only
+The `-d` (dirty) flag tells roscope to use whatever is on disk and only
 fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
 
 ### Useful resolve flags
@@ -117,7 +117,7 @@ fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
 ```bash
 source /opt/ros/humble/setup.bash
 
-launch-plus build -c my_bringup robot.launch.xml \
+roscope build -c my_bringup robot.launch.xml \
   robot_name:=my_robot \
   --rosdep \
   --colcon-flagfile colcon-flags.txt
@@ -151,12 +151,12 @@ source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
 source install/setup.bash
 
 # Preview resolve (pre-build, source paths)
-launch-plus resolve --preview -d my_bringup robot.launch.xml \
+roscope resolve --preview -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > preview.launch.xml
 
 # Post-build resolve (install paths)
-launch-plus resolve -d my_bringup robot.launch.xml \
+roscope resolve -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > postbuild.launch.xml
 
@@ -167,7 +167,7 @@ diff preview_clean.xml postbuild.launch.xml
 
 ## Directory layout
 
-After running launch-plus, your workspace will look like:
+After running roscope, your workspace will look like:
 
 ```
 my_workspace/

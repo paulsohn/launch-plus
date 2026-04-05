@@ -37,7 +37,7 @@ build/
 .pytest_cache/
 .ruff_cache/
 
-# Testing artifacts (created when running launch-plus from repo root)
+# Testing artifacts (created when running roscope from repo root)
 /src/
 /manifest.repos
 /manifest.lock.repos

@@ -2,7 +2,7 @@
 
 ## Overview
 
-launch-plus is a pure Python application providing a Bazel-inspired workflow
+roscope is a pure Python application providing a Bazel-inspired workflow
 for ROS 2: lazy, on-demand package fetching and building based on actual
 launch-time dependencies.  The CLI is built with Click; all modules are
 importable as a Python library.
@@ -12,7 +12,7 @@ importable as a Python library.
 │  CLI (cli.py)                                         │
 │  Click argument parsing → delegates to modules        │
 ├───────────────────────────────────────────────────────┤
-│  Core Library (launch_plus)                           │
+│  Core Library (roscope)                           │
 │  ├── indexer    — .repos → lockfile                   │
 │  ├── fetcher    — git sparse-checkout on demand       │
 │  ├── resolver   — launch file resolution              │
@@ -51,7 +51,7 @@ dual-indexed lockfile.
 ### 2. Resolve phase
 
 ```
-launch-plus resolve <pkg> <launcher>
+roscope resolve <pkg> <launcher>
     │
     ▼
 [orchestrator]
@@ -85,7 +85,7 @@ launch-plus resolve <pkg> <launcher>
 ### 3. Build phase
 
 ```
-launch-plus build <pkg> <launcher>
+roscope build <pkg> <launcher>
     │
     ▼
 [orchestrator]
@@ -166,7 +166,7 @@ include-chain source comments.
 
 Computes the transitive build-dependency closure and invokes `colcon build`.
 Reads extra arguments from a flagfile.  Validates that flagfile tokens don't
-conflict with launch-plus-managed arguments.
+conflict with roscope-managed arguments.
 
 ### Rosdep (`rosdep.py`)
 
@@ -187,7 +187,7 @@ packages cleanly without either problem.
 ### Why shim modules instead of real launch/launch_ros?
 
 Installing `launch` and `launch_ros` would require a full ROS 2 Python
-environment on the resolver host.  The shims let launch-plus work with just
+environment on the resolver host.  The shims let roscope work with just
 Python 3 and no ROS 2 installation — the resolver is a standalone tool.
 
 ### Why pure Python?
@@ -196,5 +196,5 @@ ROS 2 is fundamentally a Python ecosystem.  A Rust+Python hybrid required
 maintaining a subprocess boundary with JSON serialization — every new node
 attribute needed changes in three places (Python shim, JSON serde structs, Rust
 IR types).  Pure Python eliminates this boundary friction, simplifies
-installation to `pip install launch-plus`, and lets the resolver return
+installation to `pip install roscope`, and lets the resolver return
 `ParsedLaunchFile` dataclasses directly instead of serializing through JSON.

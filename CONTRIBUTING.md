@@ -1,4 +1,4 @@
-# Contributing to launch-plus
+# Contributing to roscope
 
 ## Branching Strategy
 
@@ -44,8 +44,8 @@ Do **not** push directly to `devel`.
 ### Setup
 
 ```bash
-git clone https://github.com/paulsohn/launch-plus.git
-cd launch-plus
+git clone https://github.com/paulsohn/roscope.git
+cd roscope
 pre-commit install   # optional but recommended
 ```
 

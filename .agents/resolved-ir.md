@@ -103,7 +103,7 @@ Condition          ::= IfCondition                 (* if="expr" — execute when
 
 ### 2.2 Action Class Structure
 
-All action classes live in `launch_plus/entities/actions/`. Each has:
+All action classes live in `roscope/entities/actions/`. Each has:
 
 - `@classmethod parse(cls, entity, parser)` — parse XML/YAML Entity into action with unresolved tokens
 - `__init__(**kwargs)` — stores raw substitution tokens (XML path) or resolved values (Python shim path)
@@ -202,7 +202,7 @@ tracked = {
 
 ### 3.4 Handler Location
 
-All `@expose_action` handlers live in `launch_plus/entities/actions/`:
+All `@expose_action` handlers live in `roscope/entities/actions/`:
 
 | Module | Tags |
 |---|---|

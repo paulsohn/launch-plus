@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from launch_plus.resolver import _PATCHED_MODULES, _PatchingFinder
+from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
 
 
 def _install_import_patching():

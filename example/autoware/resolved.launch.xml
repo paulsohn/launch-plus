@@ -1,5 +1,5 @@
 <!-- PREVIEW: resolved from source workspace, not install paths -->
-<!-- resolved by launch-plus from autoware_launch://launch/autoware.launch.xml -->
+<!-- resolved by roscope from autoware_launch://launch/autoware.launch.xml -->
 <launch>
   <!-- arg name="map_path" value="{map_path}" -->
   <!-- arg name="sensor_model" value="sample_sensor_kit" -->

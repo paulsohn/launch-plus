@@ -102,14 +102,14 @@ than a manually-maintained, often over-inclusive list.
 All the information needed to determine the minimal build set is already there —
 it just needs to be extracted.
 
-This is the core insight behind launch-plus: **treat the launch file as a build
+This is the core insight behind roscope: **treat the launch file as a build
 target**, like Bazel treats a `BUILD` file.  Instead of relying on `exec_depend`
 or manually labeling repositories, let the tool trace the launch graph and
 determine exactly which packages are needed.
 
-## What launch-plus provides
+## What roscope provides
 
-launch-plus replaces the four-step pipeline with a single command that
+roscope replaces the four-step pipeline with a single command that
 understands the full picture:
 
 ```
@@ -119,13 +119,13 @@ rosdep install --from-paths src           # install all deps
 colcon build                              # build everything
 ros2 launch my_pkg my_launch.xml          # launch
 
-# launch-plus: 1 tool, launch-file-driven
-launch-plus build my_pkg my_launch.xml \
+# roscope: 1 tool, launch-file-driven
+roscope build my_pkg my_launch.xml \
   --clean --rosdep                        # fetch + deps + build (only what's needed)
 ros2 launch my_pkg my_launch.xml          # launch
 ```
 
-| Traditional workflow | launch-plus workflow |
+| Traditional workflow | roscope workflow |
 |---|---|
 | Mutable `.repos` refs | SHA-pinned lockfile (reproducible) |
 | Clone all repos | Sparse-checkout only needed packages |
@@ -134,24 +134,24 @@ ros2 launch my_pkg my_launch.xml          # launch
 | Manual per-ECU configs | Automatic dependency tracing |
 | Separate build lists per target | Per-ECU launch file = per-ECU build set |
 
-With launch-plus, the multi-ECU problem reduces to:
+With roscope, the multi-ECU problem reduces to:
 
 ```bash
 # Perception ECU — just point at the perception launch file
-launch-plus build perception_launch perception.launch.xml --clean --rosdep
+roscope build perception_launch perception.launch.xml --clean --rosdep
 
 # Planning ECU — point at the planning launch file
-launch-plus build planning_launch planning.launch.xml --clean --rosdep
+roscope build planning_launch planning.launch.xml --clean --rosdep
 
 # Logging ECU — point at the logging launch file
-launch-plus build logging_launch logging.launch.xml --clean --rosdep
+roscope build logging_launch logging.launch.xml --clean --rosdep
 ```
 
 No labels.  No manual filtering.  The launch file *is* the build specification.
 
 ## Beyond Autoware
 
-While launch-plus was developed with Autoware as the primary test case, it is
+While roscope was developed with Autoware as the primary test case, it is
 designed to work with **any ROS 2 project** that uses standard `.repos` manifests
 and launch files.  The tool has no Autoware-specific logic — it operates on
 standard ROS 2 conventions:
@@ -162,4 +162,4 @@ standard ROS 2 conventions:
 - `colcon` for building
 - `rosdep` for system dependency resolution
 
-If your project follows these conventions, launch-plus can help.
+If your project follows these conventions, roscope can help.

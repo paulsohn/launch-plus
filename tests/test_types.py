@@ -1,8 +1,8 @@
-"""Tests for launch_plus.types — IR dataclasses and namespace helpers."""
+"""Tests for roscope.types — IR dataclasses and namespace helpers."""
 
 from pathlib import Path
 
-from launch_plus.types import (
+from roscope.types import (
     DependencyKind,
     FileDependency,
     IncludeArgContext,

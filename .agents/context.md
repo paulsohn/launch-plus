@@ -1,8 +1,8 @@
-# Project Context: launch-plus
+# Project Context: roscope
 
 ## Overview
 
-launch-plus is a **Bazel-like build/run system for ROS 2** that enables lazy, on-demand package fetching and building based on actual launch-time dependencies.
+roscope is a **Bazel-like build/run system for ROS 2** that enables lazy, on-demand package fetching and building based on actual launch-time dependencies.
 
 **Problem**: Traditional ROS 2 workflow (vcs → rosdep → colcon → ros2 launch) requires cloning and building everything upfront.
 
@@ -11,27 +11,27 @@ launch-plus is a **Bazel-like build/run system for ROS 2** that enables lazy, on
 ## Design Philosophy: Bazel for ROS 2
 
 ```
-# Bazel                          # launch-plus
-bazel build //pkg:target    →    launch-plus build <pkg> <launcher>
-bazel test //pkg:target     →    launch-plus test <pkg> <launcher>
-bazel run //pkg:target      →    launch-plus run <pkg> <launcher>
-bazel query //pkg:target    →    launch-plus dry-run <pkg> <launcher>
+# Bazel                          # roscope
+bazel build //pkg:target    →    roscope build <pkg> <launcher>
+bazel test //pkg:target     →    roscope test <pkg> <launcher>
+bazel run //pkg:target      →    roscope run <pkg> <launcher>
+bazel query //pkg:target    →    roscope dry-run <pkg> <launcher>
 ```
 
 Key insight: **A launch file IS a build target** that declares its dependencies through:
 - `<include file="$(find-pkg-share ...)"/>` - package dependencies
 - `<node pkg="..."/>` - executable dependencies
-- Embedded `launch-plus:` comment blocks - explicit dependency override (inline)
+- Embedded `roscope:` comment blocks - explicit dependency override (inline)
 
 ## Architecture
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
 │  CLI Layer (Python — Click)                                       │
-│  ├── launch-plus ...      (standalone)                            │
-│  └── ros2 launch-plus ... (ros2 verb integration)                 │
+│  ├── roscope ...      (standalone)                            │
+│  └── ros2 roscope ... (ros2 verb integration)                 │
 ├───────────────────────────────────────────────────────────────────┤
-│  Core Library (launch_plus — pure Python)                         │
+│  Core Library (roscope — pure Python)                         │
 │  ├── indexer      — .repos → lockfile (pkg→repo+path+SHA map)     │
 │  ├── resolver     — launch file → resolved structure + dep graph  │
 │  │   ├── entities/substitutions/ — typed substitution objects     │
@@ -53,8 +53,8 @@ Key insight: **A launch file IS a build target** that declares its dependencies 
 ```
 1. INDEX PHASE
 
-   launch-plus index [file.repos...]           # Generate from scratch
-   launch-plus index --append [file.repos...]  # Append to existing
+   roscope index [file.repos...]           # Generate from scratch
+   roscope index --append [file.repos...]  # Append to existing
         ↓
    [indexer] for each repo in .repos:
      - git ls-remote → resolve version to SHA
@@ -67,7 +67,7 @@ Key insight: **A launch file IS a build target** that declares its dependencies 
 
 2. UPDATE PHASE (optional, on-demand)
 
-   launch-plus update [--branch]
+   roscope update [--branch]
         ↓
    [updater] for each repo in lockfile:
      - compare current SHA vs remote
@@ -77,7 +77,7 @@ Key insight: **A launch file IS a build target** that declares its dependencies 
 
 3. EXECUTION PHASE (resolve/build/test/run)
 
-   launch-plus <mode> <package> <launch_file>
+   roscope <mode> <package> <launch_file>
         ↓
    [resolver] lockfile.packages[package] → quick lookup
         ↓
@@ -101,9 +101,9 @@ Key insight: **A launch file IS a build target** that declares its dependencies 
 **Default**: `manifest.repos` → `manifest.lock.repos`
 
 ```bash
-launch-plus index                        # Uses manifest.repos
-launch-plus index my.repos               # Appends my.repos → manifest.lock.repos
-launch-plus index a.repos b.repos        # Appends multiple → manifest.lock.repos
+roscope index                        # Uses manifest.repos
+roscope index my.repos               # Appends my.repos → manifest.lock.repos
+roscope index a.repos b.repos        # Appends multiple → manifest.lock.repos
 ```
 
 ### Output: manifest.lock.repos
@@ -157,9 +157,9 @@ The shims require no ROS 2 Python packages to be installed.
 ## Directory Structure
 
 ```
-launch-plus/
+roscope/
 ├── pyproject.toml                    # Python package configuration
-├── launch_plus/
+├── roscope/
 │   ├── __init__.py
 │   ├── __main__.py                   # Entry point
 │   ├── cli.py                        # Click CLI
@@ -205,7 +205,7 @@ launch-plus/
 ## ROS 2 Integration
 
 - **Target: ROS 2 Humble / Jazzy**
-- Integrates as `ros2 launch-plus` verb
+- Integrates as `ros2 roscope` verb
 - Respects `AMENT_PREFIX_PATH`, `COLCON_PREFIX_PATH`
 - Uses standard `package.xml` for dependency info
 

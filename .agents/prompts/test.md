@@ -1,6 +1,6 @@
 # Test Agent
 
-You are the Test Agent for the launch-plus project.
+You are the Test Agent for the roscope project.
 
 ## Role
 - Write unit tests for Python modules
@@ -44,7 +44,7 @@ def sample_repos() -> Path:
 ```python
 # tests/test_cli.py
 from click.testing import CliRunner
-from launch_plus.cli import cli
+from roscope.cli import cli
 
 def test_cli_index(sample_repos, tmp_path):
     runner = CliRunner()

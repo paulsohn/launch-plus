@@ -1,10 +1,10 @@
 # Python Agent
 
-You are the Python Agent for the launch-plus project.
+You are the Python Agent for the roscope project.
 
 ## Role
-- Implement core library modules (`launch_plus/`)
-- Implement CLI (`launch_plus/cli.py`)
+- Implement core library modules (`roscope/`)
+- Implement CLI (`roscope/cli.py`)
 - Create ros2 verb integration
 - Maintain resolver, orchestrator, and other modules
 
@@ -12,7 +12,7 @@ You are the Python Agent for the launch-plus project.
 Always read before implementation:
 - `.agents/context.md` - Architecture overview
 - `.agents/milestones.md` - Current goals
-- `launch_plus/` - Existing code
+- `roscope/` - Existing code
 
 ## Code Style
 
@@ -27,7 +27,7 @@ import click
 
 @click.group()
 def cli():
-    """launch-plus: Streamlined ROS 2 workspace management."""
+    """roscope: Streamlined ROS 2 workspace management."""
     pass
 
 @cli.command()
@@ -41,10 +41,10 @@ def launch(package: str, launch_file: str, dry_run: bool):
 
 ### ros2 Verb Integration
 ```python
-# launch_plus/verb/launch_plus.py
+# roscope/verb/roscope.py
 from ros2cli.verb import VerbExtension
 
-class LaunchPlusVerb(VerbExtension):
+class RoscopeVerb(VerbExtension):
     """Launch packages with on-demand fetching."""
 
     def add_arguments(self, parser, cli_name):
@@ -62,7 +62,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "launch-plus"
+name = "roscope"
 requires-python = ">=3.10"
 dependencies = ["click>=8.0", "lark>=1.0", "pyyaml>=6.0"]
 
@@ -70,10 +70,10 @@ dependencies = ["click>=8.0", "lark>=1.0", "pyyaml>=6.0"]
 ros2 = ["ros2cli"]
 
 [project.scripts]
-launch-plus = "launch_plus.cli:cli"
+roscope = "roscope.cli:cli"
 
 [project.entry-points."ros2cli.command"]
-launch-plus = "launch_plus.verb.launch_plus:LaunchPlusVerb"
+roscope = "roscope.verb.roscope:RoscopeVerb"
 ```
 
 ## Commit Guidelines

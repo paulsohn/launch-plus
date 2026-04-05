@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install mypy types-PyYAML click pyyaml
-      - run: mypy launch_plus/resolver.py
+      - run: mypy roscope/resolver.py
 
   pytest:
     name: Test (Python ${{ matrix.python-version }})

@@ -1,18 +1,18 @@
-"""Tests for launch_plus.renderer — action-based rendering."""
+"""Tests for roscope.renderer — action-based rendering."""
 
 from __future__ import annotations
 
-from launch_plus.entities.actions.executable import ExecuteProcess
-from launch_plus.entities.actions.group import GroupAction
-from launch_plus.entities.actions.marker import SourceMarker
-from launch_plus.entities.actions.node import (
+from roscope.entities.actions.executable import ExecuteProcess
+from roscope.entities.actions.group import GroupAction
+from roscope.entities.actions.marker import SourceMarker
+from roscope.entities.actions.node import (
     ComposableNode,
     ComposableNodeContainer,
     LoadComposableNodes,
     Node,
 )
-from launch_plus.entities.state import LaunchContext, ResolverState
-from launch_plus.renderer import render_resolved_xml
+from roscope.entities.state import LaunchContext, ResolverState
+from roscope.renderer import render_resolved_xml
 
 
 def _make_ctx(**lc):

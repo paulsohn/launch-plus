@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "launch-plus"
+name = "roscope"
 version = "0.2.0"
-description = "Bazel-like build and run system for ROS 2"
+description = "ROS 2 launch resolver and build orchestrator"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
@@ -39,13 +39,13 @@ dev = [
 ]
 
 [project.scripts]
-launch-plus = "launch_plus.cli:main"
+roscope = "roscope.cli:main"
 
 [project.entry-points."ros2cli.command"]
-launch-plus = "launch_plus.verb:LaunchPlusCommand"
+roscope = "roscope.verb:RoscopeCommand"
 
 [tool.hatch.build.targets.wheel]
-packages = ["launch_plus"]
+packages = ["roscope"]
 
 [tool.ruff]
 line-length = 100
@@ -61,7 +61,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"launch_plus/resolver.py" = ["E501", "E402"]  # long lines and import ordering — acceptable in this module
+"roscope/resolver.py" = ["E501", "E402"]  # long lines and import ordering — acceptable in this module
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -74,9 +74,9 @@ docs: update architecture diagram in context.md
 ## File Organization
 
 ```
-launch-plus/
+roscope/
 ├── pyproject.toml
-├── launch_plus/
+├── roscope/
 │   ├── __init__.py
 │   ├── __main__.py               # Entry point
 │   ├── cli.py                    # Click CLI

@@ -2,7 +2,7 @@
 
 ## Vision
 
-launch-plus is a Bazel-like build and run system for ROS 2 that enables:
+roscope is a Bazel-like build and run system for ROS 2 that enables:
 - **Static analysis** of launch file dependency graphs without executing them
 - **Selective building** — only compile the packages referenced by a launch target
 - **On-demand fetching** — sparse-checkout packages from git as they are needed

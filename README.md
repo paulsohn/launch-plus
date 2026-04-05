@@ -1,9 +1,9 @@
-# launch-plus
+# roscope
 
 **Bazel-like build system for ROS 2** — resolve, fetch, and build only what your
 launch file actually needs.
 
-Instead of cloning and building an entire workspace upfront, launch-plus reads a
+Instead of cloning and building an entire workspace upfront, roscope reads a
 `.repos` manifest, generates a lockfile, and resolves a launch file on demand —
 fetching only the packages actually referenced, then producing a single flattened
 XML that shows every node, parameter, and remap that would be active at runtime.
@@ -28,15 +28,15 @@ This is slow, wasteful, and makes it hard to iterate on a subset of the system.
 
 ## The solution
 
-launch-plus treats **launch files as build targets**.  It parses the launch
+roscope treats **launch files as build targets**.  It parses the launch
 graph statically, determines exactly which packages are needed, fetches only
 those via [git sparse-checkout](https://git-scm.com/docs/git-sparse-checkout),
 and builds the minimal set:
 
 ```
-# launch-plus workflow
-launch-plus index autoware.repos     # generate lockfile (one-time)
-launch-plus build autoware_launch autoware.launch.xml \
+# roscope workflow
+roscope index autoware.repos     # generate lockfile (one-time)
+roscope build autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   map_path:=/path/to/map \
@@ -60,7 +60,7 @@ variables substituted — invaluable for debugging and CI validation.
 - **rosdep integration** — automatically installs system dependencies for the
   packages being built
 
-> **Current scope:** launch-plus is a build-time tool today (resolve + build).
+> **Current scope:** roscope is a build-time tool today (resolve + build).
 > Execution support — both a built-in executor and integration with `ros2 launch`
 > and third-party launchers — is on the roadmap.
 
@@ -75,14 +75,14 @@ variables substituted — invaluable for debugging and CI validation.
 ### Install
 
 ```bash
-pip install git+https://github.com/paulsohn/launch-plus.git
+pip install git+https://github.com/paulsohn/roscope.git
 ```
 
 Or for development:
 
 ```bash
-git clone https://github.com/paulsohn/launch-plus.git
-cd launch-plus
+git clone https://github.com/paulsohn/roscope.git
+cd roscope
 pip install -e .
 ```
 
@@ -99,7 +99,7 @@ source /opt/ros/humble/setup.bash
 cd example/autoware
 
 # Preview-resolve: produces flattened XML without building
-launch-plus resolve -d autoware_launch autoware.launch.xml \
+roscope resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   "map_path:={map_path}" \
@@ -122,7 +122,7 @@ The pre-generated output files are included for reference:
 To build the resolved packages (requires a sourced ROS 2 environment and `colcon`):
 
 ```bash
-launch-plus build -d autoware_launch autoware.launch.xml \
+roscope build -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   "map_path:={map_path}" \
@@ -135,9 +135,9 @@ launch-plus build -d autoware_launch autoware.launch.xml \
 
 1. Write a `.repos` file listing your repositories (standard
    [vcstool](https://github.com/dirk-thomas/vcstool) format)
-2. Generate a lockfile: `launch-plus index`
-3. Resolve: `launch-plus resolve <pkg> <launcher> [args...]`
-4. Build: `launch-plus build <pkg> <launcher> [args...] --clean --rosdep`
+2. Generate a lockfile: `roscope index`
+3. Resolve: `roscope resolve <pkg> <launcher> [args...]`
+4. Build: `roscope build <pkg> <launcher> [args...] --clean --rosdep`
 
 See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
 
@@ -155,7 +155,7 @@ See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
 | `fetch` | Sparse-checkout specific packages from the lockfile |
 | `clean` | Remove fetched packages |
 
-Run `launch-plus <command> --help` for detailed usage of each command.
+Run `roscope <command> --help` for detailed usage of each command.
 
 ## Workspace state flags
 
@@ -171,7 +171,7 @@ Commands that refer to source code support workspace state flags:
 
 | Document | Description |
 |---|---|
-| [Motivation](docs/motivation.md) | Why launch-plus exists and what problems it solves |
+| [Motivation](docs/motivation.md) | Why roscope exists and what problems it solves |
 | [Core Concepts](docs/concepts.md) | Lockfiles, sparse checkout, package resolution, and more |
 | [Getting Started](docs/getting-started.md) | Step-by-step tutorial for your own project |
 | [Architecture](docs/architecture.md) | How the resolver, fetcher, and builder work internally |

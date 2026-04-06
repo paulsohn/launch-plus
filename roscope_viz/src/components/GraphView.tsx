@@ -204,17 +204,11 @@ interface Props {
   cyRef: React.RefObject<cytoscape.Core | null>;
   onNodeTap: (data: Record<string, unknown>) => void;
   onBackgroundTap: () => void;
-  panelOpen: boolean;
 }
 
-export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap, panelOpen }: Props) {
+export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
-
-  // Resize Cytoscape when the sidebar opens/closes
-  useEffect(() => {
-    cyRef.current?.resize();
-  }, [panelOpen, cyRef]);
 
   const initCy = useCallback(() => {
     if (!containerRef.current) return;
@@ -251,39 +245,35 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap, panelOpen 
     cy.fit(undefined, 40);
     setLoading(false);
 
-    // Event handlers — single tap selects + highlights
-    cy.on("tap", "node", (evt) => {
-      const tapped = evt.target;
-      onNodeTap(tapped.data());
-
+    // Shared selection logic for tap and drag
+    function selectNode(node: cytoscape.NodeSingular) {
+      onNodeTap(node.data());
       cy.elements().removeClass("highlighted").addClass("faded");
-      tapped.removeClass("faded").addClass("highlighted");
-      tapped.ancestors().removeClass("faded");
-
-      if (tapped.isParent()) {
-        // Box selected: highlight all descendants and their external connections
-        const desc = tapped.descendants();
+      node.removeClass("faded").addClass("highlighted");
+      node.ancestors().removeClass("faded");
+      if (node.isParent()) {
+        const desc = node.descendants();
         desc.removeClass("faded").addClass("highlighted");
-        // Edges connected to descendant leaf nodes
-        const descLeaves = desc.filter((n: cytoscape.NodeSingular) => !n.isParent());
-        const extEdges = descLeaves.connectedEdges();
+        const extEdges = desc.filter((n: cytoscape.NodeSingular) => !n.isParent()).connectedEdges();
         extEdges.removeClass("faded").addClass("highlighted");
         extEdges.connectedNodes().removeClass("faded");
         extEdges.connectedNodes().ancestors().removeClass("faded");
-        // LCN wrapper: also highlight the corresponding LCN marker
-        if (tapped.data("type") === "lcn_wrapper") {
-          const lcnEdges = tapped.connectedEdges('[type="load_target"]');
+        if (node.data("type") === "lcn_wrapper") {
+          const lcnEdges = node.connectedEdges('[type="load_target"]');
           lcnEdges.removeClass("faded").addClass("highlighted");
           lcnEdges.connectedNodes().removeClass("faded").addClass("highlighted");
         }
       } else {
-        // Leaf node / topic: highlight connected edges + nodes
-        const edges = tapped.connectedEdges();
+        const edges = node.connectedEdges();
         edges.removeClass("faded").addClass("highlighted");
         edges.connectedNodes().removeClass("faded").addClass("highlighted");
         edges.connectedNodes().ancestors().removeClass("faded");
       }
-    });
+    }
+
+    // Event handlers — tap or grab selects + highlights
+    cy.on("tap", "node", (evt) => selectNode(evt.target));
+    cy.on("grab", "node", (evt) => selectNode(evt.target));
 
     cy.on("tap", (evt) => {
       if (evt.target === cy) {
@@ -352,7 +342,7 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap, panelOpen 
 
   return (
     <>
-      <div id="cy" ref={containerRef} className={panelOpen ? "panel-open" : undefined} />
+      <div id="cy" ref={containerRef} />
       {loading && (
         <div className="loading-overlay">
           <div className="spinner" />

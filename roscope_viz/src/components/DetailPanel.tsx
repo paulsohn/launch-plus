@@ -24,40 +24,42 @@ interface Props {
 }
 
 export function DetailPanel({ detail, onClose }: Props) {
-  if (!detail) return null;
-
-  const title =
-    detail.type === "group"
+  const title = !detail
+    ? ""
+    : detail.type === "group"
       ? detail.source || "Group"
       : detail.fqn || detail.fullName || detail.name || "Vertex";
 
   return (
     <div id="detail-panel">
       <div id="detail-header">
-        <span id="detail-title">{title}</span>
-        <button id="detail-close" onClick={onClose}>
-          &times;
-        </button>
+        <span id="detail-title">{title || "Nothing selected"}</span>
+        {detail && (
+          <button id="detail-close" onClick={onClose}>
+            &times;
+          </button>
+        )}
       </div>
       <div id="detail-body">
-        <h3>Info</h3>
-        {detail.type && <Field label="Type" value={detail.type} />}
-        {detail.source && <Field label="Source" value={detail.source} />}
-        {detail.package && <Field label="Package" value={detail.package} />}
-        {detail.executable && (
+        {!detail && <p style={{ color: "#8888aa", fontSize: "12px" }}>Click or drag a vertex to inspect it.</p>}
+        {detail && <h3>Info</h3>}
+        {detail?.type && <Field label="Type" value={detail.type} />}
+        {detail?.source && <Field label="Source" value={detail.source} />}
+        {detail?.package && <Field label="Package" value={detail.package} />}
+        {detail?.executable && (
           <Field label="Executable" value={detail.executable} />
         )}
-        {detail.plugin && <Field label="Plugin" value={detail.plugin} />}
-        {detail.name && <Field label="Name" value={detail.name} />}
-        {detail.namespace && (
+        {detail?.plugin && <Field label="Plugin" value={detail.plugin} />}
+        {detail?.name && <Field label="Name" value={detail.name} />}
+        {detail?.namespace && (
           <Field label="Namespace" value={detail.namespace} />
         )}
-        {detail.fqn && <Field label="FQN" value={detail.fqn} />}
-        {detail.cmd && <Field label="Command" value={detail.cmd} />}
-        {detail.target && <Field label="Target" value={detail.target} />}
-        {detail.fullName && <Field label="Topic" value={detail.fullName} />}
+        {detail?.fqn && <Field label="FQN" value={detail.fqn} />}
+        {detail?.cmd && <Field label="Command" value={detail.cmd} />}
+        {detail?.target && <Field label="Target" value={detail.target} />}
+        {detail?.fullName && <Field label="Topic" value={detail.fullName} />}
 
-        {detail.includeArgs && Object.keys(detail.includeArgs).length > 0 && (
+        {detail?.includeArgs && Object.keys(detail.includeArgs).length > 0 && (
           <>
             <h3>Include Args ({Object.keys(detail.includeArgs).length})</h3>
             <table>
@@ -79,7 +81,7 @@ export function DetailPanel({ detail, onClose }: Props) {
           </>
         )}
 
-        {detail.args && detail.args.length > 0 && (
+        {detail?.args && detail.args.length > 0 && (
           <>
             <h3>Declared Args ({detail.args.length})</h3>
             <table>
@@ -105,7 +107,7 @@ export function DetailPanel({ detail, onClose }: Props) {
           </>
         )}
 
-        {detail.params && detail.params.length > 0 && (
+        {detail?.params && detail.params.length > 0 && (
           <>
             <h3>Parameters ({detail.params.length})</h3>
             <table>
@@ -127,7 +129,7 @@ export function DetailPanel({ detail, onClose }: Props) {
           </>
         )}
 
-        {detail.remaps && detail.remaps.length > 0 && (
+        {detail?.remaps && detail.remaps.length > 0 && (
           <>
             <h3>Remaps ({detail.remaps.length})</h3>
             <table>

@@ -57,13 +57,8 @@ body {
 }
 
 #cy {
-  width: 100%;
-  height: calc(100vh - 48px);
-  transition: width 0.15s ease;
-}
-
-#cy.panel-open {
   width: calc(100% - 380px);
+  height: calc(100vh - 48px);
 }
 
 /* Detail panel */

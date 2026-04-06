@@ -187,6 +187,17 @@ def _build_patched_launch_event_handlers():
     return mod
 
 
+def _build_patched_launch_events():
+    mod = types.ModuleType("launch.events")
+    mod.__path__ = []
+    mod.__package__ = "launch.events"
+    # matches_action is used in event-handler callbacks at runtime; a no-op lambda
+    # is sufficient for static resolution — we only need the import to succeed.
+    mod.matches_action = lambda *_a, **_kw: lambda _e: True
+    mod.Shutdown = Shutdown
+    return mod
+
+
 def _build_patched_launch_conditions():
     mod = types.ModuleType("launch.conditions")
     mod.IfCondition = IfCondition
@@ -206,6 +217,25 @@ def _build_patched_launch_launch_description_sources():
 def _build_patched_launch_ros_substitutions():
     mod = types.ModuleType("launch_ros.substitutions")
     mod.FindPackageShare = FindPackageShare
+    return mod
+
+
+def _build_patched_launch_ros_events():
+    mod = types.ModuleType("launch_ros.events")
+    mod.__path__ = []
+    mod.__package__ = "launch_ros.events"
+    return mod
+
+
+def _build_patched_launch_ros_events_lifecycle():
+    mod = types.ModuleType("launch_ros.events.lifecycle")
+    mod.ChangeState = lambda *_a, **_kw: None
+    return mod
+
+
+def _build_patched_launch_ros_event_handlers():
+    mod = types.ModuleType("launch_ros.event_handlers")
+    mod.OnStateTransition = OnStateTransition
     return mod
 
 
@@ -234,9 +264,13 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
             _build_patched_launch_substitutions_environment_variable
         ),
         "launch.actions": _build_patched_launch_actions,
+        "launch.events": _build_patched_launch_events,
         "launch.event_handlers": _build_patched_launch_event_handlers,
         "launch.conditions": _build_patched_launch_conditions,
         "launch.launch_description_sources": _build_patched_launch_launch_description_sources,
+        "launch_ros.events": _build_patched_launch_ros_events,
+        "launch_ros.events.lifecycle": _build_patched_launch_ros_events_lifecycle,
+        "launch_ros.event_handlers": _build_patched_launch_ros_event_handlers,
         "launch_ros.substitutions": _build_patched_launch_ros_substitutions,
         "launch_ros.parameter_descriptions": _build_patched_launch_ros_parameter_descriptions,
     }

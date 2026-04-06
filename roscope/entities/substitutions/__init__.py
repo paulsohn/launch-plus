@@ -1,5 +1,6 @@
 """Substitution handlers (registered via @expose_substitution)."""
 
+import roscope.entities.substitutions.anon_name  # noqa: F401
 import roscope.entities.substitutions.arg  # noqa: F401
 import roscope.entities.substitutions.boolean  # noqa: F401
 import roscope.entities.substitutions.command  # noqa: F401

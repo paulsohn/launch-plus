@@ -87,9 +87,8 @@ body {
 #detail-title {
   font-weight: 600;
   font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+  word-break: break-all;
 }
 
 #detail-close {
@@ -121,6 +120,8 @@ body {
 
 #detail-body .field {
   margin: 2px 0;
+  overflow-wrap: break-word;
+  word-break: break-all;
 }
 
 #detail-body .field-label {

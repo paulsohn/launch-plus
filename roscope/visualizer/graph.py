@@ -114,7 +114,7 @@ class _GraphBuilder:
         for child in children:
             if isinstance(child, ArgComment):
                 args.append(
-                    {"name": child.name, "value": child.value, "is_default": child.is_default}
+                    {"name": child.name, "value": child.value, "isDefault": child.is_default}
                 )
 
         # Capture include_args from the first-child SourceMarker
@@ -129,7 +129,7 @@ class _GraphBuilder:
                 "source": source,
                 "parent": parent_id,
                 "args": args,
-                "include_args": include_args,
+                "includeArgs": include_args,
             }
         )
 
@@ -296,9 +296,9 @@ class _GraphBuilder:
                     "id": wrapper_id,
                     "source": None,
                     "parent": actual_parent,
-                    "group_type": "lcn_wrapper",
+                    "groupType": "lcn_wrapper",
                     "args": [],
-                    "include_args": None,
+                    "includeArgs": None,
                 }
             )
             # Edge from the LCN leaf node to the wrapper inside the container

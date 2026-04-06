@@ -59,6 +59,21 @@ function computeLCA(
   return undefined;
 }
 
+/** Count how many compound ancestors a node has (its nesting depth). */
+function compoundDepth(
+  id: string,
+  parentMap: Map<string, string | undefined>,
+  typeMap: Map<string, string>,
+): number {
+  let depth = 0;
+  let cur = parentMap.get(id);
+  while (cur) {
+    if (COMPOUND_TYPES.has(typeMap.get(cur) ?? "")) depth++;
+    cur = parentMap.get(cur);
+  }
+  return depth;
+}
+
 export function buildElements(graph: GraphData): ElementDefinition[] {
   const elements: ElementDefinition[] = [];
 
@@ -66,7 +81,14 @@ export function buildElements(graph: GraphData): ElementDefinition[] {
   const parentMap = new Map<string, string | undefined>();
   const typeMap = new Map<string, string>();
 
-  // Groups
+  // Groups — first pass: populate parentMap/typeMap so depth is computable
+  for (const g of graph.groups) {
+    const type = g.groupType === "lcn_wrapper" ? "lcn_wrapper" : "group";
+    parentMap.set(g.id, g.parent ?? undefined);
+    typeMap.set(g.id, type);
+  }
+
+  // Groups — second pass: build elements with depth
   for (const g of graph.groups) {
     const isLcnWrapper = g.groupType === "lcn_wrapper";
     const label = isLcnWrapper
@@ -75,8 +97,7 @@ export function buildElements(graph: GraphData): ElementDefinition[] {
         ? shortenSource(g.source)
         : "group";
     const type = isLcnWrapper ? "lcn_wrapper" : "group";
-    parentMap.set(g.id, g.parent ?? undefined);
-    typeMap.set(g.id, type);
+    const depth = compoundDepth(g.id, parentMap, typeMap);
     elements.push({
       group: "nodes",
       data: {
@@ -84,6 +105,7 @@ export function buildElements(graph: GraphData): ElementDefinition[] {
         label,
         parent: g.parent ?? undefined,
         type,
+        depth,
         source: g.source ?? "",
         args: g.args ?? [],
         includeArgs: g.includeArgs ?? null,

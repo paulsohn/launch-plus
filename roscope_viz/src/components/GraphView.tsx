@@ -17,7 +17,8 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
     selector: 'node[type="group"]',
     style: {
       shape: "round-rectangle",
-      "background-color": "rgba(40, 40, 80, 0.4)",
+      "background-color": "#282850",
+      "background-opacity": "mapData(depth, 0, 5, 0.2, 0.55)" as unknown as number,
       "border-color": "#334",
       "border-width": 2,
       label: "data(label)",
@@ -203,11 +204,17 @@ interface Props {
   cyRef: React.RefObject<cytoscape.Core | null>;
   onNodeTap: (data: Record<string, unknown>) => void;
   onBackgroundTap: () => void;
+  panelOpen: boolean;
 }
 
-export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
+export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap, panelOpen }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
+
+  // Resize Cytoscape when the sidebar opens/closes
+  useEffect(() => {
+    cyRef.current?.resize();
+  }, [panelOpen, cyRef]);
 
   const initCy = useCallback(() => {
     if (!containerRef.current) return;
@@ -345,7 +352,7 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
 
   return (
     <>
-      <div id="cy" ref={containerRef} />
+      <div id="cy" ref={containerRef} className={panelOpen ? "panel-open" : undefined} />
       {loading && (
         <div className="loading-overlay">
           <div className="spinner" />

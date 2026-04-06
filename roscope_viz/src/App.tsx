@@ -41,6 +41,7 @@ export function App() {
         cyRef={cyRef}
         onNodeTap={handleNodeTap}
         onBackgroundTap={handleBackgroundTap}
+        panelOpen={detail !== null}
       />
       <DetailPanel
         detail={detail as Parameters<typeof DetailPanel>[0]["detail"]}

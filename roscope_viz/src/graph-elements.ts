@@ -122,7 +122,7 @@ export function buildElements(graph: GraphData): ElementDefinition[] {
           ? n.name || n.cmd || "exec"
           : n.type === "load_composable_node"
             ? "load"
-            : n.fqn || n.name || "node";
+            : n.fqn || n.name || "vertex";
 
     parentMap.set(n.id, n.parent ?? undefined);
     typeMap.set(n.id, n.type);

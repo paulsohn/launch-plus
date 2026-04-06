@@ -39,8 +39,7 @@ const GAP_X = 20;
 const GAP_Y = 20;
 const DEFAULT_LEAF_W = 120;
 const DEFAULT_LEAF_H = 40;
-const TOPIC_NODE_MIN_DIST = 60;  // min distance between a topic and any non-topic node
-const TOPIC_TOPIC_MIN_DIST = 50; // min distance between two topics
+// Extra clearance added on top of the sum of half-sizes (center-to-center).
 
 // ── Strategy interface ────────────────────────────────────────────────
 
@@ -299,7 +298,7 @@ function positionTopics(cy: cytoscape.Core): void {
   const topics = cy.nodes('[type="topic"]');
   if (topics.length === 0) return;
 
-  // Initial placement: centroid of connected non-topic nodes
+  // Place each topic at the centroid of its connected non-topic nodes.
   topics.forEach((t: cytoscape.NodeSingular) => {
     const neighbors = t.neighborhood().nodes().not('[type="topic"]');
     if (neighbors.length === 0) return;
@@ -311,53 +310,6 @@ function positionTopics(cy: cytoscape.Core): void {
     });
     t.position({ x: cx / neighbors.length, y: cy2 / neighbors.length });
   });
-
-  // Iterative repulsion: push topics away from nodes and other topics.
-  // Topics are mobile; non-topic nodes are fixed anchors.
-  const nonTopics = cy.nodes().not('[type="topic"]');
-  const topicArr: cytoscape.NodeSingular[] = [];
-  topics.forEach((t: cytoscape.NodeSingular) => { topicArr.push(t); });
-
-  for (let iter = 0; iter < 60; iter++) {
-    let moved = false;
-
-    for (const t of topicArr) {
-      let fx = 0, fy = 0;
-
-      // Repulsion from non-topic nodes (fixed)
-      nonTopics.forEach((n: cytoscape.NodeSingular) => {
-        const tp = t.position(), np = n.position();
-        const dx = tp.x - np.x, dy = tp.y - np.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < TOPIC_NODE_MIN_DIST && dist > 0.01) {
-          const mag = (TOPIC_NODE_MIN_DIST - dist) / dist;
-          fx += dx * mag;
-          fy += dy * mag;
-        }
-      });
-
-      // Repulsion from other topics (mobile — use current positions)
-      for (const other of topicArr) {
-        if (other === t) continue;
-        const tp = t.position(), op = other.position();
-        const dx = tp.x - op.x, dy = tp.y - op.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < TOPIC_TOPIC_MIN_DIST && dist > 0.01) {
-          const mag = (TOPIC_TOPIC_MIN_DIST - dist) / (2 * dist);
-          fx += dx * mag;
-          fy += dy * mag;
-        }
-      }
-
-      if (Math.abs(fx) > 0.1 || Math.abs(fy) > 0.1) {
-        const tp = t.position();
-        t.position({ x: tp.x + fx, y: tp.y + fy });
-        moved = true;
-      }
-    }
-
-    if (!moved) break;
-  }
 }
 
 // ── LCN marker snap ───────────────────────────────────────────────────

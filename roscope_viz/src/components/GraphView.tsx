@@ -273,7 +273,17 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
 
     // Event handlers — tap or grab selects + highlights
     cy.on("tap", "node", (evt) => selectNode(evt.target));
-    cy.on("grab", "node", (evt) => selectNode(evt.target));
+
+    // Grab fires on the target node AND bubbles to all ancestor compounds.
+    // We only want the deepest (first) grab — use a per-tick flag to ignore
+    // the bubbled re-fires on parent compounds.
+    let grabHandled = false;
+    cy.on("grab", "node", (evt) => {
+      if (grabHandled) return;
+      grabHandled = true;
+      Promise.resolve().then(() => { grabHandled = false; });
+      selectNode(evt.target);
+    });
 
     cy.on("tap", (evt) => {
       if (evt.target === cy) {

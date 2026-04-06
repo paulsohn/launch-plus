@@ -197,12 +197,12 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
             f"_inline_launch_{len(state.include_chain)}", real_path
         )
         if spec is None or spec.loader is None:
-            logger.warning("cannot load included launch file: %s", real_path)
+            logger.error("cannot load included launch file: %s", real_path)
             return []
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
     except Exception as e:
-        logger.warning("failed to load included launch file %s: %s", real_path, e)
+        logger.error("failed to load included launch file %s: %s", real_path, e)
         return []
 
     if not hasattr(mod, "generate_launch_description"):
@@ -213,7 +213,7 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
         try:
             ld = mod.generate_launch_description()
         except Exception as e:
-            logger.warning("generate_launch_description() failed in %s: %s", launch_file, e)
+            logger.error("generate_launch_description() failed in %s: %s", launch_file, e)
             return []
 
         entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []

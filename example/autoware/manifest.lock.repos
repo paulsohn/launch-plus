@@ -30,7 +30,7 @@ repositories:
   core/autoware_core:
     type: git
     url: https://github.com/autowarefoundation/autoware_core.git
-    version: 5e0b0e102d8ed03229df62fb8499df68d1b388c0
+    version: cdac1c800568542ecf3d111c893ffeea5da513c0
     ref: main
     packages:
     - autoware_adapi_adaptors
@@ -173,7 +173,7 @@ repositories:
   launcher/autoware_launch:
     type: git
     url: https://github.com/autowarefoundation/autoware_launch.git
-    version: 53de37611b62bdded88d11d42b51725b50e9e2ec
+    version: 31ecc61c8f472edc1ab4fb5a9a59f244ab88c3aa
     ref: main
     packages:
     - autoware_launch
@@ -379,7 +379,7 @@ repositories:
   universe/autoware_universe:
     type: git
     url: https://github.com/autowarefoundation/autoware_universe.git
-    version: b4593ce29d84b5a35165e1c15b6bcbbe3cd0227c
+    version: cd77740079147fa56ea2a34e40ad49a80fa13ec4
     ref: main
     packages:
     - autoware_accel_brake_map_calibrator

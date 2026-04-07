@@ -316,9 +316,13 @@ def rosdep_install(keys: list[str]) -> None:
             check=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            text=True,
         )
         if proc.returncode != 0:
-            raise ProcessExecutionError(f"apt-get install failed (exit {proc.returncode})")
+            logger.debug("apt-get output:\n%s", proc.stdout)
+            raise ProcessExecutionError(
+                f"apt-get install failed (exit {proc.returncode}):\n{proc.stdout.strip()}"
+            )
 
     if pip_pkgs:
         logger.info("Installing %d pip packages", len(pip_pkgs))
@@ -331,6 +335,10 @@ def rosdep_install(keys: list[str]) -> None:
             check=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            text=True,
         )
         if proc.returncode != 0:
-            raise ProcessExecutionError(f"pip install failed (exit {proc.returncode})")
+            logger.debug("pip output:\n%s", proc.stdout)
+            raise ProcessExecutionError(
+                f"pip install failed (exit {proc.returncode}):\n{proc.stdout.strip()}"
+            )

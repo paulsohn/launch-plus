@@ -40,12 +40,12 @@ class AnonName(Substitution):
 
         name = perform_substitutions(ctx, self._name)
 
-        anon_map = ctx._launch_configurations.setdefault("anon", {})
+        anon_map: dict[str, str] = ctx._state.tracked.setdefault("anon_names", {})
         if name not in anon_map:
             suffix = hashlib.md5(name.encode()).hexdigest()[:8]
             anon_map[name] = f"{name}_{suffix}"
 
-        return str(anon_map[name])
+        return anon_map[name]
 
     def __str__(self) -> str:
         try:

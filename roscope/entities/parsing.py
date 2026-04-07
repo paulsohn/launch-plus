@@ -48,11 +48,11 @@ class _ActionParser:
     # ── Unresolved extraction from Entity children ───────────────────
 
     def parse_params(self, entity: Entity) -> list:
-        """Extract <param> children as unresolved token structures.
+        """Extract <param> children as unresolved parameter objects.
 
-        Returns a list of dicts, each either:
-        - ``{"name": tokens, "value": tokens}`` for inline params
-        - ``{"from": tokens}`` for param file references
+        Returns a list of :class:`~roscope.entities.parameter_descriptions.Parameter`
+        and :class:`~roscope.entities.parameter_descriptions.ParameterFile` objects
+        with unresolved substitution tokens.
         """
         from roscope.entities.parameter_descriptions import Parameter, ParameterFile
 

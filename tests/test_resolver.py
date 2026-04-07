@@ -1434,6 +1434,99 @@ class TestResolvePkgShare:
             state.resolve_pkg_share("lockfile_pkg")
 
 
+def _parse_yaml_and_walk(yaml_str, ctx=None, **ctx_kwargs):
+    """Parse YAML string and walk it.  Returns (ctx, tracked)."""
+    if ctx is None:
+        ctx = _fresh_walker_ctx(**ctx_kwargs)
+    elements = parse_yaml_launch(yaml_str, "test.launch.yaml")
+    resolve_xml_elements(elements, ctx)
+    return ctx, ctx._state.tracked
+
+
+class TestResolveYamlElements:
+    """End-to-end tests for the YAML parse → resolve_xml_elements pipeline."""
+
+    def test_simple_node(self):
+        yaml = textwrap.dedent("""\
+            launch:
+              - node:
+                  pkg: my_pkg
+                  exec: my_exec
+                  name: my_node
+        """)
+        _, tracked = _parse_yaml_and_walk(yaml)
+        assert "my_pkg" in tracked["packages"]
+
+    def test_arg_and_let(self):
+        yaml = textwrap.dedent("""\
+            launch:
+              - arg:
+                  name: vehicle
+                  default: sample
+              - node:
+                  pkg: "$(arg vehicle)_pkg"
+                  exec: node
+                  name: n
+        """)
+        _, tracked = _parse_yaml_and_walk(yaml)
+        assert "sample_pkg" in tracked["packages"]
+
+    def test_set_parameter(self):
+        yaml = textwrap.dedent("""\
+            launch:
+              - set_parameter:
+                  name: use_sim_time
+                  value: "true"
+        """)
+        _, tracked = _parse_yaml_and_walk(yaml)
+        assert ["use_sim_time", "true"] in tracked["global_params"]
+
+    def test_push_ros_namespace(self):
+        yaml = textwrap.dedent("""\
+            launch:
+              - push_ros_namespace:
+                  namespace: /my_ns
+              - node:
+                  pkg: p
+                  exec: e
+                  name: n
+        """)
+        _, tracked = _parse_yaml_and_walk(yaml)
+        assert "p" in tracked["packages"]
+
+    def test_declared_args_tracked(self):
+        yaml = textwrap.dedent("""\
+            launch:
+              - arg:
+                  name: a
+                  default: "1"
+              - arg:
+                  name: b
+                  default: "2"
+        """)
+        _, tracked = _parse_yaml_and_walk(yaml)
+        names = [a["name"] for a in tracked["declared_args"]]
+        assert "a" in names
+        assert "b" in names
+
+    def test_executable(self):
+        yaml = textwrap.dedent("""\
+            launch:
+              - executable:
+                  cmd: ls -l
+                  name: my_ls
+        """)
+        ctx, tracked = _parse_yaml_and_walk(yaml)
+        # resolve_xml_elements should not raise; executable is processed
+        assert ctx is not None
+
+    def test_missing_launch_key_returns_empty(self):
+        yaml = "foo: bar"
+        _, tracked = _parse_yaml_and_walk(yaml)
+        # No elements to walk — packages remain empty
+        assert not tracked["packages"]
+
+
 class TestTrackedFindPackageShare:
     """Tests for FindPackageShare mode-dependent perform()/str()."""
 

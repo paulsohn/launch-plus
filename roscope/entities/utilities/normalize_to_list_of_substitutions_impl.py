@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from roscope.entities.some_substitutions_type import SomeSubstitutionsType
 from roscope.entities.substitution import Substitution, TextSubstitution
 
 
-def normalize_to_list_of_substitutions(subs) -> list[Substitution]:
+def normalize_to_list_of_substitutions(subs: SomeSubstitutionsType) -> list[Substitution]:
     """Return a list of Substitutions given a variety of starting inputs.
 
     Accepts:

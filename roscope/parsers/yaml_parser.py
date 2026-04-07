@@ -61,21 +61,31 @@ class YamlEntity(Entity):
 
     @property
     def children(self) -> list[YamlEntity]:
-        """Return child entities from the ``children`` key."""
+        """Get the Entity's children."""
         self._children_accessed = True
-        if "children" not in self._element:
-            return []
-        self._read_keys.add("children")
-        raw = self._element["children"]
-        if not isinstance(raw, list):
-            return []
+        if not isinstance(self._element, (dict, list)):
+            raise TypeError(
+                f"Expected a dict or list, got {type(self._element)}:\n---\n{self._element}\n---"
+            )
+        if isinstance(self._element, dict):
+            if "children" not in self._element:
+                raise ValueError(
+                    f"Expected entity `{self._type_name}` to have children entities."
+                    f"That can be a list of subentities or a dictionary with a `children` "
+                    "list element"
+                )
+            self._read_keys.add("children")
+            children = self._element["children"]
+        else:
+            children = self._element
         entities: list[YamlEntity] = []
-        for child in raw:
-            if isinstance(child, dict) and len(child) == 1:
-                tag = next(iter(child))
-                body = child[tag]
-                if isinstance(body, dict):
-                    entities.append(YamlEntity(body, tag, parent=self))
+        for child in children:
+            if len(child) != 1:
+                raise RuntimeError(
+                    "Subentities must be a dictionary with only one key, which is the entity type"
+                )
+            type_name = list(child.keys())[0]
+            entities.append(YamlEntity(child[type_name], type_name, parent=self))
         return entities
 
     def get_attr(
@@ -116,9 +126,15 @@ class YamlEntity(Entity):
         return value
 
     def assert_entity_completely_parsed(self) -> None:
-        unparsed = set(self._element.keys()) - self._read_keys
-        if unparsed:
-            raise ValueError(f"Unexpected key(s) in {self._type_name} entity: {unparsed}")
+        if isinstance(self._element, list):
+            if not self._children_accessed:
+                raise ValueError(
+                    f"Unexpected nested entity(ies) found in `{self._type_name}`: {self._element}"
+                )
+            return
+        unparsed_keys = set(self._element.keys()) - self._read_keys
+        if unparsed_keys:
+            raise ValueError(f"Unexpected key(s) found in `{self._type_name}`: {unparsed_keys}")
 
     # ── Convenience ──────────────────────────────────────────────────────
 

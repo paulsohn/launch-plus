@@ -314,6 +314,8 @@ def rosdep_install(keys: list[str]) -> None:
         proc = subprocess.run(
             ["sudo", "apt-get", "install", "-y", "--no-install-recommends", *apt_pkgs],
             check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
         )
         if proc.returncode != 0:
             raise ProcessExecutionError(f"apt-get install failed (exit {proc.returncode})")
@@ -324,6 +326,11 @@ def rosdep_install(keys: list[str]) -> None:
         if _pip_supports_break_system_packages():
             cmd.append("--break-system-packages")
         cmd.extend(pip_pkgs)
-        proc = subprocess.run(cmd, check=False)
+        proc = subprocess.run(
+            cmd,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
         if proc.returncode != 0:
             raise ProcessExecutionError(f"pip install failed (exit {proc.returncode})")

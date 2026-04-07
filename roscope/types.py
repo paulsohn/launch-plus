@@ -88,7 +88,7 @@ class ParsedLaunchFile:
     param_files: list[FileDependency] = field(default_factory=list)
     other_files: list[FileDependency] = field(default_factory=list)
     declared_arg_defaults: dict[str, str] = field(default_factory=dict)
-    declared_args_by_file: dict[tuple[str, Path], dict[str, str]] = field(default_factory=dict)
+    declared_args_by_file: dict[str, dict[str, str]] = field(default_factory=dict)
     global_params: list[Any] = field(default_factory=list)
 
 

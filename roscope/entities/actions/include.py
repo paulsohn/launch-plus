@@ -9,7 +9,6 @@ from roscope.entities.action import Action
 from roscope.entities.actions.group import GroupAction
 from roscope.entities.actions.marker import ArgComment, SourceMarker
 from roscope.entities.expose import expose_action
-from roscope.entities.helpers import _extract_pkg_and_share_path
 from roscope.entities.parsing import _ActionParser
 from roscope.entities.substitution import Substitution
 from roscope.parsers.entity import Entity
@@ -96,10 +95,7 @@ class IncludeLaunchDescription(Action):
         )
 
         # Step 8: Wrap with markers
-        inc_dep = _extract_pkg_and_share_path(file_path)
-        pkg = inc_dep[0] if inc_dep else ""
-        share = inc_dep[1] if inc_dep else file_path
-        return _wrap_with_markers(children, pkg, share, child_args, state)
+        return _wrap_with_markers(children, file_path, child_args, state)
 
     def _resolve_file_path(self, context) -> str | None:
         """Resolve the file path from tokens (XML) or source object (Python shim)."""
@@ -153,19 +149,18 @@ class IncludeLaunchDescription(Action):
         return child_args
 
 
-def _wrap_with_markers(children, pkg, share, args, state) -> list:
+def _wrap_with_markers(children, file_path, args, state) -> list:
     """Wrap resolved children in a GroupAction with SourceMarker as first child.
 
     The GroupAction holds [SourceMarker, ArgComment..., ...children].
     """
     has_content = any(not isinstance(c, SourceMarker) for c in children)
     if has_content or state.show_empty_includes:
-        group_children: list = [SourceMarker(pkg, share, args)]
+        group_children: list = [SourceMarker(file_path, args)]
 
         # Conditionally add arg markers (--show-args)
         if state.show_args:
-            source_key = f"{pkg}://{share}" if pkg else share
-            declared = state.tracked.get("declared_args_by_file", {}).get(source_key, [])
+            declared = state.tracked.get("declared_args_by_file", {}).get(file_path, [])
             merged: dict[str, tuple[str, bool]] = {}
             for name, value in sorted(args.items()):
                 merged[name] = (value, False)
@@ -243,11 +238,7 @@ def resolve_included_file(
     from roscope.resolver import resolve_xml_elements
 
     state = ctx._state
-    inc_dep = _extract_pkg_and_share_path(file_path)
-    if inc_dep:
-        state.include_chain.append(list(inc_dep))
-    else:
-        state.include_chain.append(["", file_path])
+    state.include_chain.append(file_path)
     new_stack = include_stack + [file_path]
     for k, v in child_ctx_args.items():
         ctx._launch_configurations[k] = v

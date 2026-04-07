@@ -71,7 +71,7 @@ class ResolveResult:
     fetched_packages: list[str] = field(default_factory=list)
     parsed_files: list[Path] = field(default_factory=list)
     include_args: dict[tuple[str, Path], IncludeArgContext] = field(default_factory=dict)
-    declared_args_by_file: dict[tuple[str, Path], dict[str, str]] = field(default_factory=dict)
+    declared_args_by_file: dict[str, dict[str, str]] = field(default_factory=dict)
     global_params: list[list] = field(default_factory=list)
     initial_args: dict[str, str] = field(default_factory=dict)
     actions: list = field(default_factory=list)
@@ -148,24 +148,21 @@ def _process_parsed_file(
     result.parsed_files.append(file_path)
 
     # Store declared args for --show-args
-    root_key = (package, share_path)
-    root_args = parsed.declared_args_by_file.get(root_key, {})
-    result.declared_args_by_file[root_key] = dict(root_args)
     for key, args in parsed.declared_args_by_file.items():
         result.declared_args_by_file[key] = dict(args)
 
     # Track launch include dependencies and populate include_args
     existing_launch = {(f.package, f.share_path) for f in result.launch_files}
     for include in parsed.launch_includes:
-        key = (include.package, include.share_path)
-        if key not in result.include_args:
-            result.include_args[key] = IncludeArgContext(
+        inc_key = (include.package, include.share_path)
+        if inc_key not in result.include_args:
+            result.include_args[inc_key] = IncludeArgContext(
                 explicit=dict(include.explicit_args),
                 namespace_stack=list(include.namespace_stack),
             )
         else:
             pass  # Same file included multiple times with different args is normal
-        if key not in existing_launch:
+        if inc_key not in existing_launch:
             result.launch_files.append(
                 FileDependency(
                     package=include.package,
@@ -173,7 +170,7 @@ def _process_parsed_file(
                     kind=DependencyKind.LAUNCH,
                 )
             )
-            existing_launch.add(key)
+            existing_launch.add(inc_key)
 
 
 # ---------------------------------------------------------------------------

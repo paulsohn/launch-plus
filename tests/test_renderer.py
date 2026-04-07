@@ -135,7 +135,7 @@ def test_groups_by_source_file() -> None:
     actions = [
         GroupAction(
             resolved_children=[
-                SourceMarker("sensor_launch", "launch/sensing.launch.xml"),
+                SourceMarker("/install/share/sensor_launch/launch/sensing.launch.xml"),
                 *r1,
                 *r2,
             ]
@@ -144,7 +144,7 @@ def test_groups_by_source_file() -> None:
     xml = render_resolved_xml("my_pkg", "top.launch.xml", actions)
     assert xml.count("<group>") == 1
     assert xml.count("</group>") == 1
-    assert "sensor_launch://launch/sensing.launch.xml" in xml
+    assert "source: /install/share/sensor_launch/launch/sensing.launch.xml" in xml
 
 
 def test_nested_groups() -> None:
@@ -153,20 +153,20 @@ def test_nested_groups() -> None:
 
     inner = GroupAction(
         resolved_children=[
-            SourceMarker("sensing_pkg", "launch/sensing.launch.xml"),
+            SourceMarker("/install/share/sensing_pkg/launch/sensing.launch.xml"),
             *resolved_n,
         ]
     )
     mid = GroupAction(
         resolved_children=[
-            SourceMarker("comp_pkg", "launch/comp.launch.xml"),
+            SourceMarker("/install/share/comp_pkg/launch/comp.launch.xml"),
             inner,
         ]
     )
     actions = [
         GroupAction(
             resolved_children=[
-                SourceMarker("root_pkg", "launch/root.launch.xml"),
+                SourceMarker("/install/share/root_pkg/launch/root.launch.xml"),
                 mid,
             ]
         ),

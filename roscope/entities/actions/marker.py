@@ -16,24 +16,18 @@ from roscope.entities.helpers import sanitize_xml_comment
 class SourceMarker(Action):
     """Marks the start of an included file in the resolved tree.
 
-    Serializes to ``<!-- source: pkg://share_path -->``.
+    Serializes to ``<!-- source: /absolute/path/to/file.launch.xml -->``.
     """
 
-    def __init__(self, package: str, share_path: str, include_args: dict | None = None):
-        self.package = package
-        self.share_path = share_path
+    def __init__(self, file_path: str, include_args: dict | None = None):
+        self.file_path = file_path
         self.include_args = include_args or {}
 
     def execute(self, context) -> list:
         return []
 
-    def label(self) -> str:
-        if self.package:
-            return f"{self.package}://{self.share_path}"
-        return self.share_path
-
     def serialize_resolved(self) -> list[ET.Element]:
-        return [ET.Comment(sanitize_xml_comment(f" source: {self.label()} "))]  # type: ignore[list-item]
+        return [ET.Comment(sanitize_xml_comment(f" source: {self.file_path} "))]  # type: ignore[list-item]
 
 
 class ArgComment(Action):

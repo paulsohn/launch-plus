@@ -135,6 +135,9 @@ UNEXPECTED=$(diff preview_raw.xml postbuild.xml \
     | grep "^[<>]" \
     | grep -v "PREVIEW:" \
     | grep -v "xacro" \
+    | grep -v "<!-- source:" \
+    | grep -v "<!-- params from:" \
+    | grep -v "<!-- end params from:" \
     || true)
 
 if [[ -z "$UNEXPECTED" ]]; then

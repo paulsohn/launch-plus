@@ -96,10 +96,9 @@ class ResolverState:
             self.tracked["packages"].append(pkg)
 
     def current_source_key(self) -> str:
-        """Return the source key for the current file being resolved."""
+        """Return the source key (file path) for the current file being resolved."""
         if self.include_chain:
-            pkg, path = self.include_chain[-1]
-            return f"{pkg}://{path}" if pkg else path
+            return str(self.include_chain[-1])
         return str(self.root_source_key)
 
     def track_include(self, path, *, ros_namespace=None) -> int:

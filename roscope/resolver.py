@@ -55,7 +55,6 @@ from roscope.entities.conditions import (
     LaunchConfigurationNotEquals,
     UnlessCondition,
 )
-from roscope.entities.helpers import _extract_pkg_and_share_path
 from roscope.entities.launch_description import LaunchDescription as _LaunchDescription
 from roscope.entities.launch_description_source import (
     AnyLaunchDescriptionSource,
@@ -395,8 +394,7 @@ def resolve_file(
     state = ResolverState()
     launch_file_str = str(launch_file)
 
-    root_dep = _extract_pkg_and_share_path(launch_file_str)
-    state.root_source_key = f"{root_dep[0]}://{root_dep[1]}" if root_dep else launch_file_str
+    state.root_source_key = launch_file_str
 
     state.fetched_packages.clear()
     state.declared_arg_names.clear()
@@ -576,17 +574,10 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
         for dep in tracked.get("param_file_deps", [])
     ]
 
-    # ── Per-file declared args ────────────��───────────────────────────
-    declared_args_by_file: dict[tuple[str, Path], dict[str, str]] = {}
+    # ── Per-file declared args ────────────────────────────────────────
+    declared_args_by_file: dict[str, dict[str, str]] = {}
     for key_str, args_list in tracked.get("declared_args_by_file", {}).items():
-        if "://" in key_str:
-            idx = key_str.index("://")
-            pkg = key_str[:idx]
-            sp = Path(key_str[idx + 3 :])
-        else:
-            pkg = ""
-            sp = Path(key_str)
-        declared_args_by_file[(pkg, sp)] = {a["name"]: a["default"] for a in args_list}
+        declared_args_by_file[key_str] = {a["name"]: a["default"] for a in args_list}
 
     return _ParsedLaunchFile(
         packages=list(tracked.get("packages", [])),

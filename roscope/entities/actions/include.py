@@ -28,7 +28,7 @@ class IncludeLaunchDescription(Action):
     def parse(cls, entity: Entity, parser: _ActionParser):
         if not parser.evaluate_condition(entity):
             return None
-        raw_file = entity.get_attr("file", optional=True) or ""
+        raw_file = entity.get_attr("file")
         file_tokens = parser.parse_substitution(raw_file)
         arg_items = entity.get_attr("arg", data_type=list, optional=True) or []
         args = []
@@ -65,6 +65,7 @@ class IncludeLaunchDescription(Action):
         # Step 1: Resolve file path
         file_path = self._resolve_file_path(context)
         if not file_path:
+            logger.error("include: 'file' attribute resolved to empty string")
             return []
 
         # Step 2: Validate

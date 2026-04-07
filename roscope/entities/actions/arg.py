@@ -18,6 +18,8 @@ class DeclareLaunchArgument(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
+        if not parser.evaluate_condition(entity):
+            return None
         name = entity.get_attr("name", optional=True) or ""
         default = entity.get_attr("default", optional=True)
         fixed_value = entity.get_attr("value", optional=True)

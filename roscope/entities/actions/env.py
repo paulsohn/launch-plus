@@ -133,6 +133,8 @@ class SetRemap(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
+        if not parser.evaluate_condition(entity):
+            return None
         src = parser.parse_substitution(entity.get_attr("from", optional=True) or "")
         dst = parser.parse_substitution(entity.get_attr("to", optional=True) or "")
         return cls(src=src, dst=dst)

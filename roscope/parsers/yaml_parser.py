@@ -33,7 +33,9 @@ class YamlEntity(Entity):
 
     Unlike :class:`XmlEntity`, YAML values are natively typed — no
     coercion is needed, only type checking.  Attributes are dict keys;
-    children come from a ``children`` key or from list-valued keys.
+    sub-entity lists require a ``children`` key (for dict-backed entities)
+    or the entity itself is a list.  List-valued attribute keys are accessed
+    via ``get_attr(key, data_type=list)`` — they do not produce child entities.
     """
 
     def __init__(

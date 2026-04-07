@@ -116,6 +116,8 @@ def parse_substitution(string_value: str) -> list[Substitution]:
         return [TextSubstitution(text=string_value)]
 
     if _parser is None:
+        # TODO: official also omits parser=; adding parser="lalr" would be faster
+        # but requires verifying the grammar is LALR(1)-compatible.
         _parser = Lark(_grammar_path.read_text(), start="template")
 
     tree = _parser.parse(string_value)

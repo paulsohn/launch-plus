@@ -80,6 +80,8 @@ class YamlEntity(Entity):
             children = self._element
         entities: list[YamlEntity] = []
         for child in children:
+            # TODO: official does not guard isinstance(child, dict) here either;
+            # non-dict entries raise an unclear AttributeError from child.keys().
             if len(child) != 1:
                 raise RuntimeError(
                     "Subentities must be a dictionary with only one key, which is the entity type"
@@ -139,7 +141,10 @@ class YamlEntity(Entity):
     # ── Convenience ──────────────────────────────────────────────────────
 
     def __repr__(self) -> str:
-        return f"YamlEntity({self._type_name!r}, keys={list(self._element.keys())})"
+        # TODO: _element can be a list when children are accessed; .keys() would raise.
+        # Official has no __repr__ at all. Fix if this causes debugging pain.
+        keys = list(self._element.keys()) if isinstance(self._element, dict) else self._element
+        return f"YamlEntity({self._type_name!r}, keys={keys})"
 
 
 # ── Parser entry point ───────────────────────────────────────────────────────

@@ -907,12 +907,25 @@ class TestResolveSubstitutions:
         assert result == "/ws/src/my_pkg/config"
         assert "my_pkg" in ctx._state.tracked["packages"]
 
-    def test_resolve_find_pkg_prefix(self):
-        ctx = _fresh_subst_ctx()
-        ctx._state.package_shares["my_pkg"] = "/opt/ros/humble/share/my_pkg"
+    def test_resolve_find_pkg_prefix(self, tmp_path, monkeypatch):
+        # Build a fake AMENT index: <prefix>/share/ament_index/resource_index/packages/<pkg>
+        prefix = tmp_path / "opt" / "ros" / "humble"
+        marker_dir = prefix / "share" / "ament_index" / "resource_index" / "packages"
+        marker_dir.mkdir(parents=True)
+        (marker_dir / "my_pkg").touch()
+        monkeypatch.setenv("AMENT_PREFIX_PATH", str(prefix))
+        ctx = _fresh_subst_ctx(preview_mode=False)
         result = resolve_substitutions("$(find-pkg-prefix my_pkg)/lib", ctx)
-        assert result == "/opt/ros/humble/lib"
+        assert result == str(prefix / "lib")
         assert "my_pkg" in ctx._state.tracked["packages"]
+
+    def test_resolve_find_pkg_prefix_preview_errors(self):
+        import pytest
+
+        ctx = _fresh_subst_ctx(preview_mode=True)
+        ctx._state.package_shares["my_pkg"] = "/ws/src/my_pkg"
+        with pytest.raises(LookupError, match="unavailable in preview mode"):
+            resolve_substitutions("$(find-pkg-prefix my_pkg)", ctx)
 
     def test_resolve_nested_substitution(self):
         ctx = _fresh_subst_ctx(

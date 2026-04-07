@@ -504,7 +504,7 @@ def resolve_file(
         except Exception:
             pass
 
-    ctx = LaunchContext()
+    ctx = LaunchContext(state)
     ctx._launch_configurations = dict(args_dict)
 
     if persisted_global_params:

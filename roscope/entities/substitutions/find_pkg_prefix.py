@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -11,10 +13,21 @@ from roscope.entities.substitution import Substitution
 if TYPE_CHECKING:
     from roscope.entities.state import LaunchContext
 
+logger = logging.getLogger(__name__)
+
 
 @expose_substitution("find-pkg-prefix")
 class FindPackagePrefixSubstitution(Substitution):
-    """Resolve ``$(find-pkg-prefix <pkg>)`` to the package's install prefix."""
+    """Resolve ``$(find-pkg-prefix <pkg>)`` to the package's install prefix.
+
+    Official implementation (ament_index_python.packages.get_package_prefix) searches
+    AMENT_PREFIX_PATH for ``<prefix>/share/ament_index/resource_index/packages/<pkg>``
+    and returns the matching ``<prefix>``.  This works for both isolated install
+    (``install/<pkg>/``) and merge-install (``install/``) layouts.
+
+    Preview mode: error — source directories have no install prefix structure.
+    Postbuild mode: AMENT index lookup; error if the package is not found.
+    """
 
     def __init__(self, *, package: list[Substitution]) -> None:
         self.package = package
@@ -31,9 +44,40 @@ class FindPackagePrefixSubstitution(Substitution):
         state = ctx._state
         pkg = resolve_substitutions_from_tokens(self.package, ctx)
         state.track_package(pkg)
-        share = state.resolve_pkg_share(pkg)
-        # Prefix is the parent of share/<pkg> — e.g. /opt/ros/humble
-        return str(Path(share).parent.parent)
+
+        if state.preview_mode:
+            # In preview mode, packages are resolved to source workspace directories
+            # which have no install prefix structure.  $(find-pkg-prefix) requires a
+            # built install tree — it cannot be resolved statically from source.
+            logger.error(
+                "$(find-pkg-prefix %s) is not supported in preview mode "
+                "(source directories have no install prefix); "
+                "build the workspace first or avoid this substitution in preview",
+                pkg,
+            )
+            raise LookupError(f"$(find-pkg-prefix {pkg}) unavailable in preview mode")
+
+        # Postbuild mode: official ament_index_python behavior.
+        # Iterate AMENT_PREFIX_PATH looking for the AMENT index marker file:
+        #   <prefix>/share/ament_index/resource_index/packages/<pkg>
+        # This works for both isolated and merge-install layouts.
+        ament_prefix_path = os.environ.get("AMENT_PREFIX_PATH", "")
+        for prefix_str in ament_prefix_path.split(":"):
+            if not prefix_str:
+                continue
+            marker = (
+                Path(prefix_str) / "share" / "ament_index" / "resource_index" / "packages" / pkg
+            )
+            if marker.exists():
+                return prefix_str
+
+        logger.error(
+            "$(find-pkg-prefix %s): package not found in AMENT index "
+            "(AMENT_PREFIX_PATH=%r); source /opt/ros/<distro>/setup.bash",
+            pkg,
+            ament_prefix_path or "<unset>",
+        )
+        raise LookupError(f"$(find-pkg-prefix {pkg}): not found in AMENT_PREFIX_PATH")
 
     def __str__(self) -> str:
         return f"$(find-pkg-prefix {''.join(str(t) for t in self.package)})"

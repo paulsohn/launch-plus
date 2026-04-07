@@ -6,6 +6,8 @@ import logging
 import xml.etree.ElementTree as ET
 from xml.sax.saxutils import escape
 
+from roscope.entities.helpers import sanitize_xml_comment
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,7 +31,7 @@ def render_resolved_xml(
         for name in sorted(initial_args):
             value = initial_args[name]
             esc = escape(value, {'"': "&quot;"})
-            root.append(ET.Comment(f' arg name="{name}" value="{esc}" '))
+            root.append(ET.Comment(sanitize_xml_comment(f' arg name="{name}" value="{esc}" ')))
 
     for action in actions:
         for elem in action.serialize_resolved():

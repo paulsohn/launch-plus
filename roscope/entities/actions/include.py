@@ -87,6 +87,7 @@ class IncludeLaunchDescription(Action):
 
         # Step 5: Check file exists
         if not os.path.isfile(file_path):
+            logger.error("included launch file not found: %s", file_path)
             return []
 
         # Step 6: Resolve children

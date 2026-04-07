@@ -150,8 +150,7 @@ def resolve_value(value: Any, ctx: LaunchContext | None = None) -> str | None:
     if isinstance(value, str):
         return value
     if ctx is not None:
-        result = ctx.perform_substitution(value)
-        return result if result else None
+        return ctx.perform_substitution(value)
     return str(value)
 
 
@@ -306,3 +305,20 @@ def _read_and_expand_param_file(
     except Exception as e:
         logger.error("--inline-params: failed to read '%s': %s", path, e)
         return None
+
+
+# ─── XML utilities ────────────────────────────────────────────────────────────
+
+
+def sanitize_xml_comment(text: str) -> str:
+    """Escape *text* so it is valid inside an XML comment.
+
+    The XML spec forbids ``--`` inside comments and a trailing ``-``.
+    ``ET.Comment`` does not escape automatically, so callers must sanitize.
+    ``--`` is replaced with ``&#45;&#45;`` (both dashes as character references).
+    A trailing ``-`` is replaced with ``&#45;``.
+    """
+    text = text.replace("--", "&#45;&#45;")
+    if text.endswith("-"):
+        text = text[:-1] + "&#45;"
+    return text

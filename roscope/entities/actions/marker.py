@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from xml.sax.saxutils import escape
 
 from roscope.entities.action import Action
+from roscope.entities.helpers import sanitize_xml_comment
 
 
 class SourceMarker(Action):
@@ -32,7 +33,7 @@ class SourceMarker(Action):
         return self.share_path
 
     def serialize_resolved(self) -> list[ET.Element]:
-        return [ET.Comment(f" source: {self.label()} ")]  # type: ignore[list-item]
+        return [ET.Comment(sanitize_xml_comment(f" source: {self.label()} "))]  # type: ignore[list-item]
 
 
 class ArgComment(Action):
@@ -49,4 +50,4 @@ class ArgComment(Action):
     def serialize_resolved(self) -> list[ET.Element]:
         attr = "default" if self.is_default else "value"
         esc = escape(self.value, {'"': "&quot;"})
-        return [ET.Comment(f' arg name="{self.name}" {attr}="{esc}" ')]  # type: ignore[list-item]
+        return [ET.Comment(sanitize_xml_comment(f' arg name="{self.name}" {attr}="{esc}" '))]  # type: ignore[list-item]

@@ -61,7 +61,8 @@ class ExecuteProcess(Action):
             if isinstance(sub, TextSubstitution):
                 tokens = shlex.split(sub.text)
                 if not tokens:
-                    _append_arg()
+                    if arg:
+                        _append_arg()
                     continue
                 if sub.text[0].isspace():  # noqa: SIM102 — matches official
                     if len(arg) != 0:

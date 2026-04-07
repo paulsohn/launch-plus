@@ -1,6 +1,8 @@
 """Project-wide logging for roscope.
 
-All modules use ``logging.getLogger("roscope")`` or child loggers.
+Modules use ``logging.getLogger("roscope")`` or ``logging.getLogger(__name__)``
+(e.g. ``roscope.fetcher``).  Both are captured by :class:`DiagnosticCollector`
+since ``__name__``-based loggers are children of the ``"roscope"`` logger.
 The CLI attaches a :class:`DiagnosticCollector` handler to capture
 warnings and errors for structured output (exit codes, summary stats).
 """

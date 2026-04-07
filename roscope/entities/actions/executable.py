@@ -6,7 +6,6 @@ Method definition order follows the official implementation.
 
 from __future__ import annotations
 
-import logging
 import shlex
 import xml.etree.ElementTree as ET
 
@@ -16,8 +15,6 @@ from roscope.entities.parsing import _ActionParser
 from roscope.entities.substitution import Substitution, TextSubstitution
 from roscope.entities.utilities import normalize_to_list_of_substitutions, perform_substitutions
 from roscope.parsers.entity import Entity
-
-logger = logging.getLogger("roscope")
 
 
 @expose_action("executable")
@@ -64,8 +61,9 @@ class ExecuteProcess(Action):
             if isinstance(sub, TextSubstitution):
                 tokens = shlex.split(sub.text)
                 if not tokens:
-                    if arg:
-                        _append_arg()
+                    # String with just spaces — appending args allows splitting two
+                    # substitutions separated by a space (matches official behavior).
+                    _append_arg()
                     continue
                 if sub.text[0].isspace():  # noqa: SIM102 — matches official
                     if len(arg) != 0:
@@ -114,11 +112,7 @@ class ExecuteProcess(Action):
         env = env_overrides(context)
         if self.additional_env is not None:
             for k_tokens, v_tokens in self.additional_env:
-                key = resolve_value(k_tokens, context)
-                if not key:
-                    logger.error("additional_env entry has empty variable name; skipping")
-                    continue
-                env[key] = resolve_value(v_tokens, context) or ""
+                env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
 
         resolved = ExecuteProcess(cmd=" ".join(cmd_parts), name=name)
         resolved.env = env

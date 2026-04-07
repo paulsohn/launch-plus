@@ -40,12 +40,14 @@ class AnonName(Substitution):
 
         name = perform_substitutions(ctx, self._name)
 
-        anon_map: dict[str, str] = ctx._state.tracked.setdefault("anon_names", {})
-        if name not in anon_map:
+        # Official stores per-name cache as flat keys "anon" + name in launch_configurations.
+        # e.g. $(anon my_node) stores the result under "anonmy_node".
+        key = "anon" + name
+        if key not in ctx._launch_configurations:
             suffix = hashlib.md5(name.encode()).hexdigest()[:8]
-            anon_map[name] = f"{name}_{suffix}"
+            ctx._launch_configurations[key] = f"{name}_{suffix}"
 
-        return anon_map[name]
+        return str(ctx._launch_configurations[key])
 
     def __str__(self) -> str:
         try:

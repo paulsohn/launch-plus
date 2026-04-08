@@ -23,6 +23,7 @@ import types
 from pathlib import Path
 from typing import Any
 
+from roscope.entities.action import Action
 from roscope.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
 from roscope.entities.actions.env import (
     PushRosNamespace,
@@ -332,8 +333,8 @@ def _resolve_element(
     if tag in action_parse_methods:
         parser = _ActionParser(ctx, include_stack)
         action = action_parse_methods[tag](elem, parser)
-        if action is not None and hasattr(action, "execute"):
-            return action.execute(ctx) or []
+        if isinstance(action, Action):
+            return action.visit(ctx) or []
         return []
     logger.warning("unknown element: <%s>", tag)
     return []
@@ -341,8 +342,6 @@ def _resolve_element(
 
 def _execute_actions(actions, context) -> list:
     """Execute a list of actions and collect resolved results."""
-    from roscope.entities.action import Action
-
     results: list = []
     for action in actions or []:
         if action is None:
@@ -350,7 +349,7 @@ def _execute_actions(actions, context) -> list:
         if not isinstance(action, Action):
             logger.error("expected Action, got %s", type(action).__name__)
             continue
-        children = action.execute(context)
+        children = action.visit(context)
         if children:
             results.extend(children)
     return results
@@ -418,14 +417,12 @@ def resolve_file(
         state.preview_mode = bool(getattr(workflow_options, "preview", True))
         state.inline_params = bool(getattr(workflow_options, "inline_params", False))
         state.rosdep_fallback = bool(getattr(workflow_options, "rosdep_fallback", False))
-        state.apply_arg_defaults = bool(getattr(workflow_options, "apply_arg_defaults", False))
         state.show_empty_includes = bool(getattr(workflow_options, "show_empty_includes", False))
         state.show_args = bool(getattr(workflow_options, "show_args", False))
     else:
         state.preview_mode = True
         state.inline_params = False
         state.rosdep_fallback = False
-        state.apply_arg_defaults = False
         state.show_empty_includes = False
         state.show_args = False
 
@@ -525,7 +522,7 @@ def resolve_file(
 
     from roscope.entities.actions.group import GroupAction as _GroupAction
 
-    resolved = _GroupAction(actions=list(entities), scoped=False).execute(ctx)
+    resolved = _GroupAction(actions=list(entities), scoped=False).visit(ctx) or []
 
     return _tracked_to_parsed_launch_file(state.tracked), resolved
 

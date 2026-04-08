@@ -25,7 +25,8 @@ class ExecuteProcess(Action):
     where each inner list represents one command argument.
     """
 
-    def __init__(self, *, cmd=None, name=None, **kwargs):
+    def __init__(self, *, cmd=None, name=None, condition=None, **kwargs):
+        super().__init__(condition=condition)
         # Normalize cmd: list of argument lists, matching official Executable
         if cmd is None:
             self.cmd: list[list[Substitution]] | str = []
@@ -84,15 +85,13 @@ class ExecuteProcess(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
+        _, kwargs = super().parse(entity, parser)
         cmd_raw = entity.get_attr("cmd", optional=True) or ""
         name_raw = entity.get_attr("name", optional=True)
-        return cls(
-            cmd=cls._parse_cmdline(cmd_raw, parser),
-            name=parser.parse_substitution(name_raw) if name_raw else None,
-            additional_env=parser.parse_envs(entity),
-        )
+        kwargs["cmd"] = cls._parse_cmdline(cmd_raw, parser)
+        kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
+        kwargs["additional_env"] = parser.parse_envs(entity)
+        return cls, kwargs
 
     def execute(self, context) -> list:
         """Resolve substitutions and return a clean resolved ExecuteProcess."""

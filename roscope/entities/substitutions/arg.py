@@ -29,7 +29,6 @@ class ArgSubstitution(Substitution):
 
     def perform(self, ctx: LaunchContext) -> str:
         from roscope.entities.helpers import resolve_substitutions_from_tokens
-        from roscope.entities.substitutions.launch_config import DeferredDefault
 
         name = resolve_substitutions_from_tokens(self.name, ctx)
         lc = getattr(ctx, "_launch_configurations", {})
@@ -37,11 +36,7 @@ class ArgSubstitution(Substitution):
         if value is None:
             logger.error("undefined argument: %s", name)
             return f"$(arg {name})"
-        if isinstance(value, DeferredDefault):
-            resolved = value.resolve(ctx)
-            lc[name] = resolved
-            value = resolved
-        return resolve_substitutions_from_tokens(parse_to_tokens(value), ctx)
+        return resolve_substitutions_from_tokens(parse_to_tokens(str(value)), ctx)
 
     def __str__(self) -> str:
         return f"$(arg {''.join(str(t) for t in self.name)})"

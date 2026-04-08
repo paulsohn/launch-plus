@@ -471,7 +471,6 @@ def fetch(
 @click.option("-l", "--lockfile", default="manifest.lock.repos", help="Lockfile path")
 @click.option("--src", default="src", help="Source directory")
 @click.option("--report", is_flag=True, help="Print dependency report to stderr")
-@click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--preview", is_flag=True, help="Resolve from source workspace")
 @click.option("--show-args", is_flag=True)
 @click.option("--inline-params", is_flag=True)
@@ -493,7 +492,6 @@ def resolve(
     lockfile: str,
     src: str,
     report: bool,
-    apply_launch_arg_defaults: bool,
     preview: bool,
     show_args: bool,
     inline_params: bool,
@@ -510,7 +508,6 @@ def resolve(
     workspace_state = _parse_workspace_state(clean, dirty)
 
     workflow_options = ResolveWorkflowOptions(
-        apply_arg_defaults=apply_launch_arg_defaults,
         preview=preview,
         rosdep_fallback=rosdep,
         inline_params=inline_params,
@@ -546,7 +543,6 @@ def resolve(
 @click.argument("args", nargs=-1)
 @click.option("-l", "--lockfile", default="manifest.lock.repos", help="Lockfile path")
 @click.option("--src", default="src", help="Source directory")
-@click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--preview", is_flag=True)
 @click.option("--rosdep", is_flag=True)
 @click.option("--strict", is_flag=True, help="Treat warnings as errors")
@@ -561,7 +557,6 @@ def check(
     args: tuple[str, ...],
     lockfile: str,
     src: str,
-    apply_launch_arg_defaults: bool,
     preview: bool,
     rosdep: bool,
     strict: bool,
@@ -576,7 +571,6 @@ def check(
     workspace_state = _parse_workspace_state(clean, dirty)
 
     workflow_options = ResolveWorkflowOptions(
-        apply_arg_defaults=apply_launch_arg_defaults,
         preview=preview,
         rosdep_fallback=rosdep,
         inline_params=False,
@@ -613,7 +607,6 @@ def check(
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
-@click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--rosdep", is_flag=True)
 @click.option("--build-base", default="build")
 @click.option("--install-base", default="install")
@@ -631,7 +624,6 @@ def build(
     clean: bool,
     dirty: bool,
     shallow: bool,
-    apply_launch_arg_defaults: bool,
     rosdep: bool,
     build_base: str,
     install_base: str,
@@ -646,7 +638,6 @@ def build(
     workspace_state = _parse_workspace_state(clean, dirty)
 
     workflow_options = ResolveWorkflowOptions(
-        apply_arg_defaults=apply_launch_arg_defaults,
         preview=True,  # always resolve from source for build
         rosdep_fallback=rosdep,
     )
@@ -771,7 +762,6 @@ def build_pkg(
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
-@click.option("--apply-launch-arg-defaults", is_flag=True)
 @click.option("--rosdep", is_flag=True)
 @click.option("--build-base", default="build")
 @click.option("--install-base", default="install")
@@ -789,7 +779,6 @@ def test_cmd(
     clean: bool,
     dirty: bool,
     shallow: bool,
-    apply_launch_arg_defaults: bool,
     rosdep: bool,
     build_base: str,
     install_base: str,
@@ -804,7 +793,6 @@ def test_cmd(
     workspace_state = _parse_workspace_state(clean, dirty)
 
     workflow_options = ResolveWorkflowOptions(
-        apply_arg_defaults=apply_launch_arg_defaults,
         preview=True,
         rosdep_fallback=rosdep,
     )
@@ -928,27 +916,6 @@ def _cmd_resolve(
         click.echo(err=True)
         for err in all_errors:
             click.echo(f"[error] {err}", err=True)
-
-        # Show hints for undefined variable errors
-        hint_defaults = not workflow_options.apply_arg_defaults
-        if any("undefined variable" in e for e in all_errors) and hint_defaults:
-            click.echo(err=True)
-            click.echo(
-                "  hint: possible causes for 'undefined variable' in the current mode:",
-                err=True,
-            )
-            click.echo(err=True)
-            click.echo("  · Arg default not applied (defaults disabled by default).", err=True)
-            click.echo("    → Provide the arg on the command line:  x:=value", err=True)
-            click.echo(
-                '    → Or: --apply-launch-arg-defaults  (applies <arg default="...">)',
-                err=True,
-            )
-            click.echo(err=True)
-            click.echo(
-                "  Flags are intentionally verbose — prefer fixing the launch files.",
-                err=True,
-            )
 
     if collector.warnings:
         click.echo(err=True)

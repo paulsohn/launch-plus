@@ -20,13 +20,13 @@ class SetLaunchConfiguration(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
-        name = entity.get_attr("name", optional=True) or ""
-        value = parser.parse_substitution(entity.get_attr("value", optional=True) or "")
-        return cls(name=name, value=value)
+        _, kwargs = super().parse(entity, parser)
+        kwargs["name"] = entity.get_attr("name", optional=True) or ""
+        kwargs["value"] = parser.parse_substitution(entity.get_attr("value", optional=True) or "")
+        return cls, kwargs
 
     def __init__(self, name=None, value=None, **kwargs):
+        super().__init__(**kwargs)
         self._name = name
         self._value = value
 
@@ -51,11 +51,13 @@ class SetParameter(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        name = parser.parse_substitution(entity.get_attr("name", optional=True) or "")
-        value = parser.parse_substitution(entity.get_attr("value", optional=True) or "")
-        return cls(name=name, value=value)
+        _, kwargs = super().parse(entity, parser)
+        kwargs["name"] = parser.parse_substitution(entity.get_attr("name", optional=True) or "")
+        kwargs["value"] = parser.parse_substitution(entity.get_attr("value", optional=True) or "")
+        return cls, kwargs
 
     def __init__(self, name=None, value=None, **kwargs):
+        super().__init__(**kwargs)
         self._name = name
         self._value = value
 

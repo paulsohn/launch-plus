@@ -36,9 +36,6 @@ logger = logging.getLogger(__name__)
 class ResolveWorkflowOptions:
     """Options controlling the resolution workflow."""
 
-    apply_arg_defaults: bool = False
-    """Apply ``default="..."`` values from ``<arg>`` elements."""
-
     preview: bool = False
     """Resolve from source workspace instead of AMENT_PREFIX_PATH."""
 

@@ -19,6 +19,9 @@ class EventHandler(Action):
 
     Subclasses handle both XML parse path (via ``@expose_action`` + ``parse()``)
     and Python shim path (via import patching with compatible ``__init__``).
+
+    Note: event handler actions exist only in Python launch files officially;
+    the XML parse path here is ad-hoc (no official XML counterpart).
     """
 
     def __init__(
@@ -41,6 +44,7 @@ class EventHandler(Action):
         event_handler=None,
         **kwargs,
     ):
+        super().__init__(**kwargs)
         self.handler_kind = handler_kind
         self.target = target
         self.target_node = target_node
@@ -52,7 +56,10 @@ class EventHandler(Action):
 
     @classmethod
     def _parse_xml(cls, entity: Entity, parser: _ActionParser):
-        """Shared XML parse logic for all event handler types."""
+        """Shared XML parse logic for all event handler types.
+
+        Ad-hoc — event handlers have no official XML counterpart.
+        """
         handler_kind = entity.type_name
         target = entity.get_attr("target", optional=True)
         target_node = entity.get_attr("target_node", optional=True)
@@ -168,9 +175,13 @@ class OnShutdown(EventHandler):
 
 @expose_action("emit_event")
 class EmitEvent(Action):
-    """<emit_event> — an event emission."""
+    """<emit_event> — an event emission.
+
+    Ad-hoc XML parse — no official XML counterpart.
+    """
 
     def __init__(self, *, event: str = "", target_node=None, namespace=None, **kwargs):
+        super().__init__(**kwargs)
         self.event = event
         self.target_node = target_node
         self.namespace = namespace
@@ -211,6 +222,7 @@ class TrackedEmitEvent(Action):
     """Python shim for ``launch.actions.EmitEvent``."""
 
     def __init__(self, event=None, **kwargs):
+        super().__init__(**kwargs)
         self._event = event
 
 
@@ -218,18 +230,19 @@ class ChangeState(Action):
     """Python shim for ``lifecycle_msgs.msg.Transition``."""
 
     def __init__(self, lifecycle_node_matcher=None, transition_id=None, **kwargs):
-        pass
+        super().__init__(**kwargs)
 
 
 class Shutdown(Action):
     """Python shim for ``launch.actions.Shutdown``."""
 
     def __init__(self, **kwargs):
-        pass
+        super().__init__(**kwargs)
 
 
 class RegisterEventHandler(Action):
     """Python shim for ``launch.actions.RegisterEventHandler``."""
 
     def __init__(self, event_handler=None, **kwargs):
+        super().__init__(**kwargs)
         self._event_handler = event_handler

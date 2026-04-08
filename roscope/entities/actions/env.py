@@ -22,27 +22,19 @@ class SetEnvironmentVariable(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
-        name = parser.parse_substitution(entity.get_attr("name", optional=True) or "")
-        value = parser.parse_substitution(entity.get_attr("value", optional=True) or "")
-        return cls(name=name, value=value)
+        _, kwargs = super().parse(entity, parser)
+        kwargs["name"] = parser.parse_substitution(entity.get_attr("name", optional=True) or "")
+        kwargs["value"] = parser.parse_substitution(entity.get_attr("value", optional=True) or "")
+        return cls, kwargs
 
     def __init__(self, name=None, value=None, **kwargs):
+        super().__init__(**kwargs)
         self._name = name
         self._value = value
-        self._condition = kwargs.get("condition")
 
     def execute(self, context) -> list | None:
         from roscope.entities.helpers import resolve_value
 
-        if self._condition is not None and context is not None:
-            try:
-                if not self._condition.evaluate(context):
-                    return None
-            except Exception as e:
-                logger.warning("SetEnvironmentVariable condition evaluation failed: %s", e)
-                return None
         name = resolve_value(self._name, context)
         if not name:
             logger.error("SetEnvironmentVariable: resolved name is empty or None — skipping")
@@ -58,23 +50,15 @@ class UnsetEnvironmentVariable(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
-        name = parser.parse_substitution(entity.get_attr("name", optional=True) or "")
-        return cls(name=name)
+        _, kwargs = super().parse(entity, parser)
+        kwargs["name"] = parser.parse_substitution(entity.get_attr("name", optional=True) or "")
+        return cls, kwargs
 
     def __init__(self, name=None, **kwargs):
+        super().__init__(**kwargs)
         self._name = name
-        self._condition = kwargs.get("condition")
 
     def execute(self, context) -> list | None:
-        if self._condition is not None and context is not None:
-            try:
-                if not self._condition.evaluate(context):
-                    return None
-            except Exception as e:
-                logger.warning("UnsetEnvironmentVariable condition evaluation failed: %s", e)
-                return None
         from roscope.entities.helpers import resolve_value
 
         name = resolve_value(self._name, context)
@@ -106,12 +90,14 @@ class PushRosNamespace(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
-        ns_tokens = parser.parse_substitution(entity.get_attr("namespace", optional=True) or "")
-        return cls(namespace=ns_tokens)
+        _, kwargs = super().parse(entity, parser)
+        kwargs["namespace"] = parser.parse_substitution(
+            entity.get_attr("namespace", optional=True) or ""
+        )
+        return cls, kwargs
 
     def __init__(self, namespace=None, **kwargs):
+        super().__init__(**kwargs)
         self._namespace = namespace
 
     def execute(self, context) -> list | None:
@@ -133,13 +119,13 @@ class SetRemap(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
-        src = parser.parse_substitution(entity.get_attr("from", optional=True) or "")
-        dst = parser.parse_substitution(entity.get_attr("to", optional=True) or "")
-        return cls(src=src, dst=dst)
+        _, kwargs = super().parse(entity, parser)
+        kwargs["src"] = parser.parse_substitution(entity.get_attr("from", optional=True) or "")
+        kwargs["dst"] = parser.parse_substitution(entity.get_attr("to", optional=True) or "")
+        return cls, kwargs
 
     def __init__(self, src="", dst="", **kwargs):
+        super().__init__(**kwargs)
         self._src = src
         self._dst = dst
 

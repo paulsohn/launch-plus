@@ -35,7 +35,6 @@ class ResolverState:
         "preview_mode",
         "lockfile_data",
         "rosdep_fallback",
-        "apply_arg_defaults",
         "fetch_dir",
         "fetch_options",
         "fetched_packages",
@@ -69,7 +68,6 @@ class ResolverState:
         self.preview_mode: bool = True
         self.lockfile_data: dict = {}
         self.rosdep_fallback: bool = False
-        self.apply_arg_defaults: bool = False
         self.fetch_dir: str = ""
         self.fetch_options: Any = None  # FetchOptions from fetcher.py
         self.fetched_packages: set = set()

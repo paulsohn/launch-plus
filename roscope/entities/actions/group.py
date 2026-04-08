@@ -24,38 +24,28 @@ class GroupAction(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
+        _, kwargs = super().parse(entity, parser)
         scoped_raw = entity.get_attr("scoped", optional=True)
         if scoped_raw is None:
-            scoped = True
+            kwargs["scoped"] = True
         elif isinstance(scoped_raw, bool):
-            scoped = scoped_raw
+            kwargs["scoped"] = scoped_raw
         else:
-            scoped = str(scoped_raw).lower() not in ("false", "0", "no")
-        return cls(
-            actions=list(entity.children),
-            scoped=scoped,
-            _include_stack=list(parser.include_stack),
-        )
+            kwargs["scoped"] = str(scoped_raw).lower() not in ("false", "0", "no")
+        kwargs["actions"] = list(entity.children)
+        kwargs["_include_stack"] = list(parser.include_stack)
+        return cls, kwargs
 
     def __init__(self, actions=None, **kwargs):
+        super().__init__(**kwargs)
         self.actions: list = list(actions or [])
         self.scoped: bool = kwargs.get("scoped", True)
-        self.condition = kwargs.get("condition")
         self._include_stack: list = kwargs.get("_include_stack", [])
         # Set on resolved GroupAction instances (from IncludeLaunchDescription)
         self.resolved_children: list = kwargs.get("resolved_children", [])
 
     def execute(self, context) -> list:
         """Execute group: push/pop scope, execute children, return results."""
-        if self.condition is not None and context is not None:
-            try:
-                if not self.condition.evaluate(context):
-                    return []
-            except Exception as e:
-                logger.warning("GroupAction condition evaluation failed: %s", e)
-                return []
 
         if self.scoped:
             context._push_launch_configurations()
@@ -70,7 +60,7 @@ class GroupAction(Action):
 
                     results.extend(_resolve_element(child, context, self._include_stack))
                 elif isinstance(child, Action):
-                    children = child.execute(context)
+                    children = child.visit(context)
                     if children:
                         results.extend(children)
                 else:
@@ -97,6 +87,7 @@ class OpaqueFunction(Action):
     """Stores an OpaqueFunction's callable so the walker can invoke it."""
 
     def __init__(self, *, function=None, **kwargs):
+        super().__init__(**kwargs)
         self.function = function
 
     def execute(self, context) -> list:
@@ -121,6 +112,7 @@ class TimerAction(Action):
     """
 
     def __init__(self, *, period=None, actions=None, **kwargs):
+        super().__init__(**kwargs)
         self.actions: list = list(actions or [])
 
     def execute(self, context) -> list:

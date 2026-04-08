@@ -1327,7 +1327,7 @@
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-              <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/left/pointcloud_preprocessor">
+              <node_container pkg="rclcpp_components" exec="component_container" name="pointcloud_container" namespace="/sensing/lidar/left/pointcloud_preprocessor">
                 <param name="front_overhang" value="1.0"/>
                 <param name="left_overhang" value="0.128"/>
                 <param name="max_steer_angle" value="0.7"/>
@@ -1502,7 +1502,7 @@
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-              <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/right/pointcloud_preprocessor">
+              <node_container pkg="rclcpp_components" exec="component_container" name="pointcloud_container" namespace="/sensing/lidar/right/pointcloud_preprocessor">
                 <param name="front_overhang" value="1.0"/>
                 <param name="left_overhang" value="0.128"/>
                 <param name="max_steer_angle" value="0.7"/>
@@ -1677,7 +1677,7 @@
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-              <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/rear/pointcloud_preprocessor">
+              <node_container pkg="rclcpp_components" exec="component_container" name="pointcloud_container" namespace="/sensing/lidar/rear/pointcloud_preprocessor">
                 <param name="front_overhang" value="1.0"/>
                 <param name="left_overhang" value="0.128"/>
                 <param name="max_steer_angle" value="0.7"/>
@@ -2857,44 +2857,6 @@
           <!-- arg name="use_intra_process" value="true" -->
           <!-- arg name="use_multithread" value="true" -->
           <!-- arg name="use_pointcloud_container" value="true" -->
-          <node_container pkg="rclcpp_components" exec="component_container_mt" name="occupancy_grid_map_container" namespace="/perception/occupancy_grid_map">
-            <param name="front_overhang" value="1.0"/>
-            <param name="left_overhang" value="0.128"/>
-            <param name="max_steer_angle" value="0.7"/>
-            <param name="rear_overhang" value="1.1"/>
-            <param name="right_overhang" value="0.128"/>
-            <param name="use_sim_time" value="false"/>
-            <param name="vehicle_height" value="2.5"/>
-            <param name="wheel_base" value="2.79"/>
-            <param name="wheel_radius" value="0.383"/>
-            <param name="wheel_tread" value="1.64"/>
-            <param name="wheel_width" value="0.235"/>
-            <composable_node pkg="autoware_probabilistic_occupancy_grid_map" plugin="autoware::occupancy_grid_map::PointcloudBasedOccupancyGridMapNode" name="occupancy_grid_map_node" namespace="/perception/occupancy_grid_map">
-              <param name="OccupancyGridMapFixedBlindSpot" value="{'distance_margin': 1.0}"/>
-              <param name="OccupancyGridMapProjectiveBlindSpot" value="{'projection_dz_threshold': 0.01, 'obstacle_separation_threshold': 1.0, 'pub_debug_grid': False}"/>
-              <param name="base_link_frame" value="base_link"/>
-              <param name="downsample_input_pointcloud" value="False"/>
-              <param name="downsample_voxel_size" value="0.125"/>
-              <param name="enable_single_frame_mode" value="False"/>
-              <param name="filter_obstacle_pointcloud_by_raw_pointcloud" value="False"/>
-              <param name="grid_map_type" value="OccupancyGridMapFixedBlindSpot"/>
-              <param name="gridmap_origin_frame" value="base_link"/>
-              <param name="height_filter" value="{'use_height_filter': True, 'min_height': -1.0, 'max_height': 2.0}"/>
-              <param name="map_frame" value="map"/>
-              <param name="map_length" value="150.0"/>
-              <param name="map_resolution" value="0.5"/>
-              <param name="probability_matrix" value="{'occupied_to_occupied': 0.95, 'occupied_to_free': 0.05, 'free_to_occupied': 0.2, 'free_to_free': 0.8}"/>
-              <param name="processing_time_consecutive_excess_tolerance_ms" value="1000.0"/>
-              <param name="processing_time_tolerance_ms" value="50.0"/>
-              <param name="publish_processing_time_detail" value="False"/>
-              <param name="scan_origin_frame" value="base_link"/>
-              <param name="updater_type" value="binary_bayes_filter"/>
-              <param name="v_ratio" value="10.0"/>
-              <remap from="~/input/obstacle_pointcloud" to="/perception/obstacle_segmentation/single_frame/pointcloud"/>
-              <remap from="~/input/raw_pointcloud" to="/sensing/lidar/concatenated/pointcloud"/>
-              <remap from="~/output/occupancy_grid_map" to="/perception/occupancy_grid_map/map"/>
-            </composable_node>
-          </node_container>
           <load_composable_node target="/pointcloud_container">
             <composable_node pkg="autoware_probabilistic_occupancy_grid_map" plugin="autoware::occupancy_grid_map::PointcloudBasedOccupancyGridMapNode" name="occupancy_grid_map_node" namespace="/perception/occupancy_grid_map">
               <param name="OccupancyGridMapFixedBlindSpot" value="{'distance_margin': 1.0}"/>
@@ -3112,65 +3074,6 @@
               <!-- arg name="use_low_height_cropbox" value="false" -->
               <!-- arg name="use_pointcloud_container" value="true" -->
               <!-- arg name="voxel_grid_based_euclidean_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/clustering/voxel_grid_based_euclidean_cluster.param.yaml" -->
-              <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="euclidean_cluster_container" namespace="/perception/object_recognition/detection/clustering">
-                <param name="front_overhang" value="1.0"/>
-                <param name="left_overhang" value="0.128"/>
-                <param name="max_steer_angle" value="0.7"/>
-                <param name="rear_overhang" value="1.1"/>
-                <param name="right_overhang" value="0.128"/>
-                <param name="use_sim_time" value="false"/>
-                <param name="vehicle_height" value="2.5"/>
-                <param name="wheel_base" value="2.79"/>
-                <param name="wheel_radius" value="0.383"/>
-                <param name="wheel_tread" value="1.64"/>
-                <param name="wheel_width" value="0.235"/>
-              </node_container>
-              <load_composable_node target="/pointcloud_container">
-                <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="low_height_crop_box_filter" namespace="/perception/object_recognition/detection/clustering">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_cluster_size" value="3000"/>
-                  <param name="max_points_per_voxel_in_large_cluster" value="10"/>
-                  <param name="max_voxel_cluster_for_output" value="800"/>
-                  <param name="max_x" value="200.0"/>
-                  <param name="max_y" value="200.0"/>
-                  <param name="max_z" value="2.0"/>
-                  <param name="min_cluster_size" value="10"/>
-                  <param name="min_points_number_per_voxel" value="1"/>
-                  <param name="min_voxel_cluster_size_for_filtering" value="65"/>
-                  <param name="min_x" value="-200.0"/>
-                  <param name="min_y" value="-200.0"/>
-                  <param name="min_z" value="-10.0"/>
-                  <param name="negative" value="False"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <param name="tolerance" value="0.7"/>
-                  <param name="use_height" value="False"/>
-                  <param name="voxel_leaf_size" value="0.3"/>
-                  <remap from="input" to="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud"/>
-                  <remap from="output" to="/perception/object_recognition/detection/clustering/low_height/pointcloud"/>
-                </composable_node>
-                <composable_node pkg="autoware_euclidean_cluster" plugin="autoware::euclidean_cluster::VoxelGridBasedEuclideanClusterNode" name="euclidean_cluster" namespace="/perception/object_recognition/detection/clustering">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_cluster_size" value="3000"/>
-                  <param name="max_points_per_voxel_in_large_cluster" value="10"/>
-                  <param name="max_voxel_cluster_for_output" value="800"/>
-                  <param name="max_x" value="200.0"/>
-                  <param name="max_y" value="200.0"/>
-                  <param name="max_z" value="2.0"/>
-                  <param name="min_cluster_size" value="10"/>
-                  <param name="min_points_number_per_voxel" value="1"/>
-                  <param name="min_voxel_cluster_size_for_filtering" value="65"/>
-                  <param name="min_x" value="-200.0"/>
-                  <param name="min_y" value="-200.0"/>
-                  <param name="min_z" value="-10.0"/>
-                  <param name="negative" value="False"/>
-                  <param name="processing_time_threshold_sec" value="0.01"/>
-                  <param name="tolerance" value="0.7"/>
-                  <param name="use_height" value="False"/>
-                  <param name="voxel_leaf_size" value="0.3"/>
-                  <remap from="input" to="/perception/object_recognition/detection/clustering/low_height/pointcloud"/>
-                  <remap from="output" to="/perception/object_recognition/detection/clustering/clusters"/>
-                </composable_node>
-              </load_composable_node>
               <load_composable_node target="/pointcloud_container">
                 <composable_node pkg="autoware_euclidean_cluster" plugin="autoware::euclidean_cluster::VoxelGridBasedEuclideanClusterNode" name="euclidean_cluster" namespace="/perception/object_recognition/detection/clustering">
                   <param name="input_frame" value="base_link"/>
@@ -3989,77 +3892,6 @@
               <remap from="~/output/raw_image" to="/sensing/camera/camera6/image_raw"/>
             </composable_node>
           </load_composable_node>
-          <load_composable_node target="/perception/traffic_light_recognition/camera6/traffic_light_node_container">
-            <composable_node pkg="autoware_traffic_light_fine_detector" plugin="autoware::traffic_light::TrafficLightFineDetectorNode" name="traffic_light_fine_detector" namespace="/perception/traffic_light_recognition/camera6/detection">
-              <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml -->
-              <param name="precision" value="fp16"/>
-              <param name="score_thresh" value="0.3"/>
-              <param name="nms_thresh" value="0.65"/>
-              <param name="approximate_sync" value="false"/>
-              <param name="gpu_id" value="0"/>
-              <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx"/>
-              <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
-              <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rough/rois"/>
-              <remap from="~/expect/rois" to="/perception/traffic_light_recognition/camera6/detection/expect/rois"/>
-              <remap from="~/output/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
-            </composable_node>
-          </load_composable_node>
-          <load_composable_node target="/perception/traffic_light_recognition/camera6/traffic_light_node_container">
-            <composable_node pkg="autoware_tensorrt_yolox" plugin="autoware::tensorrt_yolox::TrtYoloXNode" name="traffic_light_whole_image_detector" namespace="/perception/traffic_light_recognition/camera6/detection">
-              <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
-              <param name="score_threshold" value="0.35"/>
-              <param name="nms_threshold" value="0.7"/>
-              <param name="precision" value="fp16"/>
-              <param name="calibration_algorithm" value="Entropy"/>
-              <param name="dla_core_id" value="-1"/>
-              <param name="quantize_first_layer" value="false"/>
-              <param name="quantize_last_layer" value="false"/>
-              <param name="profile_per_layer" value="false"/>
-              <param name="clip_value" value="6.0"/>
-              <param name="preprocess_on_gpu" value="true"/>
-              <param name="gpu_id" value="0"/>
-              <param name="calibration_image_list_path" value=""/>
-              <param name="is_roi_overlap_segmentation" value="false"/>
-              <param name="overlap_roi_score_threshold" value="0.3"/>
-              <param name="is_publish_color_mask" value="false"/>
-              <param name="roi_overlay_segmentation_label.UNKNOWN" value="false"/>
-              <param name="roi_overlay_segmentation_label.CAR" value="false"/>
-              <param name="roi_overlay_segmentation_label.TRUCK" value="false"/>
-              <param name="roi_overlay_segmentation_label.BUS" value="false"/>
-              <param name="roi_overlay_segmentation_label.MOTORCYCLE" value="false"/>
-              <param name="roi_overlay_segmentation_label.BICYCLE" value="false"/>
-              <param name="roi_overlay_segmentation_label.PEDESTRIAN" value="false"/>
-              <param name="roi_overlay_segmentation_label.ANIMAL" value="false"/>
-              <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx"/>
-              <param name="roi_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv"/>
-              <param name="roi_to_semantic_segmentation_remap_path" value=""/>
-              <param name="semantic_segmentation_color_map_path" value=""/>
-              <remap from="~/in/image" to="/sensing/camera/camera6/image_raw"/>
-              <remap from="~/out/objects" to="/perception/traffic_light_recognition/camera6/detection/traffic_light_whole_image_detector/rois"/>
-              <remap from="~/out/image" to="/perception/traffic_light_recognition/camera6/detection/traffic_light_whole_image_detector/debug/image"/>
-              <remap from="~/out/image/compressed" to="/perception/traffic_light_recognition/camera6/detection/traffic_light_whole_image_detector/debug/image/compressed"/>
-              <remap from="~/out/image/compressedDepth" to="/perception/traffic_light_recognition/camera6/detection/traffic_light_whole_image_detector/debug/image/compressedDepth"/>
-              <remap from="~/out/image/theora" to="/perception/traffic_light_recognition/camera6/detection/traffic_light_whole_image_detector/debug/image/theora"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_selector" plugin="autoware::traffic_light::TrafficLightSelectorNode" name="traffic_light_selector" namespace="/perception/traffic_light_recognition/camera6/detection">
-              <remap from="input/detected_rois" to="/perception/traffic_light_recognition/camera6/detection/traffic_light_whole_image_detector/rois"/>
-              <remap from="input/rough_rois" to="/perception/traffic_light_recognition/camera6/detection/rough/rois"/>
-              <remap from="input/expect_rois" to="/perception/traffic_light_recognition/camera6/detection/expect/rois"/>
-              <remap from="input/camera_info" to="/sensing/camera/camera6/camera_info"/>
-              <remap from="output/traffic_rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_category_merger" plugin="autoware::traffic_light::TrafficLightCategoryMergerNode" name="traffic_light_category_merger" namespace="/perception/traffic_light_recognition/camera6/classification">
-              <remap from="input/car_signals" to="/perception/traffic_light_recognition/camera6/classification/car/traffic_signals"/>
-              <remap from="input/pedestrian_signals" to="/perception/traffic_light_recognition/camera6/classification/pedestrian/traffic_signals"/>
-              <remap from="output/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/traffic_signals"/>
-            </composable_node>
-          </load_composable_node>
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera7">
             <param name="front_overhang" value="1.0"/>
             <param name="left_overhang" value="0.128"/>
@@ -4128,77 +3960,6 @@
               <param name="encoding" value="rgb8"/>
               <remap from="~/input/compressed_image" to="/sensing/camera/camera7/image_raw/compressed"/>
               <remap from="~/output/raw_image" to="/sensing/camera/camera7/image_raw"/>
-            </composable_node>
-          </load_composable_node>
-          <load_composable_node target="/perception/traffic_light_recognition/camera7/traffic_light_node_container">
-            <composable_node pkg="autoware_traffic_light_fine_detector" plugin="autoware::traffic_light::TrafficLightFineDetectorNode" name="traffic_light_fine_detector" namespace="/perception/traffic_light_recognition/camera7/detection">
-              <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml -->
-              <param name="precision" value="fp16"/>
-              <param name="score_thresh" value="0.3"/>
-              <param name="nms_thresh" value="0.65"/>
-              <param name="approximate_sync" value="false"/>
-              <param name="gpu_id" value="0"/>
-              <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx"/>
-              <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
-              <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rough/rois"/>
-              <remap from="~/expect/rois" to="/perception/traffic_light_recognition/camera7/detection/expect/rois"/>
-              <remap from="~/output/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
-            </composable_node>
-          </load_composable_node>
-          <load_composable_node target="/perception/traffic_light_recognition/camera7/traffic_light_node_container">
-            <composable_node pkg="autoware_tensorrt_yolox" plugin="autoware::tensorrt_yolox::TrtYoloXNode" name="traffic_light_whole_image_detector" namespace="/perception/traffic_light_recognition/camera7/detection">
-              <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
-              <param name="score_threshold" value="0.35"/>
-              <param name="nms_threshold" value="0.7"/>
-              <param name="precision" value="fp16"/>
-              <param name="calibration_algorithm" value="Entropy"/>
-              <param name="dla_core_id" value="-1"/>
-              <param name="quantize_first_layer" value="false"/>
-              <param name="quantize_last_layer" value="false"/>
-              <param name="profile_per_layer" value="false"/>
-              <param name="clip_value" value="6.0"/>
-              <param name="preprocess_on_gpu" value="true"/>
-              <param name="gpu_id" value="0"/>
-              <param name="calibration_image_list_path" value=""/>
-              <param name="is_roi_overlap_segmentation" value="false"/>
-              <param name="overlap_roi_score_threshold" value="0.3"/>
-              <param name="is_publish_color_mask" value="false"/>
-              <param name="roi_overlay_segmentation_label.UNKNOWN" value="false"/>
-              <param name="roi_overlay_segmentation_label.CAR" value="false"/>
-              <param name="roi_overlay_segmentation_label.TRUCK" value="false"/>
-              <param name="roi_overlay_segmentation_label.BUS" value="false"/>
-              <param name="roi_overlay_segmentation_label.MOTORCYCLE" value="false"/>
-              <param name="roi_overlay_segmentation_label.BICYCLE" value="false"/>
-              <param name="roi_overlay_segmentation_label.PEDESTRIAN" value="false"/>
-              <param name="roi_overlay_segmentation_label.ANIMAL" value="false"/>
-              <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml -->
-              <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx"/>
-              <param name="roi_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv"/>
-              <param name="roi_to_semantic_segmentation_remap_path" value=""/>
-              <param name="semantic_segmentation_color_map_path" value=""/>
-              <remap from="~/in/image" to="/sensing/camera/camera7/image_raw"/>
-              <remap from="~/out/objects" to="/perception/traffic_light_recognition/camera7/detection/traffic_light_whole_image_detector/rois"/>
-              <remap from="~/out/image" to="/perception/traffic_light_recognition/camera7/detection/traffic_light_whole_image_detector/debug/image"/>
-              <remap from="~/out/image/compressed" to="/perception/traffic_light_recognition/camera7/detection/traffic_light_whole_image_detector/debug/image/compressed"/>
-              <remap from="~/out/image/compressedDepth" to="/perception/traffic_light_recognition/camera7/detection/traffic_light_whole_image_detector/debug/image/compressedDepth"/>
-              <remap from="~/out/image/theora" to="/perception/traffic_light_recognition/camera7/detection/traffic_light_whole_image_detector/debug/image/theora"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_selector" plugin="autoware::traffic_light::TrafficLightSelectorNode" name="traffic_light_selector" namespace="/perception/traffic_light_recognition/camera7/detection">
-              <remap from="input/detected_rois" to="/perception/traffic_light_recognition/camera7/detection/traffic_light_whole_image_detector/rois"/>
-              <remap from="input/rough_rois" to="/perception/traffic_light_recognition/camera7/detection/rough/rois"/>
-              <remap from="input/expect_rois" to="/perception/traffic_light_recognition/camera7/detection/expect/rois"/>
-              <remap from="input/camera_info" to="/sensing/camera/camera7/camera_info"/>
-              <remap from="output/traffic_rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
-            </composable_node>
-            <composable_node pkg="autoware_traffic_light_category_merger" plugin="autoware::traffic_light::TrafficLightCategoryMergerNode" name="traffic_light_category_merger" namespace="/perception/traffic_light_recognition/camera7/classification">
-              <remap from="input/car_signals" to="/perception/traffic_light_recognition/camera7/classification/car/traffic_signals"/>
-              <remap from="input/pedestrian_signals" to="/perception/traffic_light_recognition/camera7/classification/pedestrian/traffic_signals"/>
-              <remap from="output/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/traffic_signals"/>
             </composable_node>
           </load_composable_node>
         </group>

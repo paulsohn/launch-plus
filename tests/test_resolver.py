@@ -27,10 +27,7 @@ from roscope.entities.helpers import (
 )
 from roscope.entities.state import LaunchContext, ResolverState
 from roscope.entities.substitutions.find_pkg_share import FindPackageShare
-from roscope.entities.substitutions.launch_config import (
-    DeferredDefault,
-    LaunchConfiguration,
-)
+from roscope.entities.substitutions.launch_config import LaunchConfiguration
 from roscope.resolver import parse_xml_launch, parse_yaml_launch, resolve_xml_elements
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -40,7 +37,6 @@ def _make_context(configs=None):
     """Build a LaunchContext with a fresh ResolverState and test defaults."""
     ctx = LaunchContext()
     ctx._state.preview_mode = True
-    ctx._state.apply_arg_defaults = True
     ctx._launch_configurations = dict(configs or {})
     return ctx
 
@@ -834,7 +830,6 @@ def _fresh_subst_ctx(**kwargs):
     """Create a LaunchContext with a fresh ResolverState and test defaults."""
     ctx = LaunchContext()
     ctx._state.preview_mode = True
-    ctx._state.apply_arg_defaults = True
     # Translate legacy args/vars kwargs to _launch_configurations
     lc_updates: dict = {}
     for k, v in kwargs.items():
@@ -1056,7 +1051,6 @@ def _fresh_walker_ctx(**kwargs):
     """Create a fresh LaunchContext with test defaults for walker tests."""
     ctx = LaunchContext()
     ctx._state.preview_mode = True
-    ctx._state.apply_arg_defaults = True
     # Translate legacy args/vars kwargs to _launch_configurations
     lc_updates: dict = {}
     for k, v in kwargs.items():
@@ -1280,14 +1274,14 @@ class TestActionRegistry:
 # Mirror the Rust-side tests in rosdep.rs.
 
 
-# ─── _apply_declared_arg (lazy default evaluation) ───────────────────────────
+# ─── _apply_declared_arg ─────────────────────────────────────────────────────
 
 
-class TestApplyDeclaredArgLazy:
-    """Default is NOT resolved when the arg is already set by the caller."""
+class TestApplyDeclaredArg:
+    """DeclareLaunchArgument.execute() resolves defaults immediately (matching official)."""
 
-    def test_default_not_resolved_when_arg_already_set(self, caplog):
-        """FindPackageShare in default must not be perform()'d if arg is set."""
+    def test_arg_already_set_is_preserved(self, caplog):
+        """Caller-provided value is not overwritten."""
         ctx = _make_context({"my_arg": "already_set_value"})
         ctx._state.preview_mode = False
         arg = DeclareLaunchArgument(
@@ -1301,97 +1295,27 @@ class TestApplyDeclaredArgLazy:
             _apply_declared_arg(arg, ctx)
         # Arg value unchanged (caller's value preserved).
         assert ctx._launch_configurations["my_arg"] == "already_set_value"
-        # No error — default was not resolved.
-        assert "nonexistent_pkg" not in caplog.text
 
-    def test_default_deferred_when_arg_not_set(self):
-        """Default is stored as DeferredDefault, resolved on read."""
+    def test_default_resolved_immediately_when_arg_not_set(self):
+        """Default is resolved and stored immediately — matching official."""
         ctx = _make_context({})
         ctx._state.preview_mode = True
+        ctx._state.package_shares["my_pkg"] = "/ws/src/my_pkg"
         arg = DeclareLaunchArgument(
             "my_arg",
             default_value="simple_default",
         )
         _apply_declared_arg(arg, ctx)
-        # Stored as deferred, not yet resolved.
-        assert isinstance(ctx._launch_configurations["my_arg"], DeferredDefault)
-        # Reading via LaunchConfiguration resolves it.
-        lc = LaunchConfiguration("my_arg")
-        assert lc.perform(ctx) == "simple_default"
-        # Now it's resolved in the context.
+        # Resolved immediately (no deferred default).
         assert ctx._launch_configurations["my_arg"] == "simple_default"
+        assert LaunchConfiguration("my_arg").perform(ctx) == "simple_default"
 
-    def test_deferred_default_not_resolved_if_never_read(self, caplog):
-        """FindPackageShare for uninstalled pkg causes no error if arg is never read."""
-        ctx = _make_context({})
-        ctx._state.preview_mode = False
-        arg = DeclareLaunchArgument(
-            "cuda_param",
-            default_value=[
-                FindPackageShare("uninstalled_cuda_pkg"),
-                "/config/file.yaml",
-            ],
-        )
-        with caplog.at_level(logging.WARNING):
-            _apply_declared_arg(arg, ctx)
-        # Default is deferred — no resolution happened, no error.
-        assert isinstance(ctx._launch_configurations["cuda_param"], DeferredDefault)
-        assert "uninstalled_cuda_pkg" not in caplog.text
-
-    def test_unresolved_default_recorded_for_show_args(self):
-        """When arg is already set, the raw default string is recorded for --show-args."""
-        ctx = _make_context({"my_arg": "caller_value"})
-        ctx._state.preview_mode = False
-        arg = DeclareLaunchArgument(
-            "my_arg",
-            default_value=[
-                FindPackageShare("some_pkg"),
-                "/config/file.yaml",
-            ],
-        )
-        _apply_declared_arg(arg, ctx)
-        # declared_args records the unresolved default (str() form).
-        recorded = ctx._state.tracked["declared_args"]
-        assert len(recorded) == 1
-        assert "$(find-pkg-share some_pkg)" in recorded[0]["default"]
-        assert "/config/file.yaml" in recorded[0]["default"]
-
-
-# ─── Strictness flags ────────────────────────────────────────────────────────
-
-
-class TestStrictnessFlags:
-    """Tests for apply_arg_defaults."""
-
-    def test_apply_arg_defaults_true_applies_default(self):
+    def test_default_applies_via_xml(self):
+        """<arg default=...> immediately resolves when arg not provided."""
         ctx = LaunchContext()
-        ctx._state.apply_arg_defaults = True
         elements = parse_xml_launch('<launch><arg name="x" default="hello"/></launch>', "test.xml")
         resolve_xml_elements(elements, ctx)
-        # Default is stored as DeferredDefault; resolve via $(arg x)
         assert resolve_substitutions("$(arg x)", ctx) == "hello"
-
-    def test_apply_arg_defaults_false_skips_default(self):
-        ctx = LaunchContext()
-        ctx._state.apply_arg_defaults = False
-        elements = parse_xml_launch('<launch><arg name="x" default="hello"/></launch>', "test.xml")
-        resolve_xml_elements(elements, ctx)
-        # Default not applied — arg stays absent
-        assert "x" not in ctx._launch_configurations
-
-    def test_apply_arg_defaults_false_undefined_ref_errors(self, caplog):
-        ctx = LaunchContext()
-        ctx._state.apply_arg_defaults = False
-        elements = parse_xml_launch(
-            """<launch>
-                <arg name="x" default="hello"/>
-                <let name="y" value="$(arg x)"/>
-            </launch>""",
-            "test.xml",
-        )
-        with caplog.at_level(logging.WARNING):
-            resolve_xml_elements(elements, ctx)
-        assert "undefined" in caplog.text
 
 
 # ─── _resolve_pkg_share and FindPackageShare ─────────────────────────

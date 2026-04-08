@@ -112,35 +112,33 @@ class Node(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
-        pkg = parser.parse_substitution(
+        _, kwargs = super().parse(entity, parser)
+        kwargs["package"] = parser.parse_substitution(
             entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
         )
-        exe = parser.parse_substitution(
+        kwargs["executable"] = parser.parse_substitution(
             entity.get_attr("exec", optional=True)
             or entity.get_attr("executable", optional=True)
             or ""
         )
         name_raw = entity.get_attr("name", optional=True)
         ns_raw = entity.get_attr("namespace", optional=True)
-        node_kind = "lifecycle_node" if entity.type_name == "lifecycle_node" else "node"
-        return cls(
-            package=pkg,
-            executable=exe,
-            name=parser.parse_substitution(name_raw) if name_raw else None,
-            namespace=parser.parse_substitution(ns_raw) if ns_raw else None,
-            parameters=parser.parse_params(entity),
-            remappings=parser.parse_remaps(entity),
-            env=parser.parse_envs(entity),
-            kind=node_kind,
-            output=_parse_optional(parser, entity.get_attr("output", optional=True)),
-            arguments=_parse_optional(parser, entity.get_attr("args", optional=True)),
-            respawn=_parse_optional(parser, entity.get_attr("respawn", optional=True)),
-            respawn_delay=_parse_optional(parser, entity.get_attr("respawn_delay", optional=True)),
+        kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
+        kwargs["namespace"] = parser.parse_substitution(ns_raw) if ns_raw else None
+        kwargs["parameters"] = parser.parse_params(entity)
+        kwargs["remappings"] = parser.parse_remaps(entity)
+        kwargs["env"] = parser.parse_envs(entity)
+        kwargs["kind"] = "lifecycle_node" if entity.type_name == "lifecycle_node" else "node"
+        kwargs["output"] = _parse_optional(parser, entity.get_attr("output", optional=True))
+        kwargs["arguments"] = _parse_optional(parser, entity.get_attr("args", optional=True))
+        kwargs["respawn"] = _parse_optional(parser, entity.get_attr("respawn", optional=True))
+        kwargs["respawn_delay"] = _parse_optional(
+            parser, entity.get_attr("respawn_delay", optional=True)
         )
+        return cls, kwargs
 
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
+        super().__init__(**kwargs)
         self._kind = kwargs.pop("kind", None) or "node"
         self.package = package
         self.executable = executable
@@ -371,26 +369,27 @@ class ComposableNodeContainer(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
-        pkg = parser.parse_substitution(
+        _, kwargs = super().parse(entity, parser)
+        kwargs["package"] = parser.parse_substitution(
             entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
         )
-        exe = parser.parse_substitution(
+        kwargs["executable"] = parser.parse_substitution(
             entity.get_attr("exec", optional=True)
             or entity.get_attr("executable", optional=True)
             or ""
         )
         name_raw = entity.get_attr("name", optional=True)
         ns_raw = entity.get_attr("namespace", optional=True)
-        return cls(
-            package=pkg,
-            executable=exe,
-            name=parser.parse_substitution(name_raw) if name_raw else None,
-            namespace=parser.parse_substitution(ns_raw) if ns_raw else None,
-            env=parser.parse_envs(entity),
-            composable_node_descriptions=parser.parse_composable_plugins(entity),
-        )
+        kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
+        kwargs["namespace"] = parser.parse_substitution(ns_raw) if ns_raw else None
+        kwargs["env"] = parser.parse_envs(entity)
+        kwargs["composable_node_descriptions"] = parser.parse_composable_plugins(entity)
+        # Attributes consumed by Node/ExecuteProcess.parse() in the official inheritance
+        # chain (ComposableNodeContainer → Node → ExecuteProcess). Since roscope's
+        # ComposableNodeContainer inherits from Action directly, consume them explicitly.
+        _ = entity.get_attr("output", optional=True)  # runtime; not used for static analysis
+        _ = entity.get_attr("args", optional=True)  # command-line args; runtime only
+        return cls, kwargs
 
     def __init__(
         self,
@@ -401,6 +400,7 @@ class ComposableNodeContainer(Action):
         composable_node_descriptions=None,
         **kwargs,
     ):
+        super().__init__(**kwargs)
         self.package = package
         self.executable = executable
         self.name = name
@@ -504,17 +504,16 @@ class LoadComposableNodes(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
+        _, kwargs = super().parse(entity, parser)
         target_raw = entity.get_attr("target", optional=True)
         ns_raw = entity.get_attr("namespace", optional=True)
-        return cls(
-            target_container=_parse_optional(parser, target_raw),
-            composable_node_descriptions=parser.parse_composable_plugins(entity),
-            namespace=_parse_optional(parser, ns_raw),
-        )
+        kwargs["target_container"] = _parse_optional(parser, target_raw)
+        kwargs["composable_node_descriptions"] = parser.parse_composable_plugins(entity)
+        kwargs["namespace"] = _parse_optional(parser, ns_raw)
+        return cls, kwargs
 
     def __init__(self, *, composable_node_descriptions=None, target_container=None, **kwargs):
+        super().__init__(**kwargs)
         self.target_container = target_container
         self.namespace = kwargs.get("namespace")
         self.composable_node_descriptions: list = list(composable_node_descriptions or [])

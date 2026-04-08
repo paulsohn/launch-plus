@@ -16,35 +16,6 @@ from roscope.entities.substitution import Substitution
 logger = logging.getLogger("roscope")
 
 
-class DeferredDefault:
-    """Wraps an unresolved DeclareLaunchArgument default_value.
-
-    Stored in ``_launch_configurations`` instead of a resolved string.
-    Resolution is deferred until the value is actually read via
-    ``LaunchConfiguration.perform()``.
-    """
-
-    def __init__(self, default_value):
-        self.default_value = default_value
-
-    def resolve(self, context):
-        """Resolve the deferred substitutions to a string."""
-        dv = self.default_value
-        if isinstance(dv, Substitution):
-            result = dv.perform(context)
-            return str(result) if result is not None else str(dv)
-        if isinstance(dv, list):
-            parts = []
-            for sub in dv:
-                if isinstance(sub, Substitution):
-                    result = sub.perform(context)
-                    parts.append(str(result) if result is not None else str(sub))
-                else:
-                    parts.append(str(sub))
-            return "".join(parts)
-        return str(dv)
-
-
 @expose_substitution("var")
 class LaunchConfiguration(Substitution):
     """Unified substitution: ``$(var name)`` (XML) and ``LaunchConfiguration("name")`` (Python).
@@ -89,20 +60,19 @@ class LaunchConfiguration(Substitution):
         return str(name) if name is not None else ""
 
     def perform(self, context, **kwargs):
-        """Resolve to the launch configuration value."""
+        """Resolve to the launch configuration value.
+
+        Matching official ``LaunchConfiguration.perform()``:
+        reads from ``context.launch_configurations[name]`` and returns the value.
+        Values are always plain strings (DeclareLaunchArgument resolves defaults
+        immediately at execute() time — no deferred resolution).
+        """
         name = self._resolve_name(context)
         if context is not None:
-            value = None
-            # launch_configurations is the single source of truth
             lc = getattr(context, "_launch_configurations", {})
             if name in lc:
                 value = lc[name]
-                if isinstance(value, DeferredDefault):
-                    resolved = value.resolve(context)
-                    lc[name] = resolved
-                    return resolved
-            if value is not None:
-                return str(value)
+                return str(value) if value is not None else ""
         if self._default is not None:
             return str(self._default)
         # Not found

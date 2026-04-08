@@ -26,10 +26,12 @@ class IncludeLaunchDescription(Action):
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        if not parser.evaluate_condition(entity):
-            return None
+        _, kwargs = super().parse(entity, parser)
         raw_file = entity.get_attr("file")
-        file_tokens = parser.parse_substitution(raw_file)
+        kwargs["launch_description_source"] = None
+        kwargs["file_tokens"] = parser.parse_substitution(raw_file)
+        kwargs["raw_file"] = raw_file
+        kwargs["include_stack"] = list(parser.include_stack)
         arg_items = entity.get_attr("arg", data_type=list, optional=True) or []
         args = []
         for a in arg_items:
@@ -37,15 +39,11 @@ class IncludeLaunchDescription(Action):
             arg_value = a.get_attr("value", optional=True)
             if arg_value is not None:
                 args.append((arg_name, parser.parse_substitution(arg_value)))
-        return cls(
-            launch_description_source=None,
-            file_tokens=file_tokens,
-            raw_file=raw_file,
-            launch_arguments=args,
-            include_stack=list(parser.include_stack),
-        )
+        kwargs["launch_arguments"] = args
+        return cls, kwargs
 
     def __init__(self, launch_description_source=None, launch_arguments=None, **kwargs):
+        super().__init__(**kwargs)
         self.source = launch_description_source
         self.launch_arguments = launch_arguments
         self.file_tokens = kwargs.get("file_tokens")

@@ -6,8 +6,37 @@ Provides :class:`_ActionParser`, a stateless parsing helper that action
 
 from __future__ import annotations
 
-from roscope.entities.helpers import _evaluate_condition
+from roscope.entities.helpers import _evaluate_condition, _is_truthy
 from roscope.parsers.entity import Entity
+
+
+class _ParsedCondition:
+    """A parsed ``if=``/``unless=`` condition stored on an action.
+
+    Mirrors official ``IfCondition``/``UnlessCondition``: stores substitution
+    tokens and evaluates them at visit time against the current context.
+    ``evaluate(context)`` returns True when the action should execute.
+    """
+
+    __slots__ = ("kind", "tokens")
+
+    def __init__(self, kind: str, tokens: list) -> None:
+        self.kind = kind  # "If" or "Unless"
+        self.tokens = tokens
+
+    def evaluate(self, context) -> bool:
+        """Resolve tokens and return True if the action should execute."""
+        from roscope.entities.helpers import resolve_substitutions_from_tokens
+
+        try:
+            resolved = resolve_substitutions_from_tokens(self.tokens, context)
+            truthy = _is_truthy(resolved)
+        except Exception:
+            return False
+        return truthy if self.kind == "If" else not truthy
+
+    def __repr__(self) -> str:
+        return f"_ParsedCondition({self.kind!r}, {self.tokens!r})"
 
 
 class _ActionParser:
@@ -34,8 +63,30 @@ class _ActionParser:
 
         return _lark_parse(text)
 
+    def parse_condition(self, entity: Entity) -> _ParsedCondition | None:
+        """Parse if=/unless= on *entity* into a condition object.
+
+        Returns a :class:`_ParsedCondition` that can be stored on an action
+        and evaluated at visit time, or ``None`` if no condition is present.
+        Matches official ``Action.parse()`` → ``IfCondition``/``UnlessCondition``.
+        """
+        if_val = entity.get_attr("if", optional=True)
+        unless_val = entity.get_attr("unless", optional=True)
+        if if_val is not None and unless_val is not None:
+            raise RuntimeError("if= and unless= cannot be used simultaneously")
+        if if_val is not None:
+            return _ParsedCondition("If", self.parse_substitution(if_val))
+        if unless_val is not None:
+            return _ParsedCondition("Unless", self.parse_substitution(unless_val))
+        return None
+
     def evaluate_condition(self, entity: Entity) -> bool:
-        """Evaluate if=/unless= on *entity*.  Returns True → element should execute."""
+        """Eagerly evaluate if=/unless= on *entity* at parse time.
+
+        Used for inline sub-entity filtering (e.g. ``<composable_node>``
+        children) where the element is not an ``Action`` and has no visit().
+        For top-level actions, prefer ``parse_condition()`` + ``visit()``.
+        """
         if_val = entity.get_attr("if", optional=True)
         unless_val = entity.get_attr("unless", optional=True)
         cond: dict[str, str] | None = None

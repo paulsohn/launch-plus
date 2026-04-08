@@ -14,13 +14,16 @@ from roscope.parsers.entity import Entity
 class LogInfo(Action):
     """<log> — records a log message."""
 
-    def __init__(self, message="", **kwargs):
-        self.message = message
-
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
-        msg = parser.parse_substitution(entity.get_attr("message", optional=True) or "")
-        return cls(message=msg)
+        _, kwargs = super().parse(entity, parser)
+        msg_raw = entity.get_attr("message", optional=True) or ""
+        kwargs["message"] = parser.parse_substitution(msg_raw)
+        return cls, kwargs
+
+    def __init__(self, message="", **kwargs):
+        super().__init__(**kwargs)
+        self.message = message
 
     def execute(self, context) -> list:
         from roscope.entities.helpers import resolve_value

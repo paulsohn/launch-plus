@@ -1,7 +1,4 @@
-"""CLI for roscope — Bazel-like build and run system for ROS 2.
-
-Ported from crates/roscope-cli/src/main.rs (clap → Click).
-"""
+"""CLI for roscope — Bazel-like build and run system for ROS 2."""
 
 from __future__ import annotations
 
@@ -21,7 +18,6 @@ if TYPE_CHECKING:
     from roscope.types import Lockfile
 
 logger = logging.getLogger(__name__)
-
 
 # ---------------------------------------------------------------------------
 # Helpers

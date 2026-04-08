@@ -1,7 +1,5 @@
 """Builder: compute a selective colcon build plan from a resolved launch target.
 
-Ported from crates/roscope-core/src/builder.rs.
-
 The build plan is derived from the launch resolver output:
 1. ``direct_packages`` — packages directly referenced in the launch graph.
 2. ``resolve_dependencies`` with ``BuildAndExec`` mode — transitive expansion.
@@ -31,19 +29,14 @@ class BuildPlan:
 
     packages: list[str] = field(default_factory=list)
     """Lockfile packages to build, in topological order (dependencies first)."""
-
     external_deps: set[str] = field(default_factory=set)
     """External dependencies not in the lockfile (e.g. system ROS packages)."""
-
     src_dir: Path = field(default_factory=Path)
     """Source directory passed to ``colcon build --base-paths``."""
-
     build_base: Path = field(default_factory=Path)
     """Colcon build output directory (``--build-base``)."""
-
     install_base: Path = field(default_factory=Path)
     """Colcon install prefix (``--install-base``)."""
-
     log_base: Path = field(default_factory=Path)
     """Colcon log directory (``--log-base``)."""
 
@@ -54,7 +47,6 @@ class BuildOptions:
 
     dry_run: bool = False
     """Print the colcon command without running it."""
-
     extra_colcon_args: list[str] = field(default_factory=list)
     """Extra arguments inserted into ``colcon build`` before ``--packages-select``."""
 

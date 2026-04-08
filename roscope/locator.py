@@ -1,7 +1,5 @@
 """Package and launch file locator.
 
-Ported from crates/roscope-core/src/locator.rs.
-
 Two resolution modes:
 1. **Lockfile mode** (``resolve_*``): Deterministic paths from lockfile, no disk check.
 2. **Discovery mode** (``locate_*``): Filesystem search + AMENT_PREFIX_PATH fallback.

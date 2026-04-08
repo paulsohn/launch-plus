@@ -1,7 +1,5 @@
 """Shared helpers for invoking rosdep from both the resolver and builder.
 
-Ported from crates/roscope-core/src/rosdep.rs.
-
 Uses ``rosdep resolve`` to map rosdep keys to system package names, then
 installs via ``apt-get``/``pip`` directly.
 
@@ -83,10 +81,8 @@ class ResolvedDeps:
 
     apt: list[str] = field(default_factory=list)
     """Packages to install via ``apt-get install``."""
-
     pip: list[str] = field(default_factory=list)
     """Packages to install via ``pip install``."""
-
     unresolved: list[str] = field(default_factory=list)
     """Rosdep keys that could not be resolved."""
 

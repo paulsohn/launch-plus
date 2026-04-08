@@ -1,7 +1,4 @@
-"""Exception hierarchy for roscope.
-
-Ported from crates/roscope-core/src/error.rs.
-"""
+"""Exception hierarchy for roscope."""
 
 from __future__ import annotations
 

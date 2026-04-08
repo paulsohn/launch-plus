@@ -1,7 +1,5 @@
 """Indexer module: parse .repos files and generate lockfiles.
 
-Ported from crates/roscope-core/src/indexer.rs.
-
 The indexer is responsible for:
 - Parsing .repos YAML files (VCS format)
 - Resolving versions (tags/branches/SHAs) to concrete SHAs via blobless clone

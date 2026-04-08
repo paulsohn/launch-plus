@@ -1,7 +1,5 @@
 """Sparse-checkout based package fetcher.
 
-Ported from crates/roscope-core/src/fetcher.rs.
-
 All git operations are subprocess calls (same as Rust version).
 """
 
@@ -17,7 +15,6 @@ from roscope.exceptions import GitError, PackageNotFoundError
 from roscope.types import Lockfile
 
 logger = logging.getLogger(__name__)
-
 
 # ---------------------------------------------------------------------------
 # Types
@@ -37,10 +34,8 @@ class WorkspaceState(Enum):
 
     CLEAN = auto()
     """Reset every repository to the pinned lockfile SHA (auto-stash)."""
-
     DIRTY = auto()
     """Trust whatever is on disk; only missing repos are cloned."""
-
     DEFAULT = auto()
     """Verify SHA + clean tree; error if mismatch."""
 

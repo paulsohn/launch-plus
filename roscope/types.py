@@ -1,7 +1,5 @@
 """IR (Intermediate Representation) types for roscope.
 
-Ported from crates/roscope-core/src/resolver.rs.
-
 These dataclasses represent the resolved launch graph — the output of the
 resolver and the input to the renderer.  They are the shared vocabulary between
 all roscope modules.
@@ -24,10 +22,8 @@ class DependencyKind(Enum):
 
     LAUNCH = auto()
     """Launch file — needs recursive parsing to discover more dependencies."""
-
     PARAM = auto()
     """Parameter/config file — just needs fetching, no parsing."""
-
     OTHER = auto()
     """Other file type — needs fetching, no special handling."""
 
@@ -43,10 +39,8 @@ class FileDependency:
 
     package: str
     """Package name."""
-
     share_path: Path
     """Path relative to package share directory."""
-
     kind: DependencyKind
 
 
@@ -56,10 +50,8 @@ class IncludeArgContext:
 
     explicit: dict[str, str] = field(default_factory=dict)
     """Args explicitly forwarded via ``<arg name="..." value="..."/>``."""
-
     with_cascade: dict[str, str] = field(default_factory=dict)
     """Full parent arg context + explicit overrides (for ``--allow-global-arg-cascade``)."""
-
     namespace_stack: list[str] = field(default_factory=list)
     """Accumulated ``<push-ros-namespace>`` stack at the include site."""
 
@@ -101,16 +93,12 @@ class RepoLock:
 
     url: str
     """Git repository URL."""
-
     version: str
     """Pinned SHA."""
-
     repo_type: str = "git"
     """Repository type (always ``"git"``)."""
-
     version_ref: str | None = None
     """Original version reference (tag, branch, or short SHA)."""
-
     packages: list[str] = field(default_factory=list)
     """Package names contained in this repository."""
 
@@ -121,7 +109,6 @@ class PackageLock:
 
     repo: str
     """Key into :attr:`Lockfile.repositories`."""
-
     path: str
     """Path within the repository."""
 
@@ -132,7 +119,6 @@ class Lockfile:
 
     repositories: dict[str, RepoLock] = field(default_factory=dict)
     """Repository-centric view (for fetching)."""
-
     packages: dict[str, PackageLock] = field(default_factory=dict)
     """Package-centric view (for O(1) lookup)."""
 
@@ -155,10 +141,8 @@ class RepoEntry:
 
     repo_type: str
     """Repository type (always ``"git"``)."""
-
     url: str
     """Git repository URL."""
-
     version: str
     """Version specification (tag, branch, or SHA)."""
 
@@ -187,19 +171,14 @@ class Dependencies:
 
     build: list[str] = field(default_factory=list)
     """``<build_depend>``: needed to compile this package."""
-
     build_export: list[str] = field(default_factory=list)
     """``<build_export_depend>``: needed by packages that compile against this one."""
-
     buildtool: list[str] = field(default_factory=list)
     """``<buildtool_depend>``: build tool needed to build this package."""
-
     buildtool_export: list[str] = field(default_factory=list)
     """``<buildtool_export_depend>``: build tool exported by this package."""
-
     exec: list[str] = field(default_factory=list)
     """``<exec_depend>``: needed at runtime."""
-
     test: list[str] = field(default_factory=list)
     """``<test_depend>``: needed only for testing."""
 
@@ -210,10 +189,8 @@ class PackageInfo:
 
     name: str
     """Package name from package.xml."""
-
     path: str
     """Path within the repository (directory containing package.xml)."""
-
     dependencies: Dependencies = field(default_factory=Dependencies)
     """Dependencies extracted from package.xml."""
 
@@ -223,13 +200,10 @@ class DependencyMode(Enum):
 
     BUILD = auto()
     """Build dependencies only (for colcon build)."""
-
     EXEC = auto()
     """Execution dependencies only (for runtime)."""
-
     BUILD_AND_EXEC = auto()
     """Both build and exec dependencies."""
-
     ALL = auto()
     """All dependencies including test."""
 
@@ -240,10 +214,8 @@ class DependencyGraph:
 
     packages: set[str] = field(default_factory=set)
     """All packages needed (root + transitive)."""
-
     missing: set[str] = field(default_factory=set)
     """Packages that were requested but not found in lockfile."""
-
     external: set[str] = field(default_factory=set)
     """Packages that are external (not in lockfile, e.g., system deps)."""
 

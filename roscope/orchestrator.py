@@ -1,7 +1,5 @@
 """Resolve orchestrator: combines locator, fetcher, and resolver.
 
-Ported from crates/roscope-core/src/orchestrator.rs.
-
 Key difference from Rust: the Python resolver is imported directly —
 no subprocess boundary or JSON serialization. The ``run_py_resolver`` +
 ``py_output_to_parsed`` pipeline is replaced by a direct function call.
@@ -26,7 +24,6 @@ from roscope.types import (
 
 logger = logging.getLogger(__name__)
 
-
 # ---------------------------------------------------------------------------
 # Workflow options
 # ---------------------------------------------------------------------------
@@ -38,16 +35,12 @@ class ResolveWorkflowOptions:
 
     preview: bool = False
     """Resolve from source workspace instead of AMENT_PREFIX_PATH."""
-
     rosdep_fallback: bool = False
     """Auto-install missing packages via ``rosdep``."""
-
     inline_params: bool = False
     """Expand ``<param from="...">`` files at resolve time."""
-
     show_empty_includes: bool = False
     """Show source groups even for includes that produce no resolved actions."""
-
     show_args: bool = False
     """Add arg markers to include groups showing include arguments."""
 

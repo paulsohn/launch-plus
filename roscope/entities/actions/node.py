@@ -131,6 +131,9 @@ class Node(Action):
         kwargs["kind"] = "lifecycle_node" if entity.type_name == "lifecycle_node" else "node"
         kwargs["output"] = _parse_optional(parser, entity.get_attr("output", optional=True))
         kwargs["arguments"] = _parse_optional(parser, entity.get_attr("args", optional=True))
+        kwargs["ros_arguments"] = _parse_optional(
+            parser, entity.get_attr("ros_args", optional=True)
+        )
         kwargs["respawn"] = _parse_optional(parser, entity.get_attr("respawn", optional=True))
         kwargs["respawn_delay"] = _parse_optional(
             parser, entity.get_attr("respawn_delay", optional=True)
@@ -150,6 +153,7 @@ class Node(Action):
         self.param_files: list = []
         self.output = kwargs.get("output")
         self.args = kwargs.get("arguments")
+        self.ros_args = kwargs.get("ros_arguments")
         self.respawn = kwargs.get("respawn")
         self.respawn_delay = kwargs.get("respawn_delay")
         self.ros_namespace: str | None = None
@@ -219,6 +223,7 @@ class Node(Action):
         resolved.env = env
         resolved.output = _resolve_opt("output")
         resolved.args = _resolve_opt("args")
+        resolved.ros_args = _resolve_opt("ros_args")
         resolved.respawn = _resolve_opt("respawn")
         resolved.respawn_delay = _resolve_opt("respawn_delay")
         return [resolved]
@@ -241,6 +246,8 @@ class Node(Action):
             elem.set("output", self.output)
         if self.args:
             elem.set("args", self.args)
+        if self.ros_args:
+            elem.set("ros_args", self.ros_args)
         if self.respawn:
             elem.set("respawn", self.respawn)
         if self.respawn_delay:
@@ -384,11 +391,14 @@ class ComposableNodeContainer(Action):
         kwargs["namespace"] = parser.parse_substitution(ns_raw) if ns_raw else None
         kwargs["env"] = parser.parse_envs(entity)
         kwargs["composable_node_descriptions"] = parser.parse_composable_plugins(entity)
-        # Attributes consumed by Node/ExecuteProcess.parse() in the official inheritance
-        # chain (ComposableNodeContainer → Node → ExecuteProcess). Since roscope's
-        # ComposableNodeContainer inherits from Action directly, consume them explicitly.
-        _ = entity.get_attr("output", optional=True)  # runtime; not used for static analysis
-        _ = entity.get_attr("args", optional=True)  # command-line args; runtime only
+        # Consumed by Node/ExecuteProcess.parse() in the official inheritance chain
+        # (ComposableNodeContainer → Node → ExecuteProcess). Roscope inherits from
+        # Action directly, so parse them explicitly and preserve in output.
+        kwargs["output"] = _parse_optional(parser, entity.get_attr("output", optional=True))
+        kwargs["arguments"] = _parse_optional(parser, entity.get_attr("args", optional=True))
+        kwargs["ros_arguments"] = _parse_optional(
+            parser, entity.get_attr("ros_args", optional=True)
+        )
         return cls, kwargs
 
     def __init__(
@@ -410,6 +420,9 @@ class ComposableNodeContainer(Action):
         self.parameters: dict = {}
         self.param_files: list = []
         self.remappings: list = []
+        self.output = kwargs.get("output")
+        self.args = kwargs.get("arguments")
+        self.ros_args = kwargs.get("ros_arguments")
         self.ros_namespace: str | None = None
         self.explicit_namespace: str | None = None
 
@@ -438,6 +451,13 @@ class ComposableNodeContainer(Action):
 
         _resolve_plugins(self.composable_node_descriptions, context)
 
+        def _resolve_opt(attr):
+            raw = getattr(self, attr, None)
+            if raw is None:
+                return None
+            r = context.perform_substitution(raw)
+            return r if r else str(raw)
+
         resolved = ComposableNodeContainer(package=pkg, executable=exe, name=name or None)
         resolved.ros_namespace = ros_ns
         resolved.explicit_namespace = ns
@@ -446,6 +466,9 @@ class ComposableNodeContainer(Action):
         resolved.param_files = list(context._launch_configurations.get("global_param_files", []))
         resolved.remappings = list(context._launch_configurations.get("ros_remaps", []))
         resolved.env = env
+        resolved.output = _resolve_opt("output")
+        resolved.args = _resolve_opt("args")
+        resolved.ros_args = _resolve_opt("ros_args")
         resolved.composable_node_descriptions = self.composable_node_descriptions
 
         # Store FQN on the original object for LoadComposableNodes.
@@ -466,6 +489,12 @@ class ComposableNodeContainer(Action):
             elem.set("name", self.name)
         if self.namespace:
             elem.set("namespace", self.namespace)
+        if self.output:
+            elem.set("output", self.output)
+        if self.args:
+            elem.set("args", self.args)
+        if self.ros_args:
+            elem.set("ros_args", self.ros_args)
 
         for pf in self.param_files:
             path = pf.get("path", "")

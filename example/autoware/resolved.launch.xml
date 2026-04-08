@@ -8,7 +8,7 @@
     <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/pointcloud_container.launch.py -->
     <!-- arg name="container_name" value="pointcloud_container" -->
     <!-- arg name="use_multithread" value="true" -->
-    <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="pointcloud_container" namespace="/">
+    <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="pointcloud_container" namespace="/" output="both">
       <param name="front_overhang" value="1.0"/>
       <param name="left_overhang" value="0.128"/>
       <param name="max_steer_angle" value="0.7"/>
@@ -105,7 +105,7 @@
         <!-- arg name="ntp_monitor_config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/system_monitor/ntp_monitor.param.yaml" -->
         <!-- arg name="process_monitor_config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/system_monitor/process_monitor.param.yaml" -->
         <!-- arg name="voltage_monitor_config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/system_monitor/voltage_monitor.param.yaml" -->
-        <node_container pkg="rclcpp_components" exec="component_container_mt" name="system_monitor_container" namespace="/system/system_monitor/system_monitor">
+        <node_container pkg="rclcpp_components" exec="component_container_mt" name="system_monitor_container" namespace="/system/system_monitor/system_monitor" output="screen">
           <param name="front_overhang" value="1.0"/>
           <param name="left_overhang" value="0.128"/>
           <param name="max_steer_angle" value="0.7"/>
@@ -741,7 +741,7 @@
       <group>
         <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_mrm_comfortable_stop_operator/launch/mrm_comfortable_stop_operator.launch.py -->
         <!-- arg name="config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/mrm_comfortable_stop_operator/mrm_comfortable_stop_operator.param.yaml" -->
-        <node_container pkg="rclcpp_components" exec="component_container" name="mrm_comfortable_stop_operator_container" namespace="/system/mrm_comfortable_stop_operator">
+        <node_container pkg="rclcpp_components" exec="component_container" name="mrm_comfortable_stop_operator_container" namespace="/system/mrm_comfortable_stop_operator" output="screen">
           <param name="front_overhang" value="1.0"/>
           <param name="left_overhang" value="0.128"/>
           <param name="max_steer_angle" value="0.7"/>
@@ -768,7 +768,7 @@
       <group>
         <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_mrm_emergency_stop_operator/launch/mrm_emergency_stop_operator.launch.py -->
         <!-- arg name="config_file" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/mrm_emergency_stop_operator/mrm_emergency_stop_operator.param.yaml" -->
-        <node_container pkg="rclcpp_components" exec="component_container" name="mrm_emergency_stop_operator_container" namespace="/system/mrm_emergency_stop_operator">
+        <node_container pkg="rclcpp_components" exec="component_container" name="mrm_emergency_stop_operator_container" namespace="/system/mrm_emergency_stop_operator" output="screen">
           <param name="front_overhang" value="1.0"/>
           <param name="left_overhang" value="0.128"/>
           <param name="max_steer_angle" value="0.7"/>
@@ -983,7 +983,7 @@
       <!-- arg name="pointcloud_map_metadata_path" value="{map_path}/pointcloud_map_metadata.yaml" -->
       <!-- arg name="pointcloud_map_path" value="{map_path}/pointcloud_map.pcd" -->
       <!-- arg name="use_multithread" default="false" -->
-      <node_container pkg="rclcpp_components" exec="component_container_mt" name="map_container" namespace="/map">
+      <node_container pkg="rclcpp_components" exec="component_container_mt" name="map_container" namespace="/map" output="both">
         <param name="front_overhang" value="1.0"/>
         <param name="left_overhang" value="0.128"/>
         <param name="max_steer_angle" value="0.7"/>
@@ -1152,7 +1152,7 @@
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="true" -->
               <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-              <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/top/pointcloud_preprocessor">
+              <node_container pkg="rclcpp_components" exec="component_container_mt" name="pointcloud_container" namespace="/sensing/lidar/top/pointcloud_preprocessor" output="both">
                 <param name="front_overhang" value="1.0"/>
                 <param name="left_overhang" value="0.128"/>
                 <param name="max_steer_angle" value="0.7"/>
@@ -1327,7 +1327,7 @@
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-              <node_container pkg="rclcpp_components" exec="component_container" name="pointcloud_container" namespace="/sensing/lidar/left/pointcloud_preprocessor">
+              <node_container pkg="rclcpp_components" exec="component_container" name="pointcloud_container" namespace="/sensing/lidar/left/pointcloud_preprocessor" output="both">
                 <param name="front_overhang" value="1.0"/>
                 <param name="left_overhang" value="0.128"/>
                 <param name="max_steer_angle" value="0.7"/>
@@ -1502,7 +1502,7 @@
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-              <node_container pkg="rclcpp_components" exec="component_container" name="pointcloud_container" namespace="/sensing/lidar/right/pointcloud_preprocessor">
+              <node_container pkg="rclcpp_components" exec="component_container" name="pointcloud_container" namespace="/sensing/lidar/right/pointcloud_preprocessor" output="both">
                 <param name="front_overhang" value="1.0"/>
                 <param name="left_overhang" value="0.128"/>
                 <param name="max_steer_angle" value="0.7"/>
@@ -1677,7 +1677,7 @@
               <!-- arg name="use_intra_process" value="true" -->
               <!-- arg name="use_multithread" value="false" -->
               <!-- arg name="vehicle_mirror_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/mirror.param.yaml" -->
-              <node_container pkg="rclcpp_components" exec="component_container" name="pointcloud_container" namespace="/sensing/lidar/rear/pointcloud_preprocessor">
+              <node_container pkg="rclcpp_components" exec="component_container" name="pointcloud_container" namespace="/sensing/lidar/rear/pointcloud_preprocessor" output="both">
                 <param name="front_overhang" value="1.0"/>
                 <param name="left_overhang" value="0.128"/>
                 <param name="max_steer_angle" value="0.7"/>
@@ -3822,7 +3822,7 @@
           <!-- arg name="whole_image_detection/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
           <!-- arg name="whole_image_detection/yolox_roi_label_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv" -->
           <!-- arg name="yolox_traffic_light_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml" -->
-          <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera6">
+          <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera6" output="both">
             <param name="front_overhang" value="1.0"/>
             <param name="left_overhang" value="0.128"/>
             <param name="max_steer_angle" value="0.7"/>
@@ -3892,7 +3892,7 @@
               <remap from="~/output/raw_image" to="/sensing/camera/camera6/image_raw"/>
             </composable_node>
           </load_composable_node>
-          <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera7">
+          <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera7" output="both">
             <param name="front_overhang" value="1.0"/>
             <param name="left_overhang" value="0.128"/>
             <param name="max_steer_angle" value="0.7"/>
@@ -4672,7 +4672,7 @@
             <!-- arg name="launch_traffic_light_module" default="true" -->
             <!-- arg name="launch_virtual_traffic_light_module" default="true" -->
             <!-- arg name="launch_walkway_module" default="true" -->
-            <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="behavior_planning_container" namespace="/planning/scenario_planning/lane_driving/behavior_planning">
+            <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="behavior_planning_container" namespace="/planning/scenario_planning/lane_driving/behavior_planning" output="both">
               <param name="front_overhang" value="1.0"/>
               <param name="left_overhang" value="0.128"/>
               <param name="max_steer_angle" value="0.7"/>
@@ -6074,7 +6074,7 @@
             <!-- arg name="launch_road_user_stop_module" default="true" -->
             <!-- arg name="launch_run_out_module" default="true" -->
             <!-- arg name="motion_velocity_planner_launch_modules" default="[" -->
-            <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="motion_planning_container" namespace="/planning/scenario_planning/lane_driving/motion_planning">
+            <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="motion_planning_container" namespace="/planning/scenario_planning/lane_driving/motion_planning" output="screen">
               <param name="front_overhang" value="1.0"/>
               <param name="left_overhang" value="0.128"/>
               <param name="max_steer_angle" value="0.7"/>
@@ -6810,7 +6810,7 @@
           <!-- arg name="container_type" value="component_container_mt" -->
           <!-- arg name="input_objects_topic_name" default="/perception/object_recognition/objects" -->
           <!-- arg name="input_pointcloud_topic_name" default="/perception/obstacle_segmentation/pointcloud" -->
-          <node_container pkg="rclcpp_components" exec="component_container_mt" name="parking_container" namespace="/planning/scenario_planning/parking">
+          <node_container pkg="rclcpp_components" exec="component_container_mt" name="parking_container" namespace="/planning/scenario_planning/parking" output="screen">
             <param name="front_overhang" value="1.0"/>
             <param name="left_overhang" value="0.128"/>
             <param name="max_steer_angle" value="0.7"/>
@@ -6948,7 +6948,7 @@
         <!-- arg name="planning_validator_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/planning_validator/planning_validator.param.yaml" -->
         <!-- arg name="planning_validator_rear_collision_checker_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/planning_validator/rear_collision_checker.param.yaml" -->
         <!-- arg name="planning_validator_trajectory_checker_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/planning_validator/trajectory_checker.param.yaml" -->
-        <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="planning_validator_container" namespace="/planning">
+        <node_container pkg="agnocast_components" exec="agnocast_component_container_cie" name="planning_validator_container" namespace="/planning" output="both">
           <param name="front_overhang" value="1.0"/>
           <param name="left_overhang" value="0.128"/>
           <param name="max_steer_angle" value="0.7"/>
@@ -7912,7 +7912,7 @@
       <group>
         <!-- source: {workspace}/src/universe/autoware_universe/system/autoware_default_adapi_universe/launch/default_adapi.launch.py -->
         <!-- arg name="config" value="{workspace}/src/universe/autoware_universe/system/autoware_default_adapi_universe/config/default_adapi.param.yaml" -->
-        <node_container pkg="rclcpp_components" exec="component_container_mt" name="container" namespace="/adapi">
+        <node_container pkg="rclcpp_components" exec="component_container_mt" name="container" namespace="/adapi" ros_args="--log-leveladapi.container:=WARN">
           <param name="front_overhang" value="1.0"/>
           <param name="left_overhang" value="0.128"/>
           <param name="max_steer_angle" value="0.7"/>

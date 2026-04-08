@@ -400,17 +400,10 @@ def resolve_file(
     state.include_chain.clear()
     state.package_shares = dict(package_shares)
 
-    # Reset state.tracked
-    state.tracked["packages"] = []
-    state.tracked["includes"] = []
-    state.tracked["declared_args"] = []
-    state.tracked["declared_args_by_file"] = {}
-    state.tracked["global_params"] = []
-    state.tracked["include_args"] = {}
-    state.tracked["param_files"] = []
-    state.tracked["set_launch_configurations"] = {}
-    state.tracked["include_deps"] = []
-    state.tracked["param_file_deps"] = []
+    # Reset dependency tracking
+    state.packages = []
+    state.include_deps = []
+    state.param_file_deps = []
 
     # Workflow flags
     if workflow_options is not None:
@@ -464,7 +457,7 @@ def resolve_file(
                 content = f.read()
         except Exception as e:
             logger.error("cannot read %s: %s", launch_file_str, e)
-            return _tracked_to_parsed_launch_file(state.tracked), []
+            return _tracked_to_parsed_launch_file(state), []
 
         if launch_file_str.endswith((".yaml", ".yml")):
             elements = parse_yaml_launch(content, launch_file_str)
@@ -475,24 +468,24 @@ def resolve_file(
         subst_ctx.launch_file_dir = os.path.dirname(os.path.abspath(launch_file_str))
         subst_ctx.preview_mode = state.preview_mode
         resolved = resolve_xml_elements(elements, subst_ctx, include_stack=[launch_file_str])
-        return _tracked_to_parsed_launch_file(state.tracked), resolved
+        return _tracked_to_parsed_launch_file(state, subst_ctx), resolved
 
     # ── Python launch files ──────────────────────────────────────────────
     spec = importlib.util.spec_from_file_location("_target_launch", launch_file_str)
     if spec is None or spec.loader is None:
         logger.error("cannot load %s", launch_file_str)
-        return _tracked_to_parsed_launch_file(state.tracked), []
+        return _tracked_to_parsed_launch_file(state), []
 
     mod = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(mod)
     except Exception as e:
         logger.error("Error loading launch file: %s", e)
-        return _tracked_to_parsed_launch_file(state.tracked), []
+        return _tracked_to_parsed_launch_file(state), []
 
     if not hasattr(mod, "generate_launch_description"):
         logger.error("No generate_launch_description() function found")
-        return _tracked_to_parsed_launch_file(state.tracked), []
+        return _tracked_to_parsed_launch_file(state), []
 
     # Inject persisted global params
     if "__global_params__" in args_dict:
@@ -512,7 +505,7 @@ def resolve_file(
         ld = mod.generate_launch_description()
     except Exception as e:
         logger.error("generate_launch_description() failed: %s", e)
-        return _tracked_to_parsed_launch_file(state.tracked), []
+        return _tracked_to_parsed_launch_file(state), []
 
     entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
@@ -524,11 +517,11 @@ def resolve_file(
 
     resolved = _GroupAction(actions=list(entities), scoped=False).visit(ctx) or []
 
-    return _tracked_to_parsed_launch_file(state.tracked), resolved
+    return _tracked_to_parsed_launch_file(state, ctx), resolved
 
 
-def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
-    """Build a ParsedLaunchFile from tracked state."""
+def _tracked_to_parsed_launch_file(state: Any, ctx: Any = None) -> Any:
+    """Build a ParsedLaunchFile from resolver state."""
     from roscope.types import (
         DependencyKind as _DependencyKind,
     )
@@ -542,45 +535,36 @@ def _tracked_to_parsed_launch_file(tracked: dict[str, Any]) -> Any:
         ParsedLaunchFile as _ParsedLaunchFile,
     )
 
-    # ── Include deps ────���─────────────────────────────────────────────
-    launch_includes: list[_LaunchInclude] = []
-    include_args_map = tracked.get("include_args", {})
-    for dep in tracked.get("include_deps", []):
-        dep_include_args = dep.get("include_args", {})
-        if not dep_include_args:
-            dep_include_args = include_args_map.get(dep.get("path", ""), {})
-        launch_includes.append(
-            _LaunchInclude(
-                package=dep["package"],
-                share_path=Path(dep["share_path"]),
-                explicit_args=dep_include_args,
-                namespace_stack=[dep["ros_namespace"]] if dep.get("ros_namespace") else [],
-            )
+    # ── Include deps ─────────────────────────────────────────────────
+    launch_includes: list[_LaunchInclude] = [
+        _LaunchInclude(
+            package=dep["package"],
+            share_path=Path(dep["share_path"]),
+            explicit_args=dep.get("include_args", {}),
+            namespace_stack=[dep["ros_namespace"]] if dep.get("ros_namespace") else [],
         )
+        for dep in state.include_deps
+    ]
 
-    # ── Declared args ───────────���─────────────────────────────────────
-    declared_arg_defaults = {a["name"]: a["default"] for a in tracked.get("declared_args", [])}
-
-    # ── Param file deps ────────���──────────────────────────────────────
+    # ── Param file deps ───────────────────────────────────────────────
     param_file_deps = [
         _FileDependency(
             package=dep["package"],
             share_path=Path(dep["share_path"]),
             kind=_DependencyKind.PARAM,
         )
-        for dep in tracked.get("param_file_deps", [])
+        for dep in state.param_file_deps
     ]
 
-    # ── Per-file declared args ────────────────────────────────────────
-    declared_args_by_file: dict[str, dict[str, str]] = {}
-    for key_str, args_list in tracked.get("declared_args_by_file", {}).items():
-        declared_args_by_file[key_str] = {a["name"]: a["default"] for a in args_list}
+    # ── Global params — read from context (single source of truth) ────
+    global_params: list = []
+    if ctx is not None:
+        lc = getattr(ctx, "_launch_configurations", {})
+        global_params = list(lc.get("global_params", []))
 
     return _ParsedLaunchFile(
-        packages=list(tracked.get("packages", [])),
+        packages=list(state.packages),
         launch_includes=launch_includes,
         param_files=param_file_deps,
-        declared_arg_defaults=declared_arg_defaults,
-        declared_args_by_file=declared_args_by_file,
-        global_params=list(tracked.get("global_params", [])),
+        global_params=global_params,
     )

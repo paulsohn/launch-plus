@@ -210,8 +210,7 @@ class Node(Action):
             raw = getattr(self, attr, None)
             if raw is None:
                 return None
-            r = context.perform_substitution(raw)
-            return r if r else str(raw)
+            return context.perform_substitution(raw) or None
 
         resolved = type(self)(package=pkg, executable=exe, name=name or None)
         resolved.ros_namespace = ros_ns
@@ -455,8 +454,7 @@ class ComposableNodeContainer(Action):
             raw = getattr(self, attr, None)
             if raw is None:
                 return None
-            r = context.perform_substitution(raw)
-            return r if r else str(raw)
+            return context.perform_substitution(raw) or None
 
         resolved = ComposableNodeContainer(package=pkg, executable=exe, name=name or None)
         resolved.ros_namespace = ros_ns

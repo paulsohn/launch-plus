@@ -117,32 +117,32 @@ class TestTrackPackage:
     def test_tracks_plain_string(self):
         state = ResolverState()
         state.track_package("my_pkg")
-        assert "my_pkg" in state.tracked["packages"]
+        assert "my_pkg" in state.packages
 
     def test_skips_substitution_object(self):
         state = ResolverState()
         lc = LaunchConfiguration("container_pkg")
         state.track_package(lc)
-        assert "container_pkg" not in state.tracked["packages"]
-        assert len(state.tracked["packages"]) == 0
+        assert "container_pkg" not in state.packages
+        assert len(state.packages) == 0
 
     def test_skips_empty_and_none(self):
         state = ResolverState()
         state.track_package(None)
         state.track_package("")
-        assert len(state.tracked["packages"]) == 0
+        assert len(state.packages) == 0
 
     def test_deduplicates(self):
         state = ResolverState()
         state.track_package("pkg_a")
         state.track_package("pkg_a")
-        assert state.tracked["packages"].count("pkg_a") == 1
+        assert state.packages.count("pkg_a") == 1
 
     def test_skips_list_of_substitutions(self):
         state = ResolverState()
         parts = [LaunchConfiguration("pkg_var"), "_suffix"]
         state.track_package(parts)
-        assert len(state.tracked["packages"]) == 0
+        assert len(state.packages) == 0
 
 
 # ─── perform_substitution / perform_substitutions ────────────────────────────
@@ -216,7 +216,7 @@ class TestNodeDeferredResolution:
         )
         node.execute(ctx)
 
-        assert "actual_package" in ctx._state.tracked["packages"]
+        assert "actual_package" in ctx._state.packages
 
     def test_tracked_node_unresolved_package_returns_empty(self):
         """When the LaunchConfiguration cannot be resolved, node.execute()
@@ -245,14 +245,14 @@ class TestNodeDeferredResolution:
         )
         container.execute(ctx)
 
-        assert "rclcpp_components" in ctx._state.tracked["packages"]
+        assert "rclcpp_components" in ctx._state.packages
 
     def test_plain_string_package_tracked_on_execute(self):
         """When package is a plain string, it should be tracked after execute()."""
         ctx = _make_context()
         node = Node(package="my_real_pkg", executable="exec")
         node.execute(ctx)
-        assert "my_real_pkg" in ctx._state.tracked["packages"]
+        assert "my_real_pkg" in ctx._state.packages
 
 
 # ─── Composable plugin deferred resolution ────────────────────────────────────
@@ -269,7 +269,7 @@ class TestComposablePluginResolution:
         plugins = _resolve_plugins([desc], ctx)
         assert len(plugins) == 1
         assert plugins[0]["package"] == "sensor_driver"
-        assert "sensor_driver" in ctx._state.tracked["packages"]
+        assert "sensor_driver" in ctx._state.packages
 
     def test_composable_node_unresolved_package_not_tracked(self):
         ctx = _make_context({})
@@ -279,7 +279,7 @@ class TestComposablePluginResolution:
         )
         plugins = _resolve_plugins([desc], ctx)
         assert plugins[0]["package"] == "$(var unknown)"  # portable fallback
-        assert "unknown" not in ctx._state.tracked["packages"]
+        assert "unknown" not in ctx._state.packages
 
     def test_composable_node_empty_string_remapping_preserved(self):
         """Remapping resolved to empty string should be preserved, not
@@ -402,12 +402,9 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            gp_before = len(ctx._state.tracked["global_params"])
             _inline_resolve_python_launch(ctx._state, child_path, ctx, {})
 
-            # Global params from inline include are kept
-            assert len(ctx._state.tracked["global_params"]) > gp_before
-            # Context should also have them
+            # Global params are stored in _launch_configurations
             gp_list = ctx._launch_configurations.get("global_params", [])
             assert any(name == "wheel_radius" for name, _ in gp_list)
 
@@ -450,11 +447,11 @@ class TestInlinePythonInclude:
             )
 
             ctx = _make_context({})
-            deps_before = len(ctx._state.tracked["include_deps"])
+            deps_before = len(ctx._state.include_deps)
             _inline_resolve_python_launch(ctx._state, child_path, ctx, {})
 
             # No new include deps
-            assert len(ctx._state.tracked["include_deps"]) == deps_before
+            assert len(ctx._state.include_deps) == deps_before
 
 
 # ─── Environment Variable Stack ──────────────────────────────────────────────
@@ -486,8 +483,7 @@ class TestEnvStack:
         assert name in ctx.environment
         UnsetEnvironmentVariable(name=name).execute(ctx)
         assert name not in ctx.environment
-        errors = ctx._state.tracked.get("errors", [])
-        assert not any(name in e for e in errors)
+        # No errors should be logged for a successful unset
 
     def test_inline_include_env_persists(self):
         """Env set by inline-included child persists (matching official scoped=False)."""
@@ -900,7 +896,7 @@ class TestResolveSubstitutions:
         ctx._state.package_shares["my_pkg"] = "/ws/src/my_pkg"
         result = resolve_substitutions("$(find-pkg-share my_pkg)/config", ctx)
         assert result == "/ws/src/my_pkg/config"
-        assert "my_pkg" in ctx._state.tracked["packages"]
+        assert "my_pkg" in ctx._state.packages
 
     def test_resolve_find_pkg_prefix(self, tmp_path, monkeypatch):
         # Build a fake AMENT index: <prefix>/share/ament_index/resource_index/packages/<pkg>
@@ -912,7 +908,7 @@ class TestResolveSubstitutions:
         ctx = _fresh_subst_ctx(preview_mode=False)
         result = resolve_substitutions("$(find-pkg-prefix my_pkg)/lib", ctx)
         assert result == str(prefix / "lib")
-        assert "my_pkg" in ctx._state.tracked["packages"]
+        assert "my_pkg" in ctx._state.packages
 
     def test_resolve_find_pkg_prefix_preview_errors(self):
         import pytest
@@ -1040,8 +1036,8 @@ class TestResolveSubstitutions:
         ctx._state.package_shares["pkg1"] = "/ws/src/pkg1"
         ctx._state.package_shares["pkg2"] = "/ws/src/pkg2"
         resolve_substitutions("$(find-pkg-share pkg1)/$(find-pkg-share pkg2)", ctx)
-        assert "pkg1" in ctx._state.tracked["packages"]
-        assert "pkg2" in ctx._state.tracked["packages"]
+        assert "pkg1" in ctx._state.packages
+        assert "pkg2" in ctx._state.packages
 
 
 # ─── AST Walker (resolve_xml_elements) ───────────────────────────────────────
@@ -1074,7 +1070,7 @@ def _parse_and_walk(xml_str, ctx=None, **ctx_kwargs):
         ctx = _fresh_walker_ctx(**ctx_kwargs)
     elements = parse_xml_launch(xml_str, "test.launch.xml")
     resolve_xml_elements(elements, ctx)
-    return ctx, ctx._state.tracked
+    return ctx, ctx._state
 
 
 class TestResolveXmlElements:
@@ -1084,8 +1080,8 @@ class TestResolveXmlElements:
 
     def test_simple_node(self):
         xml = '<launch><node pkg="my_pkg" exec="my_node" name="node1"/></launch>'
-        _, tracked = _parse_and_walk(xml)
-        assert "my_pkg" in tracked["packages"]
+        _, state = _parse_and_walk(xml)
+        assert "my_pkg" in state.packages
 
     # ── Arg and Let ──
 
@@ -1096,8 +1092,8 @@ class TestResolveXmlElements:
               <node pkg="$(arg vehicle)_pkg" exec="node" name="n"/>
             </launch>
         """)
-        _, tracked = _parse_and_walk(xml)
-        assert "sample_pkg" in tracked["packages"]
+        _, state = _parse_and_walk(xml)
+        assert "sample_pkg" in state.packages
 
     def test_declared_args_tracked(self):
         xml = textwrap.dedent("""\
@@ -1106,10 +1102,9 @@ class TestResolveXmlElements:
               <arg name="b" default="2"/>
             </launch>
         """)
-        _, tracked = _parse_and_walk(xml)
-        names = [a["name"] for a in tracked["declared_args"]]
-        assert "a" in names
-        assert "b" in names
+        ctx, _ = _parse_and_walk(xml)
+        assert "a" in ctx._state.declared_arg_names
+        assert "b" in ctx._state.declared_arg_names
 
     def test_let_with_condition(self, caplog):
         xml = textwrap.dedent("""\
@@ -1128,8 +1123,9 @@ class TestResolveXmlElements:
 
     def test_set_parameter(self):
         xml = '<launch><set_parameter name="use_sim_time" value="true"/></launch>'
-        _, tracked = _parse_and_walk(xml)
-        assert ["use_sim_time", "true"] in tracked["global_params"]
+        ctx, _ = _parse_and_walk(xml)
+        gp = ctx._launch_configurations.get("global_params", [])
+        assert any(name == "use_sim_time" for name, _ in gp)
 
     # ── Include (with file on disk) ──
 
@@ -1153,8 +1149,8 @@ class TestResolveXmlElements:
                   </include>
                 </launch>
             """
-            _, tracked = _parse_and_walk(main_xml)
-            assert "included_pkg" in tracked["packages"]
+            _, state = _parse_and_walk(main_xml)
+            assert "included_pkg" in state.packages
 
     def test_include_tracks_include_args(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1170,8 +1166,9 @@ class TestResolveXmlElements:
                   </include>
                 </launch>
             """
-            _, tracked = _parse_and_walk(main_xml)
-            assert tracked["include_args"][child_path] == {"x": "42"}
+            ctx, _ = _parse_and_walk(main_xml)
+            # The explicitly-passed arg is applied to the shared context
+            assert ctx._launch_configurations.get("x") == "42"
 
     def test_circular_include_detected(self, caplog):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1230,11 +1227,11 @@ class TestResolveXmlElements:
 
 
 def _parse_to_tracked(xml_str, **ctx_kwargs):
-    """Parse XML string, resolve via action registry, return _tracked."""
+    """Parse XML string, resolve via action registry, return (ctx, _tracked)."""
     ctx = _fresh_walker_ctx(**ctx_kwargs)
     elements = parse_xml_launch(xml_str, "test.launch.xml")
     resolve_xml_elements(elements, ctx)
-    return ctx._state.tracked
+    return ctx, ctx._state
 
 
 class TestActionRegistry:
@@ -1247,15 +1244,16 @@ class TestActionRegistry:
               <arg name="y" default="2"/>
             </launch>
         """)
-        tracked = _parse_to_tracked(xml)
-        assert len(tracked["declared_args"]) == 2
-        assert tracked["declared_args"][0]["name"] == "x"
-        assert tracked["declared_args"][1]["default"] == "2"
+        ctx, _ = _parse_to_tracked(xml)
+        assert "x" in ctx._state.declared_arg_names
+        assert "y" in ctx._state.declared_arg_names
+        assert ctx._launch_configurations.get("x") == "1"
+        assert ctx._launch_configurations.get("y") == "2"
 
     def test_packages_tracked(self):
         xml = '<launch><node pkg="my_pkg" exec="e" name="n"/></launch>'
-        tracked = _parse_to_tracked(xml)
-        assert "my_pkg" in tracked["packages"]
+        _, state = _parse_to_tracked(xml)
+        assert "my_pkg" in state.packages
 
     def test_errors_and_warnings(self, caplog):
         xml = textwrap.dedent("""\
@@ -1377,7 +1375,7 @@ def _parse_yaml_and_walk(yaml_str, ctx=None, **ctx_kwargs):
         ctx = _fresh_walker_ctx(**ctx_kwargs)
     elements = parse_yaml_launch(yaml_str, "test.launch.yaml")
     resolve_xml_elements(elements, ctx)
-    return ctx, ctx._state.tracked
+    return ctx, ctx._state
 
 
 class TestResolveYamlElements:
@@ -1391,8 +1389,8 @@ class TestResolveYamlElements:
                   exec: my_exec
                   name: my_node
         """)
-        _, tracked = _parse_yaml_and_walk(yaml)
-        assert "my_pkg" in tracked["packages"]
+        _, state = _parse_yaml_and_walk(yaml)
+        assert "my_pkg" in state.packages
 
     def test_arg_and_let(self):
         yaml = textwrap.dedent("""\
@@ -1405,8 +1403,8 @@ class TestResolveYamlElements:
                   exec: node
                   name: n
         """)
-        _, tracked = _parse_yaml_and_walk(yaml)
-        assert "sample_pkg" in tracked["packages"]
+        _, state = _parse_yaml_and_walk(yaml)
+        assert "sample_pkg" in state.packages
 
     def test_set_parameter(self):
         yaml = textwrap.dedent("""\
@@ -1415,8 +1413,9 @@ class TestResolveYamlElements:
                   name: use_sim_time
                   value: "true"
         """)
-        _, tracked = _parse_yaml_and_walk(yaml)
-        assert ["use_sim_time", "true"] in tracked["global_params"]
+        ctx, _ = _parse_yaml_and_walk(yaml)
+        gp = ctx._launch_configurations.get("global_params", [])
+        assert any(name == "use_sim_time" for name, _ in gp)
 
     def test_push_ros_namespace(self):
         yaml = textwrap.dedent("""\
@@ -1428,8 +1427,8 @@ class TestResolveYamlElements:
                   exec: e
                   name: n
         """)
-        _, tracked = _parse_yaml_and_walk(yaml)
-        assert "p" in tracked["packages"]
+        _, state = _parse_yaml_and_walk(yaml)
+        assert "p" in state.packages
 
     def test_declared_args_tracked(self):
         yaml = textwrap.dedent("""\
@@ -1441,10 +1440,9 @@ class TestResolveYamlElements:
                   name: b
                   default: "2"
         """)
-        _, tracked = _parse_yaml_and_walk(yaml)
-        names = [a["name"] for a in tracked["declared_args"]]
-        assert "a" in names
-        assert "b" in names
+        ctx, _ = _parse_yaml_and_walk(yaml)
+        assert "a" in ctx._state.declared_arg_names
+        assert "b" in ctx._state.declared_arg_names
 
     def test_executable(self):
         yaml = textwrap.dedent("""\
@@ -1453,15 +1451,15 @@ class TestResolveYamlElements:
                   cmd: ls -l
                   name: my_ls
         """)
-        ctx, tracked = _parse_yaml_and_walk(yaml)
+        ctx, state = _parse_yaml_and_walk(yaml)
         # resolve_xml_elements should not raise; executable is processed
         assert ctx is not None
 
     def test_missing_launch_key_returns_empty(self):
         yaml = "foo: bar"
-        _, tracked = _parse_yaml_and_walk(yaml)
+        _, state = _parse_yaml_and_walk(yaml)
         # No elements to walk — packages remain empty
-        assert not tracked["packages"]
+        assert not state.packages
 
 
 class TestTrackedFindPackageShare:

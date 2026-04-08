@@ -27,8 +27,11 @@ class ResolverState:
     """
 
     __slots__ = (
-        "tracked",
+        "packages",
+        "include_deps",
+        "param_file_deps",
         "declared_arg_names",
+        "declared_arg_names_by_file",
         "include_chain",
         "inline_params",
         "package_shares",
@@ -49,19 +52,11 @@ class ResolverState:
 
     def reset(self) -> None:
         """Reset all state to initial values."""
-        self.tracked: dict[str, Any] = {
-            "packages": [],
-            "includes": [],
-            "declared_args": [],
-            "declared_args_by_file": {},
-            "global_params": [],
-            "include_args": {},
-            "param_files": [],
-            "set_launch_configurations": {},
-            "include_deps": [],
-            "param_file_deps": [],
-        }
+        self.packages: list[str] = []
+        self.include_deps: list[dict] = []
+        self.param_file_deps: list[dict] = []
         self.declared_arg_names: set = set()
+        self.declared_arg_names_by_file: dict[str, dict] = {}
         self.include_chain: list = []
         self.inline_params: bool = False
         self.package_shares: dict = {}
@@ -90,8 +85,8 @@ class ResolverState:
         if isinstance(pkg, (list, tuple)) and any(isinstance(i, Substitution) for i in pkg):
             return
         pkg = str(pkg)
-        if pkg and pkg not in self.tracked["packages"]:
-            self.tracked["packages"].append(pkg)
+        if pkg and pkg not in self.packages:
+            self.packages.append(pkg)
 
     def current_source_key(self) -> str:
         """Return the source key (file path) for the current file being resolved."""
@@ -106,8 +101,6 @@ class ResolverState:
         if not path:
             return -1
         path = str(path)
-        if path not in self.tracked["includes"]:
-            self.tracked["includes"].append(path)
         dep = _extract_pkg_and_share_path(path)
         if dep:
             entry = {
@@ -117,9 +110,9 @@ class ResolverState:
                 "ros_namespace": ros_namespace,
                 "include_args": {},
             }
-            self.tracked["include_deps"].append(entry)
-        for i in range(len(self.tracked["include_deps"]) - 1, -1, -1):
-            if self.tracked["include_deps"][i].get("path") == path:
+            self.include_deps.append(entry)
+        for i in range(len(self.include_deps) - 1, -1, -1):
+            if self.include_deps[i].get("path") == path:
                 return i
         return -1
 
@@ -130,24 +123,11 @@ class ResolverState:
         if not path:
             return
         path = str(path)
-        if path not in self.tracked["param_files"]:
-            self.tracked["param_files"].append(path)
         dep = _extract_pkg_and_share_path(path)
         if dep:
             entry = {"package": dep[0], "share_path": dep[1]}
-            if entry not in self.tracked["param_file_deps"]:
-                self.tracked["param_file_deps"].append(entry)
-
-    def record_declared_arg(self, name: str, default: str, *, flat: bool = True) -> None:
-        """Record a declared arg in the per-file dict and optionally the flat list."""
-        if flat:
-            self.tracked["declared_args"].append({"name": name, "default": default})
-        key = self.current_source_key()
-        if key:
-            by_file = self.tracked["declared_args_by_file"]
-            if key not in by_file:
-                by_file[key] = []
-            by_file[key].append({"name": name, "default": default})
+            if entry not in self.param_file_deps:
+                self.param_file_deps.append(entry)
 
     # ─── Package resolution ───────────────────────────────────────────────
 

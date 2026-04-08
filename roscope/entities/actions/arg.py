@@ -58,45 +58,47 @@ class DeclareLaunchArgument(Action):
         if not name:
             return None
 
+        state = context._state
+
         if self._fixed_value is not None:
             # <arg name="x" value="v"/> — fixed value, set immediately
             resolved = resolve_value(self._fixed_value, context) or ""
             context._launch_configurations[name] = resolved
-            _record_and_track(name, resolved, context)
+            _track_arg_default(name, resolved, state)
             return None
+
+        # Resolve the declared default for --show-args display regardless of whether
+        # the arg is already set in context. This matches old behavior: show the
+        # declared default, not whatever value may have been set later by <let> etc.
+        declared_default = ""
+        if self.default_value is not None:
+            declared_default = resolve_value(self.default_value, context) or ""
 
         # Matching official DeclareLaunchArgument.execute():
         # if already set (passed by parent include), leave unchanged.
-        # For --show-args display, record the declared default (not the passed value);
-        # the passed value already appears in the include args comment from _wrap_with_markers.
         if name in context._launch_configurations:
-            dv = self.default_value
-            display = resolve_value(dv, context) or "" if dv is not None else ""
-            _record_and_track(name, display, context)
+            _track_arg_default(name, declared_default, state)
             return None
 
         # Not set — apply default immediately (matching official: no deferred resolution).
         if self.default_value is None:
-            # No default and not set: at runtime this would raise; for static analysis
-            # record as empty so --show-args can report the argument.
-            _record_and_track(name, "", context)
+            # No default and not set: at runtime this raises InvalidLaunchArgument.
+            logger.error("arg '%s' is required but not set", name)
+            _track_arg_default(name, "", state)
             return None
 
-        resolved = resolve_value(self.default_value, context) or ""
-        context._launch_configurations[name] = resolved
-        _record_and_track(name, resolved, context)
+        context._launch_configurations[name] = declared_default
+        _track_arg_default(name, declared_default, state)
         return None
 
 
-def _record_and_track(name: str, resolved: str, context=None) -> None:
-    """Record a declared arg in tracked state."""
-    if not name:
-        return
-    state = context._state
-    already_seen = name in state.declared_arg_names
-    if not already_seen:
-        state.declared_arg_names.add(name)
-    state.record_declared_arg(name, resolved, flat=not already_seen)
+def _track_arg_default(name: str, default: str, state) -> None:
+    """Record a declared arg name and its resolved default in global and per-file dicts."""
+    state.declared_arg_names.add(name)
+    key = state.current_source_key()
+    if key:
+        # setdefault preserves the first-seen default value for repeated declarations.
+        state.declared_arg_names_by_file.setdefault(key, {}).setdefault(name, default)
 
 
 def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
@@ -123,19 +125,21 @@ def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
                 e,
             )
 
+    declared_default = ""
+    if arg.default_value is not None:
+        declared_default = resolve_value(arg.default_value, context) or ""
+
     if arg.default_value is None:
-        _record_and_track(arg.name, "", context)
+        if arg.name not in context._launch_configurations:
+            logger.error("arg '%s' is required but not set", arg.name)
+        _track_arg_default(arg.name, "", context._state)
         return
 
     already_set = context is not None and arg.name in context._launch_configurations
     if already_set:
-        # Record the declared default for --show-args display (same as execute()).
-        dv = arg.default_value
-        display = resolve_value(dv, context) or "" if dv is not None else ""
-        _record_and_track(arg.name, display, context)
+        _track_arg_default(arg.name, declared_default, context._state)
         return
 
     # Apply default immediately — matching official DeclareLaunchArgument.execute()
-    resolved = resolve_value(arg.default_value, context) or ""
-    context._launch_configurations[arg.name] = resolved
-    _record_and_track(arg.name, resolved, context)
+    context._launch_configurations[arg.name] = declared_default
+    _track_arg_default(arg.name, declared_default, context._state)

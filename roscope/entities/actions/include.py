@@ -93,8 +93,17 @@ class IncludeLaunchDescription(Action):
             context, self.include_stack, file_path, file_path, child_args
         )
 
+        # Collect args declared in the immediate child file (not transitive includes)
+        # that were not explicitly passed — use the stored declared default, not the
+        # current _launch_configurations value (which may have been overwritten by <let>
+        # or inherited from a different context).
+        child_declared_defaults: dict[str, str] = {}
+        for name, declared_default in state.declared_arg_names_by_file.get(file_path, {}).items():
+            if name not in child_args:
+                child_declared_defaults[name] = declared_default
+
         # Step 8: Wrap with markers
-        return _wrap_with_markers(children, file_path, child_args, state)
+        return _wrap_with_markers(children, file_path, child_args, child_declared_defaults, state)
 
     def _resolve_file_path(self, context) -> str | None:
         """Resolve the file path from tokens (XML) or source object (Python shim)."""
@@ -139,19 +148,23 @@ class IncludeLaunchDescription(Action):
                 resolved = context.perform_substitution(v)
                 child_args[k_str] = resolved if resolved is not None else str(v)
 
-        # Record args for --show-args
+        # Record args for dependency tracking
         if dep_idx >= 0 and child_args:
-            state.tracked["include_deps"][dep_idx]["include_args"] = child_args
-        if child_args:
-            state.tracked["include_args"][file_path] = child_args
+            state.include_deps[dep_idx]["include_args"] = child_args
 
         return child_args
 
 
-def _wrap_with_markers(children, file_path, args, state) -> list:
+def _wrap_with_markers(
+    children, file_path, args, child_declared_defaults: dict[str, str], state
+) -> list:
     """Wrap resolved children in a GroupAction with SourceMarker as first child.
 
     The GroupAction holds [SourceMarker, ArgComment..., ...children].
+
+    ``args`` — explicitly passed include arguments (name → resolved value).
+    ``child_declared_defaults`` — args declared in the child with defaults but not
+    explicitly passed (name → resolved default value from _launch_configurations).
     """
     has_content = any(not isinstance(c, SourceMarker) for c in children)
     if has_content or state.show_empty_includes:
@@ -159,13 +172,11 @@ def _wrap_with_markers(children, file_path, args, state) -> list:
 
         # Conditionally add arg markers (--show-args)
         if state.show_args:
-            declared = state.tracked.get("declared_args_by_file", {}).get(file_path, [])
             merged: dict[str, tuple[str, bool]] = {}
-            for name, value in sorted(args.items()):
+            for name, value in args.items():
                 merged[name] = (value, False)
-            for entry in declared:
-                if entry["name"] not in merged:
-                    merged[entry["name"]] = (entry["default"], True)
+            for name, value in child_declared_defaults.items():
+                merged.setdefault(name, (value, True))
             group_children.extend(
                 ArgComment(name=k, value=v, is_default=is_def)
                 for k, (v, is_def) in sorted(merged.items())

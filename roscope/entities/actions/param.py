@@ -38,10 +38,9 @@ class SetLaunchConfiguration(Action):
             return None
         value = resolve_value(self._value, context)
         resolved_value = str(value) if value is not None else ""
-        # Set _launch_configurations (single source of truth)
+        # Set _launch_configurations — single source of truth for $(var name)
         if context is not None and hasattr(context, "_launch_configurations"):
             context._launch_configurations[name] = resolved_value
-        context._state.tracked["set_launch_configurations"][name] = resolved_value
         return None
 
 
@@ -79,5 +78,4 @@ class SetParameter(Action):
         # Matching official SetParameter: write to launch_configurations['global_params']
         gp_list = context._launch_configurations.setdefault("global_params", [])
         gp_list.append((name, value))
-        context._state.tracked["global_params"].append([name, value])
         return None

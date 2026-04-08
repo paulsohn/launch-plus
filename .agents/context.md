@@ -219,10 +219,3 @@ roscope/
 | `run` | Yes | Yes | No | Yes | Running system |
 
 *Fetch required if lockfile not available or launch file not yet fetched.
-
-## Terminology
-
-### Verbose Flag
-
-Flags that enable non-default resolver behaviour that would otherwise discourage users from
-leaving upstream launch files as-is.  Example: `--apply-launch-arg-defaults`.

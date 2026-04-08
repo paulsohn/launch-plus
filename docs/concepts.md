@@ -245,7 +245,7 @@ Here is what the resolver can and cannot verify.
   fetchable from the lockfile)
 - **Argument completeness** — every `$(var name)` / `$(arg name)` reference must
   have a corresponding `<arg name="...">` declaration or be supplied on the
-  command line (in strict mode without `--apply-launch-arg-defaults`)
+  command line
 - **Argument forwarding** — arguments used in an included file must be
   explicitly forwarded via `<arg name="..." value="..."/>` in the `<include>`
   tag

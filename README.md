@@ -103,7 +103,6 @@ roscope resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   "map_path:={map_path}" \
-  --apply-launch-arg-defaults \
   --show-args \
   --inline-params \
   --rosdep \
@@ -126,7 +125,6 @@ roscope build -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   "map_path:={map_path}" \
-  --apply-launch-arg-defaults \
   --rosdep \
   --colcon-flagfile colcon-flags.txt
 ```

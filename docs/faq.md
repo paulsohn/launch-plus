@@ -101,13 +101,6 @@ the fastest way to see the full launch graph.
 Without `--preview`, all packages are resolved via `AMENT_PREFIX_PATH`
 (installed packages).  Both modes use real filesystem paths.
 
-### Why do some flags have such long names?
-
-Flags like `--apply-launch-arg-defaults` are intentionally verbose.  They enable
-behaviors that work around common anti-patterns in legacy launch files (reliance
-on defaults).  The verbose names encourage fixing the root cause in the launch
-files rather than permanently depending on the workaround.
-
 ### What happens with OpaqueFunction?
 
 `OpaqueFunction` is a ROS 2 launch construct that wraps an arbitrary Python

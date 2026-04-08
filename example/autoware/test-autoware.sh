@@ -2,12 +2,14 @@
 # Integration test for roscope against the Autoware example.
 #
 # Usage:
-#   bash test-autoware.sh        # default: verify SHA + clean tree, error if wrong
-#   bash test-autoware.sh -c     # test --clean: reset repos to lockfile SHAs (stash dirty)
-#   bash test-autoware.sh -d     # test --dirty: use whatever is on disk
+#   bash test-autoware.sh [options]
 #
-# The -c/-d flags only select which roscope workspace mode to test;
-# they do NOT perform any extra cleanup themselves.
+# Options:
+#   -c          test --clean mode (reset repos to lockfile SHAs)
+#   -d          test --dirty mode (use whatever is on disk)
+#               (default: verify SHA + clean tree, error if mismatch)
+#   --isolated  colcon install layout: isolated (default, matches --symlink-install)
+#   --merge     colcon install layout: merge (--merge-install)
 #
 # Requires:
 #   - roscope on PATH (pip install -e . from repo root)
@@ -18,15 +20,25 @@ set -euo pipefail
 
 # ── Parse arguments ──────────────────────────────────────────────────────────
 
-MODE_FLAG="${1:-}"  # empty string if no argument given
+MODE_FLAG=""
+INSTALL_LAYOUT="isolated"
 
-if [[ $# -gt 1 ]] || [[ -n "$MODE_FLAG" && "$MODE_FLAG" != "-c" && "$MODE_FLAG" != "-d" ]]; then
-    echo "Usage: $0 [-c | -d]"
-    echo "  (none)  default (verify SHA + clean tree, error if mismatch)"
-    echo "  -c      test --clean mode (reset repos to lockfile SHAs)"
-    echo "  -d      test --dirty mode (use whatever is on disk)"
-    exit 1
-fi
+for arg in "$@"; do
+    case "$arg" in
+        -c) MODE_FLAG="-c" ;;
+        -d) MODE_FLAG="-d" ;;
+        --isolated) INSTALL_LAYOUT="isolated" ;;
+        --merge)    INSTALL_LAYOUT="merge" ;;
+        *)
+            echo "Usage: $0 [-c | -d] [--isolated | --merge]"
+            echo "  -c          test --clean mode"
+            echo "  -d          test --dirty mode"
+            echo "  --isolated  isolated install layout (default)"
+            echo "  --merge     merge install layout"
+            exit 1
+            ;;
+    esac
+done
 
 if [[ "$MODE_FLAG" == "-c" ]]; then
     MODE="--clean"
@@ -48,8 +60,9 @@ else
     exit 1
 fi
 
-echo "Using: $LP"
-echo "Mode:  ${MODE:-default (verify)}"
+echo "Using:  $LP"
+echo "Mode:   ${MODE:-default (verify)}"
+echo "Layout: $INSTALL_LAYOUT"
 echo
 
 # Build the mode argument array (empty in default mode).
@@ -73,7 +86,6 @@ LAUNCH_ARGS=(
 
 # Resolver behavior flags (shared between resolve and build)
 COMMON_FLAGS=(
-    --apply-launch-arg-defaults
     --rosdep
 )
 
@@ -125,16 +137,26 @@ $LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAG
 echo "    OK (postbuild.xml)"
 echo
 
-# ── Step 5: Compare preview vs postbuild ─────────────────────────────────────
-# Diff preview (source paths) vs postbuild (install paths).
-# Lines containing "PREVIEW:" or "xacro" are expected to differ (path-dependent).
+# ── Step 5: Normalize preview paths ──────────────────────────────────────────
+# Replace source paths with their colcon install equivalents so that
+# preview_normalized.xml can be compared directly against postbuild.xml.
+# Use --layout=isolated to match --symlink-install (isolated layout).
 
-echo "==> Step 5: Compare preview vs postbuild"
+echo "==> Step 5: Normalize preview source paths"
+python3 normalize-preview.py \
+    --lockfile manifest.lock.repos \
+    --workspace "$SCRIPT_DIR" \
+    --layout "$INSTALL_LAYOUT" \
+    preview_raw.xml > preview_normalized.xml
+echo "    OK (preview_normalized.xml)"
+echo
 
-UNEXPECTED=$(diff preview_raw.xml postbuild.xml \
+# ── Step 6: Compare normalized preview vs postbuild ───────────────────────────
+
+echo "==> Step 6: Compare normalized preview vs postbuild"
+
+UNEXPECTED=$(diff preview_normalized.xml postbuild.xml \
     | grep "^[<>]" \
-    | grep -v "PREVIEW:" \
-    | grep -v "xacro" \
     | grep -v "<!-- source:" \
     | grep -v "<!-- params from:" \
     | grep -v "<!-- end params from:" \
@@ -143,10 +165,18 @@ UNEXPECTED=$(diff preview_raw.xml postbuild.xml \
 if [[ -z "$UNEXPECTED" ]]; then
     echo "    OK (no unexpected differences)"
 else
-    echo "    FAIL: unexpected differences between preview and postbuild:"
-    echo "$UNEXPECTED" | head -20
+    echo "    FAIL: unexpected differences between normalized preview and postbuild:"
+    diff preview_normalized.xml postbuild.xml \
+        | grep "^[<>]" \
+        | grep -v "<!-- source:" \
+        | grep -v "<!-- params from:" \
+        | grep -v "<!-- end params from:" \
+        | head -20
     exit 1
 fi
 
 echo
 echo "All steps passed."
+
+# ── Cleanup temp files ────────────────────────────────────────────────────────
+rm -f preview_raw.xml preview_normalized.xml postbuild.xml

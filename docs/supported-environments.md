@@ -6,8 +6,8 @@
 |---|---|---|
 | Ubuntu 22.04 (x86_64) | Supported | Primary development platform |
 | Ubuntu 24.04 (x86_64) | Supported | |
-| Ubuntu 22.04 (aarch64) | Planned | Cross-compilation via `cross` |
-| Ubuntu 24.04 (aarch64) | Planned | Cross-compilation via `cross` |
+| Ubuntu 22.04 (aarch64) | Planned | |
+| Ubuntu 24.04 (aarch64) | Planned | |
 | macOS | Not supported | No `apt-get`; rosdep/colcon untested |
 | Windows | Not supported | Git sparse-checkout paths untested |
 
@@ -23,13 +23,7 @@ A sourced ROS 2 environment is expected.  While the resolver does not link again
 any ROS 2 libraries, it relies on `AMENT_PREFIX_PATH` to locate installed ROS
 packages (e.g. buildfarm packages like `rosbridge_server` or `tf2_ros`).  Source
 your ROS 2 setup file (`source /opt/ros/<distro>/setup.bash`) before running
-launch-plus.
-
-## Rust toolchain
-
-- **Minimum supported Rust version (MSRV):** 1.85
-- **Edition:** 2024
-- Install via [rustup.rs](https://rustup.rs)
+roscope.
 
 ## Python
 
@@ -42,7 +36,7 @@ launch-plus.
 
 ## External executables
 
-launch-plus shells out to several external tools.  Not all are required for every
+roscope shells out to several external tools.  Not all are required for every
 command — the table below shows which tools are needed and when.
 
 | Executable | Required for | Notes |
@@ -82,7 +76,7 @@ Supported via shimmed imports.  Standard patterns work:
   `AnyLaunchDescriptionSource`
 - `DeclareLaunchArgument`, `LaunchConfiguration`
 - `GroupAction`, `PushROSNamespace`
-- `OpaqueFunction` (with `--apply-opaque-file-access`)
+- `OpaqueFunction`
 - `FindPackageShare`, `PathJoinSubstitution`
 - Conditions: `IfCondition`, `UnlessCondition`, `LaunchConfigurationEquals`
 - Event handlers: `OnProcessExit`, `OnProcessStart`, etc.
@@ -102,15 +96,14 @@ are captured by the shims and appear as static elements in the resolved XML
 
 ### YAML launch files (`*.launch.yaml`)
 
-Not yet supported.  XML and Python cover the vast majority of ROS 2 launch
-files in practice.
+Supported via the YAML parser.
 
 ### Xacro (`*.xacro`, `*.urdf.xacro`)
 
 **Not supported.**  Xacro files are not launch files — they are XML macro
 templates for URDF/SDF robot descriptions.  When an XML launch file references
 xacro (e.g. via a `$(xacro ...)` substitution), the xacro call is preserved
-in the resolved output but not executed by launch-plus — the actual xacro
+in the resolved output but not executed by roscope — the actual xacro
 expansion happens at runtime when the system is launched.
 
 Python-side xacro calls (e.g. `xacro.process_file()` in an OpaqueFunction)
@@ -119,23 +112,56 @@ through the resolver's shimmed imports.
 
 ## Known limitations
 
+### `get_package_share_directory()` in preview mode
+
+`get_package_share_directory()` (from `ament_index_python`) looks up installed
+packages via `AMENT_PREFIX_PATH`.  In **preview mode** (`--preview`), source
+packages have not been built or installed yet, so the call will fail with a
+`PackageNotFoundError` for any package that exists only in the source tree.
+
+**Recommended replacement:** use the `FindPackageShare` substitution instead.
+`FindPackageShare` is resolved by roscope itself: in preview mode it points
+to the package's source directory (when the package is present in the lockfile
+source tree); after a build it points to the install directory.
+
+```python
+# Instead of:
+from ament_index_python.packages import get_package_share_directory
+pkg_share = get_package_share_directory("my_pkg")
+
+# Use:
+from launch.substitutions import FindPackageShare, PathJoinSubstitution
+pkg_share = FindPackageShare("my_pkg")
+config = PathJoinSubstitution([pkg_share, "config", "params.yaml"])
+```
+
+If a string path is required (e.g. to pass into a Python function that does not
+accept substitutions), wrap the lookup in an `OpaqueFunction` and call
+`get_package_share_directory()` there — `OpaqueFunction` bodies run after the
+environment is resolved, so installed packages are available.
+
+**Source/install path assumption:** roscope assumes that any resource file
+referenced by path in a launch file (launcher files, parameter files, etc.) is
+present at the **same relative path within the package share directory** in both
+the source tree and the install tree, and that the file contents are identical.
+This is the standard ROS 2 convention (resources are installed via CMake
+`install(DIRECTORY ...)` rules).  Resources that are generated or transformed
+during the build (e.g. files processed by `configure_file`) may not satisfy
+this assumption.
+
 ### OpaqueFunction constraints
 
-`OpaqueFunction` bodies are executed, not analyzed.  They work correctly when:
-- File reads use standard patterns (`open()`, `yaml.safe_load()`)
-- Package paths use `FindPackageShare` or `get_package_share_directory()`
-
-They may fail when:
+`OpaqueFunction` bodies are executed directly, not just analyzed.  They may fail when:
 - The function performs network I/O or other side effects
 - The function imports non-standard packages not available on the resolver host
 - The function modifies global state that affects other launch actions
+- The function calls `get_package_share_directory()` in preview mode (see above)
 
 ### stdout in Python launch files
 
 Any `print()` output in Python launch files (including inside `OpaqueFunction`
-bodies) is redirected to stderr.  This is because the Python resolver
-communicates with Rust via JSON on stdout — any extraneous output would corrupt
-the protocol.
+bodies) is redirected to stderr.  This is because the resolver writes resolved
+XML to stdout — any extraneous output would corrupt the result.
 
 ### Conditional dependencies (REP-149)
 
@@ -152,7 +178,7 @@ resolving a Humble launch file on a Jazzy host) is not supported.
 
 ## Assumptions
 
-- **vcstool `.repos` format** — launch-plus reads standard `.repos` files.
+- **vcstool `.repos` format** — roscope reads standard `.repos` files.
   Other manifest formats (rosinstall, wstool) are not supported.
 - **Standard package layout** — packages must have a `package.xml` at their root.
   Non-standard layouts (e.g. nested packages without a top-level `package.xml`)

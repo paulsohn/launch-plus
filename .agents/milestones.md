@@ -2,7 +2,7 @@
 
 ## Vision
 
-launch-plus is a Bazel-like build and run system for ROS 2 that enables:
+roscope is a Bazel-like build and run system for ROS 2 that enables:
 - **Static analysis** of launch file dependency graphs without executing them
 - **Selective building** — only compile the packages referenced by a launch target
 - **On-demand fetching** — sparse-checkout packages from git as they are needed
@@ -42,8 +42,9 @@ process env vars are never copied or exposed.  `<unset_env>` is only
 accepted for override-only vars not in process env; otherwise it errors.
 Net-zero check reports an error for overrides leaked from file scope.
 
-Preview mode emits portable `$(find-pkg-share ...)` tokens; non-preview mode
-resolves to actual AMENT install paths.
+Preview mode resolves `FindPackageShare` to source workspace paths for
+lockfile packages (falling back to AMENT for others); non-preview mode
+resolves all packages via AMENT install paths.
 
 ### Locator
 Package location from three sources: lockfile (source workspace), AMENT prefix

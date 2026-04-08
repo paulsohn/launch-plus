@@ -1,12 +1,12 @@
-"""Tests for launch_plus.locator — ported from locator.rs Rust tests."""
+"""Tests for roscope.locator — ported from locator.rs Rust tests."""
 
 from __future__ import annotations
 
 import tempfile
 from pathlib import Path
 
-from launch_plus.locator import PackageLocator
-from launch_plus.types import Lockfile, PackageLock, RepoLock
+from roscope.locator import PackageLocator
+from roscope.types import Lockfile, PackageLock, RepoLock
 
 
 def _mock_lockfile() -> Lockfile:

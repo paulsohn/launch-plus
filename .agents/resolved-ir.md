@@ -1,10 +1,10 @@
-# Resolved IR Specification
+# Resolved Output Specification
 
 ## Overview
 
-The launch resolver takes an **input launch description** (Python, XML, or YAML) containing control flow, substitutions, and nesting, and produces a **Resolved IR** — a flat list of concrete, declarative actions with no remaining control flow or unresolved substitutions.
+The launch resolver takes an **input launch description** (Python, XML, or YAML) containing control flow, substitutions, and nesting, and produces a **list of resolved action objects**. The renderer converts these actions into human-readable XML via `serialize_resolved()`.
 
-This document defines both the input grammar (what actions exist) and the output IR (what the resolver produces) using an inductive BNF-style definition.
+There is no intermediate dict IR. Actions are the resolved representation.
 
 ---
 
@@ -21,95 +21,66 @@ LaunchDescription  ::= Action*
 
 Action             ::= ControlFlow | Process | Env | Config | Event | Meta
 
-ControlFlow        ::= DeclareLaunchArgument      (* arg name, default?, description?, choices? *)
+ ControlFlow        ::= DeclareLaunchArgument      (* arg name, default?, description?, choices? *)
                       | SetLaunchConfiguration     (* let: name, value *)
                       | UnsetLaunchConfiguration   (* name *)
                       | GroupAction                (* scoped?, forwarding?, children: Action* *)
                       | IncludeLaunchDescription   (* file, launch_arguments *)
                       | OpaqueFunction             (* python callable → Action* *)
-                      | OpaqueCoroutine            (* async callable → Future *)
-                      | ForEach                    (* items, callback → Action* per iteration *)
-                      | TimerAction                (* period, children: Action* *)
-                      | Shutdown                   (* reason? *)
 
-Process            ::= ExecuteLocal                (* process_description, shell?, on_exit?, respawn?, ... *)
-                      | ExecuteProcess             (* cmd, name?, cwd?, output?, ... *)
+Process            ::= ExecuteProcess             (* cmd, name?, cwd?, output?, ... *)
 
 Env                ::= SetEnvironmentVariable      (* name, value *)
                       | UnsetEnvironmentVariable   (* name *)
-                      | AppendEnvironmentVariable  (* name, value, prepend?, separator? *)
-                      | PushEnvironment            (* snapshot current env *)
-                      | PopEnvironment             (* restore env from stack *)
-                      | ResetEnvironment           (* reset to initial env *)
-                      | ReplaceEnvironmentVariables (* replace all env with new dict *)
 
-Config             ::= PushLaunchConfigurations    (* snapshot current configs *)
-                      | PopLaunchConfigurations    (* restore configs from stack *)
-                      | ResetLaunchConfigurations  (* clear or selectively reset configs *)
-                      | Log                        (* message, level *)
-                      | LogInfo | LogWarning | LogDebug | LogError  (* message *)
+Config             ::= Log                        (* message, level *)
 
 Event              ::= EmitEvent                   (* event object *)
                       | RegisterEventHandler       (* event_handler *)
-                      | UnregisterEventHandler     (* event_handler *)
 ```
 
 ### 1.2 ROS-Specific Grammar
 
 ```
-ROSAction          ::= ROSProcess | ROSConfig | ROSNamespace | ROSTimer
+ROSAction          ::= ROSProcess | ROSConfig | ROSNamespace
 
 ROSProcess         ::= Node                        (* pkg, exec, name?, namespace?, params, remaps, envs *)
                       | LifecycleNode              (* + autostart? *)
                       | ComposableNodeContainer    (* + composable_nodes: ComposableNode* *)
                       | LoadComposableNodes        (* target, composable_nodes: ComposableNode* *)
-                      | LifecycleTransition        (* lifecycle_node_names, transition_ids *)
 
 ComposableNode     ::= ComposableNode              (* pkg, plugin, name?, namespace?, params, remaps *)
-                      | ComposableLifecycleNode    (* + autostart? *)
 
 ROSConfig          ::= SetParameter               (* name, value *)
                       | SetParametersFromFile      (* filename *)
                       | SetRemap                   (* from, to *)
-                      | SetUseSimTime              (* value *)
-                      | SetROSLogDir               (* new_log_dir *)
 
 ROSNamespace       ::= PushROSNamespace            (* namespace *)
-
-ROSTimer           ::= ROSTimer                    (* period, children: Action* *)
 ```
 
 ### 1.3 Substitutions
 
-Substitutions appear in attribute values and are resolved during the walk.
+Substitutions appear in attribute values and are resolved eagerly at `execute()` time.
 
 ```
 Substitution       ::= TextSubstitution            (* literal string *)
                       | LaunchConfiguration        (* $(arg name) — access launch config *)
                       | EnvironmentVariable        (* $(env NAME default?) *)
-                      | FindExecutable             (* locate on PATH *)
                       | FindPackageShare           (* $(find-pkg-share pkg) *)
                       | FindPackagePrefix          (* $(find-pkg-prefix pkg) *)
                       | PythonExpression           (* $(eval expr) *)
                       | Command                    (* $(command cmd) — shell command output *)
-                      | ThisLaunchFile             (* absolute path to current file *)
                       | ThisLaunchFileDir          (* $(dirname) — directory of current file *)
                       | PathJoinSubstitution       (* join path components *)
-                      | AnonName                   (* generate anonymous name *)
-                      | FileContent                (* read file contents *)
                       | IfElseSubstitution         (* condition ? if_value : else_value *)
                       | EqualsSubstitution         (* left == right → "true"/"false" *)
                       | NotEqualsSubstitution      (* left != right → "true"/"false" *)
                       | NotSubstitution            (* !value *)
                       | AndSubstitution            (* left && right *)
                       | OrSubstitution             (* left || right *)
-                      | AnySubstitution            (* any(values...) *)
-                      | AllSubstitution            (* all(values...) *)
-                      | LaunchLogDir               (* log directory path *)
-                      | LocalSubstitution          (* access local context vars *)
-                      | ForEachVar                 (* loop iteration variable *)
-                      | ForLoopIndex               (* loop iteration index *)
 ```
+
+**Exception:** `CommandSubstitution.perform()` returns `$(command resolved_args)` since commands can't be executed during static analysis.
 
 ### 1.4 Conditions
 
@@ -120,217 +91,127 @@ Condition          ::= IfCondition                 (* if="expr" — execute when
                       | UnlessCondition            (* unless="expr" — execute when falsy *)
 ```
 
-### 1.5 Events
+---
 
-Events are emitted at runtime and trigger registered handlers.
+## 2. Resolution Pipeline
 
+### 2.1 Three-Phase Architecture
+
+1. **Parse**: `@expose_action("tag")` class with `@classmethod parse(entity, parser)` → creates action with raw substitution tokens
+2. **Execute**: `action.execute(context)` → resolves substitutions, performs side effects, returns new resolved action objects (or `[]` for side-effect-only actions)
+3. **Serialize**: `action.serialize_resolved()` → returns `list[ET.Element]` for XML rendering
+
+### 2.2 Action Class Structure
+
+All action classes live in `roscope/entities/actions/`. Each has:
+
+- `@classmethod parse(cls, entity, parser)` — parse XML/YAML Entity into action with unresolved tokens
+- `__init__(**kwargs)` — stores raw substitution tokens (XML path) or resolved values (Python shim path)
+- `execute(context) → list[Action]` — resolve substitutions, perform side effects, return resolved actions
+- `serialize_resolved() → list[ET.Element]` — render to XML elements (only for actions that produce output)
+
+### 2.3 Dispatch
+
+`_resolve_element()` in resolver.py dispatches each parsed element through the action registry:
+
+```python
+def _resolve_element(elem, ctx, include_stack):
+    tag = elem.type_name
+    if tag in action_parse_methods:
+        parser = _ActionParser(ctx, include_stack)
+        action = action_parse_methods[tag](elem, parser)
+        if action is not None:
+            return action.execute(ctx)
+    return []
 ```
-Event              ::= Shutdown                    (* reason?, due_to_sigint? *)
-                      | ExecutionComplete          (* action *)
-                      | TimerEvent                 (* timer_action *)
-                      | ProcessStarted             (* action, name, cmd, cwd, env, pid *)
-                      | ProcessExited              (* + returncode *)
-                      | ProcessStdout | ProcessStderr | ProcessStdin  (* + text, fd *)
-                      | ShutdownProcess            (* process_matcher *)
-                      | SignalProcess              (* signal, process_matcher *)
-                      | IncludeLaunchDescriptionEvent  (* launch_description *)
-```
+
+### 2.4 Actions That Produce Output
+
+These actions override `serialize_resolved()` and appear in the resolved tree:
+
+| Action | XML Output |
+|---|---|
+| `Node` | `<node pkg="..." exec="..." ...>params, param_files</node>` |
+| `ComposableNodeContainer` | `<node_container ...>composable_nodes</node_container>` |
+| `LoadComposableNodes` | `<load_composable_node target="...">composable_nodes</load_composable_node>` |
+| `ExecuteProcess` | `<executable cmd="..."/>` |
+| `GroupAction` (with resolved_children) | `<group>children</group>` |
+| `SourceMarker` | `<!-- source: pkg://path -->` |
+| `ArgComment` | `<!-- arg name="..." value="..." -->` |
+| Event handlers | `<on_process_exit>`, `<on_process_start>`, etc. |
+
+### 2.5 Actions That Are Side-Effect Only
+
+These actions return `[]` from `execute()` — their effects are consumed during resolution:
+
+| Action | Side Effect |
+|---|---|
+| `DeclareLaunchArgument` | Sets default in `_launch_configurations` |
+| `SetLaunchConfiguration` (let) | Sets variable |
+| `PushRosNamespace` | Modifies `_launch_configurations['ros_namespace']` |
+| `SetParameter` | Appends to `_launch_configurations['global_params']` |
+| `SetRemap` | Appends to `_launch_configurations['ros_remaps']` |
+| `SetEnvironmentVariable` / `UnsetEnvironmentVariable` | Modifies `context.environment` |
+
+### 2.6 Actions That Delegate
+
+| Action | Behavior |
+|---|---|
+| `GroupAction.execute()` | Push/pop scope, execute children, return results |
+| `IncludeLaunchDescription.execute()` | Resolve file, execute children, wrap with markers in a GroupAction |
+| `OpaqueFunction.execute()` | Call `fn(context)`, walk returned actions |
 
 ---
 
-## 2. Output Grammar: Resolved IR
+## 3. Rendering and Tracking
 
-The resolver consumes the full input grammar and produces a resolved subset. All substitutions are resolved to concrete strings, all conditions are evaluated, but **group structure is preserved** so that scope boundaries (env, namespace, config) remain explicit.
+### 3.1 Renderer
 
-The IR is defined inductively — `IRGroupAction` contains `[IRAction]`, making the IR a tree.
+The renderer (`renderer.py`) takes a list of resolved actions and produces XML:
 
-```
-IRAction           ::= IRGroupAction
-                      | IRNode
-                      | IRLifecycleNode
-                      | IRComposableNodeContainer
-                      | IRLoadComposableNode
-                      | IRExecutable
-                      | IRLog
-                      | IROpaque
+1. Creates an `<launch>` root element
+2. Appends each action's `serialize_resolved()` elements
+3. Uses `ET.indent()` for formatting, `ET.tostring()` for output
 
-IRGroupAction      ::= GroupAction(
-                          children : [IRAction],    (* recursive *)
-                          source   : str?,          (* include origin, e.g. "pkg://launch/file.launch.xml" *)
-                        )
-                        (* Structural grouping for annotation.  Scope effects (env,
-                           namespace, params, remaps) are fully consumed during resolution
-                           and baked into child nodes.  scoped/forwarding/launch_configurations
-                           are resolution-time concepts that do not appear in the output.
-                           source records include provenance for rendering comment markers. *)
+### 3.2 Markers
 
-IRNode             ::= Node(
-                          package       : str,
-                          executable    : str,
-                          name          : str?,
-                          namespace     : str?,
-                          parameters    : {str: str},
-                          param_files   : [str],
-                          remappings    : [(str, str)],
-                          env           : {str: str},
-                          output        : str?,
-                          args          : str?,
-                          respawn       : str?,
-                          respawn_delay : str?,
-                        )
+`SourceMarker` and `ArgComment` are marker actions that appear in the resolved tree:
 
-IRLifecycleNode    ::= LifecycleNode(
-                          IRNode fields,
-                          autostart : bool?,
-                        )
+- `SourceMarker` is the first child inside a group created by `IncludeLaunchDescription`
+- `ArgComment` follows `SourceMarker` when `--show-args` is enabled
+- Both serialize to XML comments
 
-IRComposableNodeContainer
-                   ::= ComposableNodeContainer(
-                          IRNode fields,
-                          plugins : [IRComposablePlugin],
-                        )
+### 3.3 ResolverState.tracked
 
-IRComposablePlugin ::= ComposablePlugin(
-                          package    : str,
-                          plugin     : str,
-                          name       : str?,
-                          namespace  : str?,
-                          parameters : {str: str},
-                          param_files: [str],
-                          remappings : [(str, str)],
-                        )
+`ResolverState.tracked` exists for **dependency tracking** (separate concern from rendering):
 
-IRLoadComposableNode
-                   ::= LoadComposableNode(
-                          target    : str,
-                          namespace : str?,
-                          plugins   : [IRComposablePlugin],
-                        )
-
-IRExecutable       ::= Executable(
-                          cmd       : str,
-                          name      : str?,
-                          shell     : bool,
-                          namespace : str?,
-                          env       : {str: str},
-                        )
-
-IRLog              ::= Log(
-                          message : str,
-                          level   : str?,
-                        )
-
-IROpaque           ::= Opaque(
-                          description   : str,
-                          python_object : Any,
-                        )
+```python
+tracked = {
+    "packages": [str],              # referenced package names
+    "includes": [str],              # included file paths
+    "declared_args": [ArgEntry],
+    "declared_args_by_file": {str: [ArgEntry]},
+    "include_args": {file_path: {name: value}},
+    "include_deps": [IncludeDepEntry],
+    "param_file_deps": [ParamFileDepEntry],
+    "param_files": [str],           # parameter file paths
+    "global_params": [[name, value]],
+    "set_launch_configurations": {name: value},
+}
 ```
 
-### 2.1 What is NOT in the output
+### 3.4 Handler Location
 
-These input actions are **consumed during resolution** and never appear in the output IR:
+All `@expose_action` handlers live in `roscope/entities/actions/`:
 
-| Input Action | Resolution |
+| Module | Tags |
 |---|---|
-| `DeclareLaunchArgument` | Default inserted into substitution context; recorded in `declared_args` metadata |
-| `SetLaunchConfiguration` / `Unset` | Variable binding consumed during walk |
-| `IncludeLaunchDescription` | Child file parsed and inlined; recorded in `includes` metadata |
-| `OpaqueFunction` | Called; returned actions walked and inlined |
-| `OpaqueCoroutine` | Called; result inlined or becomes `IROpaque` |
-| `ForEach` | Unrolled; body actions inlined per iteration |
-| `TimerAction` / `ROSTimer` | Deferred actions inlined (timing lost) |
-| `PushEnvironment` / `Pop` / `Reset` / `Replace` | Env stack operations applied and consumed |
-| `PushLaunchConfigurations` / `Pop` / `Reset` | Config stack operations applied and consumed |
-| `AppendEnvironmentVariable` | Applied and consumed |
-| `RegisterEventHandler` / `Unregister` | Extracted to `ResolvedLaunch.event_handlers` metadata |
-| `LifecycleTransition` | Becomes `IREventHandler` in `event_handlers` metadata |
-| `Shutdown` | Runtime event; consumed |
-| `SetUseSimTime` | Merged into child nodes' `parameters` as `use_sim_time` |
-| `SetROSLogDir` | Applied to env context |
-| `SetEnvironmentVariable` / `UnsetEnvironmentVariable` | Applied to env context; reflected in child nodes' `env` |
-| `PushROSNamespace` | Applied to namespace stack; reflected in child nodes' `namespace` |
-| `SetParameter` / `SetParametersFromFile` | Merged into child nodes' `parameters` / `param_files` |
-| `SetRemap` | Merged into child nodes' `remappings` |
-| Conditions (`if=`/`unless=`) | Evaluated; element present iff condition was true |
-| All substitutions (`$(...)`) | Resolved to concrete `str`. **Exception:** `$(find-pkg-share pkg)` is preserved as-is in preview mode to keep paths portable. |
-
-### 2.2 What DOES survive (inside groups)
-
-| IR Action | Why it survives |
-|---|---|
-| `IRGroupAction` | Defines scope boundary; children inherit scoped state |
-
-All scope-level mutations (`PushROSNamespace`, `SetEnv`, `UnsetEnv`, `SetParameter`, `SetRemap`, `SetParametersFromFile`) are **consumed** during resolution. Their effects are merged into child nodes' fields (`namespace`, `env`, `parameters`, `param_files`, `remappings`). The IR shows what will eventually run — each node carries its complete effective state.
-
-### 2.3 Opaque actions
-
-`IROpaque` is the escape hatch for actions that cannot be statically resolved:
-
-- An `OpaqueFunction` returns an action type the resolver doesn't recognize
-- An `EventHandler` callback is a Python closure that can't be introspected
-- A custom action subclass not in the known set
-
-`IROpaque` carries a `description` and the original `python_object`. Serialization to XML/YAML will skip or warn on `IROpaque` — this is a renderer concern, not a resolver concern.
-
-### 2.4 Invariants
-
-1. **Tree-structured** — `IRGroupAction` contains `[IRAction]` recursively. All other actions are leaves.
-2. **Concrete** — Every `str` field is a resolved value; no `$(...)` substitutions remain.
-3. **No conditions** — Every action in the output is unconditional. Conditions were evaluated during resolution.
-4. **Deterministic** — Same inputs → same IR.
-5. **Namespace and env are effective** — Each node carries its computed effective namespace and environment. Procedural scope actions (`PushROSNamespace`, `SetEnv`, `UnsetEnv`) are consumed; only their effects survive in node fields. Namespaces are always flattened onto node attributes.
-6. **Declarative only** — No procedural actions (push/pop/set/unset for scope) survive in the IR. Only declarative actions (nodes, parameters, remaps, groups) remain.
-
----
-
-## 3. Metadata (alongside actions)
-
-The `ResolvedLaunch` container carries metadata that is not part of the action sequence but is needed by the orchestrator:
-
-```
-ResolvedLaunch     ::= {
-                          actions        : [IRAction],
-                          event_handlers : [IREventHandler],
-                          packages       : [str],           (* all referenced packages *)
-                          includes       : [ResolvedInclude],
-                          declared_args  : [DeclaredArg],
-                          warnings       : [str],
-                          errors         : [str],
-                        }
-
-IREventHandler     ::= EventHandler(
-                          kind        : EventHandlerKind,
-                          target      : str?,
-                          target_node : str?,
-                          namespace   : str?,
-                          start_state : str?,
-                          goal_state  : str?,
-                          actions     : [IREventAction],
-                        )
-
-EventHandlerKind   ::= "on_process_start"
-                      | "on_process_exit"
-                      | "on_state_transition"
-                      | "on_shutdown"
-
-IREventAction      ::= EmitEvent(
-                          event       : str,
-                          target_node : str?,
-                          namespace   : str?,
-                          metadata    : {str: str},
-                        )
-                        (* Events carry structured metadata beyond a name — e.g. Shutdown
-                           has reason, SignalProcess has signal.  metadata captures
-                           statically-known fields.  Events referencing runtime context
-                           (ExecuteLocal, ExecuteProcess, TimerAction) cannot be fully
-                           resolved; their metadata will be partial or empty. *)
-                      | IROpaque
-
-ResolvedInclude    ::= { package : str, share_path : str, args : {str: str} }
-DeclaredArg        ::= { name : str, default : str, description : str? }
-```
-
-`includes` exists because even though child actions are inlined, the orchestrator needs the include graph for:
-- Dependency tracking (which packages to fetch/build)
-- CLI introspection, such as `--show-args` include argument annotations
-- Tooling and diagnostics that need to reconstruct or visualize the include graph
+| `arg.py` | `arg`, `let` |
+| `group.py` | `group` |
+| `include.py` | `include` |
+| `node.py` | `node`, `lifecycle_node`, `node_container`, `composable_node_container`, `load_composable_node` |
+| `env.py` | `set_env`, `unset_env`, `push-ros-namespace`, `set_parameter`, `set_remap` |
+| `log.py` | `log` |
+| `executable.py` | `executable` |
+| `event_handler.py` | `on_process_start`, `on_process_exit`, `on_state_transition`, `on_shutdown`, `emit_event` |
+| `marker.py` | (not parsed from XML — created by `IncludeLaunchDescription`) |

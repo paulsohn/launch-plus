@@ -1,10 +1,9 @@
 # Getting Started
 
-This guide walks through using launch-plus with your own ROS 2 project.
+This guide walks through using roscope with your own ROS 2 project.
 
 ## Prerequisites
 
-- **Rust toolchain** (edition 2024, MSRV 1.85) — install via [rustup.rs](https://rustup.rs)
 - **Python 3.10+** — used to evaluate Python launch files and `$(eval ...)`
   substitutions in XML launch files
 - **Git** — for sparse-checkout operations
@@ -15,12 +14,15 @@ This guide walks through using launch-plus with your own ROS 2 project.
 ## Installation
 
 ```bash
-git clone https://github.com/paulsohn/launch-plus.git
-cd launch-plus
-cargo build --bin launch-plus --release
+pip install git+https://github.com/paulsohn/roscope.git
+```
 
-# Add to PATH (optional)
-export PATH="$PWD/target/release:$PATH"
+Or for development:
+
+```bash
+git clone https://github.com/paulsohn/roscope.git
+cd roscope
+pip install -e .
 ```
 
 ## Step 1: Create a .repos manifest
@@ -53,7 +55,7 @@ you can use it directly.
 ## Step 2: Generate a lockfile
 
 ```bash
-launch-plus index my_project.repos
+roscope index my_project.repos
 ```
 
 This resolves every version reference to a concrete commit SHA, scans each
@@ -70,14 +72,14 @@ source code.
 To update the lockfile when upstream repos change:
 
 ```bash
-launch-plus update              # re-resolve all refs
-launch-plus update core/my_msgs # update a specific repo (uses lockfile key)
+roscope update              # re-resolve all refs
+roscope update core/my_msgs # update a specific repo (uses lockfile key)
 ```
 
 ## Step 3: Resolve a launch file
 
 ```bash
-launch-plus resolve -d my_bringup robot.launch.xml \
+roscope resolve -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   --preview \
   > resolved.launch.xml
@@ -91,7 +93,7 @@ This will:
 5. Output a single flattened XML with all includes inlined, variables
    substituted, and conditionals evaluated
 
-The `-d` (dirty) flag tells launch-plus to use whatever is on disk and only
+The `-d` (dirty) flag tells roscope to use whatever is on disk and only
 fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
 
 ### Useful resolve flags
@@ -103,15 +105,6 @@ fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
 # Expand <param from="file.yaml"/> entries inline
 --inline-params
 
-# Allow OpaqueFunction bodies to read parameter files
---apply-opaque-file-access
-
-# Fill unset args from their declared defaults
---apply-launch-arg-defaults
-
-# Propagate parent args into included files (legacy launch files)
---allow-global-arg-cascade
-
 # Install system deps via rosdep (requires sourced ROS 2)
 --rosdep
 ```
@@ -121,7 +114,7 @@ fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
 ```bash
 source /opt/ros/humble/setup.bash
 
-launch-plus build -c my_bringup robot.launch.xml \
+roscope build -c my_bringup robot.launch.xml \
   robot_name:=my_robot \
   --rosdep \
   --colcon-flagfile colcon-flags.txt
@@ -154,30 +147,24 @@ the post-build resolution:
 source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
 source install/setup.bash
 
-# Preview resolve (pre-build, portable paths)
-launch-plus resolve --preview -d my_bringup robot.launch.xml \
+# Preview resolve (pre-build, source paths)
+roscope resolve --preview -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > preview.launch.xml
 
-# Post-build resolve (real install paths)
-launch-plus resolve -d my_bringup robot.launch.xml \
+# Post-build resolve (install paths)
+roscope resolve -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > postbuild.launch.xml
 
-# Compare preview vs postbuild (normalize paths first)
-INSTALL_DIR="$(pwd)/install"
-ROS_SHARE_DIR="/opt/ros/${ROS_DISTRO}/share"
-sed -E "s|${INSTALL_DIR}/[^/]+/share/([^/]+)|\$(find-pkg-share \1)|g" \
-  postbuild.launch.xml \
-  | sed -E "s|${ROS_SHARE_DIR}/([^/]+)|\$(find-pkg-share \1)|g" \
-  > postbuild_normalized.xml
+# Compare preview vs postbuild (strip the PREVIEW comment line)
 grep -v '^<!-- PREVIEW:' preview.launch.xml > preview_clean.xml
-diff preview_clean.xml postbuild_normalized.xml
+diff preview_clean.xml postbuild.launch.xml
 ```
 
 ## Directory layout
 
-After running launch-plus, your workspace will look like:
+After running roscope, your workspace will look like:
 
 ```
 my_workspace/
@@ -196,7 +183,7 @@ my_workspace/
 ## Next steps
 
 - Read [Core Concepts](concepts.md) for deeper understanding of lockfiles,
-  portable paths, and OpaqueFunction handling
+  package resolution, and OpaqueFunction handling
 - See [Architecture](architecture.md) for how the resolver works internally
 - Check [Supported Environments](supported-environments.md) for platform
   compatibility and known limitations

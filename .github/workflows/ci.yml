@@ -27,8 +27,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install mypy types-PyYAML click pyyaml
-      - run: mypy launch_plus/resolver.py
+      - run: pip install mypy types-PyYAML click pyyaml lark
+      - run: mypy roscope/resolver.py
 
   pytest:
     name: Test (Python ${{ matrix.python-version }})
@@ -41,5 +41,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install pytest pyyaml click
+      - run: pip install pytest pyyaml click lark
       - run: python -m pytest tests/ -v

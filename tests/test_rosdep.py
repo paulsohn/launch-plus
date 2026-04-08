@@ -1,8 +1,8 @@
-"""Tests for launch_plus.rosdep — ported from rosdep.rs Rust tests."""
+"""Tests for roscope.rosdep — ported from rosdep.rs Rust tests."""
 
 from __future__ import annotations
 
-from launch_plus.rosdep import _parse_rosdep_resolve
+from roscope.rosdep import _parse_rosdep_resolve
 
 
 def test_parse_single_key_apt() -> None:

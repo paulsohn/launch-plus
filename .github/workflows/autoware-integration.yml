@@ -43,7 +43,7 @@ jobs:
           rosdep update
         shell: bash
 
-      - name: Install launch-plus
+      - name: Install roscope
         run: pip install -e . || pip install --break-system-packages -e .
 
       - name: Install acados

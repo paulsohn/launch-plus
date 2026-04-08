@@ -1,10 +1,10 @@
-"""Tests for launch_plus.indexer — ported from indexer.rs Rust tests."""
+"""Tests for roscope.indexer — ported from indexer.rs Rust tests."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from launch_plus.indexer import (
+from roscope.indexer import (
     _evaluate_condition_impl,
     compute_build_order,
     evaluate_condition,
@@ -14,7 +14,7 @@ from launch_plus.indexer import (
     resolve_dependencies,
     serialize_lockfile,
 )
-from launch_plus.types import (
+from roscope.types import (
     DependencyMode,
     Lockfile,
     PackageLock,

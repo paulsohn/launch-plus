@@ -22,12 +22,12 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install launch-plus
+      - name: Install roscope
         run: pip install -e .
 
       - name: Reindex Autoware manifest
         working-directory: example/autoware
-        run: launch-plus index
+        run: roscope index
 
       - name: Create PR if lockfile changed
         uses: peter-evans/create-pull-request@v8
@@ -36,7 +36,7 @@ jobs:
           base: devel
           title: "chore: update Autoware lockfile"
           body: |
-            Automated lockfile update from `launch-plus index`.
+            Automated lockfile update from `roscope index`.
 
             This PR re-resolves repository refs in `example/autoware/manifest.lock.repos`
             to their latest commit SHAs.

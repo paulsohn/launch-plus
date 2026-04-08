@@ -10,23 +10,6 @@ This file contains universal instructions for AI coding agents working on this p
 
 **Important:** All agent-related files are under `.agents/` directory.
 
-## Agent Roles
-
-| Agent | Responsibility | Prompt |
-|-------|---------------|--------|
-| Architect | Design, planning, review | `prompts/architect.md` |
-| Rust | Core library implementation | `prompts/rust.md` |
-| Python | CLI and bindings | `prompts/python.md` |
-| Test | Testing and fixtures | `prompts/test.md` |
-
-## Workflow
-
-```
-1. Architect plans task
-2. Rust/Python implements → commits
-3. Test writes/runs tests → validates
-```
-
 ## General Principles
 
 1. **Read before writing** - Always read and understand existing code before making modifications

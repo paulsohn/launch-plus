@@ -1,47 +1,16 @@
 # Coding Rules & Conventions
 
-## Rust Rules
-
-### Style
-- Run `cargo fmt` before every commit
-- Run `cargo clippy` and fix warnings
-- Use `#[must_use]` for functions returning values that shouldn't be ignored
-
-### Error Handling
-- Use `thiserror` for library errors
-- Use `anyhow` only in CLI/binary crates
-- Provide context with `.context()` or custom error messages
-
-### Dependencies
-- Prefer well-maintained crates from crates.io
-- Pin versions in Cargo.toml
-- Document why each dependency is needed
-
-### Key Crates
-```toml
-serde = "1"           # Serialization
-serde_yaml = "0.9"    # YAML parsing
-thiserror = "2"       # Error derive
-quick-xml = "0.37"    # XML parsing
-clap = "4"            # CLI parsing
-tar = "0.4"           # Archive handling
-```
-
 ## Python Rules
 
 ### Style
 - Run `ruff check --fix` and `ruff format` before commit
 - Type hints required for all public functions
-- Use `pathlib.Path` not string paths
+- Use `pathlib.Path` not string paths in new code
 
 ### Dependencies
-- Minimize dependencies (Python is thin wrapper)
-- Required: `click` for CLI
+- Minimize external dependencies
+- Required: `click` for CLI, `lark` for grammar parsing, `pyyaml`
 - Optional: `ros2cli` for verb integration
-
-### Structure
-- Keep all logic in Rust, Python is just glue
-- Type stubs must match Rust implementation exactly
 
 ### None Handling
 - **Never** use `str(x)` then check `== "None"` to detect Python `None`. This conflates the literal string `"None"` with the absence of a value.
@@ -95,7 +64,6 @@ docs: update architecture diagram in context.md
 - Every bug fix or code change addressing PR review comments must include corresponding unit tests
 
 ### Naming
-- Rust: `test_<function>_<scenario>`
 - Python: `test_<function>_<scenario>`
 
 ### Fixtures
@@ -106,32 +74,37 @@ docs: update architecture diagram in context.md
 ## File Organization
 
 ```
-launch-plus/
-├── Cargo.toml                    # Workspace root
-├── crates/
-│   └── launch-plus-core/
-│       ├── Cargo.toml
-│       └── src/
-│           ├── lib.rs            # Public API
-│           ├── error.rs          # Error types
-│           ├── types.rs          # Shared types
-│           ├── indexer/          # Indexer module
-│           │   ├── mod.rs
-│           │   ├── repos.rs
-│           │   ├── lockfile.rs
-│           │   └── tests.rs
-│           ├── resolver/
-│           ├── fetcher/
-│           ├── builder/
-│           └── launcher/
-├── python/
-│   └── launch_plus/
-│       ├── __init__.py
-│       ├── _core.pyi
-│       ├── cli.py
-│       └── verb/
-├── tests/                        # Python integration tests
-│   ├── fixtures/
-│   └── test_*.py
-└── pyproject.toml
+roscope/
+├── pyproject.toml
+├── roscope/
+│   ├── __init__.py
+│   ├── __main__.py               # Entry point
+│   ├── cli.py                    # Click CLI
+│   ├── indexer.py                # .repos → lockfile
+│   ├── fetcher.py                # git sparse-checkout
+│   ├── resolver.py               # Launch file resolution + shims
+│   ├── orchestrator.py           # Resolve + fetch coordination
+│   ├── renderer.py               # Resolved IR → XML output
+│   ├── builder.py                # colcon build orchestration
+│   ├── rosdep.py                 # System dependency resolution
+│   ├── locator.py                # Package location
+│   ├── types.py                  # Shared dataclasses
+│   ├── exceptions.py             # Exception hierarchy
+│   ├── entities/
+│   │   ├── expose.py             # @expose_action / @expose_substitution
+│   │   ├── substitution.py       # Substitution ABC
+│   │   ├── substitutions/        # Typed substitution objects
+│   │   └── actions/              # @expose_action handlers
+│   ├── parsers/
+│   │   ├── entity.py             # Entity ABC
+│   │   ├── xml_parser.py         # XML → Entity tree
+│   │   ├── yaml_parser.py        # YAML → Entity tree
+│   │   ├── parse_substitution.py # Lark grammar → Substitution objects
+│   │   └── grammar.lark          # Substitution grammar
+│   └── verb/                     # ros2 CLI verb integration
+├── tests/
+│   ├── conftest.py
+│   ├── test_resolver.py
+│   └── ...
+└── .agents/                      # AI agent instructions
 ```

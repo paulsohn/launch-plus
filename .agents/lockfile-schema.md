@@ -82,7 +82,7 @@ packages:
 
 The validation should be implemented as part of:
 1. **Lockfile loading**: Validate on parse, fail fast on errors
-2. **`launch-plus index --verify`**: Full validation for CI checks
+2. **`roscope index --verify`**: Full validation for CI checks
 
 ### Suggested API
 

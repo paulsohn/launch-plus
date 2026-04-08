@@ -1,11 +1,11 @@
 # Autoware Launch Architecture Case Study
 
-Defects and refactoring suggestions discovered while running `launch-plus check` against
+Defects and refactoring suggestions discovered while running `roscope check` against
 `autoware_launch`.  Each entry is self-contained: it describes the problem, shows the
 exact lines that demonstrate it, and gives a concrete code sketch so any contributor
 (human or AI agent) can implement a fix and open a PR without additional research.
 
-This document is aimed at autoware upstream.  For launch-plus internals see
+This document is aimed at autoware upstream.  For roscope internals see
 `edge-cases.md`.
 
 ---
@@ -166,7 +166,7 @@ assignment (see `edge-cases.md §2`).
 - A node include → spawns a loader node (not launch scope)
 
 `scoped="false"` therefore has **zero effect** here.  It misleads readers into thinking
-global variables are being injected, and it triggers a launch-plus warning about
+global variables are being injected, and it triggers a roscope warning about
 `<include>` inside `scoped="false">` (which is flagged as a general anti-pattern because
 in other contexts it causes invisible variable leakage).
 
@@ -329,14 +329,14 @@ explicit:
 Benefits:
 - `ros2 launch parking.launch.xml --show-args` now surfaces `launch_parking_module`
 - Files are usable standalone: the caller must explicitly pass preset args
-- `launch-plus check` stops flagging these as undeclared variable uses
+- `roscope check` stops flagging these as undeclared variable uses
 - A contributor reading `parking.launch.xml` sees what inputs it requires
 
 ---
 
-## Anti-Pattern Warnings from `launch-plus check`
+## Anti-Pattern Warnings from `roscope check`
 
-Running `launch-plus check autoware_launch autoware.launch.xml` emits a set of static
+Running `roscope check autoware_launch autoware.launch.xml` emits a set of static
 anti-pattern warnings in addition to the structural defects above.  The table below shows
 the four categories added in M8 Phase 3, which warnings fire against the current
 `autoware_launch` sources, and where to look.
@@ -463,7 +463,7 @@ trigger the warning.
 | 4 | Component file owns subsystem's internal path structure (57 forwarded args) | High | `tier4_planning_component.launch.xml` + `planning.launch.xml` (and perception, localization) |
 | 5 | YAML preset variables undeclared in consuming files | Medium | ~10 files in `tier4_planning_launch/` |
 
-### Anti-pattern warnings (`launch-plus check`)
+### Anti-pattern warnings (`roscope check`)
 
 | Warning | Description | Typical fix |
 |---------|-------------|-------------|

@@ -1,23 +1,23 @@
-"""Tests for launch_plus.exceptions."""
+"""Tests for roscope.exceptions."""
 
-from launch_plus.exceptions import (
+from roscope.exceptions import (
     CircularDependencyError,
     DuplicatePackageError,
     GitError,
     InvalidVersionError,
     LaunchParseError,
-    LaunchPlusError,
     PackageNotFoundError,
     ProcessExecutionError,
     PythonResolverError,
     RepoNotFoundError,
+    RoscopeError,
     XmlParseError,
     YamlParseError,
 )
 
 
 def test_all_inherit_from_base() -> None:
-    """Every exception class is a subclass of LaunchPlusError."""
+    """Every exception class is a subclass of RoscopeError."""
     subclasses = [
         YamlParseError,
         XmlParseError,
@@ -32,7 +32,7 @@ def test_all_inherit_from_base() -> None:
         ProcessExecutionError,
     ]
     for cls in subclasses:
-        assert issubclass(cls, LaunchPlusError), f"{cls.__name__} not subclass of LaunchPlusError"
+        assert issubclass(cls, RoscopeError), f"{cls.__name__} not subclass of RoscopeError"
 
 
 def test_duplicate_package_error_fields() -> None:
@@ -46,8 +46,8 @@ def test_duplicate_package_error_fields() -> None:
 
 
 def test_catch_as_base() -> None:
-    """Can catch any launch-plus error via the base class."""
+    """Can catch any roscope error via the base class."""
     try:
         raise GitError("clone failed")
-    except LaunchPlusError as e:
+    except RoscopeError as e:
         assert "clone failed" in str(e)

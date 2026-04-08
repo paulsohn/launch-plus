@@ -1,6 +1,6 @@
 # Launch File Edge Cases
 
-Based on analysis of Autoware reference codebase. These patterns must be supported by launch-plus.
+Based on analysis of Autoware reference codebase. These patterns must be supported by roscope.
 
 ## 1. Complex Substitution Patterns
 
@@ -302,14 +302,14 @@ All three colcon install conventions are handled transparently:
 | `--merge-install` | `install/` | `install/share/<pkg>/` |
 | `--symlink-install` | `install/<pkg>:...` | symlink → source file |
 
-This works because both the Rust `PackageLocator` (Strategy 3 in `locate_package_share`)
-and Python `_real_get_package_share_directory` resolve via `AMENT_PREFIX_PATH` directly.
+This works because `state.resolve_pkg_share()` and `_real_get_package_share_directory`
+resolve via `AMENT_PREFIX_PATH` directly.
 The `share/<pkg>/` tree structure is identical across all conventions.
 
 **Residual gap — source-first priority:**
 `all_package_shares()` fills the package map with **source paths first** (from lockfile),
 and AMENT_PREFIX_PATH entries only cover packages not already present (`or_insert_with`).
-So for workspace packages, `_resolve_pkg_share` returns the source path even when a build
+So for workspace packages, `state.resolve_pkg_share()` returns the source path even when a build
 is present, missing generated files that only exist in the install space.
 
 After M5 (Builder), we should add a `--post-build` mode (or `--install-base <path>`) that
@@ -325,7 +325,7 @@ inverts this priority: prefer installed paths so generated files are accessible.
 - Do NOT attempt to locate the file via `ament_index_python` at analysis time (the path
   resolution already went through `FindPackageShare`, so the package is tracked)
 - For `--post-build` / `--install-base` mode: prefer install path over source path in
-  `_resolve_pkg_share` and `all_package_shares()`, so generated files are accessible
+  `state.resolve_pkg_share()` and `all_package_shares()`, so generated files are accessible
 
 ### Workaround for Launch File Authors
 
@@ -351,7 +351,7 @@ This makes the launch file work both with and without a pre-built install tree.
 
 During migration or debugging, teams may want to:
 
-1. Use `launch-plus resolve` to produce a flattened launch file
+1. Use `roscope resolve` to produce a flattened launch file
 2. Run that file directly with `ros2 launch flat.launch.xml`
 
 This "resolve then run" workflow is valuable during migration phases — it simplifies a
@@ -360,7 +360,7 @@ against the original runtime behavior.
 
 ### Path Resolution Concern
 
-`launch-plus resolve` resolves `$(find-pkg-share pkg)` to **source paths** by default:
+`roscope resolve` resolves `$(find-pkg-share pkg)` to **source paths** by default:
 
 ```
 $(find-pkg-share autoware_launch) → /workspace/src/autoware_launch
@@ -394,10 +394,10 @@ instead of the source workspace:
 
 ```bash
 # Source paths (default) — for inspection, dependency analysis
-launch-plus resolve autoware_launch autoware.launch.xml > inspect.launch.xml
+roscope resolve autoware_launch autoware.launch.xml > inspect.launch.xml
 
 # Install paths — for direct execution with ros2 launch
-launch-plus resolve autoware_launch autoware.launch.xml --output-paths=install > run.launch.xml
+roscope resolve autoware_launch autoware.launch.xml --output-paths=install > run.launch.xml
 ros2 launch run.launch.xml
 ```
 
@@ -413,7 +413,7 @@ AMENT_PREFIX_PATH-first priority (inverse of the current source-first order in
 | Phase | Behaviour |
 |-------|-----------|
 | M4 (current) | Source paths only.  Works with `--symlink-install`; may fail for generated files with copy-install. |
-| M5 (planned) | Add `--output-paths=install` flag.  Integrate with the Builder so the resolved XML is immediately runnable after `launch-plus build`. |
+| M5 (planned) | Add `--output-paths=install` flag.  Integrate with the Builder so the resolved XML is immediately runnable after `roscope build`. |
 
 ---
 
@@ -445,14 +445,14 @@ These patterns are common when:
 
 ```bash
 # Default: fail if launcher not found
-launch-plus resolve my_pkg launcher.launch.xml
+roscope resolve my_pkg launcher.launch.xml
 
 # Build if needed (resolve mode with build fallback)
-launch-plus resolve my_pkg launcher.launch.xml --build-if-missing
+roscope resolve my_pkg launcher.launch.xml --build-if-missing
 
 # Or use build/run which always builds first
-launch-plus build my_pkg launcher.launch.xml
-launch-plus run my_pkg launcher.launch.xml
+roscope build my_pkg launcher.launch.xml
+roscope run my_pkg launcher.launch.xml
 ```
 
 ### Detection Heuristics
@@ -467,7 +467,7 @@ To detect if a package might generate launch files:
 ```
 Warning: Launch file 'generated.launch.py' not found in source.
   Package 'my_pkg' may generate this file during build.
-  Use --build-if-missing to build first, or use 'launch-plus build' command.
+  Use --build-if-missing to build first, or use 'roscope build' command.
 ```
 
 ## 12. Build Modes
@@ -478,7 +478,7 @@ Two distinct build commands with dedicated verbs:
 Build only what's required for a specific launcher:
 
 ```bash
-launch-plus build my_pkg my_launcher.launch.xml
+roscope build my_pkg my_launcher.launch.xml
 ```
 
 **Process:**
@@ -497,13 +497,13 @@ Build everything in one or more packages:
 
 ```bash
 # Build entire package
-launch-plus build-pkg my_pkg
+roscope build-pkg my_pkg
 
 # Build multiple packages
-launch-plus build-pkg pkg1 pkg2 pkg3
+roscope build-pkg pkg1 pkg2 pkg3
 
 # Build all packages in lockfile
-launch-plus build-pkg --all
+roscope build-pkg --all
 ```
 
 **Use cases:**
@@ -765,9 +765,9 @@ using node-level attributes — keeping the output readable and avoiding new ele
 </on_state_transition>
 ```
 
-These are launch-plus XML extensions — `ros2 launch` does not support them. They serve as
+These are roscope XML extensions — `ros2 launch` does not support them. They serve as
 documentation in the resolved output. Actual lifecycle management (calling `/change_state`
-services) is deferred to a future `launch-plus run` implementation.
+services) is deferred to a future `roscope run` implementation.
 
 For Pattern B (exit-propagates-shutdown):
 ```xml
@@ -802,7 +802,7 @@ for `<on_*>` wrappers containing `<emit_event />` children.
 
 Event handlers affect **runtime behaviour** only — when nodes become active, what happens when
 they exit. They do **not** affect the dependency graph (which packages are needed, which nodes
-exist, which topics are remapped). For the primary purpose of `launch-plus` (dependency
+exist, which topics are remapped). For the primary purpose of `roscope` (dependency
 indexing and workspace management), the current silent-drop behaviour is correct and complete.
 
 The event-handler elements in the resolved XML are **informational**: they make the output
@@ -815,7 +815,7 @@ is deferred to future work.
 
 ### Feature Overview
 
-`launch-plus resolve` always flattens namespace stacks: the full namespace is
+`roscope resolve` always flattens namespace stacks: the full namespace is
 applied as a `namespace=` attribute directly on each `<node>` element, and
 `<push-ros-namespace>` is omitted entirely from the output.
 
@@ -994,8 +994,8 @@ autoware.launch.xml
 `LaunchConfiguration` global context — when `ros2 launch` is used, any configuration
 set by the parent is visible to all descendants without explicit forwarding.
 
-`launch-plus` resolves files independently, so this "cascade via context" is only
-honoured when `--allow-global-arg-cascade` is passed.
+`roscope` resolves files independently, so this "cascade via context" is only
+honoured when the `with_cascade` arg context is populated (i.e. the parent's full arg context is forwarded to children).
 
 **Top XML targets in Autoware:**
 
@@ -1011,7 +1011,7 @@ honoured when `--allow-global-arg-cascade` is passed.
 
 | Situation | Recommended action |
 |---|---|
-| File tree that intentionally relies on `LaunchConfiguration` cascade | Pass `--allow-global-arg-cascade` to suppress these warnings |
+| File tree that intentionally relies on `LaunchConfiguration` cascade | The resolver automatically populates `with_cascade` to forward the parent arg context |
 | Migrating to explicit arg passing | Add `<arg name="X"/>` (no default) to each intermediate file so the chain is self-documenting |
 | Quick audit — only care about errors | Run without `--strict`; excessive-include-arg warnings are non-fatal by default |
 
@@ -1147,21 +1147,18 @@ Safe pattern with fallback:
 
 ### Design Decision
 
-`$(find-pkg-share <pkg>)` substitutions have two resolution modes:
+`$(find-pkg-share <pkg>)` substitutions always resolve to a real filesystem path via `state.resolve_pkg_share()`:
 
-| Mode | `ctx.preview_mode` | Behaviour |
-|------|--------------------|-----------|
-| **Full** | `false` (default) | Expands to a real filesystem path (workspace source path → AMENT_PREFIX_PATH → fallback). Used when a real path is needed to open a file. |
-| **Preview** | `true` | Keeps the portable `$(find-pkg-share pkg)` form. Used for all output values so the resolved XML/YAML is machine-independent. |
+1. Workspace source packages (from lockfile `package_shares`) → real path
+2. Installed packages via `AMENT_PREFIX_PATH` → real path
+3. Not found → error
 
-**API contract (Rust `resolver.rs`):**
+**API contract:**
 
-- `resolve_substitutions(input, ctx)` — mode-aware: calls `resolve_substitutions_inner` with `resolve_pkg_share = !ctx.preview_mode`.  Use for **every value except include file paths**.
-- `resolve_substitutions_full(input, ctx)` — private, always full: calls `resolve_substitutions_inner` with `resolve_pkg_share = true`.  Use **only** for `<include file=...>` paths that must be real filesystem paths so the file can be opened.
+- `FindPackageShareSubstitution.perform(ctx)` calls `state.resolve_pkg_share(pkg)` and always returns a real filesystem path.
+- For `<include file=...>` paths, the action handler resolves the substitution normally via `state.resolve_pkg_share()`, which returns a real filesystem path so the file can be opened.
 
-`resolve_substitutions_full` is intentionally private and used in exactly one place (the `<include>` path where the file must be opened for recursive parsing).  All other callers use the mode-aware public API.
-
-When `resolve_pkg_share = true` and the package resolver cannot find the package, the output is also `$(find-pkg-share pkg)` (lines 505–511) — the same portable form as preview mode.  The output is never a wrong hardcoded path.
+When `state.resolve_pkg_share()` cannot find a package, it raises an error.  Paths are always real filesystem paths.
 
 ### Multi-value Strings
 
@@ -1171,42 +1168,26 @@ A single substitution string can contain multiple `$(find-pkg-share ...)` tokens
 "[$(find-pkg-share pkg1)/path/to/resource1, $(find-pkg-share pkg2)/path/to/resource2]"
 ```
 
-**Rust resolver:** `parse_substitutions` tokenises the string character-by-character into `Substitution` variants:
-```
-[Literal("["), FindPkgShare("pkg1"), Literal("/path/to/resource1, "), FindPkgShare("pkg2"), Literal("/path/to/resource2]")]
-```
-`resolve_substitutions_inner` processes each token independently and accumulates the output string.  The `resolve_pkg_share` flag is propagated through all recursive calls (including `$(arg ...)` and `$(var ...)` expansion), so every `FindPkgShare` token anywhere in the string respects the mode.
+**Lark-based resolver:** `parse_substitution` parses the string via the Lark grammar into typed `Substitution` objects (e.g. `FindPkgShareSubstitution`). `resolve_substitutions_from_tokens` calls `.perform(ctx)` on each, accumulating the output string. `FindPkgShareSubstitution.perform()` always returns a real filesystem path via `state.resolve_pkg_share()`.
 
-**Python resolver (`_resolve_ros_substitutions`):** Uses `re.sub` with a global match, finding every `$(find-pkg-share ...)` independently:
-```python
-re.sub(r'\$\(find-pkg-share ([^)]+)\)', lambda m: _resolve_pkg_share(m.group(1).strip()), value)
-```
-For each match: if the package is found, the token is replaced with the real source path; if not found, `_resolve_pkg_share` returns `$(find-pkg-share pkg)` (the fallback introduced after M4), so the replacement equals the original token and the portable form is preserved in-place.
+The Lark grammar matches the official ROS 2 `grammar.lark` — all valid XML substitution expressions (including `$(eval ...)` with operators inside quoted templates) are handled without a fallback.
 
-**Result for partially-resolvable strings:** if `pkg1` is found and `pkg2` is not:
-```
-"[/workspace/src/pkg1/path/to/resource1, $(find-pkg-share pkg2)/path/to/resource2]"
-```
-This is the maximally-resolved form for that environment; the not-found token remains portable.
+**Result:** All `$(find-pkg-share ...)` tokens are resolved to real filesystem paths via `state.resolve_pkg_share()`. If a package cannot be found, resolution raises an error.
 
-### Python Resolver Fallback
+### Package Resolution Fallback
 
-`_resolve_pkg_share(package)` in `py_resolver.py` follows this chain:
-1. Workspace source packages (from orchestrator lockfile) → real path
-2. Installed packages via `ament_index_python` (AMENT_PREFIX_PATH) → real path
-3. **Not found anywhere: returns `$(find-pkg-share {package})`** — the portable form
+`state.resolve_pkg_share(package)` follows this chain:
+1. Workspace source packages (from lockfile `package_shares`) → real path
+2. Installed packages via `AMENT_PREFIX_PATH` → real path
+3. **Not found anywhere: raises an error**
 
-The Python resolver has no explicit `preview_mode` flag: it always resolves found packages to real paths (needed for `open()` calls and include tracking) and falls back to the portable form only when the package is genuinely unknown.  Portability of the final output XML/YAML is the responsibility of the Rust output layer (`ctx.preview_mode`).
-
-### Known Limitation: Nested Substitutions in Python Regex
-
-`_resolve_ros_substitutions` uses `[^)]+` to match the package name, which stops at the first `)`.  Nested substitutions of the form `$(find-pkg-share $(var pkg_name))` would be mismatched.  This syntax appears only in XML/YAML launch files; arg values cascaded from the Rust orchestrator to the Python resolver have already had `$(var ...)` expanded by the Rust layer, so this pattern is not encountered in practice.
+`FindPkgShareSubstitution.perform()` delegates to `state.resolve_pkg_share()` and always returns a real filesystem path.
 
 ### Where the Rule Is Applied
 
 | Location | Call | Mode |
 |----------|------|------|
-| `<include file=...>` open path | `resolve_substitutions_full` | Always full (needs real path) |
+| `<include file=...>` open path | `resolve_substitutions` → `state.resolve_pkg_share()` | Always resolves to real path |
 | `<arg default=...>` | `resolve_substitutions` | Mode-aware |
 | `<let value=...>` | `resolve_substitutions` | Mode-aware |
 | `<node pkg=...>`, `exec=...`, etc. | `resolve_substitutions` | Mode-aware |
@@ -1215,12 +1196,12 @@ The Python resolver has no explicit `preview_mode` flag: it always resolves foun
 | `<push-ros-namespace namespace=...>` | `resolve_substitutions` | Mode-aware |
 | `include_args` forwarded to child | `resolve_substitutions` | Mode-aware |
 | Condition expressions | `resolve_substitutions` | Mode-aware |
-| Python `_resolve_ros_substitutions` | regex replace | Always resolves if found; portable fallback if not found |
+| Python launch output | `state.resolve_pkg_share()` | Always resolves to real path |
 
 ## 15. Unresolvable Constructs (static-analysis limitations)
 
 Several launch-file constructs execute code at ROS 2 launch runtime and cannot be evaluated
-during static analysis.  launch-plus now reports each as an error or warning rather than
+during static analysis.  roscope now reports each as an error or warning rather than
 silently discarding the value.
 
 ### `$(command 'shell cmd' ['on_error'])` — **error**
@@ -1240,10 +1221,7 @@ The shell command is executed by ROS 2 at launch time.  Static analysis cannot r
 - In full (non-preview) mode the value is an empty string, matching the ROS 2 fallback
   when the command fails with the `'warn'` on-error policy.
 
-**Rust:** `Substitution::Command(String)` variant in the `Substitution` enum.
-`parse_substitution_expr` populates it; `resolve_substitutions_inner` reports the error and
-emits the placeholder.  The error is propagated via `SubstitutionResult::errors` to
-`ResolvedLaunch::errors`.
+**Implementation:** The `command` substitution type is parsed as a `CommandSubstitution` by the Lark grammar. The resolver reports the error via `_error()` and emits the placeholder. The error appears in `_state.tracked["errors"]`.
 
 ### `$(eval 'python_expr')` failure — **warning**
 
@@ -1259,8 +1237,7 @@ syntax error, etc.) the resolver falls back to `"false"`.
 - Previously only emitted as `tracing::warn!` (developer log); now also appears in the
   user-facing `[warning]` summary.
 
-**Rust:** In the `Eval` arm of `resolve_substitutions_inner`, the `Err` branch pushes to
-`SubstitutionResult::warnings` in addition to `tracing::warn!`.
+**Implementation:** In `EvalSubstitution.perform()`, a failed expression is reported via `_error()` and the result falls back to `"false"` or the original expression (in preview mode).
 
 ### Unknown Python action type — **warning**
 
@@ -1299,7 +1276,7 @@ The correct `package.xml` tag should be `<depend>` (which expands to `build_depe
 `build_export_depend` + `exec_depend`), since the semantic intent is that the
 sub-packages must be present in the install space when the metapackage is installed.
 
-**launch-plus stance:** This is an upstream packaging issue.  launch-plus uses
+**roscope stance:** This is an upstream packaging issue.  roscope uses
 `DependencyMode::Build` which walks `build_depend`, `build_export_depend`,
 `buildtool_depend`, and `<depend>` — matching the standard ROS 2 build dependency
 model.  Packages that use only `exec_depend` for sub-packages that must be built
@@ -1322,5 +1299,5 @@ respectively.  This causes two classes of failures:
    that `find_package` a test-only dependency outside `if(BUILD_TESTING)` cause CMake
    to fail when the test package is not in the build set.
 
-Both are upstream CMakeLists.txt bugs.  launch-plus recommends `-DBUILD_TESTING=OFF`
+Both are upstream CMakeLists.txt bugs.  roscope recommends `-DBUILD_TESTING=OFF`
 in the colcon flagfile for production builds, which is standard Autoware CI practice.

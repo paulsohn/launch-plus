@@ -1,15 +1,15 @@
-# Example colcon flagfile for launch-plus build / test modes.
+# Example colcon flagfile for roscope build / test modes.
 #
 # Usage:
-#   launch-plus build ... --colcon-flagfile examples/colcon-flags.example.txt
-#   launch-plus test  ... --colcon-flagfile examples/colcon-flags.example.txt
+#   roscope build ... --colcon-flagfile examples/colcon-flags.example.txt
+#   roscope test  ... --colcon-flagfile examples/colcon-flags.example.txt
 #
 # Format:
 #   One shell token per line.  Blank lines and lines starting with '#' are ignored.
 #   Multi-token arguments (e.g. --cmake-args -DFOO=bar) each go on their own line.
 #
 # Restrictions:
-#   The following flags are managed by launch-plus and must NOT appear here:
+#   The following flags are managed by roscope and must NOT appear here:
 #     --packages-select, --packages-up-to, --packages-skip, --packages-*
 #     --base-paths, --build-base, --install-base
 

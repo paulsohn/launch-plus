@@ -7,7 +7,7 @@ Vendored `.param.yaml` and `deploy_metadata.yaml` files from the
 
 Autoware launch files reference these param YAMLs via paths like
 `$HOME/autoware_data/lidar_centerpoint/*.param.yaml`.  When
-`launch-plus resolve --inline-params` encounters a `<param from="..."/>`
+`roscope resolve --inline-params` encounters a `<param from="..."/>`
 pointing to one of these files, it reads and inlines the YAML content.
 
 The full artifact set (including large ONNX models) is ~10 GB and managed

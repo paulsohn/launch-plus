@@ -22,8 +22,10 @@ jobs:
         include:
           - os: ubuntu-22.04
             ros_distro: humble
+            cuda_repo: ubuntu2204
           - os: ubuntu-24.04
             ros_distro: jazzy
+            cuda_repo: ubuntu2404
     steps:
       - uses: actions/checkout@v6
 
@@ -38,6 +40,14 @@ jobs:
             python3-pip \
             python3-venv \
             ros-dev-tools
+
+      - name: Install CUDA 12.8
+        run: |
+          curl -fsSL -o cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.cuda_repo }}/x86_64/cuda-keyring_1.1-1_all.deb
+          dpkg -i cuda-keyring.deb
+          rm cuda-keyring.deb
+          apt-get update
+          apt-get install -y --no-install-recommends cuda-nvcc-12-8 cuda-cudart-dev-12-8
 
       - name: Install pnpm
         run: npm install -g pnpm

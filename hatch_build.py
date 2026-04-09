@@ -3,10 +3,14 @@
 When building a wheel (``pip install .``), this hook runs ``pnpm install``
 and ``pnpm run build`` in the ``roscope_viz/`` directory, producing
 the compiled SPA in ``roscope/visualizer/static/``.
+
+``pnpm`` must be available on PATH. If it is not found the build fails with
+a clear error — a missing frontend would produce a broken install.
 """
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -18,6 +22,12 @@ class CustomBuildHook(BuildHookInterface):
         vis_dir = Path(self.root) / "roscope_viz"
         if not (vis_dir / "package.json").exists():
             return
+
+        if shutil.which("pnpm") is None:
+            raise RuntimeError(
+                "pnpm not found — cannot build frontend assets. "
+                "Install pnpm (https://pnpm.io/installation) and try again."
+            )
 
         self.app.display_info("Building frontend assets...")
 

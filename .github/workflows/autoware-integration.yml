@@ -33,9 +33,14 @@ jobs:
             build-essential \
             curl \
             git \
+            nodejs \
+            npm \
             python3-pip \
             python3-venv \
             ros-dev-tools
+
+      - name: Install pnpm
+        run: npm install -g pnpm
 
       - name: Initialize rosdep
         run: |
@@ -44,7 +49,10 @@ jobs:
         shell: bash
 
       - name: Install roscope
-        run: pip install -e . || pip install --break-system-packages -e .
+        run: |
+          python3 -m venv /opt/roscope-venv
+          /opt/roscope-venv/bin/pip install -e .
+          echo "/opt/roscope-venv/bin" >> $GITHUB_PATH
 
       - name: Install acados
         run: bash example/autoware/install-acados.sh

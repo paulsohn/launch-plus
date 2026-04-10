@@ -156,6 +156,9 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       "font-size": "9px",
       color: "#fff",
       "z-index": 9999,
+      // Draw above all sibling compound boxes at every nesting depth,
+      // while remaining a compound child for hit-testing.
+      "z-compound-depth": "top",
       "text-wrap": "wrap",
     },
   },
@@ -250,9 +253,17 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
     // Shared selection logic for tap and drag
     function selectNode(node: cytoscape.NodeSingular) {
       onNodeTap(node.data());
-      cy.elements().removeClass("highlighted").addClass("faded");
+      // Only fade non-compound nodes and edges. Fading compound parents
+      // cascades opacity to their children (0.2 × 0.2 = 0.04), making
+      // topics inside faded compounds nearly invisible.
+      cy.elements().removeClass("highlighted");
+      cy.elements().not(":parent").addClass("faded");
       node.removeClass("faded").addClass("highlighted");
-      node.ancestors().removeClass("faded");
+      const ancestors = node.ancestors();
+      ancestors.removeClass("faded");
+      // Topics inside ancestor compounds would appear against a full-opacity
+      // background while faded (0.2 opacity) — unfade them too.
+      ancestors.descendants('[type="topic"]').removeClass("faded");
       if (node.isParent()) {
         const desc = node.descendants();
         desc.removeClass("faded").addClass("highlighted");
@@ -273,12 +284,12 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
       }
     }
 
-    // Event handlers — tap or grab selects + highlights
-    cy.on("tap", "node", (evt) => selectNode(evt.target));
-
-    // Grab fires on the target node AND bubbles to all ancestor compounds.
-    // We only want the deepest (first) grab — use a per-tick flag to ignore
-    // the bubbled re-fires on parent compounds.
+    // Event handlers — grab selects + highlights.
+    // We use grab (not tap) for node selection because:
+    //   1. grab fires on both click and drag — tap does not fire on drag.
+    //   2. tap bubbles to ancestor compounds, causing selectNode to be called
+    //      again with a compound as target, overriding the leaf selection.
+    // Grab also bubbles to ancestors, so we deduplicate with a per-tick flag.
     let grabHandled = false;
     cy.on("grab", "node", (evt) => {
       if (grabHandled) return;

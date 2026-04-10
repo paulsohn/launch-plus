@@ -71,6 +71,9 @@ variables substituted — invaluable for debugging and CI validation.
 - **Python 3.10+** — used to evaluate Python launch files and `$(eval ...)` substitutions in XML
 - **Git** — for sparse-checkout operations
 - **ROS 2** — source your ROS 2 environment (`source /opt/ros/<distro>/setup.bash`)
+- **pnpm** — required to build the web visualizer ([install](https://pnpm.io/installation))
+- **rosdep** — required for `--rosdep` (part of `ros-dev-tools`, not the base ROS 2 runtime)
+- **colcon** — required for `build` / `test` commands (part of `ros-dev-tools`)
 
 ### Install
 
@@ -154,6 +157,26 @@ See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
 | `clean` | Remove fetched packages |
 
 Run `roscope <command> --help` for detailed usage of each command.
+
+## Visualizer
+
+`resolve` and `build` accept a `--visualize` flag that opens an interactive
+graph view of the resolved launch structure in your browser:
+
+```bash
+roscope resolve -d autoware_launch autoware.launch.xml \
+  sensor_model:=sample_sensor_kit \
+  vehicle_model:=sample_vehicle \
+  "map_path:={map_path}" \
+  --visualize
+```
+
+The visualizer shows the full node graph — groups (include boundaries),
+containers, composable nodes, topics, and remaps — as a compound graph with
+interactive selection and detail panel.
+
+Use `--viz-id <name>` to label the snapshot; multiple snapshots are accessible
+from the browser UI. Snapshots are cached in `~/.cache/roscope-viz/`.
 
 ## Workspace state flags
 

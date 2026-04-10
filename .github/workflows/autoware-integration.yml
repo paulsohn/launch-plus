@@ -35,11 +35,15 @@ jobs:
             build-essential \
             curl \
             git \
-            nodejs \
-            npm \
             python3-pip \
             python3-venv \
             ros-dev-tools
+
+      - name: Install Node.js (LTS) and pnpm
+        run: |
+          curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+          apt-get install -y nodejs
+          npm install -g pnpm
 
       - name: Install CUDA 12.8
         run: |
@@ -48,9 +52,6 @@ jobs:
           rm cuda-keyring.deb
           apt-get update
           apt-get install -y --no-install-recommends cuda-nvcc-12-8 cuda-cudart-dev-12-8
-
-      - name: Install pnpm
-        run: npm install -g pnpm
 
       - name: Initialize rosdep
         run: |

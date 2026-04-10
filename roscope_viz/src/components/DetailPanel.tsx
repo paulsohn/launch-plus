@@ -25,10 +25,22 @@ interface Props {
 }
 
 export function DetailPanel({ detail, graph, onClose }: Props) {
+  const displayType: Record<string, string> = {
+    group: "Include boundary",
+    lcn_wrapper: "LoadComposableNodes call",
+    container: "Node container",
+    node: "Node",
+    lifecycle_node: "Lifecycle node",
+    composable_node: "Composable node",
+    load_composable_node: "Load composable node",
+    executable: "Executable",
+    topic: "Topic",
+  };
+
   const title = !detail
     ? ""
-    : detail.type === "group"
-      ? detail.source || "Group"
+    : detail.type === "group" || detail.type === "lcn_wrapper"
+      ? detail.source || displayType[detail.type as string] || detail.type
       : detail.fqn || detail.fullName || detail.name || "Vertex";
 
   return (
@@ -44,7 +56,9 @@ export function DetailPanel({ detail, graph, onClose }: Props) {
       <div id="detail-body">
         {!detail && <GraphStats graph={graph} />}
         {detail && <h3>Info</h3>}
-        {detail?.type && <Field label="Type" value={detail.type} />}
+        {detail?.type && (
+          <Field label="Type" value={displayType[detail.type] ?? detail.type} />
+        )}
         {detail?.source && <Field label="Source" value={detail.source} />}
         {detail?.package && <Field label="Package" value={detail.package} />}
         {detail?.executable && (

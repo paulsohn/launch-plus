@@ -177,13 +177,14 @@ function GraphStats({ graph }: { graph: GraphData }) {
   const nodes = graph.nodes;
   const groups = graph.groups;
 
-  const nodeCount = nodes.filter((n) => n.type === "node" || n.type === "lifecycle_node").length;
+  const standaloneCount = nodes.filter((n) => n.type === "node" || n.type === "lifecycle_node").length;
   const lifecycleCount = nodes.filter((n) => n.type === "lifecycle_node").length;
-  const containerCount = nodes.filter((n) => n.type === "container").length;
   const composableCount = nodes.filter((n) => n.type === "composable_node").length;
+  const totalNodeCount = standaloneCount + composableCount;
+  const containerCount = nodes.filter((n) => n.type === "container").length;
   const executableCount = nodes.filter((n) => n.type === "executable").length;
   const includeCount = groups.filter((g) => g.groupType === "include").length;
-  const lcnWrapperCount = groups.filter((g) => g.groupType === "lcn_wrapper").length;
+  const lcnCallCount = groups.filter((g) => g.groupType === "lcn_wrapper").length;
   const topicCount = graph.topics.length;
   const remapCount = graph.edges.filter((e) => e.type === "remap").length;
   const paramCount = nodes.reduce((s, n) => s + n.params.length, 0);
@@ -202,10 +203,11 @@ function GraphStats({ graph }: { graph: GraphData }) {
       <h3>Vertices</h3>
       <table style={{ width: "100%" }}>
         <tbody>
-          <StatRow label="Nodes" value={nodeCount} />
-          {lifecycleCount > 0 && <StatRow label="↳ Lifecycle" value={lifecycleCount} />}
-          {containerCount > 0 && <StatRow label="Containers" value={containerCount} />}
-          {composableCount > 0 && <StatRow label="Composable nodes" value={composableCount} />}
+          <StatRow label="Nodes (total)" value={totalNodeCount} />
+          <StatRow label="↳ Standalone" value={standaloneCount} />
+          {lifecycleCount > 0 && <StatRow label="  ↳ Lifecycle" value={lifecycleCount} />}
+          {composableCount > 0 && <StatRow label="↳ Composable" value={composableCount} />}
+          {containerCount > 0 && <StatRow label="Node containers" value={containerCount} />}
           {executableCount > 0 && <StatRow label="Executables" value={executableCount} />}
           <StatRow label="Topics" value={topicCount} />
         </tbody>
@@ -215,7 +217,7 @@ function GraphStats({ graph }: { graph: GraphData }) {
       <table style={{ width: "100%" }}>
         <tbody>
           <StatRow label="Include files" value={includeCount} />
-          {lcnWrapperCount > 0 && <StatRow label="LCN wrappers" value={lcnWrapperCount} />}
+          {lcnCallCount > 0 && <StatRow label="LoadComposableNodes calls" value={lcnCallCount} />}
           <StatRow label="Packages" value={packageCount} />
         </tbody>
       </table>

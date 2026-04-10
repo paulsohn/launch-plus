@@ -128,6 +128,7 @@ class _GraphBuilder:
                 "id": gid,
                 "source": source,
                 "parent": parent_id,
+                "groupType": "include",
                 "args": args,
                 "includeArgs": include_args,
             }

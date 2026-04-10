@@ -107,7 +107,7 @@ class _GraphBuilder:
         # SourceMarker is the first child of the GroupAction.
         source = None
         if children and isinstance(children[0], SourceMarker):
-            source = children[0].label()
+            source = children[0].file_path
 
         # Collect ArgComment entries from children
         args = []

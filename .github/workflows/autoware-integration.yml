@@ -63,7 +63,7 @@ jobs:
         run: |
           python3 -m venv /opt/roscope-venv
           /opt/roscope-venv/bin/pip install -e .
-          echo "/opt/roscope-venv/bin" >> $GITHUB_PATH
+          ln -s /opt/roscope-venv/bin/roscope /usr/local/bin/roscope
 
       - name: Install acados
         run: bash example/autoware/install-acados.sh

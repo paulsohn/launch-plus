@@ -35,7 +35,8 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
     selector: 'node[type="lcn_wrapper"]',
     style: {
       shape: "round-rectangle",
-      "background-color": "rgba(93, 173, 226, 0.15)",
+      "background-color": "transparent",
+      "background-opacity": 0,
       "border-color": "#5dade2",
       "border-width": 2,
       "border-style": "dashed",

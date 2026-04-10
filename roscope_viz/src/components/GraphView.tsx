@@ -155,6 +155,7 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       "text-halign": "center",
       "font-size": "9px",
       color: "#fff",
+      "z-index": 9999,
       "text-wrap": "wrap",
     },
   },

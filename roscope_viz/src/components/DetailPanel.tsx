@@ -1,4 +1,4 @@
-import type { ArgEntry, ParamEntry, RemapEntry } from "../types.generated";
+import type { ArgEntry, GraphData, ParamEntry, RemapEntry } from "../types.generated";
 
 interface NodeDetail {
   type?: string;
@@ -20,10 +20,11 @@ interface NodeDetail {
 
 interface Props {
   detail: NodeDetail | null;
+  graph: GraphData;
   onClose: () => void;
 }
 
-export function DetailPanel({ detail, onClose }: Props) {
+export function DetailPanel({ detail, graph, onClose }: Props) {
   const title = !detail
     ? ""
     : detail.type === "group"
@@ -41,7 +42,7 @@ export function DetailPanel({ detail, onClose }: Props) {
         )}
       </div>
       <div id="detail-body">
-        {!detail && <p style={{ color: "#8888aa", fontSize: "12px" }}>Click or drag a vertex to inspect it.</p>}
+        {!detail && <GraphStats graph={graph} />}
         {detail && <h3>Info</h3>}
         {detail?.type && <Field label="Type" value={detail.type} />}
         {detail?.source && <Field label="Source" value={detail.source} />}
@@ -160,5 +161,76 @@ function Field({ label, value }: { label: string; value: string }) {
     <div className="field">
       <span className="field-label">{label}:</span> {value}
     </div>
+  );
+}
+
+function StatRow({ label, value }: { label: string; value: number }) {
+  return (
+    <tr>
+      <td style={{ color: "#8888aa", paddingRight: "12px" }}>{label}</td>
+      <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{value}</td>
+    </tr>
+  );
+}
+
+function GraphStats({ graph }: { graph: GraphData }) {
+  const nodes = graph.nodes;
+  const groups = graph.groups;
+
+  const nodeCount = nodes.filter((n) => n.type === "node" || n.type === "lifecycle_node").length;
+  const lifecycleCount = nodes.filter((n) => n.type === "lifecycle_node").length;
+  const containerCount = nodes.filter((n) => n.type === "container").length;
+  const composableCount = nodes.filter((n) => n.type === "composable_node").length;
+  const executableCount = nodes.filter((n) => n.type === "executable").length;
+  const includeCount = groups.filter((g) => g.groupType === "include").length;
+  const lcnWrapperCount = groups.filter((g) => g.groupType === "lcn_wrapper").length;
+  const topicCount = graph.topics.length;
+  const remapCount = graph.edges.filter((e) => e.type === "remap").length;
+  const paramCount = nodes.reduce((s, n) => s + n.params.length, 0);
+  const packageCount = new Set(nodes.map((n) => n.package).filter(Boolean)).size;
+
+  const { package: pkg, launcher, timestamp } = graph.metadata;
+  const ts = new Date(timestamp).toLocaleString();
+
+  return (
+    <>
+      <div style={{ color: "#8888aa", fontSize: "11px", marginBottom: "12px" }}>
+        <div style={{ marginBottom: "2px" }}>{pkg} / {launcher}</div>
+        <div>{ts}</div>
+      </div>
+
+      <h3>Vertices</h3>
+      <table style={{ width: "100%" }}>
+        <tbody>
+          <StatRow label="Nodes" value={nodeCount} />
+          {lifecycleCount > 0 && <StatRow label="↳ Lifecycle" value={lifecycleCount} />}
+          {containerCount > 0 && <StatRow label="Containers" value={containerCount} />}
+          {composableCount > 0 && <StatRow label="Composable nodes" value={composableCount} />}
+          {executableCount > 0 && <StatRow label="Executables" value={executableCount} />}
+          <StatRow label="Topics" value={topicCount} />
+        </tbody>
+      </table>
+
+      <h3>Structure</h3>
+      <table style={{ width: "100%" }}>
+        <tbody>
+          <StatRow label="Include files" value={includeCount} />
+          {lcnWrapperCount > 0 && <StatRow label="LCN wrappers" value={lcnWrapperCount} />}
+          <StatRow label="Packages" value={packageCount} />
+        </tbody>
+      </table>
+
+      <h3>Connections</h3>
+      <table style={{ width: "100%" }}>
+        <tbody>
+          <StatRow label="Remaps" value={remapCount} />
+          <StatRow label="Parameters" value={paramCount} />
+        </tbody>
+      </table>
+
+      <p style={{ color: "#555577", fontSize: "11px", marginTop: "16px" }}>
+        Click or drag a vertex to inspect it.
+      </p>
+    </>
   );
 }

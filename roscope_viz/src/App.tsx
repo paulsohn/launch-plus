@@ -44,6 +44,7 @@ export function App() {
       />
       <DetailPanel
         detail={detail as Parameters<typeof DetailPanel>[0]["detail"]}
+        graph={store.activeGraph}
         onClose={() => {
           setDetail(null);
           cyRef.current?.elements().removeClass("highlighted faded");

@@ -222,6 +222,7 @@ function GraphStats({ graph }: { graph: GraphData }) {
           {lifecycleCount > 0 && <StatRow label="  ↳ Lifecycle" value={lifecycleCount} />}
           {composableCount > 0 && <StatRow label="↳ Composable" value={composableCount} />}
           {containerCount > 0 && <StatRow label="Node containers" value={containerCount} />}
+          {lcnCallCount > 0 && <StatRow label="LoadComposableNodes calls" value={lcnCallCount} />}
           {executableCount > 0 && <StatRow label="Executables" value={executableCount} />}
           <StatRow label="Topics" value={topicCount} />
         </tbody>
@@ -231,7 +232,6 @@ function GraphStats({ graph }: { graph: GraphData }) {
       <table style={{ width: "100%" }}>
         <tbody>
           <StatRow label="Include files" value={includeCount} />
-          {lcnCallCount > 0 && <StatRow label="LoadComposableNodes calls" value={lcnCallCount} />}
           <StatRow label="Packages" value={packageCount} />
         </tbody>
       </table>

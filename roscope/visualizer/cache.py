@@ -48,8 +48,7 @@ def load_catalog() -> dict[str, list[dict]]:
     """Load all cached snapshots, grouped by viz-id.
 
     Returns ``{ viz_id: [snapshot_dict, ...] }`` sorted by timestamp.
-    Viz-ids may contain ``/`` (e.g. ``package/launcher``), producing
-    nested directories under the cache root.
+    Viz-ids are flat sanitized directory names (see ``sanitize_viz_id``).
     """
     catalog: dict[str, list[dict]] = {}
     if not _CACHE_ROOT.is_dir():
@@ -76,12 +75,30 @@ def load_catalog() -> dict[str, list[dict]]:
     return catalog
 
 
+def _safe_timestamp(timestamp: str) -> bool:
+    """Return True when timestamp is a safe single-component filename stem."""
+    if not timestamp or timestamp in {".", ".."}:
+        return False
+    return Path(timestamp).name == timestamp
+
+
 def remove_snapshot(viz_id: str, timestamp: str) -> bool:
     """Remove a specific snapshot. Returns True if deleted."""
-    path = _CACHE_ROOT / viz_id / f"{timestamp}.json"
+    viz_id = sanitize_viz_id(viz_id)
+    if not _safe_timestamp(timestamp):
+        logger.warning("Refusing to remove snapshot with unsafe timestamp: %r", timestamp)
+        return False
+
+    cache_root_resolved = _CACHE_ROOT.resolve(strict=False)
+    path = (_CACHE_ROOT / viz_id / f"{timestamp}.json").resolve(strict=False)
+    try:
+        path.relative_to(cache_root_resolved)
+    except ValueError:
+        logger.warning("Refusing to delete snapshot outside cache root: %s", path)
+        return False
+
     if path.is_file():
         path.unlink()
-        # Remove empty viz-id directory
         viz_dir = path.parent
         if viz_dir.is_dir() and not any(viz_dir.iterdir()):
             viz_dir.rmdir()

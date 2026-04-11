@@ -480,7 +480,7 @@ def fetch(
 @click.option("-d", "--dirty", is_flag=True)
 @click.option("--shallow", is_flag=True)
 @click.option("--visualize", is_flag=True, help="Open graph visualizer in browser")
-@click.option("--viz-id", default="", help="Visualizer history label (default: pkg/launcher)")
+@click.option("--viz-id", default="", help="Visualizer history label (default: 'default')")
 @click.pass_context
 def resolve(
     ctx: click.Context,

@@ -160,7 +160,7 @@ Run `roscope <command> --help` for detailed usage of each command.
 
 ## Visualizer
 
-`resolve` and `build` accept a `--visualize` flag that opens an interactive
+`resolve` accepts a `--visualize` flag that opens an interactive
 graph view of the resolved launch structure in your browser:
 
 ```bash

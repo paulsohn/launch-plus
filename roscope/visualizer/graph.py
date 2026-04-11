@@ -288,7 +288,7 @@ class _GraphBuilder:
             target_name = children[0][0]
             fallback_parent = children[0][2]
             container_id = self._containers.get(target_name)
-            actual_parent = container_id or fallback_parent or ""
+            actual_parent = container_id if container_id is not None else fallback_parent
 
             # Create a wrapper group inside the container for this LCN
             wrapper_id = self._uid("lcn_wrapper", lcn_id)

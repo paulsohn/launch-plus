@@ -31,7 +31,7 @@ _STATIC_DIR = Path(str(files("roscope.visualizer") / "static"))
 
 # Auto-shutdown: if no /api/catalog poll for this many seconds
 # after at least one poll has been received, the server exits.
-_IDLE_TIMEOUT_SECONDS = 10
+_IDLE_TIMEOUT_SECONDS = 300
 _WATCHDOG_CHECK_INTERVAL = 3
 
 
@@ -83,7 +83,6 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
@@ -113,14 +112,15 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(resp)
 
     def _serve_file(self, file_path: Path) -> None:
-        # Security: ensure path doesn't escape static dir
         try:
+            static_root = _STATIC_DIR.resolve()
             resolved = file_path.resolve()
-            if not str(resolved).startswith(str(_STATIC_DIR.resolve())):
-                self.send_error(403)
-                return
-        except (OSError, ValueError):
+            resolved.relative_to(static_root)
+        except OSError:
             self.send_error(404)
+            return
+        except ValueError:
+            self.send_error(403)
             return
 
         if not resolved.is_file():
@@ -219,7 +219,7 @@ def serve(
     if info is not None:
         existing_port = info.get("port")
         existing_pid = info.get("pid")
-        if existing_port and _is_server_alive(existing_pid):
+        if existing_port and _is_server_alive(existing_pid) and _is_port_open(existing_port):
             url = f"http://127.0.0.1:{existing_port}"
             print(f"Visualizer: {url} (server already running)", file=sys.stderr)
             if open_browser:
@@ -256,4 +256,13 @@ def _is_server_alive(pid: int | None) -> bool:
         os.kill(pid, 0)
         return True
     except (OSError, ProcessLookupError):
+        return False
+
+
+def _is_port_open(port: int) -> bool:
+    """Return True if something is accepting connections on localhost:port."""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return True
+    except OSError:
         return False

@@ -224,7 +224,7 @@ function GraphStats({ graph }: { graph: GraphData }) {
           {containerCount > 0 && <StatRow label="Node containers" value={containerCount} />}
           {lcnCallCount > 0 && <StatRow label="LoadComposableNodes calls" value={lcnCallCount} />}
           {executableCount > 0 && <StatRow label="Executables" value={executableCount} />}
-          <StatRow label="Topics" value={topicCount} />
+          <StatRow label="Tracked topics" value={topicCount} />
         </tbody>
       </table>
 

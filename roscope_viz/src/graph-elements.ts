@@ -184,7 +184,6 @@ export function buildElements(graph: GraphData): ElementDefinition[] {
         fullName: t.name,
         type: "topic",
         parent: lcaParent,
-        isPrivate: t.isPrivate ?? false,
       },
     });
   }

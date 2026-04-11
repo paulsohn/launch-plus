@@ -8,7 +8,10 @@ and edges suitable for hierarchical graph layout.
 from __future__ import annotations
 
 import hashlib
+import logging
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 
 def actions_to_graph(
@@ -35,8 +38,8 @@ class _GraphBuilder:
 
         self._nodes: list[dict] = []
         self._groups: list[dict] = []
-        self._topics: dict[str, str] = {}  # canonical_key -> topic_id
-        self._topic_meta: dict[str, dict] = {}  # topic_id -> {name, is_private}
+        self._topics: dict[str, str] = {}  # expanded_topic_name -> topic_id
+        self._topic_meta: dict[str, dict] = {}  # topic_id -> {name}
         self._edges: list[dict] = []
 
         # For resolving LoadComposableNodes targets
@@ -58,16 +61,20 @@ class _GraphBuilder:
         self._uid_counters[base] = count + 1
         return base if count == 0 else f"{base}#{count}"
 
-    def _get_or_create_topic(self, topic_name: str, node_id: str) -> str:
-        is_private = topic_name.startswith("~/")
-        # Private topics (~/) are node-scoped: two nodes with ~/foo are
-        # different topics, so key by (node_id, topic_name).
-        canonical_key = f"{node_id}\0{topic_name}" if is_private else topic_name
-        if canonical_key in self._topics:
-            return self._topics[canonical_key]
-        tid = self._uid("topic", node_id if is_private else "", topic_name)
-        self._topics[canonical_key] = tid
-        self._topic_meta[tid] = {"name": topic_name, "isPrivate": is_private}
+    def _get_or_create_topic(self, topic_name: str, node_fqn: str, node_ns: str) -> str:
+        # Resolve topic name to absolute form following ROS 2 name rules:
+        #   ~/foo  → <node_fqn>/foo   (private, node-scoped, best-effort)
+        #   foo    → <node_ns>/foo    (relative, namespace-scoped)
+        #   /foo   → /foo             (absolute, used as-is)
+        if topic_name.startswith("~/"):
+            topic_name = f"{node_fqn.rstrip('/')}/{topic_name[2:]}"
+        elif not topic_name.startswith("/"):
+            topic_name = f"{node_ns.rstrip('/')}/{topic_name}"
+        if topic_name in self._topics:
+            return self._topics[topic_name]
+        tid = self._uid("topic", topic_name)
+        self._topics[topic_name] = tid
+        self._topic_meta[tid] = {"name": topic_name}
         return tid
 
     def _package_color(self, pkg: str) -> str:
@@ -148,6 +155,14 @@ class _GraphBuilder:
         ns = action.namespace or "/"
         # Fallback to executable is best-effort; users should set name= explicitly.
         name = action.name or action.executable or ""
+        if not action.name:
+            logger.warning(
+                "Node in package %r has no name set (executable=%r, namespace=%r); "
+                "FQN is best-effort.",
+                action.package,
+                action.executable,
+                ns,
+            )
         fqn = f"{ns.rstrip('/')}/{name}"
         nid = self._uid("node", action.package, fqn)
 
@@ -165,7 +180,7 @@ class _GraphBuilder:
             "remaps": self._extract_remaps(action),
         }
         self._nodes.append(node_entry)
-        self._add_topic_edges(nid, action)
+        self._add_topic_edges(nid, fqn, ns, action)
 
     def _handle_container(self, action, parent_id: str | None) -> None:
         if not action.package:
@@ -173,6 +188,14 @@ class _GraphBuilder:
         ns = action.namespace or "/"
         # Fallback to executable is best-effort; users should set name= explicitly.
         name = action.name or action.executable or ""
+        if not action.name:
+            logger.warning(
+                "Container in package %r has no name set (executable=%r, namespace=%r); "
+                "FQN is best-effort.",
+                action.package,
+                action.executable,
+                ns,
+            )
         fqn = f"{ns.rstrip('/')}/{name}"
         cid = self._uid("container", action.package, fqn)
 
@@ -207,6 +230,11 @@ class _GraphBuilder:
         cname = data.get("name", "")
         cns = data.get("namespace", "/") or "/"
         cfqn = f"{cns.rstrip('/')}/{cname}" if cname else cns
+        if not cname:
+            logger.warning(
+                "ComposableNode with plugin %r has no name set; FQN is best-effort.",
+                plugin,
+            )
         cnid = self._uid("composable", parent_id, plugin, cname)
         node_entry = {
             "id": cnid,
@@ -228,7 +256,7 @@ class _GraphBuilder:
         # Topic edges from composable node remaps
         for remap in data.get("remappings", []):
             if len(remap) == 2 and remap[1]:
-                tid = self._get_or_create_topic(remap[1], cnid)
+                tid = self._get_or_create_topic(remap[1], cfqn, cns)
                 self._edges.append({"source": cnid, "target": tid, "type": "remap"})
 
     def _handle_load_composable(self, action, parent_id: str | None) -> None:
@@ -335,11 +363,11 @@ class _GraphBuilder:
         remaps = getattr(action, "remappings", [])
         return [{"from": r[0], "to": r[1]} for r in remaps if len(r) == 2]
 
-    def _add_topic_edges(self, node_id: str, action) -> None:
+    def _add_topic_edges(self, node_id: str, node_fqn: str, node_ns: str, action) -> None:
         remaps = getattr(action, "remappings", [])
         for remap in remaps:
             if len(remap) == 2 and remap[1]:
-                tid = self._get_or_create_topic(remap[1], node_id)
+                tid = self._get_or_create_topic(remap[1], node_fqn, node_ns)
                 self._edges.append({"source": node_id, "target": tid, "type": "remap"})
 
     def to_dict(self) -> dict:

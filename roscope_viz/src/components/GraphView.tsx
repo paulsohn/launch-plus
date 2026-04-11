@@ -5,7 +5,7 @@
  * and handles interaction (click for detail, double-click to collapse groups).
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import cytoscape from "cytoscape";
 import type { GraphData } from "../types.generated";
 import { buildElements } from "../graph-elements";
@@ -206,7 +206,7 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
 
 interface Props {
   graph: GraphData;
-  cyRef: React.RefObject<cytoscape.Core | null>;
+  cyRef: RefObject<cytoscape.Core | null>;
   onNodeTap: (data: Record<string, unknown>) => void;
   onBackgroundTap: () => void;
 }

@@ -247,7 +247,12 @@ def serve(
         _run_server(port)
         os._exit(0)
     else:
-        # ── Parent: report and return to shell ──
+        # ── Parent: wait briefly for the child to start listening ──
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            if _is_port_open(port):
+                break
+            time.sleep(0.05)
         print(f"Visualizer: {url} (server pid {pid})", file=sys.stderr)
         if open_browser:
             webbrowser.open(url)
@@ -256,7 +261,7 @@ def serve(
 
 def _is_server_alive(pid: int | None) -> bool:
     """Check if a process with the given PID is still running."""
-    if pid is None:
+    if not pid or pid <= 0:
         return False
     try:
         os.kill(pid, 0)

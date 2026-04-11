@@ -236,26 +236,24 @@ def serve(
     url = f"http://127.0.0.1:{port}"
 
     # Fork a child process for the server.
-    # Write server.json in the parent (before fork) so the file is guaranteed
-    # to exist by the time we return and any caller tries to reuse it.
-    # The child PID isn't known yet, so we write pid=0 as a placeholder and
-    # let the child overwrite it with its real PID after setsid().
-    cache.write_server_info(port, 0)
-
+    # server.json is written by the parent only after the port is confirmed
+    # open, using the real child PID. This avoids the race where a concurrent
+    # invocation sees a pid=0 placeholder or a live PID with a port not yet
+    # bound, and incorrectly decides no server is running.
     pid = os.fork()
     if pid == 0:
         # ── Child: become a daemon ──
         os.setsid()  # new session, detach from terminal
-        cache.write_server_info(port, os.getpid())
         _run_server(port)
         os._exit(0)
     else:
-        # ── Parent: wait briefly for the child to start listening ──
+        # ── Parent: wait for the child to start listening, then record it ──
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline:
             if _is_port_open(port):
                 break
             time.sleep(0.05)
+        cache.write_server_info(port, pid)
         print(f"Visualizer: {url} (server pid {pid})", file=sys.stderr)
         if open_browser:
             webbrowser.open(url)

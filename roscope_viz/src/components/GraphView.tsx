@@ -1,8 +1,8 @@
 /**
  * Cytoscape.js graph visualization component.
  *
- * Converts GraphData into Cytoscape elements, runs cose layout,
- * and handles interaction (click for detail, double-click to collapse groups).
+ * Converts GraphData into Cytoscape elements, runs compound layout,
+ * and handles interaction (click for detail, background click to clear selection).
  */
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";

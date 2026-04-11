@@ -207,6 +207,13 @@ def serve(
     """
     from roscope.visualizer.graph import actions_to_graph
 
+    if not (_STATIC_DIR / "index.html").is_file():
+        raise RuntimeError(
+            "Visualizer frontend assets not found in "
+            f"{_STATIC_DIR}. "
+            "Run 'pnpm run build' in roscope_viz/ or install a wheel that includes the assets."
+        )
+
     # Build graph and save to cache
     graph = actions_to_graph(actions, package, launcher)
     timestamp = graph["metadata"]["timestamp"]
@@ -253,6 +260,9 @@ def serve(
             if _is_port_open(port):
                 break
             time.sleep(0.05)
+        else:
+            logger.warning("Visualizer server did not start within 5 seconds; giving up.")
+            return
         cache.write_server_info(port, pid)
         print(f"Visualizer: {url} (server pid {pid})", file=sys.stderr)
         if open_browser:

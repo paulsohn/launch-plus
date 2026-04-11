@@ -30,8 +30,17 @@ def server_json_path() -> Path:
 
 
 def sanitize_viz_id(viz_id: str) -> str:
-    """Replace unsafe characters so viz-id is a valid flat directory name."""
-    return re.sub(r"[^a-zA-Z0-9._-]", "_", viz_id)
+    """Replace unsafe characters so viz-id is a valid flat directory name.
+
+    Empty/whitespace-only input and the special path components ``.`` and ``..``
+    are normalized to ``_`` to prevent path traversal.
+    """
+    if not viz_id or not viz_id.strip():
+        return "_"
+    sanitized = re.sub(r"[^a-zA-Z0-9._-]", "_", viz_id)
+    if sanitized in {".", ".."}:
+        return "_"
+    return sanitized
 
 
 def save_snapshot(viz_id: str, graph: dict, timestamp: str) -> Path:

@@ -1,7 +1,8 @@
+import type { RefObject } from "react";
 import type cytoscape from "cytoscape";
 
 interface Props {
-  cyRef: React.RefObject<cytoscape.Core | null>;
+  cyRef: RefObject<cytoscape.Core | null>;
 }
 
 export function Toolbar({ cyRef }: Props) {

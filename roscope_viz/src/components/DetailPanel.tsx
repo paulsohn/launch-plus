@@ -201,7 +201,7 @@ function GraphStats({ graph }: { graph: GraphData }) {
   const lcnCallCount = groups.filter((g) => g.groupType === "lcn_wrapper").length;
   const topicCount = graph.topics.length;
   const remapCount = graph.edges.filter((e) => e.type === "remap").length;
-  const paramCount = nodes.reduce((s, n) => s + n.params.length, 0);
+  const paramCount = nodes.reduce((s, n) => s + (n.params?.length ?? 0), 0);
   const packageCount = new Set(nodes.map((n) => n.package).filter(Boolean)).size;
 
   const { package: pkg, launcher, timestamp } = graph.metadata;

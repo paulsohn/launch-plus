@@ -232,7 +232,13 @@ def serve(
 
     url = f"http://127.0.0.1:{port}"
 
-    # Fork a child process for the server
+    # Fork a child process for the server.
+    # Write server.json in the parent (before fork) so the file is guaranteed
+    # to exist by the time we return and any caller tries to reuse it.
+    # The child PID isn't known yet, so we write pid=0 as a placeholder and
+    # let the child overwrite it with its real PID after setsid().
+    cache.write_server_info(port, 0)
+
     pid = os.fork()
     if pid == 0:
         # ── Child: become a daemon ──

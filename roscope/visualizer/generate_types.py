@@ -90,13 +90,14 @@ def _emit_interface(cls: type, *, indent: str = "  ") -> str:
         ts_name = _field_name(f.name)
         annotation = hints[f.name]
 
-        # Check if the field is optional (has a default of None or Optional type)
-        origin = typing.get_origin(annotation)
-        args = typing.get_args(annotation)
-        is_nullable = (origin is Union or origin is types.UnionType) and type(None) in args
+        # A field is optional (?) only when it has a Python default value.
+        # Nullable (T | None) does not imply optional — those are separate concerns.
+        has_default = (
+            f.default is not dataclasses.MISSING or f.default_factory is not dataclasses.MISSING  # type: ignore[misc]
+        )
 
         ts = _ts_type(annotation)
-        optional = "?" if is_nullable else ""
+        optional = "?" if has_default else ""
         lines.append(f"{indent}{ts_name}{optional}: {ts};")
 
     lines.append("}")

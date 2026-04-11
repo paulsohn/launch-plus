@@ -21,10 +21,10 @@ export interface ArgEntry {
 export interface GraphNode {
   id: string;
   type: "node" | "lifecycle_node" | "container" | "composable_node" | "load_composable_node" | "executable";
-  parent?: string | null;
+  parent: string | null;
   color: string;
-  params: ParamEntry[];
-  remaps: RemapEntry[];
+  params?: ParamEntry[];
+  remaps?: RemapEntry[];
   package?: string | null;
   executable?: string | null;
   plugin?: string | null;
@@ -37,10 +37,10 @@ export interface GraphNode {
 
 export interface GraphGroup {
   id: string;
-  source?: string | null;
-  parent?: string | null;
-  groupType: "include" | "lcn_wrapper";
-  args: ArgEntry[];
+  source: string | null;
+  parent: string | null;
+  groupType?: "include" | "lcn_wrapper";
+  args?: ArgEntry[];
   includeArgs?: Record<string, string> | null;
 }
 

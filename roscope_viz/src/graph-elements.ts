@@ -88,6 +88,13 @@ export function buildElements(graph: GraphData): ElementDefinition[] {
     typeMap.set(g.id, type);
   }
 
+  // Nodes — populate parentMap/typeMap for compound node types (containers)
+  // before computing group depths, so nesting inside a container is counted.
+  for (const n of graph.nodes) {
+    parentMap.set(n.id, n.parent ?? undefined);
+    typeMap.set(n.id, n.type);
+  }
+
   // Groups — second pass: build elements with depth
   for (const g of graph.groups) {
     const isLcnWrapper = g.groupType === "lcn_wrapper";
@@ -124,8 +131,6 @@ export function buildElements(graph: GraphData): ElementDefinition[] {
             ? "load"
             : n.fqn || n.name || "vertex";
 
-    parentMap.set(n.id, n.parent ?? undefined);
-    typeMap.set(n.id, n.type);
     elements.push({
       group: "nodes",
       data: {

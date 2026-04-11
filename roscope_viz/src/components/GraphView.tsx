@@ -235,20 +235,27 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
 
     cyRef.current = cy;
 
-    // Custom compound-aware layout: positions children inside parents
+    // Yield to the browser so React can paint the loading overlay before
+    // the synchronous layout work blocks the main thread.
     setLoading(true);
-    compoundLayout(cy);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (cy.destroyed()) return;
 
-    // Lock compound node dimensions so they don't auto-resize
-    cy.nodes()
-      .filter((n) => n.isParent())
-      .forEach((n) => {
-        const bb = n.boundingBox();
-        n.style({ width: bb.w, height: bb.h });
+        compoundLayout(cy);
+
+        // Lock compound node dimensions so they don't auto-resize
+        cy.nodes()
+          .filter((n) => n.isParent())
+          .forEach((n) => {
+            const bb = n.boundingBox();
+            n.style({ width: bb.w, height: bb.h });
+          });
+
+        cy.fit(undefined, 40);
+        setLoading(false);
       });
-
-    cy.fit(undefined, 40);
-    setLoading(false);
+    });
 
     // Shared selection logic for tap and drag
     function selectNode(node: cytoscape.NodeSingular) {

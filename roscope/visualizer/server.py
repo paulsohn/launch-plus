@@ -99,6 +99,9 @@ class _Handler(BaseHTTPRequestHandler):
 
         viz_id = body.get("vizId", "")
         timestamp = body.get("timestamp", "")
+        if not isinstance(viz_id, str) or not isinstance(timestamp, str):
+            self.send_error(400, "vizId and timestamp must be strings")
+            return
         if not viz_id or not timestamp:
             self.send_error(400, "Missing vizId or timestamp")
             return

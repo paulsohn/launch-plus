@@ -57,6 +57,10 @@ export function useGraphStore(): GraphStore {
           .sort()
           .join("|");
 
+        // Mark connected as soon as any successful response arrives,
+        // regardless of whether the catalog changed.
+        setConnected(true);
+
         if (fingerprint === prevFingerprint.current) return;
         prevFingerprint.current = fingerprint;
 
@@ -68,7 +72,6 @@ export function useGraphStore(): GraphStore {
         }
 
         setCatalog(newCatalog);
-        setConnected(true);
 
         // Auto-select latest snapshot when new data arrives
         if (totalSnapshots > prevSnapshotCount.current) {

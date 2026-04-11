@@ -71,6 +71,7 @@ class GraphGroup:
 class GraphTopic:
     id: str
     name: str
+    is_private: bool = False
 
 
 @dataclass

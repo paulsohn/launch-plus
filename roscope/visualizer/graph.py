@@ -35,7 +35,8 @@ class _GraphBuilder:
 
         self._nodes: list[dict] = []
         self._groups: list[dict] = []
-        self._topics: dict[str, str] = {}  # topic_name -> topic_id
+        self._topics: dict[str, str] = {}  # canonical_key -> topic_id
+        self._topic_meta: dict[str, dict] = {}  # topic_id -> {name, is_private}
         self._edges: list[dict] = []
 
         # For resolving LoadComposableNodes targets
@@ -57,11 +58,16 @@ class _GraphBuilder:
         self._uid_counters[base] = count + 1
         return base if count == 0 else f"{base}#{count}"
 
-    def _get_or_create_topic(self, topic_name: str) -> str:
-        if topic_name in self._topics:
-            return self._topics[topic_name]
-        tid = self._uid("topic", topic_name)
-        self._topics[topic_name] = tid
+    def _get_or_create_topic(self, topic_name: str, node_id: str) -> str:
+        is_private = topic_name.startswith("~/")
+        # Private topics (~/) are node-scoped: two nodes with ~/foo are
+        # different topics, so key by (node_id, topic_name).
+        canonical_key = f"{node_id}\0{topic_name}" if is_private else topic_name
+        if canonical_key in self._topics:
+            return self._topics[canonical_key]
+        tid = self._uid("topic", node_id if is_private else "", topic_name)
+        self._topics[canonical_key] = tid
+        self._topic_meta[tid] = {"name": topic_name, "isPrivate": is_private}
         return tid
 
     def _package_color(self, pkg: str) -> str:
@@ -222,7 +228,7 @@ class _GraphBuilder:
         # Topic edges from composable node remaps
         for remap in data.get("remappings", []):
             if len(remap) == 2 and remap[1]:
-                tid = self._get_or_create_topic(remap[1])
+                tid = self._get_or_create_topic(remap[1], cnid)
                 self._edges.append({"source": cnid, "target": tid, "type": "remap"})
 
     def _handle_load_composable(self, action, parent_id: str | None) -> None:
@@ -333,13 +339,12 @@ class _GraphBuilder:
         remaps = getattr(action, "remappings", [])
         for remap in remaps:
             if len(remap) == 2 and remap[1]:
-                tid = self._get_or_create_topic(remap[1])
+                tid = self._get_or_create_topic(remap[1], node_id)
                 self._edges.append({"source": node_id, "target": tid, "type": "remap"})
 
     def to_dict(self) -> dict:
         topic_list = [
-            {"id": tid, "name": name}
-            for name, tid in sorted(self._topics.items(), key=lambda x: x[1])
+            {"id": tid, **self._topic_meta[tid]} for tid in sorted(set(self._topics.values()))
         ]
         return {
             "metadata": {

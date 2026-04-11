@@ -163,6 +163,15 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
     },
   },
   {
+    // Private topics (~/...) are node-internal and shown in a muted teal
+    // to distinguish them from shared topics.
+    selector: 'node[type="topic"][isPrivate]',
+    style: {
+      "background-color": "#5f8c8c",
+      "border-color": "#3d6b6b",
+    },
+  },
+  {
     selector: 'edge[type="remap"]',
     style: {
       width: 1,

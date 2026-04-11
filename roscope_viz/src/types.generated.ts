@@ -47,6 +47,7 @@ export interface GraphGroup {
 export interface GraphTopic {
   id: string;
   name: string;
+  isPrivate?: boolean;
 }
 
 export interface GraphEdge {

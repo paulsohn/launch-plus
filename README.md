@@ -175,6 +175,8 @@ The visualizer shows the full node graph — groups (include boundaries),
 containers, composable nodes, topics, and remaps — as a compound graph with
 interactive selection and detail panel.
 
+![Visualizer screenshot](docs/visualizer-screenshot.png)
+
 Use `--viz-id <name>` to label the snapshot; multiple snapshots are accessible
 from the browser UI. Snapshots are cached in `~/.cache/roscope-viz/`.
 

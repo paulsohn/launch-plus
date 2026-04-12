@@ -20,6 +20,7 @@ export function Toolbar({ cyRef }: Props) {
     }
 
     const q = query.trim().toLowerCase();
+    cy.elements().removeClass("highlighted faded");
     cy.elements().addClass("faded");
 
     const matched = cy.nodes().filter((n) => {

@@ -52,7 +52,7 @@ export function DetailPanel({ detail, graph, width, onResizeStart, onClose }: Pr
       <div id="detail-header">
         <span id="detail-title">{title || "Nothing selected"}</span>
         {detail && (
-          <button id="detail-close" onClick={onClose}>
+          <button id="detail-close" onClick={onClose} aria-label="Close details">
             &times;
           </button>
         )}

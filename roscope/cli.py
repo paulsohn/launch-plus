@@ -904,10 +904,9 @@ def _cmd_resolve(
         from roscope.visualizer import serve as _visualizer_serve
 
         _visualizer_serve(result.actions, package, launcher, viz_id=viz_id)
-        return
 
-    # Render XML to stdout
-    if not suppress_xml:
+    # Render XML to stdout (skipped in visualize mode — graph is shown in browser)
+    if not suppress_xml and not visualize:
         xml = render_resolved_xml(
             package,
             launcher,

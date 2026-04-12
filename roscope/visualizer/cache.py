@@ -64,11 +64,16 @@ def load_catalog() -> dict[str, list[dict]]:
         return catalog
 
     # Walk all .json files (except server.json at root) and reconstruct
-    # the viz-id from the relative path of the parent directory.
+    # the viz-id from the parent directory name.
+    # Only accept flat (single-level) viz-id directories — skip any nested paths
+    # that would produce a viz-id containing separators (inconsistent with remove_snapshot).
     for f in sorted(_CACHE_ROOT.rglob("*.json")):
-        if f.parent == _CACHE_ROOT:
+        viz_dir = f.parent
+        if viz_dir == _CACHE_ROOT:
             continue  # skip server.json and other root-level files
-        viz_id = str(f.parent.relative_to(_CACHE_ROOT))
+        if viz_dir.parent != _CACHE_ROOT:
+            continue  # skip nested directories — only flat viz-ids are valid
+        viz_id = viz_dir.name
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:

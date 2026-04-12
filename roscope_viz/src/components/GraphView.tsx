@@ -209,9 +209,10 @@ interface Props {
   cyRef: RefObject<cytoscape.Core | null>;
   onNodeTap: (data: Record<string, unknown>) => void;
   onBackgroundTap: () => void;
+  sidebarWidth: number;
 }
 
-export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
+export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap, sidebarWidth }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
 
@@ -372,7 +373,7 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap }: Props) {
 
   return (
     <>
-      <div id="cy" ref={containerRef} />
+      <div id="cy" ref={containerRef} style={{ width: `calc(100% - ${sidebarWidth}px)` }} />
       {loading && (
         <div className="loading-overlay">
           <div className="spinner" />

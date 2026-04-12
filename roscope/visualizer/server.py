@@ -87,7 +87,11 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _handle_remove(self) -> None:
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            self.send_error(400, "Invalid Content-Length")
+            return
         if length == 0:
             self.send_error(400, "Missing body")
             return
@@ -227,8 +231,12 @@ def serve(
     # Check if a server is already running
     info = cache.read_server_info()
     if info is not None:
-        existing_port = info.get("port")
-        existing_pid = info.get("pid")
+        try:
+            existing_port = int(info["port"])
+            existing_pid = int(info["pid"])
+        except (KeyError, TypeError, ValueError):
+            existing_port = 0
+            existing_pid = 0
         if existing_port and _is_server_alive(existing_pid) and _is_port_open(existing_port):
             url = f"http://127.0.0.1:{existing_port}"
             print(f"Visualizer: {url} (server already running)", file=sys.stderr)

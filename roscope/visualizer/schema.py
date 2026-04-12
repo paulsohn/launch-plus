@@ -1,8 +1,13 @@
 """Graph IR schema — single source of truth for Python and TypeScript.
 
-These dataclasses define the JSON structure exchanged between the Python
-server and the TypeScript frontend.  Run ``generate_types.py`` to emit
-the corresponding TypeScript interfaces.
+These dataclasses define the canonical schema for the graph data exchanged
+between the Python server and the TypeScript frontend.  Field names follow
+standard Python ``snake_case`` conventions; the JSON wire format uses
+``camelCase`` (e.g. ``is_default`` → ``isDefault``, ``group_type`` →
+``groupType``, ``include_args`` → ``includeArgs``).  The camelCase mapping
+is applied by ``graph.py`` when building the JSON dict, and reflected in the
+TypeScript interfaces emitted by ``generate_types.py``.  Run that script
+after changing this file to keep the two in sync.
 """
 
 from __future__ import annotations

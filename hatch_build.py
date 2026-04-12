@@ -23,6 +23,13 @@ class CustomBuildHook(BuildHookInterface):
         if not (vis_dir / "package.json").exists():
             return
 
+        # Skip rebuild if assets are already present (e.g. second target in
+        # `python -m build` which builds both sdist and wheel).
+        static_index = Path(self.root) / "roscope" / "visualizer" / "static" / "index.html"
+        if static_index.is_file():
+            self.app.display_info("Frontend assets already built, skipping.")
+            return
+
         if shutil.which("pnpm") is None:
             raise RuntimeError(
                 "pnpm not found — cannot build frontend assets. "

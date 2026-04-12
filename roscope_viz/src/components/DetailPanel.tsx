@@ -21,10 +21,12 @@ interface NodeDetail {
 interface Props {
   detail: NodeDetail | null;
   graph: GraphData;
+  width: number;
+  onResizeStart: (e: React.MouseEvent) => void;
   onClose: () => void;
 }
 
-export function DetailPanel({ detail, graph, onClose }: Props) {
+export function DetailPanel({ detail, graph, width, onResizeStart, onClose }: Props) {
   const displayType: Record<string, string> = {
     group: "Include boundary",
     lcn_wrapper: "LoadComposableNodes call",
@@ -44,7 +46,8 @@ export function DetailPanel({ detail, graph, onClose }: Props) {
       : detail.fqn || detail.fullName || detail.name || "Vertex";
 
   return (
-    <div id="detail-panel">
+    <div id="detail-panel" style={{ width }}>
+      <div id="detail-resize-handle" onMouseDown={onResizeStart} />
       <div id="detail-header">
         <span id="detail-title">{title || "Nothing selected"}</span>
         {detail && (
@@ -74,28 +77,6 @@ export function DetailPanel({ detail, graph, onClose }: Props) {
         {detail?.target && <Field label="Target" value={detail.target} />}
         {detail?.fullName && <Field label="Topic" value={detail.fullName} />}
 
-        {detail?.includeArgs && Object.keys(detail.includeArgs).length > 0 && (
-          <>
-            <h3>Include Args ({Object.keys(detail.includeArgs).length})</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(detail.includeArgs).map(([k, v]) => (
-                  <tr key={k}>
-                    <td>{k}</td>
-                    <td>{v}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-
         {detail?.args && detail.args.length > 0 && (
           <>
             <h3>Declared Args ({detail.args.length})</h3>
@@ -104,7 +85,7 @@ export function DetailPanel({ detail, graph, onClose }: Props) {
                 <tr>
                   <th>Name</th>
                   <th>Value</th>
-                  <th></th>
+                  <th>Set</th>
                 </tr>
               </thead>
               <tbody>
@@ -112,8 +93,13 @@ export function DetailPanel({ detail, graph, onClose }: Props) {
                   <tr key={i}>
                     <td>{a.name}</td>
                     <td>{a.value}</td>
-                    <td className="arg-badge">
-                      {a.isDefault ? "default" : "set"}
+                    <td className="arg-set-cell">
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={!a.isDefault}
+                        title={a.isDefault ? "Default value" : "Explicitly set"}
+                      />
                     </td>
                   </tr>
                 ))}

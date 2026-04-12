@@ -57,7 +57,7 @@ body {
 }
 
 #cy {
-  width: calc(100% - 380px);
+  /* Width is set dynamically via inline style in GraphView */
   height: calc(100vh - 48px);
 }
 
@@ -66,12 +66,26 @@ body {
   position: fixed;
   top: 48px;
   right: 0;
-  width: 380px;
+  /* Width is set dynamically via inline style from App state */
   height: calc(100vh - 48px);
   background: #16213e;
   border-left: 1px solid #0f3460;
   overflow-y: auto;
   z-index: 20;
+}
+
+#detail-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+#detail-resize-handle:hover {
+  background: rgba(233, 69, 96, 0.3);
 }
 
 #detail-header {
@@ -148,10 +162,15 @@ body {
   font-weight: 500;
 }
 
-.arg-badge {
-  font-size: 10px;
-  color: #8888aa;
-  font-style: italic;
+.arg-set-cell {
+  width: 36px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.arg-set-cell input[type="checkbox"] {
+  cursor: default;
+  accent-color: #e94560;
 }
 
 /* Loading overlay */

@@ -22,8 +22,10 @@ jobs:
         include:
           - os: ubuntu-22.04
             ros_distro: humble
+            cuda_repo: ubuntu2204
           - os: ubuntu-24.04
             ros_distro: jazzy
+            cuda_repo: ubuntu2404
     steps:
       - uses: actions/checkout@v6
 
@@ -37,6 +39,24 @@ jobs:
             python3-venv \
             ros-dev-tools
 
+      - name: Install Node.js 22 LTS and pnpm
+        run: |
+          curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+            | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
+          echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+            > /etc/apt/sources.list.d/nodesource.list
+          apt-get update
+          apt-get install -y nodejs
+          npm install -g pnpm
+
+      - name: Install CUDA 12.8
+        run: |
+          curl -fsSL -o cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.cuda_repo }}/x86_64/cuda-keyring_1.1-1_all.deb
+          dpkg -i cuda-keyring.deb
+          rm cuda-keyring.deb
+          apt-get update
+          apt-get install -y --no-install-recommends cuda-nvcc-12-8 cuda-cudart-dev-12-8
+
       - name: Initialize rosdep
         run: |
           rosdep init 2>/dev/null || true
@@ -44,7 +64,10 @@ jobs:
         shell: bash
 
       - name: Install roscope
-        run: pip install -e . || pip install --break-system-packages -e .
+        run: |
+          python3 -m venv /opt/roscope-venv
+          /opt/roscope-venv/bin/pip install -e .
+          ln -s /opt/roscope-venv/bin/roscope /usr/local/bin/roscope
 
       - name: Install acados
         run: bash example/autoware/install-acados.sh

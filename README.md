@@ -1,20 +1,23 @@
 # roscope
 
-**Bazel-like build system for ROS 2** — resolve, fetch, and build only what your
-launch file actually needs.
+**ROS 2 launch system inspector and targeted builder** — evaluate your full
+system topology and build only what you need, without a ROS 2 runtime.
 
-Instead of cloning and building an entire workspace upfront, roscope reads a
-`.repos` manifest, generates a lockfile, and resolves a launch file on demand —
-fetching only the packages actually referenced, then producing a single flattened
-XML that shows every node, parameter, and remap that would be active at runtime.
+![Visualizer screenshot](docs/visualizer-screenshot.png)
+
+roscope evaluates launch descriptions following ROS 2 semantics — resolving
+substitutions, evaluating conditionals, and executing Python
+`generate_launch_description()` callables — without a running ROS environment
+or a built workspace. From a single launch file it derives every node,
+parameter, remap, topic, package dependency, and include boundary that would be
+active at runtime, and can then fetch and build exactly those packages — nothing
+more.
 
 ## The problem
 
 A typical ROS 2 workspace like [Autoware](https://github.com/autowarefoundation/autoware)
-contains **200+ packages** across dozens of repositories.  The standard workflow
-requires cloning everything, installing all system dependencies, and building the
-full workspace before you can launch a single node — even if your launch file
-only touches 30 of those packages.
+contains **200+ packages** across dozens of repositories. Before you can answer
+"what nodes does this launch file actually start?", the standard workflow demands:
 
 ```
 # Traditional ROS 2 workflow
@@ -24,45 +27,56 @@ colcon build                         # build ALL ~235 packages (30+ min)
 ros2 launch autoware_launch ...      # finally launch
 ```
 
-This is slow, wasteful, and makes it hard to iterate on a subset of the system.
+This is slow, wasteful, and makes it hard to audit or iterate on a subset of
+the system. The topology — which nodes run, which topics they use, which
+parameters are set — is locked away behind a full build.
 
 ## The solution
 
-roscope treats **launch files as build targets**.  It parses the launch
-graph statically, determines exactly which packages are needed, fetches only
-those via [git sparse-checkout](https://git-scm.com/docs/git-sparse-checkout),
-and builds the minimal set:
+roscope makes the **launch file the source of truth**. It evaluates the launch
+description following the same semantics as `ros2 launch`, but without a
+running ROS environment, fetching only the packages it needs on demand:
 
 ```
 # roscope workflow
 roscope index autoware.repos     # generate lockfile (one-time)
-roscope build autoware_launch autoware.launch.xml \
+roscope resolve autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   map_path:=/path/to/map \
-  --clean --rosdep                   # fetch + build only what's needed
+  --visualize                        # interactive graph in your browser
 ```
 
-The resolver also produces a **flattened, fully-resolved XML** that shows the
-complete launch graph with all includes inlined, conditionals evaluated, and
-variables substituted — invaluable for debugging and CI validation.
+The resolved output is a **flattened, fully-resolved XML** with all includes
+inlined, conditionals evaluated, and variables substituted. The visualizer turns
+that into an interactive compound graph — nodes, containers, topics, remaps, and
+include boundaries — all explorable before a single package is built.
+
+Targeted builds are also supported: from the same launch evaluation, roscope
+knows exactly which packages are needed and can fetch and build only those.
 
 ## Key features
 
-- **Lazy fetching** — packages are sparse-checked out on demand; no full clone required
-- **Minimal builds** — only the transitive dependencies of your launch target are built
-- **Static analysis** — resolve launch files without building packages or running ROS nodes
-- **Python launch support** — executes `generate_launch_description()` with shimmed
-  `launch`/`launch_ros` imports; no ROS 2 Python packages needed on the resolver host
-- **OpaqueFunction handling** — executes arbitrary Python callables, transparently
-  fetching packages as they are accessed
-- **Lockfile pinning** — reproducible builds via commit-SHA-pinned lockfiles
+- **No-runtime topology** — evaluate the full launch graph and inspect nodes,
+  parameters, remaps, and topics without a build or running ROS environment
+- **Interactive visualizer** — compound graph view of the full launch structure,
+  with selection, detail panel, and topic tracking
+- **On-demand sparse checkout** — packages are sparse-cloned only when
+  referenced by the launch file, via
+  [git sparse-checkout](https://git-scm.com/docs/git-sparse-checkout)
+- **Targeted builds** — the packages required by your launch target are derived
+  from the evaluation; only those are fetched and built
+- **Python launch support** — executes `generate_launch_description()` with
+  shimmed `launch`/`launch_ros` imports; no installed ROS 2 Python packages needed
+- **OpaqueFunction handling** — executes arbitrary Python callables,
+  transparently fetching packages as they are accessed
+- **Lockfile pinning** — reproducible analysis and builds via commit-SHA-pinned lockfiles
 - **rosdep integration** — automatically installs system dependencies for the
   packages being built
 
-> **Current scope:** roscope is a build-time tool today (resolve + build).
-> Execution support — both a built-in executor and integration with `ros2 launch`
-> and third-party launchers — is on the roadmap.
+> **Current scope:** roscope covers launch evaluation without a ROS runtime and
+> targeted builds today. Execution support — a built-in executor and integration
+> with `ros2 launch` — is on the roadmap.
 
 ## Quick start
 
@@ -71,6 +85,9 @@ variables substituted — invaluable for debugging and CI validation.
 - **Python 3.10+** — used to evaluate Python launch files and `$(eval ...)` substitutions in XML
 - **Git** — for sparse-checkout operations
 - **ROS 2** — source your ROS 2 environment (`source /opt/ros/<distro>/setup.bash`)
+- **pnpm** — required to build the web visualizer ([install](https://pnpm.io/installation))
+- **rosdep** — required for `--rosdep` (part of `ros-dev-tools`, not the base ROS 2 runtime)
+- **colcon** — required for `build` / `test` commands (part of `ros-dev-tools`)
 
 ### Install
 
@@ -154,6 +171,26 @@ See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
 | `clean` | Remove fetched packages |
 
 Run `roscope <command> --help` for detailed usage of each command.
+
+## Visualizer
+
+`resolve` accepts a `--visualize` flag that opens an interactive
+graph view of the resolved launch structure in your browser:
+
+```bash
+roscope resolve -d autoware_launch autoware.launch.xml \
+  sensor_model:=sample_sensor_kit \
+  vehicle_model:=sample_vehicle \
+  "map_path:={map_path}" \
+  --visualize
+```
+
+The visualizer shows the full node graph — groups (include boundaries),
+containers, composable nodes, topics, and remaps — as a compound graph with
+interactive selection and detail panel.
+
+Use `--viz-id <name>` to label the snapshot. Snapshots are cached in
+`~/.cache/roscope-viz/`.
 
 ## Workspace state flags
 

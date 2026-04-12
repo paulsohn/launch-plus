@@ -10,6 +10,7 @@ import cytoscape from "cytoscape";
 import type { GraphData } from "../types.generated";
 import { buildElements } from "../graph-elements";
 import { compoundLayout } from "../layout/compound-layout";
+import { LoadingOverlay } from "./LoadingOverlay";
 
 /** Cytoscape style definitions */
 const cyStyles: cytoscape.StylesheetStyle[] = [
@@ -216,6 +217,11 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap, sidebarWid
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
 
+  // Notify Cytoscape when the container width changes due to sidebar resize
+  useEffect(() => {
+    cyRef.current?.resize();
+  }, [sidebarWidth, cyRef]);
+
   const initCy = useCallback(() => {
     if (!containerRef.current) return;
 
@@ -374,12 +380,7 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap, sidebarWid
   return (
     <>
       <div id="cy" ref={containerRef} style={{ width: `calc(100% - ${sidebarWidth}px)` }} />
-      {loading && (
-        <div className="loading-overlay">
-          <div className="spinner" />
-          <p>Computing layout...</p>
-        </div>
-      )}
+      <LoadingOverlay visible={loading} />
     </>
   );
 }

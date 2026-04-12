@@ -324,13 +324,18 @@ function snapLcnMarkers(cy: cytoscape.Core): void {
       const loadEdge = marker.connectedEdges('[type="load_target"]');
       if (loadEdge.length === 0) return;
 
-      const wrapper = loadEdge.connectedNodes('[type="lcn_wrapper"]').first();
-      if (wrapper.length === 0) return;
+      // Target is an lcn_wrapper when the LCN has composable children;
+      // otherwise the edge goes directly to the container.
+      let target = loadEdge.connectedNodes('[type="lcn_wrapper"]').first();
+      if (target.length === 0) {
+        target = loadEdge.connectedNodes('[type="container"]').first();
+      }
+      if (target.length === 0) return;
 
       const parent = marker.parent();
       if (parent.length === 0) return;
 
-      const wPos = wrapper.position();
+      const wPos = target.position();
       const bb = parent.boundingBox();
       const pCx = (bb.x1 + bb.x2) / 2;
       const pCy = (bb.y1 + bb.y2) / 2;

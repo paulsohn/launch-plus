@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type cytoscape from "cytoscape";
 import { GraphView } from "./components/GraphView";
 import { Toolbar } from "./components/Toolbar";
@@ -19,7 +19,7 @@ export function App() {
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+  const handleResizeStart = useCallback((e: ReactMouseEvent) => {
     resizing.current = true;
     resizeStartX.current = e.clientX;
     resizeStartWidth.current = sidebarWidth;
@@ -27,7 +27,7 @@ export function App() {
   }, [sidebarWidth]);
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: globalThis.MouseEvent) => {
       if (!resizing.current) return;
       const delta = resizeStartX.current - e.clientX;
       setSidebarWidth(Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, resizeStartWidth.current + delta)));

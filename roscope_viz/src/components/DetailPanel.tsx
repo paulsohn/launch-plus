@@ -1,3 +1,4 @@
+import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ArgEntry, GraphData, ParamEntry, RemapEntry } from "../types.generated";
 
 interface NodeDetail {
@@ -22,7 +23,7 @@ interface Props {
   detail: NodeDetail | null;
   graph: GraphData;
   width: number;
-  onResizeStart: (e: React.MouseEvent) => void;
+  onResizeStart: (e: ReactMouseEvent) => void;
   onClose: () => void;
 }
 

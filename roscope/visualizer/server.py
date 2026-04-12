@@ -134,7 +134,11 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
 
-        content = resolved.read_bytes()
+        try:
+            content = resolved.read_bytes()
+        except OSError:
+            self.send_error(500)
+            return
         content_type, _ = mimetypes.guess_type(str(resolved))
         if content_type is None:
             content_type = "application/octet-stream"

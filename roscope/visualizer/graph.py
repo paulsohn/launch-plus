@@ -292,12 +292,14 @@ class _GraphBuilder:
         if not cmd:
             return
         name = action.name if isinstance(action.name, str) else ""
-        eid = self._uid("exec", name or cmd.split()[0] if cmd else "")
+        cmd_parts = cmd.split()
+        cmd0 = cmd_parts[0] if cmd_parts else ""
+        eid = self._uid("exec", name or cmd0)
         self._nodes.append(
             {
                 "id": eid,
                 "type": "executable",
-                "name": name or cmd.split()[0] if cmd else "",
+                "name": name or cmd0,
                 "cmd": cmd,
                 "parent": parent_id,
                 "color": "hsl(30, 60%, 70%)",

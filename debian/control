@@ -5,6 +5,7 @@ Maintainer: paulsohn <paulsohnjp@gmail.com>
 Build-Depends:
  debhelper-compat (= 13),
  dh-python,
+ pybuild-plugin-pyproject,
  python3-all,
  python3-hatchling
 Standards-Version: 4.6.2

@@ -67,7 +67,8 @@ jobs:
       - run: pnpm run build
         working-directory: roscope_viz
       - run: sudo apt-get update && sudo apt-get install -y python3-all debhelper dh-python pybuild-plugin-pyproject python3-hatchling
-      - run: dpkg-buildpackage -us -uc -b -d --output-directory .
+      - run: dpkg-buildpackage -us -uc -b -d
+      - run: mv ../*.deb .
       - uses: actions/upload-artifact@v7
         with:
           name: deb-${{ matrix.os }}

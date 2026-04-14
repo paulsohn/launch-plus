@@ -1,4 +1,4 @@
-roscope (0.2.0-1) jammy; urgency=medium
+roscope (0.2.0-1) UNRELEASED; urgency=medium
 
   [ #40 — interactive graph visualizer ]
   * feat: add `roscope resolve --visualize` — opens launch topology as an

@@ -5,8 +5,6 @@ Maintainer: paulsohn <paulsohnjp@gmail.com>
 Build-Depends:
  debhelper-compat (= 13),
  dh-python,
- nodejs,
- node-pnpm,
  python3-all,
  python3-hatchling,
 Standards-Version: 4.6.2

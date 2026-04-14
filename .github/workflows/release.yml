@@ -62,7 +62,7 @@ jobs:
         with:
           node-version: lts/*
       - run: npm install -g pnpm
-      - run: sudo apt-get update && sudo apt-get install -y python3-all debhelper dh-python python3-hatchling
+      - run: sudo apt-get update && sudo apt-get install -y python3-all debhelper dh-python pybuild-plugin-pyproject python3-hatchling
       - run: dpkg-buildpackage -us -uc -b -d
       - uses: actions/upload-artifact@v7
         with:

@@ -1,5 +1,39 @@
 roscope (0.2.0-1) unstable; urgency=medium
 
-  * Initial Debian packaging.
+  * feat: interactive graph visualizer for resolved launch topology
+    (nodes, containers, composable nodes, topics, remaps, include boundaries)
+  * feat: expand ~/topic and relative topic remaps to absolute FQN per node
+  * fix: server.json written only after port confirmed open; PID always valid
+  * fix: --visualize mode now reports diagnostics and exits non-zero on errors
+  * fix: load_catalog() skips nested viz-id directories; consistent with remove
 
- -- paulsohn <paulsohn@users.noreply.github.com>  Mon, 14 Apr 2026 00:00:00 +0000
+  [ #39 — entity model refactor ]
+  * fix: align action parse/execute with official ROS 2 launch semantics
+  * fix: respect if=/unless= on <arg> and <set_remap>; include file= required
+  * fix: implement proper find-pkg-prefix and shared LaunchContext state
+  * fix: parse and serialize ros_args on Node and ComposableNodeContainer
+  * fix: match official ros2 launch semantics for anon and execute_process
+
+  [ #38 — full Python migration ]
+  * refactor: delete all Rust code; CLI, orchestrator, indexer, builder ported to Python
+  * feat: new Click-based CLI; all commands (index, update, resolve, check, build, test, fetch, clean) available
+  * fix: address multiple review comments on container attrs, source labels, XML escaping
+  * chore: bump version to 0.2.0
+
+  [ #32 — CI integration test matrix ]
+  * ci: run integration tests on both ROS Humble and ROS Jazzy
+  * chore: reindex autoware example lockfile and resolved output
+
+  [ #31 — fetch URL fix ]
+  * fix: fetch directly from URL instead of named "origin" remote for sparse clones
+  * fix: sync origin URL for promisor remote; include URL in error messages
+  * fix: scope ensure_remote_url to partial clones, skip in dirty mode
+  * fix: add -- separator to git fetch calls
+
+  [ #28 — environment variable stack tracking ]
+  * feat: track <set_env>/<unset_env> in resolver context and emit per-node <env> output
+  * feat: warn when environment overrides are active at load_composable_node boundaries
+  * fix: harden _to_str(), env-var default handling, EnvironmentVariable name resolution
+  * fix: validate <unset_env> name; support conditions on env actions
+
+ -- paulsohn <paulsohnjp@gmail.com>  Sun, 14 Apr 2026 00:00:00 +0000

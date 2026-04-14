@@ -7,3 +7,4 @@ export PYBUILD_NAME=roscope
 
 override_dh_auto_test:
 	# tests require a ROS 2 workspace — skip during package build
+	:

@@ -1,4 +1,4 @@
-roscope (0.2.0-1) unstable; urgency=medium
+roscope (0.2.0-1) jammy; urgency=medium
 
   [ #40 — interactive graph visualizer ]
   * feat: add `roscope resolve --visualize` — opens launch topology as an
@@ -13,4 +13,4 @@ roscope (0.2.0-1) unstable; urgency=medium
   * refactor: rewrite entire codebase in Python; remove all Rust code
   * feat: new Click-based CLI with all commands available as pure Python
 
- -- paulsohn <paulsohnjp@gmail.com>  Sun, 14 Apr 2026 00:00:00 +0000
+ -- paulsohn <paulsohnjp@gmail.com>  Tue, 14 Apr 2026 00:00:00 +0000

@@ -6,7 +6,7 @@ Build-Depends:
  debhelper-compat (= 13),
  dh-python,
  python3-all,
- python3-hatchling,
+ python3-hatchling
 Standards-Version: 4.6.2
 Rules-Requires-Root: no
 Homepage: https://github.com/paulsohn/roscope

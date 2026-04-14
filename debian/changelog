@@ -1,23 +1,16 @@
 roscope (0.2.0-1) unstable; urgency=medium
 
-  * feat: interactive graph visualizer for resolved launch topology
-    (nodes, containers, composable nodes, topics, remaps, include boundaries)
-  * feat: expand ~/topic and relative topic remaps to absolute FQN per node
-  * fix: server.json written only after port confirmed open; PID always valid
-  * fix: --visualize mode now reports diagnostics and exits non-zero on errors
-  * fix: load_catalog() skips nested viz-id directories; consistent with remove
+  [ #40 — interactive graph visualizer ]
+  * feat: add `roscope resolve --visualize` — opens launch topology as an
+    interactive compound graph in the browser (nodes, containers, topics,
+    remaps, include boundaries)
 
   [ #39 — entity model refactor ]
-  * fix: align action parse/execute with official ROS 2 launch semantics
-  * fix: respect if=/unless= on <arg> and <set_remap>; include file= required
-  * fix: implement proper find-pkg-prefix and shared LaunchContext state
-  * fix: parse and serialize ros_args on Node and ComposableNodeContainer
-  * fix: match official ros2 launch semantics for anon and execute_process
+  * refactor: overhaul action model to match official ROS 2 launch semantics
+    (parse/execute split, proper LaunchContext sharing, find-pkg-prefix)
 
   [ #38 — full Python migration ]
-  * refactor: delete all Rust code; CLI, orchestrator, indexer, builder ported to Python
-  * feat: new Click-based CLI; all commands (index, update, resolve, check, build, test, fetch, clean) available
-  * fix: address multiple review comments on container attrs, source labels, XML escaping
-  * chore: bump version to 0.2.0
+  * refactor: rewrite entire codebase in Python; remove all Rust code
+  * feat: new Click-based CLI with all commands available as pure Python
 
  -- paulsohn <paulsohnjp@gmail.com>  Sun, 14 Apr 2026 00:00:00 +0000

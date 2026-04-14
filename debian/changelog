@@ -1,0 +1,16 @@
+roscope (0.2.0-1) UNRELEASED; urgency=medium
+
+  [ #40 — interactive graph visualizer ]
+  * feat: add `roscope resolve --visualize` — opens launch topology as an
+    interactive compound graph in the browser (nodes, containers, topics,
+    remaps, include boundaries)
+
+  [ #39 — entity model refactor ]
+  * refactor: overhaul action model to match official ROS 2 launch semantics
+    (parse/execute split, proper LaunchContext sharing, find-pkg-prefix)
+
+  [ #38 — full Python migration ]
+  * refactor: rewrite entire codebase in Python; remove all Rust code
+  * feat: new Click-based CLI with all commands available as pure Python
+
+ -- paulsohn <paulsohnjp@gmail.com>  Tue, 14 Apr 2026 00:00:00 +0000

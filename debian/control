@@ -1,0 +1,26 @@
+Source: roscope
+Section: python
+Priority: optional
+Maintainer: paulsohn <paulsohnjp@gmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-python,
+ python3-all,
+ python3-hatchling
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+Homepage: https://github.com/paulsohn/roscope
+
+Package: roscope
+Architecture: all
+Depends:
+ ${python3:Depends},
+ ${misc:Depends},
+ python3-click,
+ python3-yaml,
+ python3-lark,
+Description: ROS 2 launch system inspector and targeted builder
+ roscope evaluates ROS 2 launch descriptions following ROS 2 semantics
+ without a running ROS environment or a built workspace. From a single
+ launch file it derives every node, parameter, remap, topic, package
+ dependency, and include boundary that would be active at runtime.

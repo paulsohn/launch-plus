@@ -1,0 +1,5 @@
+roscope (0.2.0-1) unstable; urgency=medium
+
+  * Initial Debian packaging.
+
+ -- paulsohn <paulsohn@users.noreply.github.com>  Mon, 14 Apr 2026 00:00:00 +0000

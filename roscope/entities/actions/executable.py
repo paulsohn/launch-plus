@@ -90,7 +90,14 @@ class ExecuteProcess(Action):
         name_raw = entity.get_attr("name", optional=True)
         kwargs["cmd"] = cls._parse_cmdline(cmd_raw, parser)
         kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
-        kwargs["additional_env"] = parser.parse_envs(entity)
+        env_items = entity.get_attr("env", data_type=list, optional=True) or []
+        kwargs["additional_env"] = [
+            (
+                parser.parse_substitution(e.get_attr("name", optional=True) or ""),
+                parser.parse_substitution(e.get_attr("value", optional=True) or ""),
+            )
+            for e in env_items
+        ]
         return cls, kwargs
 
     def execute(self, context) -> list:

@@ -106,6 +106,89 @@ def _resolve_plugins(items, context) -> list[dict]:
 class Node(Action):
     """Tracks a Node / LifecycleNode ."""
 
+    @staticmethod
+    def parse_params(entity: Entity, parser: _ActionParser) -> list:
+        """Extract <param> children as unresolved parameter objects."""
+        from roscope.entities.parameter_descriptions import Parameter, ParameterFile
+
+        items = entity.get_attr("param", data_type=list, optional=True)
+        if not items:
+            return []
+        result: list = []
+        for p in items:
+            name = p.get_attr("name", optional=True)
+            value = p.get_attr("value", optional=True)
+            from_file = p.get_attr("from", optional=True)
+            allow_substs_raw = p.get_attr("allow_substs", data_type=bool, optional=True)
+            if isinstance(allow_substs_raw, str):
+                allow_substs = allow_substs_raw.strip().lower() in {"true", "1", "yes", "on"}
+            else:
+                allow_substs = bool(allow_substs_raw or False)
+            if from_file:
+                result.append(
+                    ParameterFile(parser.parse_substitution(from_file), allow_substs=allow_substs)
+                )
+            elif name:
+                result.append(
+                    Parameter(
+                        name=parser.parse_substitution(name),
+                        value=parser.parse_substitution(value or ""),
+                    )
+                )
+        return result
+
+    @staticmethod
+    def parse_remaps(entity: Entity, parser: _ActionParser) -> list:
+        """Extract <remap> children as unresolved token pairs."""
+        items = entity.get_attr("remap", data_type=list, optional=True)
+        if not items:
+            return []
+        return [
+            (
+                parser.parse_substitution(r.get_attr("from", optional=True) or ""),
+                parser.parse_substitution(r.get_attr("to", optional=True) or ""),
+            )
+            for r in items
+        ]
+
+    @staticmethod
+    def parse_envs(entity: Entity, parser: _ActionParser) -> list:
+        """Extract <env> children as unresolved token pairs."""
+        items = entity.get_attr("env", data_type=list, optional=True)
+        if not items:
+            return []
+        return [
+            (
+                parser.parse_substitution(e.get_attr("name", optional=True) or ""),
+                parser.parse_substitution(e.get_attr("value", optional=True) or ""),
+            )
+            for e in items
+        ]
+
+    @staticmethod
+    def parse_composable_plugins(entity: Entity, parser: _ActionParser) -> list:
+        """Extract <composable_node> children as ComposableNode instances."""
+        items = entity.get_attr("composable_node", data_type=list, optional=True)
+        if not items:
+            return []
+        plugins = []
+        for cn in items:
+            if not parser.evaluate_condition(cn):
+                continue
+            name_raw = cn.get_attr("name", optional=True)
+            ns_raw = cn.get_attr("namespace", optional=True)
+            plugins.append(
+                ComposableNode(
+                    package=parser.parse_substitution(cn.get_attr("pkg", optional=True) or ""),
+                    plugin=parser.parse_substitution(cn.get_attr("plugin", optional=True) or ""),
+                    name=parser.parse_substitution(name_raw) if name_raw else None,
+                    namespace=parser.parse_substitution(ns_raw) if ns_raw else None,
+                    parameters=Node.parse_params(cn, parser),
+                    remappings=Node.parse_remaps(cn, parser),
+                )
+            )
+        return plugins
+
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
         _, kwargs = super().parse(entity, parser)
@@ -121,9 +204,9 @@ class Node(Action):
         ns_raw = entity.get_attr("namespace", optional=True)
         kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
         kwargs["namespace"] = parser.parse_substitution(ns_raw) if ns_raw else None
-        kwargs["parameters"] = parser.parse_params(entity)
-        kwargs["remappings"] = parser.parse_remaps(entity)
-        kwargs["env"] = parser.parse_envs(entity)
+        kwargs["parameters"] = cls.parse_params(entity, parser)
+        kwargs["remappings"] = cls.parse_remaps(entity, parser)
+        kwargs["env"] = cls.parse_envs(entity, parser)
         kwargs["kind"] = "lifecycle_node" if entity.type_name == "lifecycle_node" else "node"
         kwargs["output"] = _parse_optional(parser, entity.get_attr("output", optional=True))
         kwargs["arguments"] = _parse_optional(parser, entity.get_attr("args", optional=True))
@@ -381,8 +464,8 @@ class ComposableNodeContainer(Action):
         ns_raw = entity.get_attr("namespace", optional=True)
         kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
         kwargs["namespace"] = parser.parse_substitution(ns_raw) if ns_raw else None
-        kwargs["env"] = parser.parse_envs(entity)
-        kwargs["composable_node_descriptions"] = parser.parse_composable_plugins(entity)
+        kwargs["env"] = Node.parse_envs(entity, parser)
+        kwargs["composable_node_descriptions"] = Node.parse_composable_plugins(entity, parser)
         # Consumed by Node/ExecuteProcess.parse() in the official inheritance chain
         # (ComposableNodeContainer → Node → ExecuteProcess). Roscope inherits from
         # Action directly, so parse them explicitly and preserve in output.
@@ -528,7 +611,7 @@ class LoadComposableNodes(Action):
         target_raw = entity.get_attr("target", optional=True)
         ns_raw = entity.get_attr("namespace", optional=True)
         kwargs["target_container"] = _parse_optional(parser, target_raw)
-        kwargs["composable_node_descriptions"] = parser.parse_composable_plugins(entity)
+        kwargs["composable_node_descriptions"] = Node.parse_composable_plugins(entity, parser)
         kwargs["namespace"] = _parse_optional(parser, ns_raw)
         return cls, kwargs
 

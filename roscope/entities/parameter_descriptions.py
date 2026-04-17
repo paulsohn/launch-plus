@@ -156,6 +156,10 @@ class ParameterFile:
         ROS 2 substitutions inside each YAML scalar value are resolved after
         parsing (value-level, not text-level).
         Raises ``FileNotFoundError`` if the file does not exist.
+
+        TODO: cache expanded results keyed by resolved path for the duration
+        of a resolve run to avoid redundant disk I/O when the same file is
+        referenced by multiple nodes.
         """
         param_file = self.__param_file
         if isinstance(param_file, list):

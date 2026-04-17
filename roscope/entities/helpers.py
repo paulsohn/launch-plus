@@ -12,8 +12,6 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any
 
-import yaml
-
 from roscope.entities.state import LaunchContext
 
 logger = logging.getLogger("roscope")
@@ -220,91 +218,6 @@ def _effective_namespace(
     if explicit_ns:
         current = _ros2_namespace_join(current, explicit_ns)
     return current
-
-
-# ─── Parameter YAML expansion ────────────────────────────────────────────────
-
-
-def _expand_ros_params_yaml(content: str) -> list[tuple[str, str]]:
-    """Parse ROS 2 parameter YAML and flatten into (key, value) pairs.
-
-    Supports all standard ROS 2 layouts:
-      - bare ``ros__parameters: ...``
-      - ``/**:\\n  ros__parameters: ...`` (Autoware wildcard convention)
-      - ``/ns:\\n  node_name:\\n    ros__parameters: ...`` (general ROS 2)
-    """
-    data = yaml.safe_load(content)
-    if not isinstance(data, dict):
-        return []
-    out: list[tuple[str, str]] = []
-    _collect_ros_params(data, 0, out)
-    return out
-
-
-def _collect_ros_params(value: object, depth: int, out: list[tuple[str, str]]) -> None:
-    if depth > 3 or not isinstance(value, dict):
-        return
-    if "ros__parameters" in value:
-        _flatten_yaml_value(value["ros__parameters"], "", out)
-    else:
-        for child in value.values():
-            if isinstance(child, dict):
-                _collect_ros_params(child, depth + 1, out)
-
-
-def _flatten_yaml_value(value: object, prefix: str, out: list[tuple[str, str]]) -> None:
-    if isinstance(value, dict):
-        for k, v in value.items():
-            full_key = f"{prefix}.{k}" if prefix else str(k)
-            _flatten_yaml_value(v, full_key, out)
-    elif isinstance(value, list):
-        items = ", ".join(_yaml_value_to_str(v) for v in value)
-        out.append((prefix, f"[{items}]"))
-    else:
-        out.append((prefix, _yaml_value_to_str(value)))
-
-
-def _yaml_value_to_str(v: object) -> str:
-    if v is None:
-        return ""
-    if isinstance(v, bool):
-        return str(v).lower()
-    if isinstance(v, list):
-        items = ", ".join(_yaml_value_to_str(x) for x in v)
-        return f"[{items}]"
-    return str(v)
-
-
-def _read_and_expand_param_file(
-    path: str,
-    ctx: LaunchContext | None = None,
-    *,
-    state=None,
-) -> list[tuple[str, str]] | None:
-    """Read a param file and expand ros__parameters. Returns None on failure."""
-    if state is None and ctx is not None:
-        state = ctx._state
-    if not os.path.isfile(path):
-        logger.error("param file not found: '%s'", path)
-        return None
-    real_path = path
-    try:
-        with open(real_path) as f:
-            content = f.read()
-        pairs = _expand_ros_params_yaml(content)
-        if pairs and ctx is not None:
-            resolved_pairs: list[tuple[str, str]] = []
-            for key, val in pairs:
-                try:
-                    resolved_val = resolve_substitutions(val, ctx)
-                except Exception:
-                    resolved_val = val
-                resolved_pairs.append((key, resolved_val))
-            return resolved_pairs
-        return pairs
-    except Exception as e:
-        logger.error("--inline-params: failed to read '%s': %s", path, e)
-        return None
 
 
 # ─── XML utilities ────────────────────────────────────────────────────────────

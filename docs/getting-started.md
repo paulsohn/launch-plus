@@ -102,9 +102,6 @@ fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
 # Show launch arguments at include boundaries
 --show-args
 
-# Expand <param from="file.yaml"/> entries inline
---inline-params
-
 # Install system deps via rosdep (requires sourced ROS 2)
 --rosdep
 ```

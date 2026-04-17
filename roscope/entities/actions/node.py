@@ -11,7 +11,6 @@ import xml.etree.ElementTree as ET
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import (
-    _read_and_expand_param_file,
     _ros2_namespace_join,
     env_overrides,
     resolve_value,
@@ -49,13 +48,10 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
         full_ns = _ros2_namespace_join(ros_ns, node_ns) if node_ns else ros_ns
         for p in desc.parameters:
             if isinstance(p, ParameterFile):
-                path = p.evaluate(context)
+                path_obj, expanded = p.evaluate(context)
+                path = str(path_obj)
                 state.track_param_file(path)
-                pf_entry: dict = {"path": path}
-                if state.inline_params:
-                    expanded = _read_and_expand_param_file(path, context)
-                    if expanded is not None:
-                        pf_entry["params"] = expanded
+                pf_entry: dict = {"path": path, "params": expanded}
                 pf_list.append(pf_entry)
             elif isinstance(p, Parameter):
                 k, v = p.evaluate(context)
@@ -178,13 +174,10 @@ class Node(Action):
         pf_list: list[dict] = list(context._launch_configurations.get("global_param_files", []))
         for p in self.parameters:
             if isinstance(p, ParameterFile):
-                path = p.evaluate(context)
+                path_obj, expanded = p.evaluate(context)
+                path = str(path_obj)
                 state.track_param_file(path)
-                pf_entry: dict = {"path": path}
-                if state.inline_params:
-                    expanded = _read_and_expand_param_file(path, context)
-                    if expanded is not None:
-                        pf_entry["params"] = expanded
+                pf_entry: dict = {"path": path, "params": expanded}
                 pf_list.append(pf_entry)
             elif isinstance(p, Parameter):
                 k, v = p.evaluate(context)

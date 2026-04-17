@@ -115,8 +115,11 @@ class _ActionParser:
             name = p.get_attr("name", optional=True)
             value = p.get_attr("value", optional=True)
             from_file = p.get_attr("from", optional=True)
+            allow_substs = p.get_attr("allow_substs", data_type=bool, optional=True) or False
             if from_file:
-                result.append(ParameterFile(self.parse_substitution(from_file)))
+                result.append(
+                    ParameterFile(self.parse_substitution(from_file), allow_substs=allow_substs)
+                )
             elif name:
                 result.append(
                     Parameter(

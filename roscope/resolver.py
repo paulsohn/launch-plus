@@ -408,13 +408,11 @@ def resolve_file(
     # Workflow flags
     if workflow_options is not None:
         state.preview_mode = bool(getattr(workflow_options, "preview", True))
-        state.inline_params = bool(getattr(workflow_options, "inline_params", False))
         state.rosdep_fallback = bool(getattr(workflow_options, "rosdep_fallback", False))
         state.show_empty_includes = bool(getattr(workflow_options, "show_empty_includes", False))
         state.show_args = bool(getattr(workflow_options, "show_args", False))
     else:
         state.preview_mode = True
-        state.inline_params = False
         state.rosdep_fallback = False
         state.show_empty_includes = False
         state.show_args = False

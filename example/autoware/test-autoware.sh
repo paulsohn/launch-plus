@@ -89,11 +89,6 @@ COMMON_FLAGS=(
     --rosdep
 )
 
-# Resolve-only display flags (not accepted by build)
-RESOLVE_DISPLAY=(
-    --inline-params
-)
-
 # ── Acados environment (if installed) ────────────────────────────────────────
 
 if [[ -d /opt/acados/lib ]]; then
@@ -109,7 +104,7 @@ export ENABLE_AGNOCAST="${ENABLE_AGNOCAST:-1}"
 # ── Step 1: Preview resolve (source paths) ───────────────────────────────────
 
 echo "==> Step 1: Preview resolve"
-$LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" "${RESOLVE_DISPLAY[@]}" --preview > preview_raw.xml
+$LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" --preview > preview_raw.xml
 echo "    OK (preview_raw.xml)"
 echo
 
@@ -133,7 +128,7 @@ echo
 # ── Step 4: Post-build resolve (real paths) ──────────────────────────────────
 
 echo "==> Step 4: Post-build resolve"
-$LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" "${RESOLVE_DISPLAY[@]}" > postbuild.xml
+$LP resolve ${MODE_ARGS[@]+"${MODE_ARGS[@]}"} "${LAUNCH_ARGS[@]}" "${COMMON_FLAGS[@]}" > postbuild.xml
 echo "    OK (postbuild.xml)"
 echo
 

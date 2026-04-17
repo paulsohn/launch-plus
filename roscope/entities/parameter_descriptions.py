@@ -49,7 +49,7 @@ def _expand_ros_params_yaml(
         try:
             resolved_val = resolve_substitutions(val, context)
         except Exception:
-            logger.error("failed to resolve substitutions in param value %r: %r", key, val)
+            logger.exception("failed to resolve substitutions in param value %r: %r", key, val)
             resolved_val = val
         result.append((key, resolved_val))
     return result

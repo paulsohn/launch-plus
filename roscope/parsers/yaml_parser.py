@@ -123,10 +123,13 @@ class YamlEntity(Entity):
         self._read_keys.add(name)
         value = self._element[name]
 
-        # YAML natively types values — coerce to string when data_type is str
-        # (matching XML behaviour where all attributes are strings).
+        # YAML natively types values — coerce to target type when needed.
+        # str: match XML behaviour where all attributes are strings.
+        # bool: YAML may leave a quoted "true"/"false" as a str; coerce it.
         if data_type is str and value is not None:
             return str(value)
+        if data_type is bool and isinstance(value, str):
+            return value.strip().lower() in {"true", "1", "yes", "on"}
         return value
 
     def assert_entity_completely_parsed(self) -> None:

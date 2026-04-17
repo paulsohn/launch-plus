@@ -1002,8 +1002,8 @@
           <param name="enable_partial_load" value="true"/>
           <param name="enable_selected_load" value="false"/>
           <param name="leaf_size" value="3.0"/>
-          <param name="pcd_paths_or_directory" value="[{map_path}/pointcloud_map.pcd]"/>
-          <param name="pcd_metadata_path" value="{map_path}/pointcloud_map_metadata.yaml"/>
+          <param name="pcd_paths_or_directory" value="[$(var pointcloud_map_path)]"/>
+          <param name="pcd_metadata_path" value="$(var pointcloud_map_metadata_path)"/>
           <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/map/pointcloud_map_loader.param.yaml -->
           <param name="pcd_metadata_path" value="{map_path}/pointcloud_map_metadata.yaml"/>
           <param name="pcd_paths_or_directory" value="[{map_path}/pointcloud_map.pcd]"/>
@@ -1018,7 +1018,7 @@
           <param name="allow_unsupported_version" value="true"/>
           <param name="center_line_resolution" value="5.0"/>
           <param name="use_waypoints" value="true"/>
-          <param name="lanelet2_map_path" value="{map_path}/lanelet2_map.osm"/>
+          <param name="lanelet2_map_path" value="$(var lanelet2_map_path)"/>
           <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/map/lanelet2_map_loader.param.yaml -->
           <param name="lanelet2_map_path" value="{map_path}/lanelet2_map.osm"/>
           <remap from="output/lanelet2_map" to="/map/vector_map"/>
@@ -7317,7 +7317,7 @@
           <param name="update_rate" value="10.0"/>
           <param name="system_emergency_heartbeat_timeout" value="0.5"/>
           <param name="use_emergency_handling" value="true"/>
-          <param name="check_external_emergency_heartbeat" value="false"/>
+          <param name="check_external_emergency_heartbeat" value="$(var check_external_emergency_heartbeat)"/>
           <param name="enable_cmd_limit_filter" value="true"/>
           <param name="filter_activated_count_threshold" value="5"/>
           <param name="filter_activated_velocity_threshold" value="1.0"/>
@@ -7455,7 +7455,7 @@
           <param name="timeout_thr_sec" value="0.5"/>
           <param name="cyclic_message_timeout_thr_sec" value="0.9"/>
           <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/trajectory_follower/trajectory_follower_node.param.yaml -->
-          <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/trajectory_follower//longitudinal/pid.param.yaml -->
+          <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/trajectory_follower/longitudinal/pid.param.yaml -->
           <param name="delay_compensation_time" value="0.1"/>
           <param name="enable_smooth_stop" value="true"/>
           <param name="enable_overshoot_emergency" value="false"/>
@@ -7514,8 +7514,8 @@
           <param name="adaptive_trajectory_velocity_th" value="1.0"/>
           <param name="max_pitch_rad" value="0.1"/>
           <param name="min_pitch_rad" value="-0.1"/>
-          <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/trajectory_follower//longitudinal/pid.param.yaml -->
-          <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/trajectory_follower//lateral/mpc.param.yaml -->
+          <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/trajectory_follower/longitudinal/pid.param.yaml -->
+          <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/trajectory_follower/lateral/mpc.param.yaml -->
           <param name="traj_resample_dist" value="0.1"/>
           <param name="use_steer_prediction" value="false"/>
           <param name="use_delayed_initial_state" value="true"/>
@@ -7570,7 +7570,7 @@
           <param name="steering_offset.steer_offset_filter_cutoff_hz" value="0.3"/>
           <param name="steering_offset.max_update_th" value="0.01"/>
           <param name="publish_debug_trajectories" value="true"/>
-          <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/trajectory_follower//lateral/mpc.param.yaml -->
+          <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/trajectory_follower/lateral/mpc.param.yaml -->
           <!-- params from: {workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/vehicle_info.param.yaml -->
           <param name="wheel_radius" value="0.383"/>
           <param name="wheel_width" value="0.235"/>

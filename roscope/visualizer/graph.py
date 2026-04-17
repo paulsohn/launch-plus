@@ -246,9 +246,7 @@ class _GraphBuilder:
             "fqn": cfqn,
             "parent": parent_id,
             "color": self._package_color(pkg),
-            "params": [
-                {"name": k, "value": v} for k, v in sorted(data.get("parameters", {}).items())
-            ],
+            "params": self._build_params(data.get("param_files", []), data.get("parameters", {})),
             "remaps": [{"from": r[0], "to": r[1]} for r in data.get("remappings", [])],
         }
         self._nodes.append(node_entry)
@@ -355,11 +353,25 @@ class _GraphBuilder:
                     {"source": lcn_id, "target": container_id, "type": "load_target"}
                 )
 
+    def _build_params(self, param_files: list[dict], inline: dict) -> list[dict]:
+        """Emit all param entries in source order (param_files then inline).
+
+        Duplicates are preserved so the frontend can apply last-wins styling.
+        """
+        entries: list[dict] = []
+        for pf in param_files:
+            for k, v in pf.get("params", []):
+                entries.append({"name": k, "value": v})
+        for k, v in inline.items():
+            entries.append({"name": k, "value": v})
+        return entries
+
     def _extract_params(self, action) -> list[dict]:
-        params = getattr(action, "parameters", {})
-        if isinstance(params, dict):
-            return [{"name": k, "value": v} for k, v in sorted(params.items())]
-        return []
+        inline = getattr(action, "parameters", {})
+        return self._build_params(
+            getattr(action, "param_files", []),
+            inline if isinstance(inline, dict) else {},
+        )
 
     def _extract_remaps(self, action) -> list[dict]:
         remaps = getattr(action, "remappings", [])

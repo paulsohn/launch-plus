@@ -110,25 +110,7 @@ export function DetailPanel({ detail, graph, width, onResizeStart, onClose }: Pr
         )}
 
         {detail?.params && detail.params.length > 0 && (
-          <>
-            <h3>Parameters ({detail.params.length})</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.params.map((p, i) => (
-                  <tr key={i}>
-                    <td>{p.name}</td>
-                    <td>{p.value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
+          <ParamsTable params={detail.params} />
         )}
 
         {detail?.remaps && detail.remaps.length > 0 && (
@@ -165,6 +147,44 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ParamsTable({ params }: { params: ParamEntry[] }) {
+  // Determine which entries win (last occurrence of each name wins).
+  const winnerIndices = new Set<number>();
+  const seen = new Set<string>();
+  for (let i = params.length - 1; i >= 0; i--) {
+    if (!seen.has(params[i].name)) {
+      seen.add(params[i].name);
+      winnerIndices.add(i);
+    }
+  }
+  const activeCount = winnerIndices.size;
+
+  return (
+    <>
+      <h3>Parameters ({activeCount})</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {params.map((p, i) => {
+            const overridden = !winnerIndices.has(i);
+            return (
+              <tr key={i} style={overridden ? { opacity: 0.35 } : undefined}>
+                <td style={overridden ? { textDecoration: "line-through" } : undefined}>{p.name}</td>
+                <td style={overridden ? { textDecoration: "line-through" } : undefined}>{p.value}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
 function StatRow({ label, value }: { label: string; value: number }) {
   return (
     <tr>
@@ -188,7 +208,10 @@ function GraphStats({ graph }: { graph: GraphData }) {
   const lcnCallCount = groups.filter((g) => g.groupType === "lcn_wrapper").length;
   const topicCount = graph.topics.length;
   const remapCount = graph.edges.filter((e) => e.type === "remap").length;
-  const paramCount = nodes.reduce((s, n) => s + (n.params?.length ?? 0), 0);
+  const paramCount = nodes.reduce(
+    (s, n) => s + new Set(n.params?.map((p) => p.name) ?? []).size,
+    0,
+  );
   const packageCount = new Set(nodes.map((n) => n.package).filter(Boolean)).size;
 
   const { package: pkg, launcher, timestamp } = graph.metadata;

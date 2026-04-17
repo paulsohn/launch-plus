@@ -2585,7 +2585,16 @@
     <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
     <!-- arg name="segmentation_pointcloud_fusion_camera_ids" default="[0,2,4]" -->
     <!-- arg name="tracker_publish_merged_objects" default="false" -->
+    <!-- arg name="traffic_light_car_classifier_model" default="traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+    <!-- arg name="traffic_light_ped_classifier_model" default="ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
     <!-- arg name="traffic_light_recognition/camera_namespaces" default="[camera6, camera7]" -->
+    <!-- arg name="traffic_light_recognition/classification/car/classifier_type" default="1" -->
+    <!-- arg name="traffic_light_recognition/classification/car/label_path" default="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt" -->
+    <!-- arg name="traffic_light_recognition/classification/car/model_path" default="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+    <!-- arg name="traffic_light_recognition/classification/lamp_recognizer_ml_param_path" default="{home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
+    <!-- arg name="traffic_light_recognition/classification/pedestrian/classifier_type" default="1" -->
+    <!-- arg name="traffic_light_recognition/classification/pedestrian/label_path" default="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt" -->
+    <!-- arg name="traffic_light_recognition/classification/pedestrian/model_path" default="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
     <!-- arg name="traffic_light_recognition/high_accuracy_detection_type" default="fine_detection" -->
     <!-- arg name="traffic_light_recognition/use_high_accuracy_detection" default="true" -->
     <!-- arg name="use_camera_vru_detector" default="false" -->
@@ -2712,8 +2721,11 @@
       <!-- arg name="traffic_light_multi_camera_fusion_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_multi_camera_fusion/traffic_light_multi_camera_fusion.param.yaml" -->
       <!-- arg name="traffic_light_occlusion_predictor_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml" -->
       <!-- arg name="traffic_light_recognition/camera_namespaces" value="[camera6, camera7]" -->
+      <!-- arg name="traffic_light_recognition/classification/car/classifier_type" value="1" -->
       <!-- arg name="traffic_light_recognition/classification/car/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt" -->
       <!-- arg name="traffic_light_recognition/classification/car/model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+      <!-- arg name="traffic_light_recognition/classification/lamp_recognizer_ml_param_path" value="{home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
+      <!-- arg name="traffic_light_recognition/classification/pedestrian/classifier_type" value="1" -->
       <!-- arg name="traffic_light_recognition/classification/pedestrian/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt" -->
       <!-- arg name="traffic_light_recognition/classification/pedestrian/model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
       <!-- arg name="traffic_light_recognition/fine_detection/label_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_labels.txt" -->
@@ -3653,8 +3665,11 @@
         <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light.launch.xml -->
         <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
         <!-- arg name="car_traffic_light_classifier_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml" -->
+        <!-- arg name="classification/car/classifier_type" value="1" -->
         <!-- arg name="classification/car/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt" -->
         <!-- arg name="classification/car/model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+        <!-- arg name="classification/lamp_recognizer_ml_param_path" value="{home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
+        <!-- arg name="classification/pedestrian/classifier_type" value="1" -->
         <!-- arg name="classification/pedestrian/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt" -->
         <!-- arg name="classification/pedestrian/model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
         <!-- arg name="crosswalk_traffic_light_estimator_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/crosswalk_traffic_light_estimator/crosswalk_traffic_light_estimator.param.yaml" -->
@@ -3804,8 +3819,11 @@
           <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_node_container.launch.py -->
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
           <!-- arg name="car_traffic_light_classifier_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml" -->
+          <!-- arg name="classification/car/classifier_type" value="1" -->
           <!-- arg name="classification/car/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt" -->
           <!-- arg name="classification/car/model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+          <!-- arg name="classification/lamp_recognizer_ml_param_path" value="{home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
+          <!-- arg name="classification/pedestrian/classifier_type" value="1" -->
           <!-- arg name="classification/pedestrian/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt" -->
           <!-- arg name="classification/pedestrian/model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
           <!-- arg name="enable_image_decompressor" value="true" -->
@@ -3842,10 +3860,30 @@
               <param name="std" value="[58.395, 57.12, 57.375]"/>
               <param name="over_exposure_threshold" value="0.85"/>
               <param name="under_exposure_threshold" value="-0.83"/>
-              <param name="classifier_type" value="1"/>
               <param name="traffic_light_type" value="0"/>
+              <param name="score_threshold" value="0.2"/>
+              <param name="nms_threshold" value="0.2"/>
+              <param name="max_batch_size" value="64"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml -->
+              <!-- params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <param name="model_params.num_anchors" value="3"/>
+              <param name="model_params.chans_per_anchor" value="16"/>
+              <param name="model_params.x_index" value="0"/>
+              <param name="model_params.y_index" value="1"/>
+              <param name="model_params.w_index" value="2"/>
+              <param name="model_params.h_index" value="3"/>
+              <param name="model_params.obj_index" value="4"/>
+              <param name="model_params.color_start" value="5"/>
+              <param name="model_params.type_start" value="8"/>
+              <param name="model_params.num_types" value="6"/>
+              <param name="model_params.num_colors" value="3"/>
+              <param name="model_params.cos_index" value="14"/>
+              <param name="model_params.sin_index" value="15"/>
+              <param name="model_params.scale_x_y" value="2.0"/>
+              <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
+              <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
+              <param name="classifier_type" value="1"/>
               <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt"/>
               <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
               <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
@@ -3860,10 +3898,30 @@
               <param name="std" value="[58.395, 57.12, 57.375]"/>
               <param name="over_exposure_threshold" value="0.85"/>
               <param name="under_exposure_threshold" value="-0.83"/>
-              <param name="classifier_type" value="1"/>
               <param name="traffic_light_type" value="1"/>
+              <param name="score_threshold" value="0.2"/>
+              <param name="nms_threshold" value="0.2"/>
+              <param name="max_batch_size" value="64"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml -->
+              <!-- params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <param name="model_params.num_anchors" value="3"/>
+              <param name="model_params.chans_per_anchor" value="16"/>
+              <param name="model_params.x_index" value="0"/>
+              <param name="model_params.y_index" value="1"/>
+              <param name="model_params.w_index" value="2"/>
+              <param name="model_params.h_index" value="3"/>
+              <param name="model_params.obj_index" value="4"/>
+              <param name="model_params.color_start" value="5"/>
+              <param name="model_params.type_start" value="8"/>
+              <param name="model_params.num_types" value="6"/>
+              <param name="model_params.num_colors" value="3"/>
+              <param name="model_params.cos_index" value="14"/>
+              <param name="model_params.sin_index" value="15"/>
+              <param name="model_params.scale_x_y" value="2.0"/>
+              <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
+              <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
+              <param name="classifier_type" value="1"/>
               <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt"/>
               <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
               <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
@@ -3912,10 +3970,30 @@
               <param name="std" value="[58.395, 57.12, 57.375]"/>
               <param name="over_exposure_threshold" value="0.85"/>
               <param name="under_exposure_threshold" value="-0.83"/>
-              <param name="classifier_type" value="1"/>
               <param name="traffic_light_type" value="0"/>
+              <param name="score_threshold" value="0.2"/>
+              <param name="nms_threshold" value="0.2"/>
+              <param name="max_batch_size" value="64"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml -->
+              <!-- params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <param name="model_params.num_anchors" value="3"/>
+              <param name="model_params.chans_per_anchor" value="16"/>
+              <param name="model_params.x_index" value="0"/>
+              <param name="model_params.y_index" value="1"/>
+              <param name="model_params.w_index" value="2"/>
+              <param name="model_params.h_index" value="3"/>
+              <param name="model_params.obj_index" value="4"/>
+              <param name="model_params.color_start" value="5"/>
+              <param name="model_params.type_start" value="8"/>
+              <param name="model_params.num_types" value="6"/>
+              <param name="model_params.num_colors" value="3"/>
+              <param name="model_params.cos_index" value="14"/>
+              <param name="model_params.sin_index" value="15"/>
+              <param name="model_params.scale_x_y" value="2.0"/>
+              <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
+              <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
+              <param name="classifier_type" value="1"/>
               <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt"/>
               <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
               <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
@@ -3930,10 +4008,30 @@
               <param name="std" value="[58.395, 57.12, 57.375]"/>
               <param name="over_exposure_threshold" value="0.85"/>
               <param name="under_exposure_threshold" value="-0.83"/>
-              <param name="classifier_type" value="1"/>
               <param name="traffic_light_type" value="1"/>
+              <param name="score_threshold" value="0.2"/>
+              <param name="nms_threshold" value="0.2"/>
+              <param name="max_batch_size" value="64"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml -->
+              <!-- params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <param name="model_params.num_anchors" value="3"/>
+              <param name="model_params.chans_per_anchor" value="16"/>
+              <param name="model_params.x_index" value="0"/>
+              <param name="model_params.y_index" value="1"/>
+              <param name="model_params.w_index" value="2"/>
+              <param name="model_params.h_index" value="3"/>
+              <param name="model_params.obj_index" value="4"/>
+              <param name="model_params.color_start" value="5"/>
+              <param name="model_params.type_start" value="8"/>
+              <param name="model_params.num_types" value="6"/>
+              <param name="model_params.num_colors" value="3"/>
+              <param name="model_params.cos_index" value="14"/>
+              <param name="model_params.sin_index" value="15"/>
+              <param name="model_params.scale_x_y" value="2.0"/>
+              <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
+              <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
+              <param name="classifier_type" value="1"/>
               <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt"/>
               <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
               <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
@@ -4267,17 +4365,9 @@
       <!-- arg name="velocity_smoother_type_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/autoware_velocity_smoother/JerkFiltered.param.yaml" -->
       <group>
         <!-- source: {workspace}/src/universe/autoware_universe/planning/autoware_manual_lane_change_handler/launch/manual_lane_change_handler.launch.xml -->
-        <!-- arg name="manual_lane_change_handler_param_path" default="{workspace}/src/universe/autoware_universe/planning/autoware_manual_lane_change_handler/config/manual_lane_change_handler.param.yaml" -->
         <!-- arg name="map_topic_name" default="/map/vector_map" -->
         <!-- arg name="mission_planner_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/mission_planning/mission_planner/mission_planner.param.yaml" -->
         <node pkg="autoware_manual_lane_change_handler" exec="autoware_manual_lane_change_handler_node" name="manual_lane_change_handler" namespace="/planning/mission_planning">
-          <!-- params from: {workspace}/src/universe/autoware_universe/planning/autoware_manual_lane_change_handler/config/manual_lane_change_handler.param.yaml -->
-          <param name="map_frame" value="map"/>
-          <param name="goal_angle_threshold_deg" value="45.0"/>
-          <param name="enable_correct_goal_pose" value="false"/>
-          <param name="consider_no_drivable_lanes" value="false"/>
-          <param name="check_footprint_inside_lanes" value="true"/>
-          <!-- end params from: {workspace}/src/universe/autoware_universe/planning/autoware_manual_lane_change_handler/config/manual_lane_change_handler.param.yaml -->
           <param name="front_overhang" value="1.0"/>
           <param name="left_overhang" value="0.128"/>
           <param name="max_steer_angle" value="0.7"/>
@@ -7484,6 +7574,8 @@
           <param name="enable_integration_at_low_speed" value="false"/>
           <param name="current_vel_threshold_pid_integration" value="0.5"/>
           <param name="time_threshold_before_pid_integration" value="2.0"/>
+          <param name="ff_scale_min" value="0.5"/>
+          <param name="ff_scale_max" value="2.0"/>
           <param name="enable_brake_keeping_before_stop" value="false"/>
           <param name="brake_keeping_acc" value="-0.2"/>
           <param name="smooth_stop_max_strong_acc" value="-0.5"/>

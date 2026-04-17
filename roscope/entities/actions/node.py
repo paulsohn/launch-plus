@@ -441,7 +441,7 @@ class ComposableNode(Action):
 
 
 @expose_action("node_container")
-class ComposableNodeContainer(Action):
+class ComposableNodeContainer(Node):
     """A composable node container process.
 
     Emits a ``kind='container'`` entry whose ``plugins`` list is populated during
@@ -451,54 +451,14 @@ class ComposableNodeContainer(Action):
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
         _, kwargs = super().parse(entity, parser)
-        kwargs["package"] = parser.parse_substitution(
-            entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
-        )
-        kwargs["executable"] = parser.parse_substitution(
-            entity.get_attr("exec", optional=True)
-            or entity.get_attr("executable", optional=True)
-            or ""
-        )
-        name_raw = entity.get_attr("name", optional=True)
-        ns_raw = entity.get_attr("namespace", optional=True)
-        kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
-        kwargs["namespace"] = parser.parse_substitution(ns_raw) if ns_raw else None
-        kwargs["env"] = Node.parse_envs(entity, parser)
+        kwargs["kind"] = "container"
         kwargs["composable_node_descriptions"] = Node.parse_composable_plugins(entity, parser)
-        # Consumed by Node/ExecuteProcess.parse() in the official inheritance chain
-        # (ComposableNodeContainer → Node → ExecuteProcess). Roscope inherits from
-        # Action directly, so parse them explicitly and preserve in output.
-        kwargs["output"] = _parse_optional(parser, entity.get_attr("output", optional=True))
-        kwargs["arguments"] = _parse_optional(parser, entity.get_attr("args", optional=True))
-        kwargs["ros_arguments"] = _parse_optional(
-            parser, entity.get_attr("ros_args", optional=True)
-        )
         return cls, kwargs
 
-    def __init__(
-        self,
-        *,
-        package=None,
-        executable=None,
-        name=None,
-        composable_node_descriptions=None,
-        **kwargs,
-    ):
+    def __init__(self, *, composable_node_descriptions=None, **kwargs):
+        kwargs.setdefault("kind", "container")
         super().__init__(**kwargs)
-        self.package = package
-        self.executable = executable
-        self.name = name
-        self.namespace = kwargs.get("namespace")
-        self.env: list | dict = kwargs.get("env") or []
         self.composable_node_descriptions: list = list(composable_node_descriptions or [])
-        self.parameters: dict = {}
-        self.param_files: list = []
-        self.remappings: list = []
-        self.output = kwargs.get("output")
-        self.args = kwargs.get("arguments")
-        self.ros_args = kwargs.get("ros_arguments")
-        self.ros_namespace: str | None = None
-        self.explicit_namespace: str | None = None
 
     def execute(self, context) -> list:
         """Resolve substitutions and return a clean resolved Container."""
@@ -579,10 +539,11 @@ class ComposableNodeContainer(Action):
                     p.set("name", k)
                     p.set("value", str(v))
                 elem.append(ET.Comment(f" end params from: {path} "))
-        for k, v in sorted(self.parameters.items()):
-            p = ET.SubElement(elem, "param")
-            p.set("name", k)
-            p.set("value", v)
+        if isinstance(self.parameters, dict):
+            for k, v in sorted(self.parameters.items()):
+                p = ET.SubElement(elem, "param")
+                p.set("name", k)
+                p.set("value", v)
         for from_, to in self.remappings:
             r = ET.SubElement(elem, "remap")
             r.set("from", from_)

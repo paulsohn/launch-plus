@@ -15,7 +15,13 @@ Usage:
     from roscope.types import ParsedLaunchFile
 """
 
-__version__ = "0.2.1"
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _version
+
+try:
+    __version__ = _version("roscope")
+except PackageNotFoundError:
+    __version__ = "unknown"
 
 __all__ = [
     "__version__",

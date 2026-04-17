@@ -115,7 +115,11 @@ class _ActionParser:
             name = p.get_attr("name", optional=True)
             value = p.get_attr("value", optional=True)
             from_file = p.get_attr("from", optional=True)
-            allow_substs = p.get_attr("allow_substs", data_type=bool, optional=True) or False
+            allow_substs_raw = p.get_attr("allow_substs", data_type=bool, optional=True)
+            if isinstance(allow_substs_raw, str):
+                allow_substs = allow_substs_raw.strip().lower() in {"true", "1", "yes", "on"}
+            else:
+                allow_substs = bool(allow_substs_raw or False)
             if from_file:
                 result.append(
                     ParameterFile(self.parse_substitution(from_file), allow_substs=allow_substs)

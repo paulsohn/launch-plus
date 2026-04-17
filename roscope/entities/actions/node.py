@@ -441,7 +441,6 @@ class ComposableNode(Action):
 
 
 @expose_action("node_container")
-@expose_action("composable_node_container")
 class ComposableNodeContainer(Action):
     """A composable node container process.
 

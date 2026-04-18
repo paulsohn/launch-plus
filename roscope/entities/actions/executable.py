@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
+from roscope.entities.helpers import env_overrides, resolve_value
 from roscope.entities.parsing import _ActionParser
 from roscope.entities.substitution import Substitution, TextSubstitution
 from roscope.entities.utilities import normalize_to_list_of_substitutions, perform_substitutions
@@ -111,8 +112,6 @@ class ExecuteProcess(Action):
 
     def execute(self, context) -> list:
         """Resolve substitutions and return a clean resolved ExecuteProcess."""
-        from roscope.entities.helpers import env_overrides, resolve_value
-
         cmd_parts = (
             [perform_substitutions(context, arg) for arg in self.cmd]
             if isinstance(self.cmd, list)
@@ -124,14 +123,17 @@ class ExecuteProcess(Action):
             else self.name
         )
 
+        resolved = ExecuteProcess(cmd=" ".join(cmd_parts), name=name)
+        resolved.env = self._resolve_env(context)
+        return [resolved]
+
+    def _resolve_env(self, context) -> dict:
+        """Resolve additional_env into a flat env dict, starting from context overrides."""
         env = env_overrides(context)
         if self.additional_env is not None:
             for k_tokens, v_tokens in self.additional_env:
                 env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
-
-        resolved = ExecuteProcess(cmd=" ".join(cmd_parts), name=name)
-        resolved.env = env
-        return [resolved]
+        return env
 
     def serialize_resolved(self) -> list[ET.Element]:
         if not self.cmd:

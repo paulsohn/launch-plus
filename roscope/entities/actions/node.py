@@ -9,11 +9,7 @@ import xml.etree.ElementTree as ET
 
 from roscope.entities.actions.executable import ExecuteProcess
 from roscope.entities.expose import expose_action
-from roscope.entities.helpers import (
-    _ros2_namespace_join,
-    env_overrides,
-    resolve_value,
-)
+from roscope.entities.helpers import _ros2_namespace_join
 from roscope.entities.parameter_descriptions import Parameter, ParameterFile
 from roscope.entities.parsing import _ActionParser
 from roscope.parsers.entity import Entity
@@ -174,10 +170,7 @@ class Node(ExecuteProcess):
                 dst = context.perform_substitution(r[1])
                 remaps.append([src or str(r[0]), dst or str(r[1])])
 
-        env = env_overrides(context)
-        for item in self.env:
-            if isinstance(item, (tuple, list)) and len(item) == 2:
-                env[resolve_value(item[0], context) or ""] = resolve_value(item[1], context) or ""
+        env = self._resolve_env(context)
 
         def _resolve_opt(attr):
             raw = getattr(self, attr, None)

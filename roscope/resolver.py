@@ -25,6 +25,7 @@ from typing import Any
 
 from roscope.entities.action import Action
 from roscope.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
+from roscope.entities.actions.composable_node_container import ComposableNodeContainer
 from roscope.entities.actions.env import (
     PushRosNamespace,
     SetEnvironmentVariable,
@@ -42,13 +43,8 @@ from roscope.entities.actions.event_handler import (
 from roscope.entities.actions.executable import ExecuteProcess
 from roscope.entities.actions.group import GroupAction, OpaqueFunction, TimerAction
 from roscope.entities.actions.include import IncludeLaunchDescription
-from roscope.entities.actions.node import (
-    ComposableNode,
-    ComposableNodeContainer,
-    LifecycleNode,
-    LoadComposableNodes,
-    Node,
-)
+from roscope.entities.actions.load_composable_nodes import LoadComposableNodes
+from roscope.entities.actions.node import LifecycleNode, Node
 from roscope.entities.actions.param import ParameterFile, SetLaunchConfiguration, SetParameter
 from roscope.entities.conditions import (
     IfCondition,
@@ -56,6 +52,7 @@ from roscope.entities.conditions import (
     LaunchConfigurationNotEquals,
     UnlessCondition,
 )
+from roscope.entities.descriptions import ComposableNode
 from roscope.entities.launch_description import LaunchDescription as _LaunchDescription
 from roscope.entities.launch_description_source import (
     AnyLaunchDescriptionSource,

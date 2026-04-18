@@ -84,14 +84,12 @@ class _GraphBuilder:
         return f"hsl({hue}, 60%, 70%)"
 
     def walk(self, actions: list, parent_id: str | None) -> None:
+        from roscope.entities.actions.composable_node_container import ComposableNodeContainer
         from roscope.entities.actions.executable import ExecuteProcess
         from roscope.entities.actions.group import GroupAction
+        from roscope.entities.actions.load_composable_nodes import LoadComposableNodes
         from roscope.entities.actions.marker import ArgComment, SourceMarker
-        from roscope.entities.actions.node import (
-            ComposableNodeContainer,
-            LoadComposableNodes,
-            Node,
-        )
+        from roscope.entities.actions.node import Node
 
         # SourceMarker is now the first child of the GroupAction (not a sibling).
         # ArgComment children are also inside the group; skip them at this level.

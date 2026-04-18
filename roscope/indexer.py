@@ -825,8 +825,9 @@ def scan_source_dir(src_dir: Path) -> Lockfile:
                 repo_key = rel.parts[0]  # immediate child of src_dir
                 path_in_repo = str(Path(*rel.parts[1:])) if len(rel.parts) > 1 else "."
             else:
-                # directory IS src_dir itself
-                repo_key = directory.name
+                # directory IS src_dir itself; use "." so that
+                # src_dir / repo_key / path resolves back to src_dir
+                repo_key = "."
                 path_in_repo = "."
 
             if repo_key not in lockfile.repositories:

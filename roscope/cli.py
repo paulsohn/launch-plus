@@ -857,7 +857,12 @@ def build_pkg(
 @click.argument("package")
 @click.argument("launcher")
 @click.argument("args", nargs=-1)
-@click.option("-l", "--lockfile", default="manifest.lock.repos")
+@click.option(
+    "-l",
+    "--lockfile",
+    default="manifest.lock.repos",
+    help="Lockfile path (ignored in --dirty mode; src/ is scanned instead)",
+)
 @click.option("--src", default="src")
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
@@ -887,10 +892,23 @@ def test_cmd(
     dry_run: bool,
 ) -> None:
     """Fetch, build, and run tests (includes test_depend packages)."""
+    from click.core import ParameterSource  # type: ignore[attr-defined]
+
+    from roscope.fetcher import WorkspaceState
     from roscope.orchestrator import ResolveWorkflowOptions
 
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
+
+    lockfile_explicit = (
+        ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE  # type: ignore[attr-defined]
+    )
+    if workspace_state == WorkspaceState.DIRTY and lockfile_explicit:
+        click.echo(
+            f"warning: --lockfile is ignored in --dirty mode"
+            f" ({src.rstrip('/')}/ is scanned instead)",
+            err=True,
+        )
 
     workflow_options = ResolveWorkflowOptions(
         preview=True,

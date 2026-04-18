@@ -102,7 +102,7 @@ class ComposableNodeContainer(Node):
     """
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: _ActionParser, ignore: list | None = None):
         _, kwargs = super().parse(entity, parser)
         kwargs["kind"] = "container"
         kwargs["composable_node_descriptions"] = Node.parse_composable_plugins(entity, parser)

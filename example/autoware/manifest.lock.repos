@@ -22,8 +22,8 @@ repositories:
   core/autoware_cmake:
     type: git
     url: https://github.com/autowarefoundation/autoware_cmake.git
-    version: 0e0794e034fe1b8fea6e3a0bbcb9d9b8cdba03ad
-    ref: 1.1.0
+    version: ac910018c8b7fb29a59ee62e1f57e83c686b5632
+    ref: 1.2.0
     packages:
     - autoware_cmake
     - autoware_lint_common
@@ -143,7 +143,7 @@ repositories:
   core/autoware_rviz_plugins:
     type: git
     url: https://github.com/autowarefoundation/autoware_rviz_plugins.git
-    version: 5d3d4f0aa296470912ca7ff94f3524d9aed1f8b1
+    version: 584fd1be2b68c44a3c1f5da2d6e37663e0eab9ac
     ref: main
     packages:
     - autoware_localization_rviz_plugin
@@ -380,7 +380,7 @@ repositories:
   universe/autoware_universe:
     type: git
     url: https://github.com/autowarefoundation/autoware_universe.git
-    version: 3506a676ad33ee45b28a430c8033eddd36adb1ba
+    version: 4ac84877a715182ca1078650bfda10b945aa595c
     ref: main
     packages:
     - autoware_accel_brake_map_calibrator

@@ -27,9 +27,8 @@ def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
 
 
 @expose_action("node")
-@expose_action("lifecycle_node")
 class Node(Action):
-    """Tracks a Node / LifecycleNode ."""
+    """Tracks a ROS node."""
 
     @staticmethod
     def parse_params(entity: Entity, parser: _ActionParser) -> list:
@@ -273,6 +272,7 @@ class Node(Action):
         return f"Node(package={self.package!r})"
 
 
+@expose_action("lifecycle_node")
 class LifecycleNode(Node):
     _tag_name = "lifecycle_node"
 

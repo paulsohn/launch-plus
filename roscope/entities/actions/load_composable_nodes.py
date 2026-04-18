@@ -71,14 +71,19 @@ class LoadComposableNodes(Action):
                 else:
                     target = raw_target
 
-        _resolve_plugins(self.composable_node_descriptions, context)
+        valid_composable_nodes = [
+            desc
+            for desc in self.composable_node_descriptions
+            if desc.condition() is None or desc.condition().evaluate(context)
+        ]
+        _resolve_plugins(valid_composable_nodes, context)
 
         resolved = LoadComposableNodes()
         resolved.target = target
         resolved.ros_namespace = ros_ns
         resolved.explicit_namespace = ns
         resolved.namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
-        resolved.composable_node_descriptions = self.composable_node_descriptions
+        resolved.composable_node_descriptions = valid_composable_nodes
         return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:

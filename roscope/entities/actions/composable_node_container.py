@@ -55,11 +55,19 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
                 if dst and full_ns and not dst.startswith("/") and not dst.startswith("~/"):
                     dst = f"{full_ns.rstrip('/')}/{dst}"
                 remaps.append([src, dst])
+        extra_args: list[dict] = []
+        for ea in desc.extra_arguments or []:
+            if isinstance(ea, dict):
+                for k_tokens, v_tokens in ea.items():
+                    k = context.perform_substitution(list(k_tokens)) or ""
+                    v = context.perform_substitution(v_tokens) or ""
+                    extra_args.append({"name": k, "value": v})
     else:
         pkg = str(getattr(desc_or_dict, "package", "") or "")
         plugin_name = str(getattr(desc_or_dict, "node_plugin", "") or "")
         name = None
         full_ns = None
+        extra_args = []
 
     if pkg:
         state.track_package(pkg)
@@ -74,6 +82,8 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
     }
     if pf_list:
         entry["param_files"] = pf_list
+    if extra_args:
+        entry["extra_arguments"] = extra_args
     if isinstance(desc_or_dict, ComposableNode):
         desc_or_dict._resolved_data = entry
     return entry

@@ -166,6 +166,10 @@ class ComposableNode:
             r = ET.SubElement(elem, "remap")
             r.set("from", from_)
             r.set("to", to)
+        for ea in data.get("extra_arguments", []):
+            e = ET.SubElement(elem, "extra_arg")
+            e.set("name", ea.get("name", ""))
+            e.set("value", ea.get("value", ""))
 
         return [elem]
 

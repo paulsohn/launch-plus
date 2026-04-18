@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from roscope.entities.actions.node import Node
 from roscope.entities.descriptions import ComposableNode
 from roscope.entities.expose import expose_action
-from roscope.entities.helpers import _ros2_namespace_join, env_overrides, resolve_value
+from roscope.entities.helpers import _ros2_namespace_join
 from roscope.entities.parameter_descriptions import Parameter, ParameterFile
 from roscope.entities.parsing import _ActionParser
 from roscope.parsers.entity import Entity
@@ -115,26 +115,10 @@ class ComposableNodeContainer(Node):
 
     def execute(self, context) -> list:
         """Resolve substitutions and return a clean resolved Container."""
-        state = context._state
-
-        pkg = context.perform_substitution(self.package) or ""
-        exe = context.perform_substitution(self.executable) or ""
-        name = context.perform_substitution(self.name) or ""
-        ns = context.perform_substitution(self.namespace) if self.namespace else None
-        if pkg:
-            state.track_package(pkg)
         for desc in self.composable_node_descriptions:
             raw_pkg = getattr(desc, "package", None)
             if raw_pkg:
-                state.track_package(raw_pkg)
-
-        ros_ns = context._launch_configurations.get("ros_namespace")
-        ctx_gp = context._launch_configurations.get("global_params", [])
-
-        env = env_overrides(context)
-        for item in self.env if isinstance(self.env, list) else []:
-            if isinstance(item, (tuple, list)) and len(item) == 2:
-                env[resolve_value(item[0], context) or ""] = resolve_value(item[1], context) or ""
+                context._state.track_package(raw_pkg)
 
         valid_composable_nodes = [
             desc
@@ -143,30 +127,15 @@ class ComposableNodeContainer(Node):
         ]
         _resolve_plugins(valid_composable_nodes, context)
 
-        def _resolve_opt(attr):
-            raw = getattr(self, attr, None)
-            if raw is None:
-                return None
-            return context.perform_substitution(raw) or None
-
-        resolved = ComposableNodeContainer(package=pkg, executable=exe, name=name or None)
-        resolved.ros_namespace = ros_ns
-        resolved.explicit_namespace = ns
-        resolved.namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
-        resolved.parameters = {k: str(v) for k, v in ctx_gp}
-        resolved.param_files = list(context._launch_configurations.get("global_param_files", []))
-        resolved.remappings = list(context._launch_configurations.get("ros_remaps", []))
-        resolved.env = env
-        resolved.output = _resolve_opt("output")
-        resolved.args = _resolve_opt("args")
-        resolved.ros_args = _resolve_opt("ros_args")
-        resolved.composable_node_descriptions = valid_composable_nodes
+        # Delegate Node-level resolution (pkg, params, remaps, env, etc.) to super().
+        [resolved] = super().execute(context)
 
         # Store FQN on the original object for LoadComposableNodes.
         # Matching official: the container internally stores its fully qualified
         # node name so that load actions in different scopes can reference it.
         self.fqn = _ros2_namespace_join(resolved.namespace, resolved.name) or ""
 
+        resolved.composable_node_descriptions = valid_composable_nodes
         return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:

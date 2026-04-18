@@ -197,9 +197,14 @@ Commands that refer to source code support workspace state flags:
 
 | Flag | Short | When to use |
 |---|---|---|
-| `--clean` | `-c` | CI / reproducible runs — resets repos to lockfile SHAs |
-| `--dirty` | `-d` | Local iteration — uses whatever is on disk |
 | *(default)* | | Verifies HEAD matches lockfile SHA; errors on mismatch |
+| `--clean` | `-c` | CI / reproducible runs — resets repos to lockfile SHAs |
+| `--dirty` | `-d` | No lockfile required — scans `src/` for packages as-is |
+
+In dirty mode roscope does not read a lockfile.  Instead it walks the source
+directory (default: `src/`) looking for `package.xml` files.  This supports
+workflows where `src/` is populated by `vcs import` without generating a
+lockfile first.
 
 ## Documentation
 

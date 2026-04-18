@@ -539,10 +539,18 @@ def resolve(
     viz_id: str,
 ) -> None:
     """Resolve launch file (no build)."""
+    from click.core import ParameterSource  # type: ignore[attr-defined]
+
     from roscope.orchestrator import ResolveWorkflowOptions
 
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
+
+    if dirty and ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE:  # type: ignore[attr-defined,union-attr]
+        click.echo(
+            "warning: --lockfile is ignored in --dirty mode (src/ is scanned instead)",
+            err=True,
+        )
 
     workflow_options = ResolveWorkflowOptions(
         preview=preview,
@@ -608,10 +616,18 @@ def check(
     shallow: bool,
 ) -> None:
     """Validate launch file without running."""
+    from click.core import ParameterSource  # type: ignore[attr-defined]
+
     from roscope.orchestrator import ResolveWorkflowOptions
 
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
+
+    if dirty and ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE:  # type: ignore[attr-defined,union-attr]
+        click.echo(
+            "warning: --lockfile is ignored in --dirty mode (src/ is scanned instead)",
+            err=True,
+        )
 
     workflow_options = ResolveWorkflowOptions(
         preview=preview,
@@ -679,10 +695,18 @@ def build(
     dry_run: bool,
 ) -> None:
     """Fetch and build packages for a launcher."""
+    from click.core import ParameterSource  # type: ignore[attr-defined]
+
     from roscope.orchestrator import ResolveWorkflowOptions
 
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
+
+    if dirty and ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE:  # type: ignore[attr-defined,union-attr]
+        click.echo(
+            "warning: --lockfile is ignored in --dirty mode (src/ is scanned instead)",
+            err=True,
+        )
 
     workflow_options = ResolveWorkflowOptions(
         preview=True,  # always resolve from source for build

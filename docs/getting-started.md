@@ -86,15 +86,16 @@ roscope resolve -d my_bringup robot.launch.xml \
 ```
 
 This will:
-1. Look up `my_bringup` in the lockfile
-2. Sparse-checkout just the `my_bringup` package
+1. Look up `my_bringup` in the lockfile (or scan `src/` in dirty mode)
+2. Sparse-checkout just the `my_bringup` package (lockfile modes only)
 3. Parse `robot.launch.xml`, following all `<include>` tags
 4. Fetch additional packages as they're discovered in the launch graph
 5. Output a single flattened XML with all includes inlined, variables
    substituted, and conditionals evaluated
 
-The `-d` (dirty) flag tells roscope to use whatever is on disk and only
-fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
+The `-d` (dirty) flag tells roscope to use `src/` as-is — no lockfile
+required, no git operations performed.  Use `-c` (clean) for CI to ensure
+reproducibility.
 
 ### Useful resolve flags
 
@@ -105,6 +106,36 @@ fetch what's missing.  Use `-c` (clean) for CI to ensure reproducibility.
 # Install system deps via rosdep (requires sourced ROS 2)
 --rosdep
 ```
+
+## Lockfile-free workflow (dirty mode)
+
+If you already manage your source directory with `vcs import` and do not want
+to generate a lockfile first, you can use dirty mode (`-d`) directly:
+
+```bash
+# Populate src/ from your .repos file
+vcs import src < my_project.repos
+
+# Resolve without a lockfile — roscope scans src/ for packages
+roscope resolve -d my_bringup robot.launch.xml \
+  robot_name:=my_robot \
+  --preview \
+  > resolved.launch.xml
+
+# Build likewise
+roscope build -d my_bringup robot.launch.xml \
+  robot_name:=my_robot \
+  --rosdep
+```
+
+In dirty mode roscope walks `src/` exhaustively to discover all packages.
+It does not perform any git operations; whatever is on disk is used as-is.
+Packages not found in `src/` must be available via rosdep (with `--rosdep`)
+or already installed in `AMENT_PREFIX_PATH`; otherwise resolution fails with
+an error.
+
+To switch to the full lockfile workflow later, run `roscope index` to generate
+a lockfile from your `.repos` manifest and commit it to your repository.
 
 ## Step 4: Build
 

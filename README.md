@@ -121,7 +121,6 @@ roscope resolve -d autoware_launch autoware.launch.xml \
   vehicle_model:=sample_vehicle \
   "map_path:={map_path}" \
   --show-args \
-  --inline-params \
   --rosdep \
   --preview \
   > resolved.launch.xml

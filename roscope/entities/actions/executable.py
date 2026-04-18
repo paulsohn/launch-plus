@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
+from roscope.entities.helpers import env_overrides, resolve_value
 from roscope.entities.parsing import _ActionParser
 from roscope.entities.substitution import Substitution, TextSubstitution
 from roscope.entities.utilities import normalize_to_list_of_substitutions, perform_substitutions
@@ -83,20 +84,34 @@ class ExecuteProcess(Action):
             result_args.append(arg)
         return result_args
 
+    @staticmethod
+    def parse_envs(entity: Entity, parser: _ActionParser) -> list:
+        """Extract <env> children as unresolved token pairs."""
+        items = entity.get_attr("env", data_type=list, optional=True)
+        if not items:
+            return []
+        return [
+            (
+                parser.parse_substitution(e.get_attr("name", optional=True) or ""),
+                parser.parse_substitution(e.get_attr("value", optional=True) or ""),
+            )
+            for e in items
+        ]
+
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: _ActionParser, ignore: list | None = None):
         _, kwargs = super().parse(entity, parser)
-        cmd_raw = entity.get_attr("cmd", optional=True) or ""
+        ignore = ignore or []
+        if "cmd" not in ignore:
+            cmd_raw = entity.get_attr("cmd", optional=True) or ""
+            kwargs["cmd"] = cls._parse_cmdline(cmd_raw, parser)
         name_raw = entity.get_attr("name", optional=True)
-        kwargs["cmd"] = cls._parse_cmdline(cmd_raw, parser)
         kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
-        kwargs["additional_env"] = parser.parse_envs(entity)
+        kwargs["additional_env"] = cls.parse_envs(entity, parser)
         return cls, kwargs
 
     def execute(self, context) -> list:
         """Resolve substitutions and return a clean resolved ExecuteProcess."""
-        from roscope.entities.helpers import env_overrides, resolve_value
-
         cmd_parts = (
             [perform_substitutions(context, arg) for arg in self.cmd]
             if isinstance(self.cmd, list)
@@ -108,14 +123,17 @@ class ExecuteProcess(Action):
             else self.name
         )
 
+        resolved = ExecuteProcess(cmd=" ".join(cmd_parts), name=name)
+        resolved.env = self._resolve_env(context)
+        return [resolved]
+
+    def _resolve_env(self, context) -> dict:
+        """Resolve additional_env into a flat env dict, starting from context overrides."""
         env = env_overrides(context)
         if self.additional_env is not None:
             for k_tokens, v_tokens in self.additional_env:
                 env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
-
-        resolved = ExecuteProcess(cmd=" ".join(cmd_parts), name=name)
-        resolved.env = env
-        return [resolved]
+        return env
 
     def serialize_resolved(self) -> list[ET.Element]:
         if not self.cmd:

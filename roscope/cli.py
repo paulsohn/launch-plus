@@ -469,7 +469,6 @@ def fetch(
 @click.option("--report", is_flag=True, help="Print dependency report to stderr")
 @click.option("--preview", is_flag=True, help="Resolve from source workspace")
 @click.option("--show-args", is_flag=True)
-@click.option("--inline-params", is_flag=True)
 @click.option("--rosdep", is_flag=True, help="Install missing packages via rosdep")
 @click.option(
     "--show-empty-includes",
@@ -492,7 +491,6 @@ def resolve(
     report: bool,
     preview: bool,
     show_args: bool,
-    inline_params: bool,
     rosdep: bool,
     show_empty_includes: bool,
     clean: bool,
@@ -510,7 +508,6 @@ def resolve(
     workflow_options = ResolveWorkflowOptions(
         preview=preview,
         rosdep_fallback=rosdep,
-        inline_params=inline_params,
         show_empty_includes=show_empty_includes,
         show_args=show_args,
     )
@@ -575,7 +572,6 @@ def check(
     workflow_options = ResolveWorkflowOptions(
         preview=preview,
         rosdep_fallback=rosdep,
-        inline_params=False,
     )
 
     _cmd_resolve(

@@ -31,6 +31,12 @@ class RemapEntry:
 
 
 @dataclass
+class ExtraArgEntry:
+    name: str
+    value: str
+
+
+@dataclass
 class GraphNode:
     id: str
     type: Literal[
@@ -45,6 +51,7 @@ class GraphNode:
     color: str
     params: list[ParamEntry] = field(default_factory=list)
     remaps: list[RemapEntry] = field(default_factory=list)
+    extra_args: list[ExtraArgEntry] = field(default_factory=list)
     package: str | None = None
     executable: str | None = None
     plugin: str | None = None

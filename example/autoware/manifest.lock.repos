@@ -22,15 +22,15 @@ repositories:
   core/autoware_cmake:
     type: git
     url: https://github.com/autowarefoundation/autoware_cmake.git
-    version: 0e0794e034fe1b8fea6e3a0bbcb9d9b8cdba03ad
-    ref: 1.1.0
+    version: ac910018c8b7fb29a59ee62e1f57e83c686b5632
+    ref: 1.2.0
     packages:
     - autoware_cmake
     - autoware_lint_common
   core/autoware_core:
     type: git
     url: https://github.com/autowarefoundation/autoware_core.git
-    version: cdac1c800568542ecf3d111c893ffeea5da513c0
+    version: ff7768e4d3983ce788e0163a7db18af591fbdada
     ref: main
     packages:
     - autoware_adapi_adaptors
@@ -143,7 +143,7 @@ repositories:
   core/autoware_rviz_plugins:
     type: git
     url: https://github.com/autowarefoundation/autoware_rviz_plugins.git
-    version: 5d3d4f0aa296470912ca7ff94f3524d9aed1f8b1
+    version: 584fd1be2b68c44a3c1f5da2d6e37663e0eab9ac
     ref: main
     packages:
     - autoware_localization_rviz_plugin
@@ -173,10 +173,11 @@ repositories:
   launcher/autoware_launch:
     type: git
     url: https://github.com/autowarefoundation/autoware_launch.git
-    version: 31ecc61c8f472edc1ab4fb5a9a59f244ab88c3aa
+    version: d17ac7033a95370c0516f206d77ebf165cb1df26
     ref: main
     packages:
     - autoware_launch
+    - autoware_sample_designs
     - awsim_labs_sensor_kit_description
     - awsim_labs_sensor_kit_launch
     - awsim_labs_vehicle_description
@@ -379,7 +380,7 @@ repositories:
   universe/autoware_universe:
     type: git
     url: https://github.com/autowarefoundation/autoware_universe.git
-    version: cd77740079147fa56ea2a34e40ad49a80fa13ec4
+    version: 4ac84877a715182ca1078650bfda10b945aa595c
     ref: main
     packages:
     - autoware_accel_brake_map_calibrator
@@ -417,7 +418,6 @@ repositories:
     - autoware_bevfusion
     - autoware_bezier_sampler
     - autoware_bluetooth_monitor
-    - autoware_boundary_departure_checker
     - autoware_bytetrack
     - autoware_calibration_status_classifier
     - autoware_camera_streampetr
@@ -445,6 +445,7 @@ repositories:
     - autoware_cuda_pointcloud_preprocessor
     - autoware_cuda_utils
     - autoware_default_adapi_universe
+    - autoware_deprecated_boundary_departure_checker
     - autoware_detected_object_feature_remover
     - autoware_detected_object_validation
     - autoware_detection_by_tracker
@@ -895,9 +896,6 @@ packages:
   autoware_bluetooth_monitor:
     repo: universe/autoware_universe
     path: system/autoware_bluetooth_monitor
-  autoware_boundary_departure_checker:
-    repo: universe/autoware_universe
-    path: common/autoware_boundary_departure_checker
   autoware_bytetrack:
     repo: universe/autoware_universe
     path: perception/autoware_bytetrack
@@ -1030,6 +1028,9 @@ packages:
   autoware_dependency_checker:
     repo: tools
     path: autoware_dependency_checker
+  autoware_deprecated_boundary_departure_checker:
+    repo: universe/autoware_universe
+    path: common/autoware_deprecated_boundary_departure_checker
   autoware_detected_object_feature_remover:
     repo: universe/autoware_universe
     path: perception/autoware_detected_object_feature_remover
@@ -1564,6 +1565,9 @@ packages:
   autoware_rtc_replayer:
     repo: tools
     path: planning/autoware_rtc_replayer
+  autoware_sample_designs:
+    repo: launcher/autoware_launch
+    path: autoware_sample_designs
   autoware_sample_sensor_kit_description:
     repo: core/autoware_core
     path: description/autoware_sample_sensor_kit_description

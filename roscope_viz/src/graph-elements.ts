@@ -149,6 +149,7 @@ export function buildElements(graph: GraphData): ElementDefinition[] {
         nodeColor: n.color || "#888",
         params: n.params ?? [],
         remaps: n.remaps ?? [],
+        extraArgs: n.extraArgs ?? [],
       },
     });
   }

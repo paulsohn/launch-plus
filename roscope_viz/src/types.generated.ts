@@ -12,6 +12,11 @@ export interface RemapEntry {
   to: string;
 }
 
+export interface ExtraArgEntry {
+  name: string;
+  value: string;
+}
+
 export interface ArgEntry {
   name: string;
   value: string;
@@ -25,6 +30,7 @@ export interface GraphNode {
   color: string;
   params?: ParamEntry[];
   remaps?: RemapEntry[];
+  extraArgs?: ExtraArgEntry[];
   package?: string | null;
   executable?: string | null;
   plugin?: string | null;

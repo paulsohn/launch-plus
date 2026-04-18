@@ -7,17 +7,17 @@ import tempfile
 import textwrap
 
 from roscope.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
+from roscope.entities.actions.composable_node_container import (
+    ComposableNodeContainer,
+    _resolve_plugins,
+)
 from roscope.entities.actions.env import (
     SetEnvironmentVariable,
     UnsetEnvironmentVariable,
 )
 from roscope.entities.actions.include import _inline_resolve_python_launch
-from roscope.entities.actions.node import (
-    ComposableNode,
-    ComposableNodeContainer,
-    Node,
-    _resolve_plugins,
-)
+from roscope.entities.actions.node import Node
+from roscope.entities.descriptions import ComposableNode
 from roscope.entities.helpers import (
     _effective_namespace,
     _is_substitution,
@@ -288,10 +288,10 @@ class TestComposablePluginResolution:
         desc = ComposableNode(
             package="my_pkg",
             plugin="my_pkg::Node",
+            remappings=[
+                (LaunchConfiguration("remap_src"), LaunchConfiguration("remap_dst")),
+            ],
         )
-        desc.remappings = [
-            (LaunchConfiguration("remap_src"), LaunchConfiguration("remap_dst")),
-        ]
         plugins = _resolve_plugins([desc], ctx)
         assert plugins[0]["remappings"] == [["", ""]]
 

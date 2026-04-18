@@ -254,9 +254,9 @@ Here is what the resolver can and cannot verify.
 - **Substitution resolution** — all `$(var)`, `$(arg)`, `$(env)`, `$(eval)`,
   `$(find-pkg-share)` expressions are resolved; unresolvable substitutions are
   errors
-- **Parameter file validity** — with `--inline-params`, YAML parameter files are
-  parsed and their structure validated (must follow ROS 2 `ros__parameters`
-  conventions)
+- **Parameter file inlining** — YAML parameter files referenced by
+  `<param from="..."/>` are always read and inlined at resolve time; their
+  structure is validated (must follow ROS 2 `ros__parameters` conventions)
 - **Namespace composition** — the full namespace stack is computed for every
   node and flattened onto the `namespace=` attribute
 - **OpaqueFunction execution** — Python callables are executed (not just parsed),

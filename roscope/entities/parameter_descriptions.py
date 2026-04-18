@@ -6,13 +6,87 @@ shim paths produce. ``evaluate(context)`` resolves substitutions.
 
 from __future__ import annotations
 
+import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import yaml
 
 from roscope.entities.utilities import normalize_to_list_of_substitutions, perform_substitutions
 
 if TYPE_CHECKING:
     from roscope.entities.state import LaunchContext
     from roscope.entities.substitution import Substitution
+
+logger = logging.getLogger("roscope")
+
+
+# ─── Parameter YAML expansion ────────────────────────────────────────────────
+
+
+def _expand_ros_params_yaml(
+    content: str,
+    context: LaunchContext | None = None,
+) -> list[tuple[str, str]]:
+    """Parse ROS 2 parameter YAML and flatten into (key, value) pairs.
+
+    If *context* is given, ROS 2 substitutions inside each scalar value are
+    resolved after YAML parsing (value-level, not text-level, so the YAML
+    structure is never broken by substituted path strings containing ``[`` or
+    ``{``).
+    """
+    data = yaml.safe_load(content)
+    if not isinstance(data, dict):
+        return []
+    out: list[tuple[str, str]] = []
+    _collect_ros_params(data, 0, out)
+    if context is None:
+        return out
+    from roscope.entities.helpers import resolve_substitutions
+
+    result: list[tuple[str, str]] = []
+    for key, val in out:
+        try:
+            resolved_val = resolve_substitutions(val, context)
+        except Exception:
+            logger.exception("failed to resolve substitutions in param value %r: %r", key, val)
+            resolved_val = val
+        result.append((key, resolved_val))
+    return result
+
+
+def _collect_ros_params(value: object, depth: int, out: list[tuple[str, str]]) -> None:
+    if depth > 3 or not isinstance(value, dict):
+        return
+    if "ros__parameters" in value:
+        _flatten_yaml_value(value["ros__parameters"], "", out)
+    else:
+        for child in value.values():
+            if isinstance(child, dict):
+                _collect_ros_params(child, depth + 1, out)
+
+
+def _flatten_yaml_value(value: object, prefix: str, out: list[tuple[str, str]]) -> None:
+    if isinstance(value, dict):
+        for k, v in value.items():
+            full_key = f"{prefix}.{k}" if prefix else str(k)
+            _flatten_yaml_value(v, full_key, out)
+    elif isinstance(value, list):
+        items = ", ".join(_yaml_value_to_str(v) for v in value)
+        out.append((prefix, f"[{items}]"))
+    else:
+        out.append((prefix, _yaml_value_to_str(value)))
+
+
+def _yaml_value_to_str(v: object) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return str(v).lower()
+    if isinstance(v, list):
+        items = ", ".join(_yaml_value_to_str(x) for x in v)
+        return f"[{items}]"
+    return str(v)
 
 
 class Parameter:
@@ -65,13 +139,42 @@ class ParameterFile:
             self.__param_file = [param_file] if not isinstance(param_file, list) else param_file
         else:
             self.__param_file = ""
+        self.__allow_substs: bool = bool(allow_substs)
 
     @property
     def param_file(self) -> list[Substitution] | str:
         return self.__param_file
 
-    def evaluate(self, context: LaunchContext) -> str:
-        """Resolve the parameter file path."""
-        if isinstance(self.__param_file, str):
-            return self.__param_file
-        return perform_substitutions(context, self.__param_file)
+    @property
+    def allow_substs(self) -> bool:
+        return self.__allow_substs
+
+    def evaluate(self, context: LaunchContext) -> tuple[Path, list[tuple[str, str]]]:
+        """Evaluate and return (path, params).
+
+        Always reads and inlines the file.  If ``allow_substs`` is True,
+        ROS 2 substitutions inside each YAML scalar value are resolved after
+        parsing (value-level, not text-level).
+        Raises ``FileNotFoundError`` if the file does not exist.
+
+        TODO: cache expanded results keyed by resolved path for the duration
+        of a resolve run to avoid redundant disk I/O when the same file is
+        referenced by multiple nodes.
+        """
+        param_file = self.__param_file
+        if isinstance(param_file, list):
+            param_file = perform_substitutions(context, param_file)
+
+        param_file_path: Path = Path(param_file)
+        if not param_file_path.is_file():
+            raise FileNotFoundError(f"param file not found: '{param_file_path}'")
+
+        with open(param_file_path) as f:
+            content = f.read()
+
+        try:
+            return param_file_path, _expand_ros_params_yaml(
+                content, context if self.__allow_substs else None
+            )
+        except yaml.YAMLError as e:
+            raise yaml.YAMLError(f"Error parsing param file '{param_file_path}': {e}") from e

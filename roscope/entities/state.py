@@ -33,7 +33,6 @@ class ResolverState:
         "declared_arg_names",
         "declared_arg_names_by_file",
         "include_chain",
-        "inline_params",
         "package_shares",
         "preview_mode",
         "lockfile_data",
@@ -58,7 +57,6 @@ class ResolverState:
         self.declared_arg_names: set = set()
         self.declared_arg_names_by_file: dict[str, dict] = {}
         self.include_chain: list = []
-        self.inline_params: bool = False
         self.package_shares: dict = {}
         self.preview_mode: bool = True
         self.lockfile_data: dict = {}

@@ -1,14 +1,14 @@
 # Autoware ML Param Files
 
 Vendored `.param.yaml` and `deploy_metadata.yaml` files from the
-[Autoware ML artifact set](https://github.com/autowarefoundation/autoware/blob/811a7e75ba6d6752fd9d1caf4a9a26f09294d474/ansible/roles/artifacts/tasks/main.yaml).
+[Autoware ML artifact set](https://github.com/autowarefoundation/autoware/blob/2dbc3fabcceb8513f08488d2cbd5ead148d9fc57/ansible/roles/artifacts/tasks/main.yaml).
 
 ## Why
 
 Autoware launch files reference these param YAMLs via paths like
-`$HOME/autoware_data/lidar_centerpoint/*.param.yaml`.  When
-`roscope resolve --inline-params` encounters a `<param from="..."/>`
-pointing to one of these files, it reads and inlines the YAML content.
+`$HOME/autoware_data/lidar_centerpoint/*.param.yaml`.  When roscope
+resolves a `<param from="..."/>` pointing to one of these files, it
+reads and inlines the YAML content.
 
 The full artifact set (including large ONNX models) is ~10 GB and managed
 by Autoware's ansible provisioning.  We vendor only the lightweight YAML

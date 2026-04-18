@@ -794,6 +794,51 @@ def scan_source_dir(src_dir: Path) -> Lockfile:
     src_dir = src_dir.resolve()
 
     def _walk(directory: Path) -> None:
+        xml = directory / "package.xml"
+        if xml.exists():
+            try:
+                info = parse_package_xml(xml.read_text(), str(xml))
+            except RoscopeError as e:
+                logger.warning("scan_source_dir: skipping %s: %s", xml, e)
+                return  # don't recurse into a broken package
+
+            if info.name in seen:
+                logger.warning(
+                    "scan_source_dir: duplicate package '%s' at %s and %s; keeping first",
+                    info.name,
+                    seen[info.name],
+                    directory,
+                )
+                return
+
+            seen[info.name] = directory
+
+            # repo  = immediate child of src_dir that contains this package
+            # path  = relative path from that child to the package dir
+            # fetch_dir / repo / path  must equal directory.resolve()
+            try:
+                rel = directory.relative_to(src_dir)
+            except ValueError:
+                logger.warning("scan_source_dir: %s outside src_dir; skipping", directory)
+                return
+            if rel.parts:
+                repo_key = rel.parts[0]  # immediate child of src_dir
+                path_in_repo = str(Path(*rel.parts[1:])) if len(rel.parts) > 1 else "."
+            else:
+                # directory IS src_dir itself
+                repo_key = directory.name
+                path_in_repo = "."
+
+            if repo_key not in lockfile.repositories:
+                lockfile.repositories[repo_key] = RepoLock(url="", version="")
+
+            lockfile.packages[info.name] = PackageLock(
+                repo=repo_key,
+                path=path_in_repo,
+            )
+            # Do not recurse: ROS packages don't contain other packages
+            return
+
         try:
             entries = sorted(directory.iterdir())
         except OSError:
@@ -801,46 +846,7 @@ def scan_source_dir(src_dir: Path) -> Lockfile:
         for entry in entries:
             if not entry.is_dir() or entry.name == ".git":
                 continue
-            xml = entry / "package.xml"
-            if xml.exists():
-                try:
-                    info = parse_package_xml(xml.read_text(), str(xml))
-                except RoscopeError as e:
-                    logger.warning("scan_source_dir: skipping %s: %s", xml, e)
-                    continue
-
-                if info.name in seen:
-                    logger.warning(
-                        "scan_source_dir: duplicate package '%s' at %s and %s; keeping first",
-                        info.name,
-                        seen[info.name],
-                        entry,
-                    )
-                    continue
-
-                seen[info.name] = entry
-
-                # repo  = immediate child of src_dir that contains this package
-                # path  = relative path from that child to the package dir
-                # fetch_dir / repo / path  must equal entry.resolve()
-                try:
-                    rel = entry.relative_to(src_dir)
-                except ValueError:
-                    logger.warning("scan_source_dir: %s outside src_dir; skipping", entry)
-                    continue
-                repo_key = rel.parts[0]  # immediate child of src_dir
-                path_in_repo = str(Path(*rel.parts[1:])) if len(rel.parts) > 1 else "."
-
-                if repo_key not in lockfile.repositories:
-                    lockfile.repositories[repo_key] = RepoLock(url="", version="")
-
-                lockfile.packages[info.name] = PackageLock(
-                    repo=repo_key,
-                    path=path_in_repo,
-                )
-                # Do not recurse: ROS packages don't contain other packages
-            else:
-                _walk(entry)
+            _walk(entry)
 
     _walk(src_dir)
     logger.info(

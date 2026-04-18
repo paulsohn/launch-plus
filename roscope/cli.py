@@ -51,6 +51,8 @@ def _parse_workspace_state(clean: bool, dirty: bool) -> WorkspaceState:
     """Map --clean/--dirty flags to WorkspaceState."""
     from roscope.fetcher import WorkspaceState
 
+    if clean and dirty:
+        raise click.UsageError("--clean and --dirty are mutually exclusive")
     if clean:
         return WorkspaceState.CLEAN
     if dirty:
@@ -117,10 +119,9 @@ def _load_lockfile(
 
     if workspace_state == WorkspaceState.DIRTY:
         src_path = Path(src_dir)
-        if not src_path.exists():
+        if not src_path.is_dir():
             raise click.ClickException(
-                f"source directory '{src_dir}' does not exist; "
-                "cannot scan for packages in --dirty mode"
+                f"'{src_dir}' is not a directory; cannot scan for packages in --dirty mode"
             )
         return scan_source_dir(src_path)
 
@@ -452,12 +453,7 @@ def update(
 
 @main.command()
 @click.argument("packages", nargs=-1, required=True)
-@click.option(
-    "-l",
-    "--lockfile",
-    default="manifest.lock.repos",
-    help="Lockfile path (ignored in --dirty mode; src/ is scanned instead)",
-)
+@click.option("-l", "--lockfile", default="manifest.lock.repos", help="Lockfile path")
 @click.option("--src", default="src", help="Fetch directory")
 @click.option("--no-recurse-submodules", is_flag=True)
 @click.option("--shallow", is_flag=True, help="Use shallow clone (depth=1)")
@@ -541,12 +537,16 @@ def resolve(
     """Resolve launch file (no build)."""
     from click.core import ParameterSource  # type: ignore[attr-defined]
 
+    from roscope.fetcher import WorkspaceState
     from roscope.orchestrator import ResolveWorkflowOptions
 
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
 
-    if dirty and ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE:  # type: ignore[attr-defined,union-attr]
+    lockfile_explicit = (
+        ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE  # type: ignore[attr-defined]
+    )
+    if workspace_state == WorkspaceState.DIRTY and lockfile_explicit:
         click.echo(
             f"warning: --lockfile is ignored in --dirty mode"
             f" ({src.rstrip('/')}/ is scanned instead)",
@@ -619,12 +619,16 @@ def check(
     """Validate launch file without running."""
     from click.core import ParameterSource  # type: ignore[attr-defined]
 
+    from roscope.fetcher import WorkspaceState
     from roscope.orchestrator import ResolveWorkflowOptions
 
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
 
-    if dirty and ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE:  # type: ignore[attr-defined,union-attr]
+    lockfile_explicit = (
+        ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE  # type: ignore[attr-defined]
+    )
+    if workspace_state == WorkspaceState.DIRTY and lockfile_explicit:
         click.echo(
             f"warning: --lockfile is ignored in --dirty mode"
             f" ({src.rstrip('/')}/ is scanned instead)",
@@ -699,12 +703,16 @@ def build(
     """Fetch and build packages for a launcher."""
     from click.core import ParameterSource  # type: ignore[attr-defined]
 
+    from roscope.fetcher import WorkspaceState
     from roscope.orchestrator import ResolveWorkflowOptions
 
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
 
-    if dirty and ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE:  # type: ignore[attr-defined,union-attr]
+    lockfile_explicit = (
+        ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE  # type: ignore[attr-defined]
+    )
+    if workspace_state == WorkspaceState.DIRTY and lockfile_explicit:
         click.echo(
             f"warning: --lockfile is ignored in --dirty mode"
             f" ({src.rstrip('/')}/ is scanned instead)",
@@ -777,13 +785,26 @@ def build_pkg(
     dry_run: bool,
 ) -> None:
     """Build package(s) by name with automatic transitive dependency fetching."""
+    from click.core import ParameterSource  # type: ignore[attr-defined]
+
     from roscope.builder import BuildOptions, execute_build, plan_build_from_packages
-    from roscope.fetcher import FetchOptions, fetch_packages
+    from roscope.fetcher import FetchOptions, WorkspaceState, fetch_packages
     from roscope.rosdep import rosdep_install
 
-    parsed_lockfile = _read_lockfile(lockfile)
     src_path = Path(src)
     workspace_state = _parse_workspace_state(clean, dirty)
+
+    lockfile_explicit = (
+        ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE  # type: ignore[attr-defined]
+    )
+    if workspace_state == WorkspaceState.DIRTY and lockfile_explicit:
+        click.echo(
+            f"warning: --lockfile is ignored in --dirty mode"
+            f" ({src.rstrip('/')}/ is scanned instead)",
+            err=True,
+        )
+
+    parsed_lockfile = _load_lockfile(lockfile, src, workspace_state)
 
     fetch_options = FetchOptions(
         recurse_submodules=True,

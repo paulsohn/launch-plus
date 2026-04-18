@@ -77,20 +77,6 @@ class Node(Action):
         ]
 
     @staticmethod
-    def parse_envs(entity: Entity, parser: _ActionParser) -> list:
-        """Extract <env> children as unresolved token pairs."""
-        items = entity.get_attr("env", data_type=list, optional=True)
-        if not items:
-            return []
-        return [
-            (
-                parser.parse_substitution(e.get_attr("name", optional=True) or ""),
-                parser.parse_substitution(e.get_attr("value", optional=True) or ""),
-            )
-            for e in items
-        ]
-
-    @staticmethod
     def parse_composable_plugins(entity: Entity, parser: _ActionParser) -> list:
         """Extract <composable_node> children as ComposableNode instances."""
         from roscope.entities.descriptions import ComposableNode
@@ -121,7 +107,9 @@ class Node(Action):
         kwargs["namespace"] = parser.parse_substitution(ns_raw) if ns_raw else None
         kwargs["parameters"] = cls.parse_params(entity, parser)
         kwargs["remappings"] = cls.parse_remaps(entity, parser)
-        kwargs["env"] = cls.parse_envs(entity, parser)
+        from roscope.entities.actions.executable import ExecuteProcess
+
+        kwargs["env"] = ExecuteProcess.parse_envs(entity, parser)
         kwargs["kind"] = "lifecycle_node" if entity.type_name == "lifecycle_node" else "node"
         kwargs["output"] = _parse_optional(parser, entity.get_attr("output", optional=True))
         kwargs["arguments"] = _parse_optional(parser, entity.get_attr("args", optional=True))

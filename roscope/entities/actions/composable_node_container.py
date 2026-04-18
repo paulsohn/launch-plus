@@ -25,8 +25,8 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
 
     if isinstance(desc_or_dict, ComposableNode):
         desc = desc_or_dict
-        pkg = context.perform_substitution(desc.package) or str(desc.package or "")
-        plugin_name = context.perform_substitution(desc.node_plugin) or str(desc.node_plugin or "")
+        pkg = context.perform_substitution(desc.package) or ""
+        plugin_name = context.perform_substitution(desc.node_plugin) or ""
         name = context.perform_substitution(desc.node_name) or None
         ros_ns = context._launch_configurations.get("ros_namespace")
         node_ns = None

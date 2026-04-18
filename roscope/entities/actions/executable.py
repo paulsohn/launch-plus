@@ -83,6 +83,20 @@ class ExecuteProcess(Action):
             result_args.append(arg)
         return result_args
 
+    @staticmethod
+    def parse_envs(entity: Entity, parser: _ActionParser) -> list:
+        """Extract <env> children as unresolved token pairs."""
+        items = entity.get_attr("env", data_type=list, optional=True)
+        if not items:
+            return []
+        return [
+            (
+                parser.parse_substitution(e.get_attr("name", optional=True) or ""),
+                parser.parse_substitution(e.get_attr("value", optional=True) or ""),
+            )
+            for e in items
+        ]
+
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser):
         _, kwargs = super().parse(entity, parser)
@@ -90,14 +104,7 @@ class ExecuteProcess(Action):
         name_raw = entity.get_attr("name", optional=True)
         kwargs["cmd"] = cls._parse_cmdline(cmd_raw, parser)
         kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
-        env_items = entity.get_attr("env", data_type=list, optional=True) or []
-        kwargs["additional_env"] = [
-            (
-                parser.parse_substitution(e.get_attr("name", optional=True) or ""),
-                parser.parse_substitution(e.get_attr("value", optional=True) or ""),
-            )
-            for e in env_items
-        ]
+        kwargs["additional_env"] = cls.parse_envs(entity, parser)
         return cls, kwargs
 
     def execute(self, context) -> list:

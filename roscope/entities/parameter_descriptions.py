@@ -172,6 +172,9 @@ class ParameterFile:
         with open(param_file_path) as f:
             content = f.read()
 
-        return param_file_path, _expand_ros_params_yaml(
-            content, context if self.__allow_substs else None
-        )
+        try:
+            return param_file_path, _expand_ros_params_yaml(
+                content, context if self.__allow_substs else None
+            )
+        except yaml.YAMLError as e:
+            raise yaml.YAMLError(f"Error parsing param file '{param_file_path}': {e}") from e

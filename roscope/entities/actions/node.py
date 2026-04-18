@@ -114,7 +114,15 @@ class Node(ExecuteProcess):
 
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
         self._kind = kwargs.pop("kind", None) or "node"
-        super().__init__(executable=executable or [], name=name, **kwargs)
+        # Build a dummy cmd matching the official Node(ExecuteProcess) pattern.
+        # ExecutableInPackage cannot be supported in static analysis, so use a
+        # ros2-run-style placeholder. Matching official: if package is given,
+        # prefix with "ros2 run <package>"; otherwise start with executable.
+        if package is not None:
+            cmd: object = ["ros2", "run", package, executable]
+        else:
+            cmd = [executable]
+        super().__init__(cmd=cmd, name=name, **kwargs)
         self.package = package
         self.executable = executable
         self.name = name

@@ -244,7 +244,7 @@ class _GraphBuilder:
             "fqn": cfqn,
             "parent": parent_id,
             "color": self._package_color(pkg),
-            "params": self._build_params(data.get("param_files", []), data.get("parameters", {})),
+            "params": self._build_params(data.get("param_files", []), data.get("parameters", [])),
             "remaps": [{"from": r[0], "to": r[1]} for r in data.get("remappings", [])],
             "extraArgs": data.get("extra_arguments", []),
         }

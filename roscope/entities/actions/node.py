@@ -154,16 +154,16 @@ class Node(ExecuteProcess):
 
         # Parameters: global first, then node-specific.
         # Deduplication: skip entries whose name+value are identical to the
-        # current active value; keep entries that override a prior value so the
+        # current active_params value; keep entries that override a prior value so the
         # visualizer can show them as explicit overwrites.
         ctx_gp = context._launch_configurations.get("global_params", [])
         params: list[tuple[str, str]] = []
-        active: dict[str, str] = {}
+        active_params: dict[str, str] = {}
 
         def _push_param(k: str, v: str) -> None:
-            if active.get(k) != v:
+            if active_params.get(k) != v:
                 params.append((k, v))
-                active[k] = v
+                active_params[k] = v
 
         for k, v in ctx_gp:
             _push_param(k, str(v))
@@ -176,7 +176,7 @@ class Node(ExecuteProcess):
                 pf_entry: dict = {"path": path, "params": expanded}
                 pf_list.append(pf_entry)
                 for k, v in expanded:
-                    active[k] = str(v)
+                    active_params[k] = str(v)
             elif isinstance(p, Parameter):
                 k, v = p.evaluate(context)
                 _push_param(k, v)

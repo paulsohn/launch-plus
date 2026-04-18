@@ -19,9 +19,15 @@ from roscope.parsers.entity import Entity
 def _resolve_plugin(desc_or_dict, context) -> dict:
     """Resolve a single ComposableNode to output dict."""
     state = context._state
-    params: dict[str, str] = {}
+    params: list[tuple[str, str]] = []
+    active_params: dict[str, str] = {}
     pf_list: list[dict] = []
     remaps: list = []
+
+    def _push_param(k: str, v: str) -> None:
+        if active_params.get(k) != v:
+            params.append((k, v))
+            active_params[k] = v
 
     if isinstance(desc_or_dict, ComposableNode):
         desc = desc_or_dict
@@ -39,13 +45,15 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
                 path = str(path_obj)
                 state.track_param_file(path)
                 pf_list.append({"path": path, "params": expanded})
+                for k, v in expanded:
+                    active_params[k] = str(v)
             elif isinstance(p, Parameter):
                 k, v = p.evaluate(context)
-                params[k] = v
+                _push_param(k, v)
             elif isinstance(p, dict):
                 for k, v in p.items():
                     resolved_v = context.perform_substitution(v)
-                    params[str(k)] = resolved_v if resolved_v is not None else ""
+                    _push_param(str(k), resolved_v if resolved_v is not None else "")
         for r in desc.remappings or []:
             if isinstance(r, (tuple, list)) and len(r) == 2:
                 src = context.perform_substitution(r[0])

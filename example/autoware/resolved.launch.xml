@@ -324,9 +324,9 @@
           <param name="vehicle_height" value="2.5"/>
           <param name="max_steer_angle" value="0.7"/>
           <composable_node pkg="autoware_component_state_monitor" plugin="autoware::component_state_monitor::StateMonitor" name="component" namespace="/system/component_state_monitor">
-            <param name="autonomous" value="{'localization': ['topic_state_monitor_pose_twist_fusion_filter_pose: localization_topic_status', 'topic_state_monitor_transform_map_to_base_link: localization_topic_status'], 'perception': ['topic_state_monitor_object_recognition_objects: perception_topic_status', 'topic_state_monitor_traffic_light_recognition_traffic_signals: perception_topic_status'], 'planning': ['topic_state_monitor_mission_planning_route: planning_topic_status', 'topic_state_monitor_scenario_planning_trajectory: planning_topic_status'], 'control': ['topic_state_monitor_trajectory_follower_control_cmd: control_topic_status', 'topic_state_monitor_control_command_control_cmd: control_topic_status'], 'vehicle': ['topic_state_monitor_vehicle_status_velocity_status: vehicle_topic_status', 'topic_state_monitor_vehicle_status_steering_status: vehicle_topic_status']}"/>
-            <param name="launch" value="{'map': ['topic_state_monitor_vector_map: map_topic_status', 'topic_state_monitor_pointcloud_map: map_topic_status'], 'perception': ['topic_state_monitor_obstacle_segmentation_pointcloud: perception_topic_status'], 'system': ['topic_state_monitor_system_emergency_control_cmd: system_topic_status']}"/>
             <param name="topic_monitor_names" value="topic_state_monitor_vector_map: map_topic_statustopic_state_monitor_pointcloud_map: map_topic_statustopic_state_monitor_pose_twist_fusion_filter_pose: localization_topic_statustopic_state_monitor_obstacle_segmentation_pointcloud: perception_topic_statustopic_state_monitor_object_recognition_objects: perception_topic_statustopic_state_monitor_traffic_light_recognition_traffic_signals: perception_topic_statustopic_state_monitor_mission_planning_route: planning_topic_statustopic_state_monitor_scenario_planning_trajectory: planning_topic_statustopic_state_monitor_trajectory_follower_control_cmd: control_topic_statustopic_state_monitor_control_command_control_cmd: control_topic_statustopic_state_monitor_vehicle_status_velocity_status: vehicle_topic_statustopic_state_monitor_vehicle_status_steering_status: vehicle_topic_statustopic_state_monitor_system_emergency_control_cmd: system_topic_statustopic_state_monitor_transform_map_to_base_link: localization_topic_status"/>
+            <param name="launch" value="{'map': ['topic_state_monitor_vector_map: map_topic_status', 'topic_state_monitor_pointcloud_map: map_topic_status'], 'perception': ['topic_state_monitor_obstacle_segmentation_pointcloud: perception_topic_status'], 'system': ['topic_state_monitor_system_emergency_control_cmd: system_topic_status']}"/>
+            <param name="autonomous" value="{'localization': ['topic_state_monitor_pose_twist_fusion_filter_pose: localization_topic_status', 'topic_state_monitor_transform_map_to_base_link: localization_topic_status'], 'perception': ['topic_state_monitor_object_recognition_objects: perception_topic_status', 'topic_state_monitor_traffic_light_recognition_traffic_signals: perception_topic_status'], 'planning': ['topic_state_monitor_mission_planning_route: planning_topic_status', 'topic_state_monitor_scenario_planning_trajectory: planning_topic_status'], 'control': ['topic_state_monitor_trajectory_follower_control_cmd: control_topic_status', 'topic_state_monitor_control_command_control_cmd: control_topic_status'], 'vehicle': ['topic_state_monitor_vehicle_status_velocity_status: vehicle_topic_status', 'topic_state_monitor_vehicle_status_steering_status: vehicle_topic_status']}"/>
           </composable_node>
         </node_container>
         <group>
@@ -345,14 +345,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_vector_map" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="map_topic_status"/>
-              <param name="error_rate" value="0.0"/>
-              <param name="timeout" value="0.0"/>
               <param name="topic" value="/map/vector_map"/>
               <param name="topic_type" value="autoware_map_msgs/msg/LaneletMapBin"/>
               <param name="transient_local" value="True"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="map_topic_status"/>
               <param name="warn_rate" value="0.0"/>
+              <param name="error_rate" value="0.0"/>
+              <param name="timeout" value="0.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -374,14 +374,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_pointcloud_map" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="map_topic_status"/>
-              <param name="error_rate" value="0.0"/>
-              <param name="timeout" value="0.0"/>
               <param name="topic" value="/map/pointcloud_map"/>
               <param name="topic_type" value="sensor_msgs/msg/PointCloud2"/>
               <param name="transient_local" value="True"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="map_topic_status"/>
               <param name="warn_rate" value="0.0"/>
+              <param name="error_rate" value="0.0"/>
+              <param name="timeout" value="0.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -403,14 +403,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_pose_twist_fusion_filter_pose" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="localization_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/localization/pose_twist_fusion_filter/pose"/>
               <param name="topic_type" value="geometry_msgs/msg/PoseStamped"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="localization_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -432,14 +432,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_obstacle_segmentation_pointcloud" namespace="/system">
-              <param name="best_effort" value="True"/>
-              <param name="diag_name" value="perception_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/perception/obstacle_segmentation/pointcloud"/>
               <param name="topic_type" value="sensor_msgs/msg/PointCloud2"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="True"/>
+              <param name="diag_name" value="perception_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -461,14 +461,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_object_recognition_objects" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="perception_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/perception/object_recognition/objects"/>
               <param name="topic_type" value="autoware_perception_msgs/msg/PredictedObjects"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="perception_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -490,14 +490,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_traffic_light_recognition_traffic_signals" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="perception_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/perception/traffic_light_recognition/traffic_signals"/>
               <param name="topic_type" value="autoware_perception_msgs/msg/TrafficLightGroupArray"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="perception_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -519,14 +519,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_mission_planning_route" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="planning_topic_status"/>
-              <param name="error_rate" value="0.0"/>
-              <param name="timeout" value="0.0"/>
               <param name="topic" value="/planning/mission_planning/route"/>
               <param name="topic_type" value="autoware_planning_msgs/msg/LaneletRoute"/>
               <param name="transient_local" value="True"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="planning_topic_status"/>
               <param name="warn_rate" value="0.0"/>
+              <param name="error_rate" value="0.0"/>
+              <param name="timeout" value="0.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -548,14 +548,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_scenario_planning_trajectory" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="planning_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/planning/trajectory"/>
               <param name="topic_type" value="autoware_planning_msgs/msg/Trajectory"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="planning_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -577,14 +577,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_trajectory_follower_control_cmd" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="control_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/control/trajectory_follower/control_cmd"/>
               <param name="topic_type" value="autoware_control_msgs/msg/Control"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="control_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -606,14 +606,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_control_command_control_cmd" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="control_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/control/command/control_cmd"/>
               <param name="topic_type" value="autoware_control_msgs/msg/Control"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="control_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -635,14 +635,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_vehicle_status_velocity_status" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="vehicle_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/vehicle/status/velocity_status"/>
               <param name="topic_type" value="autoware_vehicle_msgs/msg/VelocityReport"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="vehicle_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -664,14 +664,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_vehicle_status_steering_status" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="vehicle_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/vehicle/status/steering_status"/>
               <param name="topic_type" value="autoware_vehicle_msgs/msg/SteeringReport"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="vehicle_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -693,14 +693,14 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_system_emergency_control_cmd" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="diag_name" value="system_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/system/emergency/control_cmd"/>
               <param name="topic_type" value="autoware_control_msgs/msg/Control"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="system_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -723,15 +723,15 @@
           <!-- arg name="window_size" default="10" -->
           <load_composable_node target="/system/component_state_monitor/container">
             <composable_node pkg="autoware_topic_state_monitor" plugin="autoware::topic_state_monitor::TopicStateMonitorNode" name="topic_state_monitor_transform_map_to_base_link" namespace="/system">
-              <param name="best_effort" value="False"/>
-              <param name="child_frame_id" value="base_link"/>
-              <param name="diag_name" value="localization_topic_status"/>
-              <param name="error_rate" value="1.0"/>
-              <param name="frame_id" value="map"/>
-              <param name="timeout" value="1.0"/>
               <param name="topic" value="/tf"/>
+              <param name="frame_id" value="map"/>
+              <param name="child_frame_id" value="base_link"/>
               <param name="transient_local" value="False"/>
+              <param name="best_effort" value="False"/>
+              <param name="diag_name" value="localization_topic_status"/>
               <param name="warn_rate" value="5.0"/>
+              <param name="error_rate" value="1.0"/>
+              <param name="timeout" value="1.0"/>
               <param name="window_size" value="10"/>
               <remap from="/diagnostics" to="/diagnostics"/>
             </composable_node>
@@ -754,10 +754,10 @@
           <param name="vehicle_height" value="2.5"/>
           <param name="max_steer_angle" value="0.7"/>
           <composable_node pkg="autoware_mrm_comfortable_stop_operator" plugin="autoware::mrm_comfortable_stop_operator::MrmComfortableStopOperator" name="mrm_comfortable_stop_operator" namespace="/system">
-            <param name="max_jerk" value="0.3"/>
-            <param name="min_acceleration" value="-1.0"/>
-            <param name="min_jerk" value="-0.3"/>
             <param name="update_rate" value="10"/>
+            <param name="min_acceleration" value="-1.0"/>
+            <param name="max_jerk" value="0.3"/>
+            <param name="min_jerk" value="-0.3"/>
             <remap from="~/input/mrm/comfortable_stop/operate" to="/system/mrm/comfortable_stop/operate"/>
             <remap from="~/output/mrm/comfortable_stop/status" to="/system/mrm/comfortable_stop/status"/>
             <remap from="~/output/velocity_limit" to="/planning/scenario_planning/max_velocity_candidates"/>
@@ -781,9 +781,9 @@
           <param name="vehicle_height" value="2.5"/>
           <param name="max_steer_angle" value="0.7"/>
           <composable_node pkg="autoware_mrm_emergency_stop_operator" plugin="autoware::mrm_emergency_stop_operator::MrmEmergencyStopOperator" name="mrm_emergency_stop_operator" namespace="/system">
+            <param name="update_rate" value="30"/>
             <param name="target_acceleration" value="-2.5"/>
             <param name="target_jerk" value="-1.5"/>
-            <param name="update_rate" value="30"/>
             <remap from="~/input/mrm/emergency_stop/operate" to="/system/mrm/emergency_stop/operate"/>
             <remap from="~/input/control/control_cmd" to="/control/command/control_cmd"/>
             <remap from="~/output/mrm/emergency_stop/status" to="/system/mrm/emergency_stop/status"/>
@@ -1005,8 +1005,8 @@
           <param name="pcd_paths_or_directory" value="[$(var pointcloud_map_path)]"/>
           <param name="pcd_metadata_path" value="$(var pointcloud_map_metadata_path)"/>
           <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/map/pointcloud_map_loader.param.yaml -->
-          <param name="pcd_metadata_path" value="{map_path}/pointcloud_map_metadata.yaml"/>
           <param name="pcd_paths_or_directory" value="[{map_path}/pointcloud_map.pcd]"/>
+          <param name="pcd_metadata_path" value="{map_path}/pointcloud_map_metadata.yaml"/>
           <remap from="output/pointcloud_map" to="/map/pointcloud_map"/>
           <remap from="output/pointcloud_map_metadata" to="/map/pointcloud_map_metadata"/>
           <remap from="service/get_partial_pcd_map" to="/map/get_partial_pointcloud_map"/>
@@ -1166,22 +1166,22 @@
                 <param name="max_steer_angle" value="0.7"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node" namespace="/sensing/lidar/top">
                   <param name="calibration_file" value="{workspace}/src/sensor_component/external/nebula/src/nebula_velodyne/nebula_velodyne_decoders/calibration/VLS128.yaml"/>
-                  <param name="cloud_max_angle" value="360"/>
-                  <param name="cloud_min_angle" value="0"/>
-                  <param name="data_port" value="2368"/>
-                  <param name="dual_return_distance_threshold" value="0.1"/>
-                  <param name="frame_id" value="velodyne_top"/>
-                  <param name="gnss_port" value="2380"/>
-                  <param name="host_ip" value="192.168.1.10"/>
-                  <param name="launch_hw" value="true"/>
-                  <param name="max_range" value="250.0"/>
-                  <param name="min_range" value="0.5"/>
-                  <param name="packet_mtu_size" value="1500"/>
-                  <param name="return_mode" value="SingleStrongest"/>
-                  <param name="rotation_speed" value="600"/>
-                  <param name="scan_phase" value="300.0"/>
-                  <param name="sensor_ip" value="192.168.1.201"/>
                   <param name="sensor_model" value="VLS128"/>
+                  <param name="launch_hw" value="true"/>
+                  <param name="host_ip" value="192.168.1.10"/>
+                  <param name="sensor_ip" value="192.168.1.201"/>
+                  <param name="data_port" value="2368"/>
+                  <param name="gnss_port" value="2380"/>
+                  <param name="return_mode" value="SingleStrongest"/>
+                  <param name="min_range" value="0.5"/>
+                  <param name="max_range" value="250.0"/>
+                  <param name="frame_id" value="velodyne_top"/>
+                  <param name="scan_phase" value="300.0"/>
+                  <param name="cloud_min_angle" value="0"/>
+                  <param name="cloud_max_angle" value="360"/>
+                  <param name="dual_return_distance_threshold" value="0.1"/>
+                  <param name="rotation_speed" value="600"/>
+                  <param name="packet_mtu_size" value="1500"/>
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="/sensing/lidar/top/pointcloud_raw_ex"/>
@@ -1189,30 +1189,30 @@
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self" namespace="/sensing/lidar/top">
                   <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
                   <param name="output_frame" value="base_link"/>
+                  <param name="negative" value="True"/>
                   <param name="processing_time_threshold_sec" value="0.01"/>
+                  <param name="min_x" value="1.8"/>
+                  <param name="max_x" value="3.2"/>
+                  <param name="min_y" value="-1.4"/>
+                  <param name="max_y" value="1.4"/>
+                  <param name="min_z" value="0.8"/>
+                  <param name="max_z" value="1.5"/>
                   <remap from="input" to="/sensing/lidar/top/pointcloud_raw_ex"/>
                   <remap from="output" to="/sensing/lidar/top/self_cropped/pointcloud_ex"/>
                   <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror" namespace="/sensing/lidar/top">
                   <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
                   <param name="output_frame" value="base_link"/>
+                  <param name="negative" value="True"/>
                   <param name="processing_time_threshold_sec" value="0.01"/>
+                  <param name="min_x" value="1.8"/>
+                  <param name="max_x" value="3.2"/>
+                  <param name="min_y" value="-1.4"/>
+                  <param name="max_y" value="1.4"/>
+                  <param name="min_z" value="0.8"/>
+                  <param name="max_z" value="1.5"/>
                   <remap from="input" to="/sensing/lidar/top/self_cropped/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/top/mirror_cropped/pointcloud_ex"/>
                   <extra_arg name="use_intra_process_comms" value="true"/>
@@ -1346,22 +1346,22 @@
                 <param name="max_steer_angle" value="0.7"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node" namespace="/sensing/lidar/left">
                   <param name="calibration_file" value="{workspace}/src/sensor_component/external/nebula/src/nebula_velodyne/nebula_velodyne_decoders/calibration/VLP16.yaml"/>
-                  <param name="cloud_max_angle" value="60"/>
-                  <param name="cloud_min_angle" value="300"/>
-                  <param name="data_port" value="2369"/>
-                  <param name="dual_return_distance_threshold" value="0.1"/>
-                  <param name="frame_id" value="velodyne_left"/>
-                  <param name="gnss_port" value="2380"/>
-                  <param name="host_ip" value="192.168.1.10"/>
-                  <param name="launch_hw" value="true"/>
-                  <param name="max_range" value="5.0"/>
-                  <param name="min_range" value="0.4"/>
-                  <param name="packet_mtu_size" value="1500"/>
-                  <param name="return_mode" value="SingleStrongest"/>
-                  <param name="rotation_speed" value="600"/>
-                  <param name="scan_phase" value="180.0"/>
-                  <param name="sensor_ip" value="192.168.1.202"/>
                   <param name="sensor_model" value="VLP16"/>
+                  <param name="launch_hw" value="true"/>
+                  <param name="host_ip" value="192.168.1.10"/>
+                  <param name="sensor_ip" value="192.168.1.202"/>
+                  <param name="data_port" value="2369"/>
+                  <param name="gnss_port" value="2380"/>
+                  <param name="return_mode" value="SingleStrongest"/>
+                  <param name="min_range" value="0.4"/>
+                  <param name="max_range" value="5.0"/>
+                  <param name="frame_id" value="velodyne_left"/>
+                  <param name="scan_phase" value="180.0"/>
+                  <param name="cloud_min_angle" value="300"/>
+                  <param name="cloud_max_angle" value="60"/>
+                  <param name="dual_return_distance_threshold" value="0.1"/>
+                  <param name="rotation_speed" value="600"/>
+                  <param name="packet_mtu_size" value="1500"/>
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="/sensing/lidar/left/pointcloud_raw_ex"/>
@@ -1369,30 +1369,30 @@
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self" namespace="/sensing/lidar/left">
                   <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
                   <param name="output_frame" value="base_link"/>
+                  <param name="negative" value="True"/>
                   <param name="processing_time_threshold_sec" value="0.01"/>
+                  <param name="min_x" value="1.8"/>
+                  <param name="max_x" value="3.2"/>
+                  <param name="min_y" value="-1.4"/>
+                  <param name="max_y" value="1.4"/>
+                  <param name="min_z" value="0.8"/>
+                  <param name="max_z" value="1.5"/>
                   <remap from="input" to="/sensing/lidar/left/pointcloud_raw_ex"/>
                   <remap from="output" to="/sensing/lidar/left/self_cropped/pointcloud_ex"/>
                   <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror" namespace="/sensing/lidar/left">
                   <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
                   <param name="output_frame" value="base_link"/>
+                  <param name="negative" value="True"/>
                   <param name="processing_time_threshold_sec" value="0.01"/>
+                  <param name="min_x" value="1.8"/>
+                  <param name="max_x" value="3.2"/>
+                  <param name="min_y" value="-1.4"/>
+                  <param name="max_y" value="1.4"/>
+                  <param name="min_z" value="0.8"/>
+                  <param name="max_z" value="1.5"/>
                   <remap from="input" to="/sensing/lidar/left/self_cropped/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/left/mirror_cropped/pointcloud_ex"/>
                   <extra_arg name="use_intra_process_comms" value="true"/>
@@ -1526,22 +1526,22 @@
                 <param name="max_steer_angle" value="0.7"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node" namespace="/sensing/lidar/right">
                   <param name="calibration_file" value="{workspace}/src/sensor_component/external/nebula/src/nebula_velodyne/nebula_velodyne_decoders/calibration/VLP16.yaml"/>
-                  <param name="cloud_max_angle" value="60"/>
-                  <param name="cloud_min_angle" value="300"/>
-                  <param name="data_port" value="2370"/>
-                  <param name="dual_return_distance_threshold" value="0.1"/>
-                  <param name="frame_id" value="velodyne_right"/>
-                  <param name="gnss_port" value="2380"/>
-                  <param name="host_ip" value="192.168.1.10"/>
-                  <param name="launch_hw" value="true"/>
-                  <param name="max_range" value="5.0"/>
-                  <param name="min_range" value="0.4"/>
-                  <param name="packet_mtu_size" value="1500"/>
-                  <param name="return_mode" value="SingleStrongest"/>
-                  <param name="rotation_speed" value="600"/>
-                  <param name="scan_phase" value="180.0"/>
-                  <param name="sensor_ip" value="192.168.1.203"/>
                   <param name="sensor_model" value="VLP16"/>
+                  <param name="launch_hw" value="true"/>
+                  <param name="host_ip" value="192.168.1.10"/>
+                  <param name="sensor_ip" value="192.168.1.203"/>
+                  <param name="data_port" value="2370"/>
+                  <param name="gnss_port" value="2380"/>
+                  <param name="return_mode" value="SingleStrongest"/>
+                  <param name="min_range" value="0.4"/>
+                  <param name="max_range" value="5.0"/>
+                  <param name="frame_id" value="velodyne_right"/>
+                  <param name="scan_phase" value="180.0"/>
+                  <param name="cloud_min_angle" value="300"/>
+                  <param name="cloud_max_angle" value="60"/>
+                  <param name="dual_return_distance_threshold" value="0.1"/>
+                  <param name="rotation_speed" value="600"/>
+                  <param name="packet_mtu_size" value="1500"/>
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="/sensing/lidar/right/pointcloud_raw_ex"/>
@@ -1549,30 +1549,30 @@
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self" namespace="/sensing/lidar/right">
                   <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
                   <param name="output_frame" value="base_link"/>
+                  <param name="negative" value="True"/>
                   <param name="processing_time_threshold_sec" value="0.01"/>
+                  <param name="min_x" value="1.8"/>
+                  <param name="max_x" value="3.2"/>
+                  <param name="min_y" value="-1.4"/>
+                  <param name="max_y" value="1.4"/>
+                  <param name="min_z" value="0.8"/>
+                  <param name="max_z" value="1.5"/>
                   <remap from="input" to="/sensing/lidar/right/pointcloud_raw_ex"/>
                   <remap from="output" to="/sensing/lidar/right/self_cropped/pointcloud_ex"/>
                   <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror" namespace="/sensing/lidar/right">
                   <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
                   <param name="output_frame" value="base_link"/>
+                  <param name="negative" value="True"/>
                   <param name="processing_time_threshold_sec" value="0.01"/>
+                  <param name="min_x" value="1.8"/>
+                  <param name="max_x" value="3.2"/>
+                  <param name="min_y" value="-1.4"/>
+                  <param name="max_y" value="1.4"/>
+                  <param name="min_z" value="0.8"/>
+                  <param name="max_z" value="1.5"/>
                   <remap from="input" to="/sensing/lidar/right/self_cropped/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/right/mirror_cropped/pointcloud_ex"/>
                   <extra_arg name="use_intra_process_comms" value="true"/>
@@ -1706,22 +1706,22 @@
                 <param name="max_steer_angle" value="0.7"/>
                 <composable_node pkg="nebula_velodyne" plugin="VelodyneRosWrapper" name="velodyne_ros_wrapper_node" namespace="/sensing/lidar/rear">
                   <param name="calibration_file" value="{workspace}/src/sensor_component/external/nebula/src/nebula_velodyne/nebula_velodyne_decoders/calibration/VLP16.yaml"/>
-                  <param name="cloud_max_angle" value="60"/>
-                  <param name="cloud_min_angle" value="300"/>
-                  <param name="data_port" value="2371"/>
-                  <param name="dual_return_distance_threshold" value="0.1"/>
-                  <param name="frame_id" value="velodyne_rear"/>
-                  <param name="gnss_port" value="2380"/>
-                  <param name="host_ip" value="192.168.1.10"/>
-                  <param name="launch_hw" value="true"/>
-                  <param name="max_range" value="1.5"/>
-                  <param name="min_range" value="0.4"/>
-                  <param name="packet_mtu_size" value="1500"/>
-                  <param name="return_mode" value="SingleStrongest"/>
-                  <param name="rotation_speed" value="600"/>
-                  <param name="scan_phase" value="180.0"/>
-                  <param name="sensor_ip" value="192.168.1.204"/>
                   <param name="sensor_model" value="VLP16"/>
+                  <param name="launch_hw" value="true"/>
+                  <param name="host_ip" value="192.168.1.10"/>
+                  <param name="sensor_ip" value="192.168.1.204"/>
+                  <param name="data_port" value="2371"/>
+                  <param name="gnss_port" value="2380"/>
+                  <param name="return_mode" value="SingleStrongest"/>
+                  <param name="min_range" value="0.4"/>
+                  <param name="max_range" value="1.5"/>
+                  <param name="frame_id" value="velodyne_rear"/>
+                  <param name="scan_phase" value="180.0"/>
+                  <param name="cloud_min_angle" value="300"/>
+                  <param name="cloud_max_angle" value="60"/>
+                  <param name="dual_return_distance_threshold" value="0.1"/>
+                  <param name="rotation_speed" value="600"/>
+                  <param name="packet_mtu_size" value="1500"/>
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="/sensing/lidar/rear/pointcloud_raw_ex"/>
@@ -1729,30 +1729,30 @@
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self" namespace="/sensing/lidar/rear">
                   <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
                   <param name="output_frame" value="base_link"/>
+                  <param name="negative" value="True"/>
                   <param name="processing_time_threshold_sec" value="0.01"/>
+                  <param name="min_x" value="1.8"/>
+                  <param name="max_x" value="3.2"/>
+                  <param name="min_y" value="-1.4"/>
+                  <param name="max_y" value="1.4"/>
+                  <param name="min_z" value="0.8"/>
+                  <param name="max_z" value="1.5"/>
                   <remap from="input" to="/sensing/lidar/rear/pointcloud_raw_ex"/>
                   <remap from="output" to="/sensing/lidar/rear/self_cropped/pointcloud_ex"/>
                   <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror" namespace="/sensing/lidar/rear">
                   <param name="input_frame" value="base_link"/>
-                  <param name="max_x" value="3.2"/>
-                  <param name="max_y" value="1.4"/>
-                  <param name="max_z" value="1.5"/>
-                  <param name="min_x" value="1.8"/>
-                  <param name="min_y" value="-1.4"/>
-                  <param name="min_z" value="0.8"/>
-                  <param name="negative" value="True"/>
                   <param name="output_frame" value="base_link"/>
+                  <param name="negative" value="True"/>
                   <param name="processing_time_threshold_sec" value="0.01"/>
+                  <param name="min_x" value="1.8"/>
+                  <param name="max_x" value="3.2"/>
+                  <param name="min_y" value="-1.4"/>
+                  <param name="max_y" value="1.4"/>
+                  <param name="min_z" value="0.8"/>
+                  <param name="max_z" value="1.5"/>
                   <remap from="input" to="/sensing/lidar/rear/self_cropped/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/rear/mirror_cropped/pointcloud_ex"/>
                   <extra_arg name="use_intra_process_comms" value="true"/>
@@ -2800,49 +2800,49 @@
         <load_composable_node target="/pointcloud_container">
           <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter" namespace="/perception/obstacle_segmentation">
             <param name="input_frame" value="base_link"/>
+            <param name="output_frame" value="base_link"/>
+            <param name="max_z" value="2.5"/>
+            <param name="min_z" value="-2.5"/>
+            <param name="min_x" value="-100.0"/>
+            <param name="max_x" value="150.0"/>
+            <param name="min_y" value="-70.0"/>
+            <param name="max_y" value="70.0"/>
             <param name="margin_max_z" value="0.0"/>
             <param name="margin_min_z" value="-2.5"/>
-            <param name="max_x" value="150.0"/>
-            <param name="max_y" value="70.0"/>
-            <param name="max_z" value="2.5"/>
-            <param name="min_x" value="-100.0"/>
-            <param name="min_y" value="-70.0"/>
-            <param name="min_z" value="-2.5"/>
             <param name="negative" value="False"/>
-            <param name="output_frame" value="base_link"/>
             <param name="processing_time_threshold_sec" value="0.01"/>
             <remap from="input" to="/sensing/lidar/concatenated/pointcloud"/>
             <remap from="output" to="/perception/obstacle_segmentation/range_cropped/pointcloud"/>
             <extra_arg name="use_intra_process_comms" value="true"/>
           </composable_node>
           <composable_node pkg="autoware_ground_segmentation" plugin="autoware::ground_segmentation::ScanGroundFilterComponent" name="common_ground_filter" namespace="/perception/obstacle_segmentation">
-            <param name="center_pcl_shift" value="0.0"/>
+            <param name="global_slope_max_angle_deg" value="10.0"/>
+            <param name="local_slope_max_angle_deg" value="13.0"/>
+            <param name="split_points_distance_tolerance" value="0.2"/>
+            <param name="use_virtual_ground_point" value="True"/>
+            <param name="split_height_distance" value="0.2"/>
+            <param name="non_ground_height_threshold" value="0.2"/>
+            <param name="grid_size_m" value="0.5"/>
+            <param name="gnd_grid_buffer_size" value="4"/>
             <param name="detection_range_z_max" value="2.5"/>
             <param name="elevation_grid_mode" value="True"/>
-            <param name="global_slope_max_angle_deg" value="10.0"/>
-            <param name="gnd_grid_buffer_size" value="4"/>
-            <param name="grid_size_m" value="0.5"/>
-            <param name="input_frame" value="base_link"/>
-            <param name="local_slope_max_angle_deg" value="13.0"/>
-            <param name="low_priority_region_x" value="-20.0"/>
-            <param name="max_height_offset" value="2.5"/>
-            <param name="max_lateral_offset" value="0.948"/>
-            <param name="max_longitudinal_offset" value="3.79"/>
-            <param name="min_height_offset" value="0.0"/>
-            <param name="min_lateral_offset" value="-0.948"/>
-            <param name="min_longitudinal_offset" value="-1.1"/>
-            <param name="non_ground_height_threshold" value="0.2"/>
-            <param name="output_frame" value="base_link"/>
-            <param name="publish_processing_time_detail" value="False"/>
-            <param name="radial_divider_angle_deg" value="1.0"/>
-            <param name="recheck_start_distance" value="20.0"/>
-            <param name="split_height_distance" value="0.2"/>
-            <param name="split_points_distance_tolerance" value="0.2"/>
-            <param name="use_lowest_point" value="True"/>
             <param name="use_recheck_ground_cluster" value="True"/>
-            <param name="use_virtual_ground_point" value="True"/>
+            <param name="recheck_start_distance" value="20.0"/>
+            <param name="use_lowest_point" value="True"/>
+            <param name="low_priority_region_x" value="-20.0"/>
+            <param name="center_pcl_shift" value="0.0"/>
+            <param name="radial_divider_angle_deg" value="1.0"/>
+            <param name="publish_processing_time_detail" value="False"/>
             <param name="vehicle_length" value="4.890000000000001"/>
             <param name="vehicle_width" value="1.896"/>
+            <param name="min_longitudinal_offset" value="-1.1"/>
+            <param name="max_longitudinal_offset" value="3.79"/>
+            <param name="min_lateral_offset" value="-0.948"/>
+            <param name="max_lateral_offset" value="0.948"/>
+            <param name="min_height_offset" value="0.0"/>
+            <param name="max_height_offset" value="2.5"/>
+            <param name="input_frame" value="base_link"/>
+            <param name="output_frame" value="base_link"/>
             <remap from="input" to="/perception/obstacle_segmentation/range_cropped/pointcloud"/>
             <remap from="output" to="/perception/obstacle_segmentation/single_frame/pointcloud"/>
             <extra_arg name="use_intra_process_comms" value="true"/>
@@ -2898,26 +2898,26 @@
           <!-- arg name="use_pointcloud_container" value="true" -->
           <load_composable_node target="/pointcloud_container">
             <composable_node pkg="autoware_probabilistic_occupancy_grid_map" plugin="autoware::occupancy_grid_map::PointcloudBasedOccupancyGridMapNode" name="occupancy_grid_map_node" namespace="/perception/occupancy_grid_map">
-              <param name="OccupancyGridMapFixedBlindSpot" value="{'distance_margin': 1.0}"/>
-              <param name="OccupancyGridMapProjectiveBlindSpot" value="{'projection_dz_threshold': 0.01, 'obstacle_separation_threshold': 1.0, 'pub_debug_grid': False}"/>
-              <param name="base_link_frame" value="base_link"/>
+              <param name="map_length" value="150.0"/>
+              <param name="map_resolution" value="0.5"/>
+              <param name="height_filter" value="{'use_height_filter': True, 'min_height': -1.0, 'max_height': 2.0}"/>
               <param name="downsample_input_pointcloud" value="False"/>
               <param name="downsample_voxel_size" value="0.125"/>
               <param name="enable_single_frame_mode" value="False"/>
               <param name="filter_obstacle_pointcloud_by_raw_pointcloud" value="False"/>
-              <param name="grid_map_type" value="OccupancyGridMapFixedBlindSpot"/>
-              <param name="gridmap_origin_frame" value="base_link"/>
-              <param name="height_filter" value="{'use_height_filter': True, 'min_height': -1.0, 'max_height': 2.0}"/>
               <param name="map_frame" value="map"/>
-              <param name="map_length" value="150.0"/>
-              <param name="map_resolution" value="0.5"/>
-              <param name="probability_matrix" value="{'occupied_to_occupied': 0.95, 'occupied_to_free': 0.05, 'free_to_occupied': 0.2, 'free_to_free': 0.8}"/>
-              <param name="processing_time_consecutive_excess_tolerance_ms" value="1000.0"/>
-              <param name="processing_time_tolerance_ms" value="50.0"/>
-              <param name="publish_processing_time_detail" value="False"/>
+              <param name="base_link_frame" value="base_link"/>
+              <param name="gridmap_origin_frame" value="base_link"/>
               <param name="scan_origin_frame" value="base_link"/>
-              <param name="updater_type" value="binary_bayes_filter"/>
+              <param name="grid_map_type" value="OccupancyGridMapFixedBlindSpot"/>
+              <param name="OccupancyGridMapFixedBlindSpot" value="{'distance_margin': 1.0}"/>
+              <param name="OccupancyGridMapProjectiveBlindSpot" value="{'projection_dz_threshold': 0.01, 'obstacle_separation_threshold': 1.0, 'pub_debug_grid': False}"/>
+              <param name="publish_processing_time_detail" value="False"/>
+              <param name="processing_time_tolerance_ms" value="50.0"/>
+              <param name="processing_time_consecutive_excess_tolerance_ms" value="1000.0"/>
+              <param name="probability_matrix" value="{'occupied_to_occupied': 0.95, 'occupied_to_free': 0.05, 'free_to_occupied': 0.2, 'free_to_free': 0.8}"/>
               <param name="v_ratio" value="10.0"/>
+              <param name="updater_type" value="binary_bayes_filter"/>
               <remap from="~/input/obstacle_pointcloud" to="/perception/obstacle_segmentation/single_frame/pointcloud"/>
               <remap from="~/input/raw_pointcloud" to="/sensing/lidar/concatenated/pointcloud"/>
               <remap from="~/output/occupancy_grid_map" to="/perception/occupancy_grid_map/map"/>
@@ -3116,24 +3116,24 @@
               <!-- arg name="voxel_grid_based_euclidean_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/clustering/voxel_grid_based_euclidean_cluster.param.yaml" -->
               <load_composable_node target="/pointcloud_container">
                 <composable_node pkg="autoware_euclidean_cluster" plugin="autoware::euclidean_cluster::VoxelGridBasedEuclideanClusterNode" name="euclidean_cluster" namespace="/perception/object_recognition/detection/clustering">
-                  <param name="input_frame" value="base_link"/>
-                  <param name="max_cluster_size" value="3000"/>
-                  <param name="max_points_per_voxel_in_large_cluster" value="10"/>
-                  <param name="max_voxel_cluster_for_output" value="800"/>
-                  <param name="max_x" value="200.0"/>
-                  <param name="max_y" value="200.0"/>
-                  <param name="max_z" value="2.0"/>
-                  <param name="min_cluster_size" value="10"/>
+                  <param name="tolerance" value="0.7"/>
+                  <param name="voxel_leaf_size" value="0.3"/>
                   <param name="min_points_number_per_voxel" value="1"/>
+                  <param name="min_cluster_size" value="10"/>
+                  <param name="max_cluster_size" value="3000"/>
+                  <param name="max_voxel_cluster_for_output" value="800"/>
                   <param name="min_voxel_cluster_size_for_filtering" value="65"/>
+                  <param name="max_points_per_voxel_in_large_cluster" value="10"/>
+                  <param name="use_height" value="False"/>
+                  <param name="input_frame" value="base_link"/>
+                  <param name="max_x" value="200.0"/>
                   <param name="min_x" value="-200.0"/>
+                  <param name="max_y" value="200.0"/>
                   <param name="min_y" value="-200.0"/>
+                  <param name="max_z" value="2.0"/>
                   <param name="min_z" value="-10.0"/>
                   <param name="negative" value="False"/>
                   <param name="processing_time_threshold_sec" value="0.01"/>
-                  <param name="tolerance" value="0.7"/>
-                  <param name="use_height" value="False"/>
-                  <param name="voxel_leaf_size" value="0.3"/>
                   <remap from="input" to="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud"/>
                   <remap from="output" to="/perception/object_recognition/detection/clustering/clusters"/>
                 </composable_node>
@@ -3263,16 +3263,16 @@
               <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
             <composable_node pkg="autoware_compare_map_segmentation" plugin="autoware::compare_map_segmentation::VoxelBasedCompareMapFilterComponent" name="voxel_based_compare_map_filter" namespace="/perception/object_recognition/detection">
-              <param name="distance_threshold" value="0.5"/>
               <param name="down_sample_voxel_size" value="0.1"/>
+              <param name="distance_threshold" value="0.5"/>
               <param name="downsize_ratio_z_axis" value="0.6"/>
-              <param name="input_frame" value="map"/>
-              <param name="map_loader_radius" value="150.0"/>
-              <param name="map_update_distance_threshold" value="10.0"/>
-              <param name="max_map_grid_size" value="1000.0"/>
               <param name="publish_debug_pcd" value="False"/>
-              <param name="timer_interval_ms" value="100"/>
               <param name="use_dynamic_map_loading" value="True"/>
+              <param name="timer_interval_ms" value="100"/>
+              <param name="map_update_distance_threshold" value="10.0"/>
+              <param name="map_loader_radius" value="150.0"/>
+              <param name="max_map_grid_size" value="1000.0"/>
+              <param name="input_frame" value="map"/>
               <remap from="input" to="/perception/obstacle_segmentation/pointcloud_map_filtered/downsampled/pointcloud"/>
               <remap from="map" to="/map/pointcloud_map"/>
               <remap from="output" to="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud"/>
@@ -3913,9 +3913,9 @@
               <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
               <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
-              <param name="classifier_type" value="1"/>
               <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt"/>
               <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
+              <param name="classifier_type" value="1"/>
               <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
               <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/car/traffic_signals"/>
@@ -3952,9 +3952,9 @@
               <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
               <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
-              <param name="classifier_type" value="1"/>
               <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt"/>
               <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
+              <param name="classifier_type" value="1"/>
               <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
               <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/pedestrian/traffic_signals"/>
@@ -4027,9 +4027,9 @@
               <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
               <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
-              <param name="classifier_type" value="1"/>
               <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt"/>
               <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
+              <param name="classifier_type" value="1"/>
               <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
               <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/car/traffic_signals"/>
@@ -4066,9 +4066,9 @@
               <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
               <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
-              <param name="classifier_type" value="1"/>
               <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt"/>
               <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
+              <param name="classifier_type" value="1"/>
               <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
               <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/pedestrian/traffic_signals"/>
@@ -5232,9 +5232,9 @@
                 <param name="no_drivable_lane.stop_margin" value="1.5"/>
                 <param name="no_drivable_lane.print_debug_info" value="false"/>
                 <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/no_drivable_lane.param.yaml -->
+                <param name="launch_modules" value="[autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin, autoware::behavior_velocity_planner::experimental::WalkwayModulePlugin, autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin, autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin, autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin, autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin, autoware::behavior_velocity_planner::experimental::VirtualTrafficLightModulePlugin, autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin, autoware::behavior_velocity_planner::experimental::StopLineModulePlugin, &quot;&quot;]"/>
                 <param name="enable_all_modules_auto_mode" value="false"/>
                 <param name="is_simulation" value="false"/>
-                <param name="launch_modules" value="[autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin, autoware::behavior_velocity_planner::experimental::WalkwayModulePlugin, autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin, autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin, autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin, autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin, autoware::behavior_velocity_planner::experimental::VirtualTrafficLightModulePlugin, autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin, autoware::behavior_velocity_planner::experimental::StopLineModulePlugin, &quot;&quot;]"/>
                 <remap from="~/input/path_with_lane_id" to="/planning/scenario_planning/lane_driving/behavior_planning/path_with_lane_id"/>
                 <remap from="~/input/vector_map" to="/map/vector_map"/>
                 <remap from="~/input/vehicle_odometry" to="/localization/kinematic_state"/>
@@ -6165,9 +6165,9 @@
                 <param name="input_path_interval" value="2.0"/>
                 <param name="output_path_interval" value="2.0"/>
                 <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/behavior_path_planner.param.yaml -->
+                <param name="launch_modules" value="[autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager, autoware::behavior_path_planner::SideShiftModuleManager, autoware::behavior_path_planner::BidirectionalTrafficModuleManager, autoware::behavior_path_planner::StartPlannerModuleManager, autoware::behavior_path_planner::GoalPlannerModuleManager, autoware::behavior_path_planner::LaneChangeRightModuleManager, autoware::behavior_path_planner::LaneChangeLeftModuleManager, autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager, &quot;&quot;]"/>
                 <param name="enable_all_modules_auto_mode" value="false"/>
                 <param name="is_simulation" value="false"/>
-                <param name="launch_modules" value="[autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager, autoware::behavior_path_planner::SideShiftModuleManager, autoware::behavior_path_planner::BidirectionalTrafficModuleManager, autoware::behavior_path_planner::StartPlannerModuleManager, autoware::behavior_path_planner::GoalPlannerModuleManager, autoware::behavior_path_planner::LaneChangeRightModuleManager, autoware::behavior_path_planner::LaneChangeLeftModuleManager, autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager, &quot;&quot;]"/>
                 <remap from="~/input/route" to="/planning/mission_planning/route"/>
                 <remap from="~/input/vector_map" to="/map/vector_map"/>
                 <remap from="~/input/perception" to="/perception/object_recognition/objects"/>
@@ -7768,8 +7768,8 @@
         <!-- arg name="use_intra_process" value="false" -->
         <load_composable_node target="/control/control_container">
           <composable_node pkg="autoware_external_cmd_selector" plugin="autoware::external_cmd_selector::ExternalCmdSelector" name="external_cmd_selector" namespace="/control">
-            <param name="initial_selector_mode" value="local"/>
             <param name="update_rate" value="10.0"/>
+            <param name="initial_selector_mode" value="local"/>
             <remap from="~/service/select_external_command" to="~/select_external_command"/>
             <remap from="~/output/current_selector_mode" to="~/current_selector_mode"/>
             <remap from="~/input/local/pedals_cmd" to="/external/local/pedals_cmd"/>
@@ -7814,13 +7814,13 @@
         <!-- arg name="wait_for_first_topic" default="true" -->
         <load_composable_node target="/control/control_container">
           <composable_node pkg="autoware_external_cmd_converter" plugin="autoware::external_cmd_converter::ExternalCmdConverterNode" name="external_cmd_converter" namespace="/control">
-            <param name="control_command_timeout" value="1.0"/>
             <param name="csv_path_accel_map" value="{workspace}/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter/data/default/accel_map.csv"/>
             <param name="csv_path_brake_map" value="{workspace}/src/universe/autoware_universe/vehicle/autoware_raw_vehicle_cmd_converter/data/default/brake_map.csv"/>
-            <param name="emergency_stop_timeout" value="3.0"/>
             <param name="ref_vel_gain" value="3.0"/>
             <param name="timer_rate" value="10.0"/>
             <param name="wait_for_first_topic" value="true"/>
+            <param name="control_command_timeout" value="1.0"/>
+            <param name="emergency_stop_timeout" value="3.0"/>
             <remap from="in/pedals_cmd" to="/external/selected/pedals_cmd"/>
             <remap from="in/steering_cmd" to="/external/selected/steering_cmd"/>
             <remap from="in/gear_cmd" to="/external/selected/gear_cmd"/>
@@ -7966,7 +7966,6 @@
           <param name="previous_obstacle_keep_time" value="1.0"/>
           <param name="aeb_hz" value="10.0"/>
           <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/autoware_autonomous_emergency_braking/autonomous_emergency_braking.param.yaml -->
-          <param name="check_autoware_state" value="true"/>
           <remap from="~/input/pointcloud" to="/perception/obstacle_segmentation/pointcloud"/>
           <remap from="~/input/velocity" to="/vehicle/status/velocity_status"/>
           <remap from="~/input/imu" to="/sensing/imu/imu_data"/>

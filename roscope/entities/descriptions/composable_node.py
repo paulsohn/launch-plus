@@ -158,7 +158,7 @@ class ComposableNode:
             else:
                 p = ET.SubElement(elem, "param")
                 p.set("from", path)
-        for k, v in sorted(data.get("parameters", {}).items()):
+        for k, v in data.get("parameters", []):
             p = ET.SubElement(elem, "param")
             p.set("name", k)
             p.set("value", v)

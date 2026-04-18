@@ -1185,6 +1185,7 @@
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="/sensing/lidar/top/pointcloud_raw_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self" namespace="/sensing/lidar/top">
                   <param name="input_frame" value="base_link"/>
@@ -1199,6 +1200,7 @@
                   <param name="processing_time_threshold_sec" value="0.01"/>
                   <remap from="input" to="/sensing/lidar/top/pointcloud_raw_ex"/>
                   <remap from="output" to="/sensing/lidar/top/self_cropped/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror" namespace="/sensing/lidar/top">
                   <param name="input_frame" value="base_link"/>
@@ -1213,6 +1215,7 @@
                   <param name="processing_time_threshold_sec" value="0.01"/>
                   <remap from="input" to="/sensing/lidar/top/self_cropped/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/top/mirror_cropped/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::DistortionCorrectorComponent" name="distortion_corrector_node" namespace="/sensing/lidar/top">
                   <!-- params from: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/config/distortion_corrector_node.param.yaml -->
@@ -1227,6 +1230,7 @@
                   <remap from="~/input/imu" to="/sensing/imu/imu_data"/>
                   <remap from="~/input/pointcloud" to="/sensing/lidar/top/mirror_cropped/pointcloud_ex"/>
                   <remap from="~/output/pointcloud" to="/sensing/lidar/top/rectified/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::RingOutlierFilterComponent" name="ring_outlier_filter" namespace="/sensing/lidar/top">
                   <!-- params from: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/config/ring_outlier_filter_node.param.yaml -->
@@ -1246,6 +1250,7 @@
                   <param name="output_frame" value="velodyne_top"/>
                   <remap from="input" to="/sensing/lidar/top/rectified/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/top/pointcloud_before_sync"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
               </node_container>
             </group>
@@ -1360,6 +1365,7 @@
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="/sensing/lidar/left/pointcloud_raw_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self" namespace="/sensing/lidar/left">
                   <param name="input_frame" value="base_link"/>
@@ -1374,6 +1380,7 @@
                   <param name="processing_time_threshold_sec" value="0.01"/>
                   <remap from="input" to="/sensing/lidar/left/pointcloud_raw_ex"/>
                   <remap from="output" to="/sensing/lidar/left/self_cropped/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror" namespace="/sensing/lidar/left">
                   <param name="input_frame" value="base_link"/>
@@ -1388,6 +1395,7 @@
                   <param name="processing_time_threshold_sec" value="0.01"/>
                   <remap from="input" to="/sensing/lidar/left/self_cropped/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/left/mirror_cropped/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::DistortionCorrectorComponent" name="distortion_corrector_node" namespace="/sensing/lidar/left">
                   <!-- params from: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/config/distortion_corrector_node.param.yaml -->
@@ -1402,6 +1410,7 @@
                   <remap from="~/input/imu" to="/sensing/imu/imu_data"/>
                   <remap from="~/input/pointcloud" to="/sensing/lidar/left/mirror_cropped/pointcloud_ex"/>
                   <remap from="~/output/pointcloud" to="/sensing/lidar/left/rectified/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::RingOutlierFilterComponent" name="ring_outlier_filter" namespace="/sensing/lidar/left">
                   <!-- params from: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/config/ring_outlier_filter_node.param.yaml -->
@@ -1421,6 +1430,7 @@
                   <param name="output_frame" value="velodyne_left"/>
                   <remap from="input" to="/sensing/lidar/left/rectified/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/left/pointcloud_before_sync"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
               </node_container>
             </group>
@@ -1535,6 +1545,7 @@
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="/sensing/lidar/right/pointcloud_raw_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self" namespace="/sensing/lidar/right">
                   <param name="input_frame" value="base_link"/>
@@ -1549,6 +1560,7 @@
                   <param name="processing_time_threshold_sec" value="0.01"/>
                   <remap from="input" to="/sensing/lidar/right/pointcloud_raw_ex"/>
                   <remap from="output" to="/sensing/lidar/right/self_cropped/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror" namespace="/sensing/lidar/right">
                   <param name="input_frame" value="base_link"/>
@@ -1563,6 +1575,7 @@
                   <param name="processing_time_threshold_sec" value="0.01"/>
                   <remap from="input" to="/sensing/lidar/right/self_cropped/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/right/mirror_cropped/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::DistortionCorrectorComponent" name="distortion_corrector_node" namespace="/sensing/lidar/right">
                   <!-- params from: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/config/distortion_corrector_node.param.yaml -->
@@ -1577,6 +1590,7 @@
                   <remap from="~/input/imu" to="/sensing/imu/imu_data"/>
                   <remap from="~/input/pointcloud" to="/sensing/lidar/right/mirror_cropped/pointcloud_ex"/>
                   <remap from="~/output/pointcloud" to="/sensing/lidar/right/rectified/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::RingOutlierFilterComponent" name="ring_outlier_filter" namespace="/sensing/lidar/right">
                   <!-- params from: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/config/ring_outlier_filter_node.param.yaml -->
@@ -1596,6 +1610,7 @@
                   <param name="output_frame" value="velodyne_right"/>
                   <remap from="input" to="/sensing/lidar/right/rectified/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/right/pointcloud_before_sync"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
               </node_container>
             </group>
@@ -1710,6 +1725,7 @@
                   <param name="setup_sensor" value="True"/>
                   <param name="udp_only" value="false"/>
                   <remap from="velodyne_points" to="/sensing/lidar/rear/pointcloud_raw_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_self" namespace="/sensing/lidar/rear">
                   <param name="input_frame" value="base_link"/>
@@ -1724,6 +1740,7 @@
                   <param name="processing_time_threshold_sec" value="0.01"/>
                   <remap from="input" to="/sensing/lidar/rear/pointcloud_raw_ex"/>
                   <remap from="output" to="/sensing/lidar/rear/self_cropped/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter_mirror" namespace="/sensing/lidar/rear">
                   <param name="input_frame" value="base_link"/>
@@ -1738,6 +1755,7 @@
                   <param name="processing_time_threshold_sec" value="0.01"/>
                   <remap from="input" to="/sensing/lidar/rear/self_cropped/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/rear/mirror_cropped/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::DistortionCorrectorComponent" name="distortion_corrector_node" namespace="/sensing/lidar/rear">
                   <!-- params from: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/config/distortion_corrector_node.param.yaml -->
@@ -1752,6 +1770,7 @@
                   <remap from="~/input/imu" to="/sensing/imu/imu_data"/>
                   <remap from="~/input/pointcloud" to="/sensing/lidar/rear/mirror_cropped/pointcloud_ex"/>
                   <remap from="~/output/pointcloud" to="/sensing/lidar/rear/rectified/pointcloud_ex"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
                 <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::RingOutlierFilterComponent" name="ring_outlier_filter" namespace="/sensing/lidar/rear">
                   <!-- params from: {workspace}/src/launcher/autoware_launch/sensor_kit/sample_sensor_kit_launch/common_sensor_launch/config/ring_outlier_filter_node.param.yaml -->
@@ -1771,6 +1790,7 @@
                   <param name="output_frame" value="velodyne_rear"/>
                   <remap from="input" to="/sensing/lidar/rear/rectified/pointcloud_ex"/>
                   <remap from="output" to="/sensing/lidar/rear/pointcloud_before_sync"/>
+                  <extra_arg name="use_intra_process_comms" value="true"/>
                 </composable_node>
               </node_container>
             </group>
@@ -1832,6 +1852,7 @@
                 <remap from="~/input/twist" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
                 <remap from="output" to="/sensing/lidar/concatenated/pointcloud"/>
                 <remap from="output_info" to="/sensing/lidar/concatenated/pointcloud_info"/>
+                <extra_arg name="use_intra_process_comms" value="true"/>
               </composable_node>
             </load_composable_node>
           </group>
@@ -2340,6 +2361,7 @@
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/ndt_scan_matcher/pointcloud_preprocessor/crop_box_filter_measurement_range.param.yaml -->
               <remap from="input" to="/sensing/lidar/concatenated/pointcloud"/>
               <remap from="output" to="/localization/util/measurement_range/pointcloud"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
             <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::VoxelGridDownsampleFilterComponent" name="voxel_grid_downsample_filter" namespace="/localization/util">
               <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/ndt_scan_matcher/pointcloud_preprocessor/voxel_grid_filter.param.yaml -->
@@ -2349,6 +2371,7 @@
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/ndt_scan_matcher/pointcloud_preprocessor/voxel_grid_filter.param.yaml -->
               <remap from="input" to="/localization/util/measurement_range/pointcloud"/>
               <remap from="output" to="/localization/util/voxel_grid_downsample/pointcloud"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
             <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::RandomDownsampleFilterComponent" name="random_downsample_filter" namespace="/localization/util">
               <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/ndt_scan_matcher/pointcloud_preprocessor/random_downsample_filter.param.yaml -->
@@ -2356,6 +2379,7 @@
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/ndt_scan_matcher/pointcloud_preprocessor/random_downsample_filter.param.yaml -->
               <remap from="input" to="/localization/util/voxel_grid_downsample/pointcloud"/>
               <remap from="output" to="/localization/util/downsample/pointcloud"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
           </load_composable_node>
         </group>
@@ -2789,6 +2813,7 @@
             <param name="processing_time_threshold_sec" value="0.01"/>
             <remap from="input" to="/sensing/lidar/concatenated/pointcloud"/>
             <remap from="output" to="/perception/obstacle_segmentation/range_cropped/pointcloud"/>
+            <extra_arg name="use_intra_process_comms" value="true"/>
           </composable_node>
           <composable_node pkg="autoware_ground_segmentation" plugin="autoware::ground_segmentation::ScanGroundFilterComponent" name="common_ground_filter" namespace="/perception/obstacle_segmentation">
             <param name="center_pcl_shift" value="0.0"/>
@@ -2820,6 +2845,7 @@
             <param name="vehicle_width" value="1.896"/>
             <remap from="input" to="/perception/obstacle_segmentation/range_cropped/pointcloud"/>
             <remap from="output" to="/perception/obstacle_segmentation/single_frame/pointcloud"/>
+            <extra_arg name="use_intra_process_comms" value="true"/>
           </composable_node>
           <composable_node pkg="autoware_occupancy_grid_map_outlier_filter" plugin="autoware::occupancy_grid_map_outlier_filter::OccupancyGridMapOutlierFilterComponent" name="occupancy_grid_based_outlier_filter" namespace="/perception/obstacle_segmentation">
             <!-- params from: {workspace}/src/universe/autoware_universe/perception/autoware_occupancy_grid_map_outlier_filter/config/occupancy_grid_map_outlier_filter.param.yaml -->
@@ -2838,6 +2864,7 @@
             <remap from="~/input/occupancy_grid_map" to="/perception/occupancy_grid_map/map"/>
             <remap from="~/input/pointcloud" to="/perception/obstacle_segmentation/single_frame/pointcloud"/>
             <remap from="~/output/pointcloud" to="/perception/obstacle_segmentation/pointcloud"/>
+            <extra_arg name="use_intra_process_comms" value="true"/>
           </composable_node>
         </load_composable_node>
       </group>
@@ -2894,6 +2921,7 @@
               <remap from="~/input/obstacle_pointcloud" to="/perception/obstacle_segmentation/single_frame/pointcloud"/>
               <remap from="~/input/raw_pointcloud" to="/sensing/lidar/concatenated/pointcloud"/>
               <remap from="~/output/occupancy_grid_map" to="/perception/occupancy_grid_map/map"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
           </load_composable_node>
         </group>
@@ -3232,6 +3260,7 @@
               <param name="voxel_size_z" value="0.1"/>
               <remap from="input" to="/perception/obstacle_segmentation/pointcloud"/>
               <remap from="output" to="/perception/obstacle_segmentation/pointcloud_map_filtered/downsampled/pointcloud"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
             <composable_node pkg="autoware_compare_map_segmentation" plugin="autoware::compare_map_segmentation::VoxelBasedCompareMapFilterComponent" name="voxel_based_compare_map_filter" namespace="/perception/object_recognition/detection">
               <param name="distance_threshold" value="0.5"/>
@@ -3249,6 +3278,7 @@
               <remap from="output" to="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud"/>
               <remap from="map_loader_service" to="/map/get_differential_pointcloud_map"/>
               <remap from="kinematic_state" to="/localization/kinematic_state"/>
+              <extra_arg name="use_intra_process_comms" value="False"/>
             </composable_node>
           </load_composable_node>
         </group>
@@ -3889,6 +3919,7 @@
               <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
               <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/car/traffic_signals"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
             <composable_node pkg="autoware_traffic_light_classifier" plugin="autoware::traffic_light::TrafficLightClassifierNodelet" name="pedestrian_traffic_light_classifier" namespace="/perception/traffic_light_recognition/camera6/classification">
               <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml -->
@@ -3927,6 +3958,7 @@
               <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
               <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera6/classification/pedestrian/traffic_signals"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
             <composable_node pkg="autoware_traffic_light_visualization" plugin="autoware::traffic_light::TrafficLightRoiVisualizerNode" name="traffic_light_roi_visualizer" namespace="/perception/traffic_light_recognition/camera6">
               <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_visualization/traffic_light_roi_visualizer.param.yaml -->
@@ -3941,6 +3973,7 @@
               <remap from="~/output/image/compressed" to="/perception/traffic_light_recognition/camera6/debug/rois/compressed"/>
               <remap from="~/output/image/compressedDepth" to="/perception/traffic_light_recognition/camera6/debug/rois/compressedDepth"/>
               <remap from="~/output/image/theora" to="/perception/traffic_light_recognition/camera6/debug/rois/theora"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
           </node_container>
           <load_composable_node target="/perception/traffic_light_recognition/camera6/traffic_light_node_container">
@@ -3948,6 +3981,7 @@
               <param name="encoding" value="rgb8"/>
               <remap from="~/input/compressed_image" to="/sensing/camera/camera6/image_raw/compressed"/>
               <remap from="~/output/raw_image" to="/sensing/camera/camera6/image_raw"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
           </load_composable_node>
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera7" output="both">
@@ -3999,6 +4033,7 @@
               <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
               <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/car/traffic_signals"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
             <composable_node pkg="autoware_traffic_light_classifier" plugin="autoware::traffic_light::TrafficLightClassifierNodelet" name="pedestrian_traffic_light_classifier" namespace="/perception/traffic_light_recognition/camera7/classification">
               <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml -->
@@ -4037,6 +4072,7 @@
               <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
               <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/camera7/classification/pedestrian/traffic_signals"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
             <composable_node pkg="autoware_traffic_light_visualization" plugin="autoware::traffic_light::TrafficLightRoiVisualizerNode" name="traffic_light_roi_visualizer" namespace="/perception/traffic_light_recognition/camera7">
               <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_visualization/traffic_light_roi_visualizer.param.yaml -->
@@ -4051,6 +4087,7 @@
               <remap from="~/output/image/compressed" to="/perception/traffic_light_recognition/camera7/debug/rois/compressed"/>
               <remap from="~/output/image/compressedDepth" to="/perception/traffic_light_recognition/camera7/debug/rois/compressedDepth"/>
               <remap from="~/output/image/theora" to="/perception/traffic_light_recognition/camera7/debug/rois/theora"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
           </node_container>
           <load_composable_node target="/perception/traffic_light_recognition/camera7/traffic_light_node_container">
@@ -4058,6 +4095,7 @@
               <param name="encoding" value="rgb8"/>
               <remap from="~/input/compressed_image" to="/sensing/camera/camera7/image_raw/compressed"/>
               <remap from="~/output/raw_image" to="/sensing/camera/camera7/image_raw"/>
+              <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
           </load_composable_node>
         </group>
@@ -5213,6 +5251,7 @@
                 <remap from="~/output/stop_reasons" to="/planning/scenario_planning/status/stop_reasons"/>
                 <remap from="~/output/infrastructure_commands" to="/planning/scenario_planning/status/infrastructure_commands"/>
                 <remap from="~/output/traffic_signal" to="/planning/scenario_planning/lane_driving/behavior_planning/debug/traffic_signal"/>
+                <extra_arg name="use_intra_process_comms" value="false"/>
               </composable_node>
             </node_container>
             <load_composable_node target="/planning/scenario_planning/lane_driving/behavior_planning/behavior_planning_container">
@@ -6143,6 +6182,7 @@
                 <remap from="~/output/hazard_lights_cmd" to="/planning/behavior_path_planner/hazard_lights_cmd"/>
                 <remap from="~/output/modified_goal" to="/planning/scenario_planning/modified_goal"/>
                 <remap from="~/output/stop_reasons" to="/planning/scenario_planning/status/stop_reasons"/>
+                <extra_arg name="use_intra_process_comms" value="false"/>
               </composable_node>
             </load_composable_node>
           </group>
@@ -6236,6 +6276,7 @@
                 <remap from="~/input/path" to="/planning/scenario_planning/lane_driving/behavior_planning/path"/>
                 <remap from="~/input/odometry" to="/localization/kinematic_state"/>
                 <remap from="~/output/path" to="/planning/scenario_planning/lane_driving/motion_planning/path_smoother/path"/>
+                <extra_arg name="use_intra_process_comms" value="false"/>
               </composable_node>
             </load_composable_node>
             <load_composable_node target="/planning/scenario_planning/lane_driving/motion_planning/motion_planning_container">
@@ -6332,6 +6373,7 @@
                 <remap from="~/input/path" to="/planning/scenario_planning/lane_driving/motion_planning/path_smoother/path"/>
                 <remap from="~/input/odometry" to="/localization/kinematic_state"/>
                 <remap from="~/output/path" to="/planning/scenario_planning/lane_driving/motion_planning/path_optimizer/trajectory"/>
+                <extra_arg name="use_intra_process_comms" value="false"/>
               </composable_node>
             </load_composable_node>
             <load_composable_node target="/planning/scenario_planning/lane_driving/motion_planning/motion_planning_container">
@@ -6891,6 +6933,7 @@
                 <remap from="~/output/clear_velocity_limit" to="/planning/scenario_planning/clear_velocity_limit"/>
                 <remap from="~/output/stop_reasons" to="/planning/scenario_planning/status/stop_reasons"/>
                 <remap from="~/output/velocity_factors" to="/planning/velocity_factors/motion_velocity_planner"/>
+                <extra_arg name="use_intra_process_comms" value="false"/>
               </composable_node>
             </load_composable_node>
           </group>
@@ -6953,6 +6996,7 @@
               <remap from="~/input/scenario" to="/planning/scenario_planning/scenario"/>
               <remap from="~/output/grid_map" to="/planning/scenario_planning/parking/costmap_generator/grid_map"/>
               <remap from="~/output/occupancy_grid" to="/planning/scenario_planning/parking/costmap_generator/occupancy_grid"/>
+              <extra_arg name="use_intra_process_comms" value="false"/>
             </composable_node>
             <composable_node pkg="autoware_freespace_planner" plugin="autoware::freespace_planner::FreespacePlannerNode" name="freespace_planner" namespace="/planning/scenario_planning/parking">
               <!-- params from: {workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/vehicle_info.param.yaml -->
@@ -7012,6 +7056,7 @@
               <remap from="~/input/odometry" to="/localization/kinematic_state"/>
               <remap from="~/output/trajectory" to="/planning/scenario_planning/parking/trajectory"/>
               <remap from="is_completed" to="/planning/scenario_planning/parking/is_completed"/>
+              <extra_arg name="use_intra_process_comms" value="false"/>
             </composable_node>
           </node_container>
         </group>
@@ -7206,6 +7251,7 @@
             <remap from="~/input/operational_mode_state" to="/system/operation_mode/state"/>
             <remap from="~/output/trajectory" to="/planning/trajectory"/>
             <remap from="~/output/validation_status" to="~/validation_status"/>
+            <extra_arg name="use_intra_process_comms" value="false"/>
           </composable_node>
         </node_container>
       </group>
@@ -7401,6 +7447,7 @@
           <remap from="input/state" to="/autoware/state"/>
           <remap from="input/current_gear" to="/vehicle/status/gear_status"/>
           <remap from="output/gear_cmd" to="/control/shift_decider/gear_cmd"/>
+          <extra_arg name="use_intra_process_comms" value="false"/>
         </composable_node>
         <composable_node pkg="autoware_vehicle_cmd_gate" plugin="autoware::vehicle_cmd_gate::VehicleCmdGate" name="vehicle_cmd_gate" namespace="/control">
           <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/vehicle_cmd_gate/vehicle_cmd_gate.param.yaml -->
@@ -7483,6 +7530,7 @@
           <remap from="input/engage" to="/autoware/engage"/>
           <remap from="~/service/external_emergency_stop" to="~/external_emergency_stop"/>
           <remap from="~/service/clear_external_emergency_stop" to="~/clear_external_emergency_stop"/>
+          <extra_arg name="use_intra_process_comms" value="false"/>
         </composable_node>
         <composable_node pkg="autoware_operation_mode_transition_manager" plugin="autoware::operation_mode_transition_manager::OperationModeTransitionManager" name="autoware_operation_mode_transition_manager" namespace="/control">
           <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/common/nearest_search.param.yaml -->
@@ -7532,6 +7580,7 @@
           <remap from="gate_operation_mode" to="/control/vehicle_cmd_gate/operation_mode"/>
           <remap from="is_autonomous_available" to="/control/is_autonomous_available"/>
           <remap from="control_mode_request" to="/control/control_mode_request"/>
+          <extra_arg name="use_intra_process_comms" value="false"/>
         </composable_node>
       </node_container>
       <load_composable_node target="/control/control_container">
@@ -7689,6 +7738,7 @@
           <remap from="~/output/longitudinal_diagnostic" to="/control/trajectory_follower/longitudinal/diagnostic"/>
           <remap from="~/output/stop_reason" to="/control/trajectory_follower/longitudinal/stop_reason"/>
           <remap from="~/output/control_cmd" to="/control/trajectory_follower/control_cmd"/>
+          <extra_arg name="use_intra_process_comms" value="false"/>
         </composable_node>
       </load_composable_node>
       <group>
@@ -7740,6 +7790,7 @@
             <remap from="~/output/gear_cmd" to="/external/selected/gear_cmd"/>
             <remap from="~/output/turn_indicators_cmd" to="/external/selected/turn_indicators_cmd"/>
             <remap from="~/output/hazard_lights_cmd" to="/external/selected/hazard_lights_cmd"/>
+            <extra_arg name="use_intra_process_comms" value="false"/>
           </composable_node>
         </load_composable_node>
       </group>
@@ -7777,6 +7828,7 @@
             <remap from="in/current_gate_mode" to="/control/current_gate_mode"/>
             <remap from="in/odometry" to="/localization/kinematic_state"/>
             <remap from="out/control_cmd" to="/external/selected/control_cmd"/>
+            <extra_arg name="use_intra_process_comms" value="false"/>
           </composable_node>
         </load_composable_node>
       </group>
@@ -7838,6 +7890,7 @@
           <remap from="~/input/route" to="/planning/mission_planning/route"/>
           <remap from="~/input/reference_trajectory" to="/planning/trajectory"/>
           <remap from="~/input/predicted_trajectory" to="/control/trajectory_follower/lateral/predicted_trajectory"/>
+          <extra_arg name="use_intra_process_comms" value="false"/>
         </composable_node>
       </load_composable_node>
       <load_composable_node target="/control/control_check_container">
@@ -7919,6 +7972,7 @@
           <remap from="~/input/imu" to="/sensing/imu/imu_data"/>
           <remap from="~/input/objects" to="/perception/object_recognition/objects"/>
           <remap from="~/input/predicted_trajectory" to="/control/trajectory_follower/lateral/predicted_trajectory"/>
+          <extra_arg name="use_intra_process_comms" value="false"/>
         </composable_node>
       </load_composable_node>
       <load_composable_node target="/control/control_check_container">

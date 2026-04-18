@@ -1,5 +1,5 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
-import type { ArgEntry, GraphData, ParamEntry, RemapEntry } from "../types.generated";
+import type { ArgEntry, ExtraArgEntry, GraphData, ParamEntry, RemapEntry } from "../types.generated";
 
 interface NodeDetail {
   type?: string;
@@ -15,6 +15,7 @@ interface NodeDetail {
   source?: string;
   params?: ParamEntry[];
   remaps?: RemapEntry[];
+  extraArgs?: ExtraArgEntry[];
   args?: ArgEntry[];
   includeArgs?: Record<string, string> | null;
 }
@@ -128,6 +129,28 @@ export function DetailPanel({ detail, graph, width, onResizeStart, onClose }: Pr
                   <tr key={i}>
                     <td>{r.from}</td>
                     <td>{r.to}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {detail?.extraArgs && detail.extraArgs.length > 0 && (
+          <>
+            <h3>Extra Args ({detail.extraArgs.length})</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.extraArgs.map((ea, i) => (
+                  <tr key={i}>
+                    <td>{ea.name}</td>
+                    <td>{ea.value}</td>
                   </tr>
                 ))}
               </tbody>

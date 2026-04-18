@@ -780,7 +780,7 @@ def build_pkg(
 ) -> None:
     """Build package(s) by name with automatic transitive dependency fetching."""
     from roscope.builder import BuildOptions, execute_build, plan_build_from_packages
-    from roscope.fetcher import FetchOptions, fetch_packages
+    from roscope.fetcher import FetchOptions, WorkspaceState, fetch_packages
     from roscope.rosdep import rosdep_install
 
     src_path = Path(src)
@@ -796,10 +796,11 @@ def build_pkg(
         workspace_state=workspace_state,
     )
 
-    # Fetch the seed packages first
-    to_fetch = [p for p in packages if p in parsed_lockfile.packages]
-    if to_fetch:
-        fetch_packages(to_fetch, parsed_lockfile, src_path, fetch_options)
+    # Fetch the seed packages first (skipped in dirty mode — src/ is authoritative)
+    if workspace_state != WorkspaceState.DIRTY:
+        to_fetch = [p for p in packages if p in parsed_lockfile.packages]
+        if to_fetch:
+            fetch_packages(to_fetch, parsed_lockfile, src_path, fetch_options)
 
     seed = set(packages)
     plan = plan_build_from_packages(

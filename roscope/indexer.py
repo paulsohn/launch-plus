@@ -798,6 +798,9 @@ def scan_source_dir(src_dir: Path) -> Lockfile:
         if xml.exists():
             try:
                 info = parse_package_xml(xml.read_text(), str(xml))
+            except (OSError, UnicodeDecodeError) as e:
+                logger.warning("scan_source_dir: cannot read %s: %s", xml, e)
+                return  # don't recurse into an unreadable package
             except RoscopeError as e:
                 logger.warning("scan_source_dir: skipping %s: %s", xml, e)
                 return  # don't recurse into a broken package

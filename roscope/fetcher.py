@@ -409,14 +409,21 @@ def fetch_repo_sparse(
     options: FetchOptions,
 ) -> None:
     """Fetch a repository with sparse-checkout for specific paths."""
+    if options.workspace_state == WorkspaceState.DIRTY:
+        # Dirty mode: trust whatever is on disk, never perform git operations.
+        # The repo may or may not have a .git directory (e.g. plain vcs import).
+        if repo_dir.exists():
+            logger.debug("Skipping git operations for %s (--dirty)", repo_dir)
+        else:
+            logger.warning(
+                "Dirty mode: repository directory %s does not exist; "
+                "package may be missing from src/",
+                repo_dir,
+            )
+        return
+
     if repo_dir.exists() and (repo_dir / ".git").exists():
-        if options.workspace_state == WorkspaceState.DIRTY:
-            desc = _describe_repo_state(repo_dir, sha)
-            if desc:
-                logger.info("Using as-is (--dirty) %s :\n  %s", repo_dir, desc)
-            else:
-                logger.debug("Skipping git operations for %s (--dirty)", repo_dir)
-        elif options.workspace_state == WorkspaceState.DEFAULT:
+        if options.workspace_state == WorkspaceState.DEFAULT:
             _ensure_remote_url(repo_dir, url)
             if not (repo_dir / ".git" / "index").exists():
                 logger.info("Initializing sparse-checkout for no-checkout clone at %s", repo_dir)

@@ -767,6 +767,92 @@ def generate_lockfile(
 
 
 # ---------------------------------------------------------------------------
+# Source directory scanning (dirty mode)
+# ---------------------------------------------------------------------------
+
+
+def scan_source_dir(src_dir: Path) -> Lockfile:
+    """Build a synthetic Lockfile by scanning a source directory for packages.
+
+    Walks ``src_dir`` recursively, finds every ``package.xml``, and maps each
+    package to a ``PackageLock``.  The resulting ``Lockfile`` has empty
+    ``url`` / ``version`` fields (sufficient for dirty-mode resolution, where
+    git operations are never performed).
+
+    Intended for ``--dirty`` mode: lets users work without a lockfile after
+    a plain ``vcs import src < some.repos``.  Works equally well when there is
+    no remote, or when the directory is not a git repository at all.
+
+    Traversal rules:
+    - Recurse into every subdirectory except ``.git/``.
+    - When ``package.xml`` is found at a node, record the package and stop
+      recursing into that directory (ROS packages don't nest inside each other).
+    - Duplicate package names: warn and keep the first occurrence.
+    """
+    lockfile = Lockfile()
+    seen: dict[str, Path] = {}  # pkg_name -> first absolute path
+    src_dir = src_dir.resolve()
+
+    def _walk(directory: Path) -> None:
+        try:
+            entries = sorted(directory.iterdir())
+        except OSError:
+            return
+        for entry in entries:
+            if not entry.is_dir() or entry.name == ".git":
+                continue
+            xml = entry / "package.xml"
+            if xml.exists():
+                try:
+                    info = parse_package_xml(xml.read_text(), str(xml))
+                except RoscopeError as e:
+                    logger.warning("scan_source_dir: skipping %s: %s", xml, e)
+                    continue
+
+                if info.name in seen:
+                    logger.warning(
+                        "scan_source_dir: duplicate package '%s' at %s and %s; keeping first",
+                        info.name,
+                        seen[info.name],
+                        entry,
+                    )
+                    continue
+
+                seen[info.name] = entry
+
+                # repo  = immediate child of src_dir that contains this package
+                # path  = relative path from that child to the package dir
+                # fetch_dir / repo / path  must equal entry.resolve()
+                try:
+                    rel = entry.relative_to(src_dir)
+                except ValueError:
+                    logger.warning("scan_source_dir: %s outside src_dir; skipping", entry)
+                    continue
+                repo_key = rel.parts[0]  # immediate child of src_dir
+                path_in_repo = str(Path(*rel.parts[1:])) if len(rel.parts) > 1 else "."
+
+                if repo_key not in lockfile.repositories:
+                    lockfile.repositories[repo_key] = RepoLock(url="", version="")
+
+                lockfile.packages[info.name] = PackageLock(
+                    repo=repo_key,
+                    path=path_in_repo,
+                )
+                # Do not recurse: ROS packages don't contain other packages
+            else:
+                _walk(entry)
+
+    _walk(src_dir)
+    logger.info(
+        "scan_source_dir: found %d packages in %d repos under %s",
+        len(lockfile.packages),
+        len(lockfile.repositories),
+        src_dir,
+    )
+    return lockfile
+
+
+# ---------------------------------------------------------------------------
 # Dependency resolution
 # ---------------------------------------------------------------------------
 

@@ -128,17 +128,39 @@ reads files as they exist in the source directory.
 ## Workspace state: clean vs dirty
 
 Every command that refers to source code supports **workspace state flags** that
-control how roscope treats the on-disk state of fetched repositories:
+control how roscope locates and validates source packages.
 
-- **`--clean` (`-c`)** — Resets every fetched repository to the exact SHA
-  recorded in the lockfile.  Guarantees reproducible output.  Use in CI.
-- **`--dirty` (`-d`)** — Uses whatever is currently on disk.  Only fetches
-  repositories that are completely missing.  Use during local development to
-  preserve your edits.
-- **Default (no flag)** — Verifies that each repository's HEAD matches the
-  lockfile SHA and that the working tree is clean.  Errors if either check
-  fails.  This is the safest mode: it refuses to proceed on ambiguous state
-  without forcing any changes.
+- **Default (no flag)** — Requires a lockfile.  Verifies that each fetched
+  repository's HEAD matches the lockfile SHA and that the working tree is clean.
+  Errors if either check fails.  This is the safest mode: it refuses to proceed
+  on ambiguous state without forcing any changes.
+- **`--clean` (`-c`)** — Requires a lockfile.  Resets every fetched repository
+  to the exact SHA recorded in the lockfile.  Guarantees reproducible output.
+  Use in CI.
+- **`--dirty` (`-d`)** — **Does not require a lockfile.**  Instead, roscope
+  walks the `src/` directory (or the path given by `--src`) looking for
+  `package.xml` files.  Every directory containing a `package.xml` is treated
+  as a package at exactly the version on disk — no git operations are performed.
+  Packages not found in `src/` and not installable via rosdep are an error.
+  Use this mode when you have already populated `src/` with `vcs import` and
+  want to resolve without generating a lockfile first.
+
+### Dirty mode and the `vcs import` workflow
+
+Dirty mode is designed for teams that manage their source directory with
+`vcs import` but do not (yet) use a roscope lockfile:
+
+```bash
+vcs import src < my_project.repos   # populate src/ from your .repos file
+roscope resolve -d my_bringup robot.launch.xml
+```
+
+roscope scans `src/` exhaustively — recursing into subdirectories until it
+finds a `package.xml`, then treating that directory as a package root (without
+recursing further into it).  Only `.git/` directories are skipped.
+
+If `--lockfile` is also passed with `--dirty`, roscope emits a warning and
+ignores the lockfile entirely.
 
 ## Resolution modes
 

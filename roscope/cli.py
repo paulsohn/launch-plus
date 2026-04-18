@@ -51,6 +51,8 @@ def _parse_workspace_state(clean: bool, dirty: bool) -> WorkspaceState:
     """Map --clean/--dirty flags to WorkspaceState."""
     from roscope.fetcher import WorkspaceState
 
+    if clean and dirty:
+        raise click.UsageError("--clean and --dirty are mutually exclusive")
     if clean:
         return WorkspaceState.CLEAN
     if dirty:
@@ -96,6 +98,61 @@ def _read_lockfile(lockfile_path: str) -> Lockfile:
         )
     content = p.read_text()
     return parse_lockfile(content)
+
+
+def _load_lockfile(
+    lockfile_path: str,
+    src_dir: str,
+    workspace_state: WorkspaceState,
+) -> Lockfile:
+    """Load a lockfile appropriate for the current workspace state.
+
+    In dirty mode the lockfile is ignored entirely: the source directory is
+    scanned for ``package.xml`` files and a synthetic lockfile is built on the
+    fly.  This supports workflows where users populate ``src/`` via
+    ``vcs import`` without generating a lockfile first.
+
+    In default or clean mode the lockfile is required and loaded normally.
+    """
+    from roscope.fetcher import WorkspaceState
+    from roscope.indexer import scan_source_dir
+
+    if workspace_state == WorkspaceState.DIRTY:
+        src_path = Path(src_dir)
+        if not src_path.is_dir():
+            raise click.ClickException(
+                f"'{src_dir}' is not a directory; cannot scan for packages in --dirty mode"
+            )
+        return scan_source_dir(src_path)
+
+    return _read_lockfile(lockfile_path)
+
+
+def _warn_if_lockfile_ignored(
+    ctx: click.Context,
+    workspace_state: WorkspaceState,
+    src: str,
+) -> None:
+    """Emit a warning when --lockfile is explicitly passed with --dirty.
+
+    In dirty mode the lockfile is ignored entirely (src/ is scanned instead),
+    so passing --lockfile alongside --dirty is likely a mistake.
+    """
+    from click.core import ParameterSource  # type: ignore[attr-defined]
+
+    from roscope.fetcher import WorkspaceState
+
+    if workspace_state != WorkspaceState.DIRTY:
+        return
+    lockfile_explicit = (
+        ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE  # type: ignore[attr-defined]
+    )
+    if lockfile_explicit:
+        click.echo(
+            f"warning: --lockfile is ignored in --dirty mode"
+            f" ({src.rstrip('/')}/ is scanned instead)",
+            err=True,
+        )
 
 
 def _contains_git_dir(path: Path) -> bool:
@@ -464,7 +521,12 @@ def fetch(
 @click.argument("package")
 @click.argument("launcher")
 @click.argument("args", nargs=-1)
-@click.option("-l", "--lockfile", default="manifest.lock.repos", help="Lockfile path")
+@click.option(
+    "-l",
+    "--lockfile",
+    default="manifest.lock.repos",
+    help="Lockfile path (ignored in --dirty mode; src/ is scanned instead)",
+)
 @click.option("--src", default="src", help="Source directory")
 @click.option("--report", is_flag=True, help="Print dependency report to stderr")
 @click.option("--preview", is_flag=True, help="Resolve from source workspace")
@@ -505,6 +567,8 @@ def resolve(
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
 
+    _warn_if_lockfile_ignored(ctx, workspace_state, src)
+
     workflow_options = ResolveWorkflowOptions(
         preview=preview,
         rosdep_fallback=rosdep,
@@ -540,7 +604,12 @@ def resolve(
 @click.argument("package")
 @click.argument("launcher")
 @click.argument("args", nargs=-1)
-@click.option("-l", "--lockfile", default="manifest.lock.repos", help="Lockfile path")
+@click.option(
+    "-l",
+    "--lockfile",
+    default="manifest.lock.repos",
+    help="Lockfile path (ignored in --dirty mode; src/ is scanned instead)",
+)
 @click.option("--src", default="src", help="Source directory")
 @click.option("--preview", is_flag=True)
 @click.option("--rosdep", is_flag=True)
@@ -568,6 +637,8 @@ def check(
 
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
+
+    _warn_if_lockfile_ignored(ctx, workspace_state, src)
 
     workflow_options = ResolveWorkflowOptions(
         preview=preview,
@@ -600,7 +671,12 @@ def check(
 @click.argument("package")
 @click.argument("launcher")
 @click.argument("args", nargs=-1)
-@click.option("-l", "--lockfile", default="manifest.lock.repos", help="Lockfile path")
+@click.option(
+    "-l",
+    "--lockfile",
+    default="manifest.lock.repos",
+    help="Lockfile path (ignored in --dirty mode; src/ is scanned instead)",
+)
 @click.option("--src", default="src", help="Source directory")
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
@@ -635,6 +711,8 @@ def build(
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
 
+    _warn_if_lockfile_ignored(ctx, workspace_state, src)
+
     workflow_options = ResolveWorkflowOptions(
         preview=True,  # always resolve from source for build
         rosdep_fallback=rosdep,
@@ -668,7 +746,12 @@ def build(
 
 @main.command("build-pkg")
 @click.argument("packages", nargs=-1, required=True)
-@click.option("-l", "--lockfile", default="manifest.lock.repos", help="Lockfile path")
+@click.option(
+    "-l",
+    "--lockfile",
+    default="manifest.lock.repos",
+    help="Lockfile path (ignored in --dirty mode; src/ is scanned instead)",
+)
 @click.option("--src", default="src", help="Source directory")
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
@@ -697,12 +780,15 @@ def build_pkg(
 ) -> None:
     """Build package(s) by name with automatic transitive dependency fetching."""
     from roscope.builder import BuildOptions, execute_build, plan_build_from_packages
-    from roscope.fetcher import FetchOptions, fetch_packages
+    from roscope.fetcher import FetchOptions, WorkspaceState, fetch_packages
     from roscope.rosdep import rosdep_install
 
-    parsed_lockfile = _read_lockfile(lockfile)
     src_path = Path(src)
     workspace_state = _parse_workspace_state(clean, dirty)
+
+    _warn_if_lockfile_ignored(ctx, workspace_state, src)
+
+    parsed_lockfile = _load_lockfile(lockfile, src, workspace_state)
 
     fetch_options = FetchOptions(
         recurse_submodules=True,
@@ -710,10 +796,11 @@ def build_pkg(
         workspace_state=workspace_state,
     )
 
-    # Fetch the seed packages first
-    to_fetch = [p for p in packages if p in parsed_lockfile.packages]
-    if to_fetch:
-        fetch_packages(to_fetch, parsed_lockfile, src_path, fetch_options)
+    # Fetch the seed packages first (skipped in dirty mode — src/ is authoritative)
+    if workspace_state != WorkspaceState.DIRTY:
+        to_fetch = [p for p in packages if p in parsed_lockfile.packages]
+        if to_fetch:
+            fetch_packages(to_fetch, parsed_lockfile, src_path, fetch_options)
 
     seed = set(packages)
     plan = plan_build_from_packages(
@@ -755,7 +842,12 @@ def build_pkg(
 @click.argument("package")
 @click.argument("launcher")
 @click.argument("args", nargs=-1)
-@click.option("-l", "--lockfile", default="manifest.lock.repos")
+@click.option(
+    "-l",
+    "--lockfile",
+    default="manifest.lock.repos",
+    help="Lockfile path (ignored in --dirty mode; src/ is scanned instead)",
+)
 @click.option("--src", default="src")
 @click.option("-c", "--clean", is_flag=True)
 @click.option("-d", "--dirty", is_flag=True)
@@ -789,6 +881,8 @@ def test_cmd(
 
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
+
+    _warn_if_lockfile_ignored(ctx, workspace_state, src)
 
     workflow_options = ResolveWorkflowOptions(
         preview=True,
@@ -872,7 +966,7 @@ def _cmd_resolve(
     from roscope.orchestrator import resolve_launch_recursive
     from roscope.renderer import render_resolved_xml
 
-    parsed_lockfile = _read_lockfile(lockfile_path)
+    parsed_lockfile = _load_lockfile(lockfile_path, src_dir, workspace_state)
     fetch_path = Path(src_dir)
     options = FetchOptions(
         recurse_submodules=True,
@@ -987,7 +1081,7 @@ def _run_build(
     from roscope.orchestrator import resolve_launch_recursive
     from roscope.rosdep import rosdep_install
 
-    parsed_lockfile = _read_lockfile(lockfile_path)
+    parsed_lockfile = _load_lockfile(lockfile_path, src_dir, workspace_state)
     fetch_path = Path(src_dir)
     fetch_options = FetchOptions(
         recurse_submodules=True,

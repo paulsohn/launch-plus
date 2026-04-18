@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 
-from roscope.entities.action import Action
+from roscope.entities.actions.executable import ExecuteProcess
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import (
     _ros2_namespace_join,
@@ -27,7 +27,7 @@ def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
 
 
 @expose_action("node")
-class Node(Action):
+class Node(ExecuteProcess):
     """Tracks a ROS node."""
 
     @staticmethod
@@ -90,8 +90,8 @@ class Node(Action):
         return plugins
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
-        _, kwargs = super().parse(entity, parser)
+    def parse(cls, entity: Entity, parser: _ActionParser, ignore: list | None = None):
+        _, kwargs = super().parse(entity, parser, ignore=["cmd"])
         kwargs["package"] = parser.parse_substitution(
             entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""
         )
@@ -100,15 +100,10 @@ class Node(Action):
             or entity.get_attr("executable", optional=True)
             or ""
         )
-        name_raw = entity.get_attr("name", optional=True)
         ns_raw = entity.get_attr("namespace", optional=True)
-        kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
         kwargs["namespace"] = parser.parse_substitution(ns_raw) if ns_raw else None
         kwargs["parameters"] = cls.parse_params(entity, parser)
         kwargs["remappings"] = cls.parse_remaps(entity, parser)
-        from roscope.entities.actions.executable import ExecuteProcess
-
-        kwargs["env"] = ExecuteProcess.parse_envs(entity, parser)
         kwargs["kind"] = "lifecycle_node" if entity.type_name == "lifecycle_node" else "node"
         kwargs["output"] = _parse_optional(parser, entity.get_attr("output", optional=True))
         kwargs["arguments"] = _parse_optional(parser, entity.get_attr("args", optional=True))
@@ -122,15 +117,15 @@ class Node(Action):
         return cls, kwargs
 
     def __init__(self, *, package=None, executable=None, name=None, **kwargs):
-        super().__init__(**kwargs)
         self._kind = kwargs.pop("kind", None) or "node"
+        super().__init__(executable=executable or [], name=name, **kwargs)
         self.package = package
         self.executable = executable
         self.name = name
         self.namespace = kwargs.get("namespace")
         self.parameters: list | dict = list(kwargs.get("parameters") or [])
         self.remappings: list = list(kwargs.get("remappings") or [])
-        self.env: list | dict = kwargs.get("env") or []
+        self.env: dict = {}
         self.param_files: list = []
         self.output = kwargs.get("output")
         self.args = kwargs.get("arguments")

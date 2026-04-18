@@ -98,11 +98,13 @@ class ExecuteProcess(Action):
         ]
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: _ActionParser, ignore: list | None = None):
         _, kwargs = super().parse(entity, parser)
-        cmd_raw = entity.get_attr("cmd", optional=True) or ""
+        ignore = ignore or []
+        if "cmd" not in ignore:
+            cmd_raw = entity.get_attr("cmd", optional=True) or ""
+            kwargs["cmd"] = cls._parse_cmdline(cmd_raw, parser)
         name_raw = entity.get_attr("name", optional=True)
-        kwargs["cmd"] = cls._parse_cmdline(cmd_raw, parser)
         kwargs["name"] = parser.parse_substitution(name_raw) if name_raw else None
         kwargs["additional_env"] = cls.parse_envs(entity, parser)
         return cls, kwargs

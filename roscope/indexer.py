@@ -842,7 +842,8 @@ def scan_source_dir(src_dir: Path) -> Lockfile:
 
         try:
             entries = sorted(directory.iterdir())
-        except OSError:
+        except OSError as e:
+            logger.warning("scan_source_dir: cannot read %s: %s", directory, e)
             return
         for entry in entries:
             if not entry.is_dir() or entry.name == ".git":

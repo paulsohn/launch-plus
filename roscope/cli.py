@@ -548,7 +548,8 @@ def resolve(
 
     if dirty and ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE:  # type: ignore[attr-defined,union-attr]
         click.echo(
-            "warning: --lockfile is ignored in --dirty mode (src/ is scanned instead)",
+            f"warning: --lockfile is ignored in --dirty mode"
+            f" ({src.rstrip('/')}/ is scanned instead)",
             err=True,
         )
 
@@ -625,7 +626,8 @@ def check(
 
     if dirty and ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE:  # type: ignore[attr-defined,union-attr]
         click.echo(
-            "warning: --lockfile is ignored in --dirty mode (src/ is scanned instead)",
+            f"warning: --lockfile is ignored in --dirty mode"
+            f" ({src.rstrip('/')}/ is scanned instead)",
             err=True,
         )
 
@@ -704,7 +706,8 @@ def build(
 
     if dirty and ctx.get_parameter_source("lockfile") == ParameterSource.COMMANDLINE:  # type: ignore[attr-defined,union-attr]
         click.echo(
-            "warning: --lockfile is ignored in --dirty mode (src/ is scanned instead)",
+            f"warning: --lockfile is ignored in --dirty mode"
+            f" ({src.rstrip('/')}/ is scanned instead)",
             err=True,
         )
 

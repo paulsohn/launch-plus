@@ -352,7 +352,7 @@ class _GraphBuilder:
                     {"source": lcn_id, "target": container_id, "type": "load_target"}
                 )
 
-    def _build_params(self, param_files: list[dict], inline: dict) -> list[dict]:
+    def _build_params(self, param_files: list[dict], inline: list) -> list[dict]:
         """Emit all param entries in source order (param_files then inline).
 
         Duplicates are preserved so the frontend can apply last-wins styling.
@@ -361,15 +361,15 @@ class _GraphBuilder:
         for pf in param_files:
             for k, v in pf.get("params", []):
                 entries.append({"name": k, "value": v})
-        for k, v in inline.items():
+        for k, v in inline:
             entries.append({"name": k, "value": v})
         return entries
 
     def _extract_params(self, action) -> list[dict]:
-        inline = getattr(action, "parameters", {})
+        inline = getattr(action, "parameters", [])
         return self._build_params(
             getattr(action, "param_files", []),
-            inline if isinstance(inline, dict) else {},
+            inline if isinstance(inline, list) else [],
         )
 
     def _extract_remaps(self, action) -> list[dict]:

@@ -166,11 +166,10 @@ class ComposableNodeContainer(Node):
                     p.set("name", k)
                     p.set("value", str(v))
                 elem.append(ET.Comment(f" end params from: {path} "))
-        if isinstance(self.parameters, dict):
-            for k, v in sorted(self.parameters.items()):
-                p = ET.SubElement(elem, "param")
-                p.set("name", k)
-                p.set("value", v)
+        for k, v in self.parameters:
+            p = ET.SubElement(elem, "param")
+            p.set("name", k)
+            p.set("value", v)
         for from_, to in self.remappings:
             r = ET.SubElement(elem, "remap")
             r.set("from", from_)

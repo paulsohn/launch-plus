@@ -127,7 +127,7 @@ class Node(ExecuteProcess):
         self.executable = executable
         self.name = name
         self.namespace = kwargs.get("namespace")
-        self.parameters: list | dict = list(kwargs.get("parameters") or [])
+        self.parameters: list = list(kwargs.get("parameters") or [])
         self.remappings: list = list(kwargs.get("remappings") or [])
         self.env: dict = {}
         self.param_files: list = []
@@ -152,9 +152,21 @@ class Node(ExecuteProcess):
 
         ros_ns = context._launch_configurations.get("ros_namespace")
 
-        # Parameters: global first, then node-specific
+        # Parameters: global first, then node-specific.
+        # Deduplication: skip entries whose name+value are identical to the
+        # current active value; keep entries that override a prior value so the
+        # visualizer can show them as explicit overwrites.
         ctx_gp = context._launch_configurations.get("global_params", [])
-        params: dict[str, str] = {k: str(v) for k, v in ctx_gp}
+        params: list[tuple[str, str]] = []
+        active: dict[str, str] = {}
+
+        def _push_param(k: str, v: str) -> None:
+            if active.get(k) != v:
+                params.append((k, v))
+                active[k] = v
+
+        for k, v in ctx_gp:
+            _push_param(k, str(v))
         pf_list: list[dict] = list(context._launch_configurations.get("global_param_files", []))
         for p in self.parameters:
             if isinstance(p, ParameterFile):
@@ -163,13 +175,15 @@ class Node(ExecuteProcess):
                 state.track_param_file(path)
                 pf_entry: dict = {"path": path, "params": expanded}
                 pf_list.append(pf_entry)
+                for k, v in expanded:
+                    active[k] = str(v)
             elif isinstance(p, Parameter):
                 k, v = p.evaluate(context)
-                params[k] = v
+                _push_param(k, v)
             elif isinstance(p, dict):
                 for k, v in p.items():
                     resolved_v = context.perform_substitution(v)
-                    params[str(k)] = resolved_v if resolved_v is not None else ""
+                    _push_param(str(k), resolved_v if resolved_v is not None else "")
 
         remaps = list(context._launch_configurations.get("ros_remaps", []))
         for r in self.remappings:
@@ -245,11 +259,10 @@ class Node(ExecuteProcess):
                 p = ET.SubElement(parent, "param")
                 p.set("from", path)
 
-        if isinstance(self.parameters, dict):
-            for key, value in sorted(self.parameters.items()):
-                p = ET.SubElement(parent, "param")
-                p.set("name", key)
-                p.set("value", value)
+        for key, value in self.parameters:
+            p = ET.SubElement(parent, "param")
+            p.set("name", key)
+            p.set("value", value)
 
         for from_, to in self.remappings:
             if to and self.namespace and not to.startswith("/") and not to.startswith("~/"):

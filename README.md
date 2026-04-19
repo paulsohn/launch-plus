@@ -106,15 +106,14 @@ pip install -e .
 
 ### Try the bundled Autoware example
 
-A pre-cloned source snapshot for a full [Autoware workspace](https://github.com/autowarefoundation/autoware)
-is included in [`example/autoware/`](example/autoware/).  You can run the
-resolver immediately — no lockfile or index step needed.
+An [Autoware workspace](https://github.com/autowarefoundation/autoware) example is included in [`example/autoware/`](example/autoware/).
+You can run the resolver immediately once after you clone everything in `manifest.repos` (which is a mirror of the official `autoware.repos`).
 
 ```bash
-# Source ROS 2 first (only needed for --rosdep)
-source /opt/ros/humble/setup.bash
-
 cd example/autoware
+
+# Source ROS 2 first
+source /opt/ros/<distro>/setup.bash
 
 # For the first time, to initialize the workspace
 vcs import src < manifest.repos

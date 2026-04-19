@@ -109,25 +109,38 @@ determine exactly which packages are needed.
 
 ## What roscope provides
 
-roscope replaces the four-step pipeline with a single command that
-understands the full picture:
+roscope's primary contribution is the **resolver**: a launch file evaluator
+that derives the full runtime topology — every node, parameter, remap, and
+include boundary — without a build or a running ROS environment.
 
 ```
-# Traditional: 4 tools, no shared context
+# Traditional: build first, then launch to see the topology
 vcs import src < project.repos            # clone everything
 rosdep install --from-paths src           # install all deps
 colcon build                              # build everything
-ros2 launch my_pkg my_launch.xml          # launch
+ros2 launch my_pkg my_launch.xml          # topology visible only now
 
-# roscope: inspect topology without building
+# roscope: inspect topology immediately, no build required
+vcs import src < project.repos            # clone repos (as usual)
 roscope resolve -d my_pkg my_launch.xml \
-  --visualize                             # interactive graph — no build needed
+  --visualize                             # interactive graph — before any build
+```
 
-# roscope: targeted build from the same launch file
+Targeted builds are also supported from the same launch evaluation, using
+`colcon build` as the backend:
+
+```
 roscope build my_pkg my_launch.xml \
   --clean --rosdep                        # fetch + deps + build (only what's needed)
 ros2 launch my_pkg my_launch.xml          # launch
 ```
+
+This build approach mirrors how Bazel treats `BUILD` files: the launch file
+is the entry point, and the tool derives the minimal build set from it — no
+manually-curated package lists required.  Unlike a full Bazel migration,
+roscope requires zero changes to your existing `colcon`/`ament`/`rosdep`
+setup.  See [FAQ: Is this Bazel but for ROS?](../docs/faq.md#is-this-bazel-but-for-ros)
+for a fuller comparison.
 
 | Traditional workflow | roscope workflow |
 |---|---|
@@ -139,20 +152,24 @@ ros2 launch my_pkg my_launch.xml          # launch
 | Separate build lists per target | Per-ECU launch file = per-ECU build set |
 | Topology hidden behind full build | Interactive graph visualizer — no build needed |
 
-With roscope, the multi-ECU problem reduces to:
+With roscope, the multi-ECU problem reduces to pointing at the right launch
+file.  To inspect the topology each ECU will run:
 
 ```bash
-# Perception ECU — just point at the perception launch file
+roscope resolve -d perception_launch perception.launch.xml --visualize
+roscope resolve -d planning_launch planning.launch.xml --visualize
+roscope resolve -d logging_launch logging.launch.xml --visualize
+```
+
+And to build only the packages each ECU needs:
+
+```bash
 roscope build perception_launch perception.launch.xml --clean --rosdep
-
-# Planning ECU — point at the planning launch file
 roscope build planning_launch planning.launch.xml --clean --rosdep
-
-# Logging ECU — point at the logging launch file
 roscope build logging_launch logging.launch.xml --clean --rosdep
 ```
 
-No labels.  No manual filtering.  The launch file *is* the build specification.
+No labels.  No manual filtering.  The launch file *is* the system specification.
 
 ## Beyond Autoware
 

@@ -1,7 +1,7 @@
 # roscope
 
-**ROS 2 launch system inspector and targeted builder** — evaluate your full
-system topology and build only what you need, without a ROS 2 runtime.
+**ROS 2 launch system inspector** — evaluate your full system topology
+without a ROS 2 runtime.
 
 ![Visualizer screenshot](docs/visualizer-screenshot.png)
 
@@ -10,8 +10,8 @@ substitutions, evaluating conditionals, and executing Python
 `generate_launch_description()` callables — without a running ROS environment
 or a built workspace. From a single launch file it derives the full
 connectivity graph: every node, parameter, remap, topic connection, package
-dependency, and include boundary that would be active at runtime. It can then
-fetch and build exactly those packages — nothing more.
+dependency, and include boundary that would be active at runtime. Targeted
+builds of exactly those packages are also supported.
 
 ## The problem
 
@@ -74,8 +74,9 @@ knows exactly which packages are needed and can fetch and build only those.
   referenced by the launch file, via
   [git sparse-checkout](https://git-scm.com/docs/git-sparse-checkout)
 
-> **Current scope:** roscope covers launch evaluation for Autoware without a ROS runtime and targeted builds today.
-> Execution support — a built-in executor backend and integration with `ros2 launch` is on the roadmap.
+> **Current scope:** roscope covers launch evaluation for Autoware without a ROS runtime today.
+> Targeted builds are supported with `colcon build` as the backend.
+> Execution support — a built-in executor and integration with `ros2 launch` — is on the roadmap.
 
 ## Quick start
 
@@ -231,7 +232,7 @@ See [Core Concepts](docs/concepts.md) for more on lockfiles and sparse checkout.
 | Document | Description |
 |---|---|
 | [Motivation](docs/motivation.md) | Why roscope exists and what problems it solves |
-| [Core Concepts](docs/concepts.md) | Lockfiles, sparse checkout, package resolution, and more |
+| [Core Concepts](docs/concepts.md) | Launch language semantics, resolution, lockfiles, sparse checkout, and more |
 | [Getting Started](docs/getting-started.md) | Step-by-step tutorial for your own project |
 | [Architecture](docs/architecture.md) | How the resolver, fetcher, and builder work internally |
 | [Supported Environments](docs/supported-environments.md) | Platforms, ROS distros, and known limitations |
@@ -240,14 +241,14 @@ See [Core Concepts](docs/concepts.md) for more on lockfiles and sparse checkout.
 
 ## Who is this for?
 
-- **ROS 2 developers** working with large multi-repository workspaces who want
-  faster iteration cycles
-- **CI/CD pipelines** that need to build and test only the packages affected by
-  a launch configuration change
-- **System integrators** who want a clear, auditable view of what a launch file
-  actually does — every node, parameter, and remap in one flat XML
-- **Anyone** tired of waiting 30+ minutes for a full workspace build when they
-  only need a handful of packages
+- **ROS 2 developers** who want to understand what a launch file actually does —
+  every node, parameter, remap, and include boundary — without a full build
+- **System integrators** auditing a large workspace: roscope makes the full
+  launch graph inspectable and the include chain explicit
+- **CI/CD pipelines** that need to validate launch configurations or build and
+  test only the packages a given launch file requires
+- **Anyone** working with large multi-repository workspaces who wants faster
+  iteration without waiting for a full workspace build
 
 ## License
 

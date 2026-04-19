@@ -66,6 +66,11 @@ defined outside `launch` / `launch_ros` — fall outside the closed language by
 definition and are not resolved.  Projects that rely on them will see those
 constructs as unresolved entries in the output.
 
+> **Note on formal foundations:** The semantics described above — partial evaluation, oracle treatment of OpaqueFunction, and the soundness guarantee — are stated informally here.
+> Precise formal definitions (operational semantics of the launch language) and machine-checked proofs of soundness are ongoing and planned work.
+> In the meantime, empirical validation against large-scale systems like Autoware provides confidence in the implementation.
+> The gap between roscope's behavior and the official `ros2 launch` semantics is tracked and continuously narrowed.
+
 ## Resolution modes
 
 ### Preview resolution

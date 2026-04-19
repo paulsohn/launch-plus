@@ -130,11 +130,23 @@ launch file.
 Even if a node writes `<remap from="/tf" to="/tf"/>` as an identity remap,
 roscope will pick it up and track it — but this is rarely done in practice.
 
-Tracking these topics for all nodes automatically would be noisy: a `/tf`
-hub node connected to every node in the graph adds visual clutter without
-much actionable information.  Opt-in tracking via explicit remaps strikes a
-better balance.  Smarter handling — perhaps rendering infrastructure topics
-as a distinct layer or collapsing them — is a possible future improvement.
+For well-structured systems this approach already captures the meaningful
+connections.  A common ROS 2 convention — followed in Autoware — is that
+nodes declare their interfaces using local placeholder names (e.g.
+`~/input/points`, `~/output/objects`) and require explicit `<remap>` rules
+in the launch file to bind those names to the actual runtime topics.  In
+such systems the remaps in the launcher are already a comprehensive record
+of the significant topic connections, and roscope tracks all of them.
+
+Tracking infrastructure topics for all nodes automatically would be noisy:
+a `/tf` hub node connected to every node in the graph adds visual clutter
+without much actionable information.  Opt-in tracking via explicit remaps
+strikes a better balance.
+
+There is no architectural barrier to surfacing infrastructure topics more
+prominently — rendering them as a distinct collapsible layer, for instance.
+It is a deliberate prioritization: the benefit does not justify the cost at
+this stage, not a fundamental limitation of what roscope can represent.
 
 More fundamentally, infrastructure topics are structural constants of any
 ROS 2 system — they do not distinguish one configuration from another.  What

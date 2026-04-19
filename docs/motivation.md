@@ -111,10 +111,12 @@ addresses each:
 
 - **Deep include nesting across multiple repositories** makes it impossible to
   know which nodes actually run without manually tracing every file.
-  roscope inlines the full include chain into a single flat document.
+  roscope inlines the full include chain into a single flat document; the
+  interactive visualizer makes the same structure explorable as a graph.
 - **Implicit argument scope**: arguments propagate downstream by default, making
   it hard to reason about which values reach which nodes.  roscope resolves and
-  shows all argument values explicitly at each include boundary (`--show-args`).
+  shows all argument values explicitly at each include boundary (`--show-args`,
+  automatically enabled in visualizer mode).
 - **Scattered, overriding parameters**: parameter files are spread across packages
   and silently overridden at multiple levels; the final runtime state is uncertain.
   roscope inlines all parameter files at resolve time, with override order visible.
@@ -134,10 +136,14 @@ addresses each:
 - **Late error detection**: wrong remaps, missing arguments, and broken includes
   surface only at runtime.  `roscope check` catches these at resolve time, before
   any build.
-- **Equivalence verification**: when a launcher is rewritten or auto-generated,
-  there is no automated path to verify it behaves identically to the original.
-  Resolving both versions and comparing the output provides a concrete, auditable
-  answer — without repeating the full test suite.
+- **Invisible runtime impact of launch changes**: when a pull request touches
+  launch files or parameters, there is no easy way to see what changes to the
+  running system it would introduce — without building and running it.  Resolving
+  the base branch and the PR branch in dirty mode and diffing the two XML outputs
+  makes the runtime impact immediately visible: every node addition, parameter
+  change, and remap modification, before the PR is merged.  Staging the "before"
+  output and overwriting with "after" lets an IDE highlight the diff inline.
+  Dedicated structured diffing (both XML output and visualizer) for CI is planned.
 
 ### The insight: launch files already declare runtime dependencies
 

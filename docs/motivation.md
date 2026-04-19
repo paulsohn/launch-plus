@@ -242,10 +242,10 @@ No labels.  No manual filtering.  The launch file *is* the system specification.
 
 ## Beyond Autoware
 
-While roscope was developed with Autoware as the primary test case, it is
-designed to work with **any ROS 2 project** that uses standard `.repos` manifests
-and launch files.  The tool has no Autoware-specific logic — it operates on
-standard ROS 2 conventions:
+roscope was developed and validated against Autoware, one of the largest and
+most complex ROS 2 workspaces in production.  The tool has no Autoware-specific
+logic — it operates on standard ROS 2 conventions and is intended to work with
+any project that follows them:
 
 - `.repos` files (vcstool format)
 - `package.xml` (REP-149 / REP-127)
@@ -253,4 +253,12 @@ standard ROS 2 conventions:
 - `colcon` for building
 - `rosdep` for system dependency resolution
 
-If your project follows these conventions, roscope can help.
+The one precondition is that launch files use the standard `launch`/`launch_ros`
+API.  Patterns that reach outside it — such as direct calls to
+`get_package_share_directory()` or custom `Action` subclasses — require targeted
+refactoring to standard equivalents before roscope can resolve them fully
+(see [Supported Environments](supported-environments.md#known-limitations)).
+
+Validation beyond Autoware is ongoing.  Nav2 is the next planned target.
+If your project follows these conventions, roscope should work — feedback on
+projects other than Autoware is very welcome.

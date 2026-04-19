@@ -135,10 +135,40 @@ pkg_share = FindPackageShare("my_pkg")
 config = PathJoinSubstitution([pkg_share, "config", "params.yaml"])
 ```
 
-If a string path is required (e.g. to pass into a Python function that does not
-accept substitutions), wrap the lookup in an `OpaqueFunction` and call
-`get_package_share_directory()` there — `OpaqueFunction` bodies run after the
-environment is resolved, so installed packages are available.
+If a string path is required, move the affected logic into an `OpaqueFunction`
+and call `FindPackageShare("my_pkg").perform(context)` there.  The launch
+context is available inside `OpaqueFunction`, and `FindPackageShare` resolves
+correctly in both preview and post-build mode.  Any actions that depend on the
+string must also be constructed and returned from within the function:
+
+```python
+import os
+from launch import LaunchDescription
+from launch.actions import Node, OpaqueFunction
+from launch.substitutions import FindPackageShare
+
+def generate_launch_description():
+    def setup(context, *args, **kwargs):
+        pkg_share = FindPackageShare("my_pkg").perform(context)
+        config = os.path.join(pkg_share, "config", "params.yaml")
+        return [
+            Node(
+                package="my_pkg",
+                executable="my_node",
+                parameters=[config],
+            )
+        ]
+
+    return LaunchDescription([OpaqueFunction(function=setup)])
+```
+
+> **Note:** This is the most general migration pattern, but many simple cases
+> do not require `OpaqueFunction` at all.  In the example above, the
+> `parameters` argument of `Node` accepts substitutions directly, so
+> `PathJoinSubstitution([FindPackageShare("my_pkg"), "config", "params.yaml"])`
+> would suffice without performing any substitution manually.  Reserve
+> `OpaqueFunction` for cases where a plain string is genuinely required by a
+> context that does not accept substitutions.
 
 **Source/install path assumption:** roscope assumes that any resource file
 referenced by path in a launch file (launcher files, parameter files, etc.) is
@@ -175,6 +205,44 @@ are excluded.
 The resolver runs on a single machine and produces output for that machine's
 architecture and ROS distribution.  Cross-distribution resolution (e.g.
 resolving a Humble launch file on a Jazzy host) is not supported.
+
+### Custom `Action` and `Substitution` extensions
+
+Third-party `Action` or `Substitution` subclasses defined outside the standard
+`launch` / `launch_ros` packages are not resolved.  roscope's resolver only
+covers the closed vocabulary of the standard API.  Custom constructs appear in
+the output as unresolved entries; they do not cause resolution to fail.
+
+### `$(command ...)` substitution
+
+The `$(command ...)` substitution executes a shell command and substitutes its
+output.  It is currently left unresolved: roscope preserves the literal
+`$(command ...)` expression in the output rather than executing it.  The only
+known call site in Autoware is xacro invocations — the resulting unresolved
+substitution is visible in the resolved XML.
+
+### `ExecutableInPackage` substitution
+
+`ExecutableInPackage` resolves the path to an executable within an installed
+package, using `AMENT_PREFIX_PATH`.  In preview mode, source packages are not
+yet installed, so the substitution produces an incorrect path.  Use post-build
+mode if launch files depend on `ExecutableInPackage`.
+
+### Event handler callbacks
+
+`OpaqueFunction` callbacks registered on event handlers (e.g.
+`OnProcessExit(on_exit=my_fn)`) that return arbitrary Python closures are not
+serializable to XML.  Built-in actions (`EmitEvent`, `LogInfo`, `Shutdown`)
+used as event handler targets are supported.  Arbitrary Python function
+callbacks are dropped from the resolved output.
+
+### Incomplete coverage of standard types
+
+The current implementation covers the subset of standard `Action` and
+`Substitution` types needed to resolve Autoware launch files.  Some types in
+the standard `launch` / `launch_ros` API are not yet implemented.  Unimplemented
+types are treated as unresolved entries in the output.  The complete coverage
+list will be finalized alongside the formal operational semantics work.
 
 ## Assumptions
 

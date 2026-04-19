@@ -16,14 +16,14 @@ fetch and build exactly those packages — nothing more.
 ## The problem
 
 A typical ROS 2 workspace like [Autoware](https://github.com/autowarefoundation/autoware)
-contains **200+ packages** across dozens of repositories. Before you can answer
+contains **400+ packages** across dozens of repositories. Before you can answer
 "what nodes does this launch file actually start?", the standard workflow demands:
 
 ```
 # Traditional ROS 2 workflow
-vcs import src < autoware.repos      # clone ~50 repos
+vcs import src < autoware.repos      # clone ~30 repos
 rosdep install --from-paths src      # install ALL system deps
-colcon build                         # build ALL ~235 packages (30+ min)
+colcon build                         # build ALL ~400 packages (1+ hours)
 ros2 launch autoware_launch ...      # finally launch
 ```
 
@@ -33,8 +33,8 @@ parameters are set — is locked away behind a full build.
 
 ## The solution
 
-roscope treats the **launch file as the system description language of ROS 2** — not merely a convenience script to collectively start
-nodes, but a sufficient, evaluatable specification of the system topology.
+Roscope treats the **launch file as the system description language of ROS 2** — not just a convenience script to collectively start nodes,
+but a sufficient, inspectable specification of the system topology.
 
 It partially evaluates the description following the same semantics as `ros2 launch`, but without a running ROS environment. You can use it directly on a workspace you already have:
 
@@ -58,8 +58,7 @@ knows exactly which packages are needed and can fetch and build only those.
 
 ## Key features
 
-- **No-runtime topology** — derive the full launch graph and inspect nodes,
-  parameters, remaps, and topics without a build or running ROS environment
+- **Runtime topology without runtime** — derive the sufficient launch graph and inspect nodes, parameters, remaps, and topics without a build or running ROS environment.
 - **Python launch support** — executes `generate_launch_description()` with
   shimmed `launch`/`launch_ros` imports; no installed ROS 2 Python packages needed
 - **OpaqueFunction handling** — executes arbitrary Python callables,
@@ -75,9 +74,8 @@ knows exactly which packages are needed and can fetch and build only those.
   referenced by the launch file, via
   [git sparse-checkout](https://git-scm.com/docs/git-sparse-checkout)
 
-> **Current scope:** roscope covers launch evaluation without a ROS runtime and
-> targeted builds today. Execution support — a built-in executor and integration
-> with `ros2 launch` — is on the roadmap.
+> **Current scope:** roscope covers launch evaluation for Autoware without a ROS runtime and targeted builds today.
+> Execution support — a built-in executor backend and integration with `ros2 launch` is on the roadmap.
 
 ## Quick start
 
@@ -144,61 +142,6 @@ roscope build -d autoware_launch autoware.launch.xml \
   --colcon-flagfile colcon-flags.txt
 ```
 
-### Use your own workspace
-
-If you already have a workspace cloned with `vcs import` (or any other way),
-pass `--dirty` / `-d` and roscope will scan your `src/` directory for packages:
-
-```bash
-vcs import src < your-project.repos    # clone repos as usual
-roscope resolve -d <pkg> <launcher> [args...]   # inspect without building
-roscope build -d <pkg> <launcher> [args...] --rosdep   # build only what's needed
-```
-
-See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
-
-## Lockfile workflow
-
-For reproducible analysis and targeted sparse-checkout (fetching only the
-packages a launch file needs rather than cloning everything), roscope has a
-lockfile-based workflow:
-
-```bash
-# 1. Generate a lockfile from a .repos manifest (one-time)
-roscope index your-project.repos
-
-# 2. Resolve — roscope sparse-clones only the needed packages on demand
-roscope resolve <pkg> <launcher> [args...] --visualize
-
-# 3. Build only the resolved packages
-roscope build <pkg> <launcher> [args...] --rosdep
-
-# 4. For CI / reproducible runs, add --clean to reset repos to lockfile SHAs
-roscope build <pkg> <launcher> [args...] --clean --rosdep
-```
-
-With a lockfile, roscope pins every repository to a specific commit SHA, so
-analyses and builds are fully reproducible across machines.  Packages are
-sparse-cloned on demand rather than importing the entire workspace up front.
-
-See [Core Concepts](docs/concepts.md) for more on lockfiles and sparse checkout.
-
-## Commands
-
-| Command | Description |
-|---|---|
-| `index` | Parse `.repos` files and generate a lockfile |
-| `update` | Re-resolve refs and update lockfile SHAs |
-| `resolve` | Resolve and flatten a launch file to XML (no build) |
-| `check` | Like `resolve` but exits non-zero on warnings/errors |
-| `build` | Resolve, fetch dependencies, and run `colcon build` |
-| `build-pkg` | Build package(s) by name with transitive dependency fetching |
-| `test` | Like `build` but includes `test_depend` packages |
-| `fetch` | Sparse-checkout specific packages from the lockfile |
-| `clean` | Remove fetched packages |
-
-Run `roscope <command> --help` for detailed usage of each command.
-
 ## Visualizer
 
 `resolve` accepts a `--visualize` flag that opens an interactive
@@ -219,7 +162,57 @@ interactive selection and detail panel.
 Use `--viz-id <name>` to label the snapshot. Snapshots are cached in
 `~/.cache/roscope-viz/`.
 
-## Workspace state flags
+### Use your own workspace
+
+If you already have a workspace cloned with `vcs import` (or any other way),
+pass `--dirty` / `-d` and roscope will scan your `src/` directory for packages:
+
+```bash
+vcs import src < your-project.repos    # clone repos as usual
+roscope resolve -d <pkg> <launcher> [args...]   # inspect without building
+roscope build -d <pkg> <launcher> [args...] --rosdep   # build only what's needed
+```
+
+See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `index` | Parse `.repos` files and generate a lockfile |
+| `update` | Re-resolve refs and update lockfile SHAs |
+| `resolve` | Resolve and flatten a launch file to XML (no build) |
+| `check` | Like `resolve` but exits non-zero on warnings/errors |
+| `build` | Resolve, fetch dependencies, and run `colcon build` |
+| `build-pkg` | Build package(s) by name with transitive dependency fetching |
+| `test` | Like `build` but includes `test_depend` packages |
+| `fetch` | Sparse-checkout specific packages from the lockfile |
+| `clean` | Remove fetched packages |
+
+Run `roscope <command> --help` for detailed usage of each command.
+
+## Lockfile workflow
+
+For reproducible analysis and targeted sparse-checkout (fetching only the
+packages a launch file needs rather than cloning everything), roscope has a
+lockfile-based workflow as default:
+
+```bash
+# 1. Generate a lockfile from a .repos manifest (one-time)
+roscope index your-project.repos
+
+# 2. Resolve — roscope sparse-clones only the needed packages on demand
+roscope resolve <pkg> <launcher> [args...] --visualize
+
+# 3. Build only the resolved packages
+roscope build <pkg> <launcher> [args...] --rosdep
+
+# 4. For CI / reproducible runs, add --clean to reset repos to lockfile SHAs
+roscope build <pkg> <launcher> [args...] --clean --rosdep
+```
+
+With a lockfile, roscope pins every repository to a specific commit SHA, so analyses and builds are fully reproducible across machines.
+Packages are sparse-cloned on demand rather than importing the entire workspace up front, which you can apply full clone any time you want.
 
 Commands that refer to source code support workspace state flags:
 
@@ -229,10 +222,9 @@ Commands that refer to source code support workspace state flags:
 | `--clean` | `-c` | CI / reproducible runs — resets repos to lockfile SHAs |
 | `--dirty` | `-d` | No lockfile required — scans `src/` for packages as-is |
 
-In dirty mode roscope does not read a lockfile.  Instead it walks the source
-directory (default: `src/`) looking for `package.xml` files.  This supports
-workflows where `src/` is populated by `vcs import` without generating a
-lockfile first.
+In dirty mode roscope does not read a lockfile.  Instead it walks the source directory (default: `src/`) looking for `package.xml` files.  This supports workflows where `src/` is populated by `vcs import` without generating a lockfile first.
+
+See [Core Concepts](docs/concepts.md) for more on lockfiles and sparse checkout.
 
 ## Documentation
 

@@ -88,6 +88,24 @@ shows what `ros2 launch` would do — useful for debugging and CI.
 The goal is a complete `resolve → build → launch` pipeline in a single tool,
 while remaining compatible with the broader ROS 2 launch ecosystem.
 
+### How do I use the interactive visualizer?
+
+Pass `--visualize` to `roscope resolve`.  After resolution completes, roscope
+opens an interactive graph view in your browser showing the full launch
+structure — include boundaries, containers, composable nodes, topics, and
+remaps.
+
+```bash
+roscope resolve -d my_pkg my_launch.xml \
+  arg1:=value1 \
+  --visualize
+```
+
+`--show-args` is automatically enabled in visualizer mode so launch argument
+values appear in the graph.  Use `--viz-id <name>` to label the snapshot for
+later reference.  Snapshots are cached in `~/.cache/roscope-viz/` and can be
+reopened without re-resolving.
+
 ## Resolution
 
 ### What does "preview" mode mean?

@@ -3,11 +3,11 @@
 ## The scaling problem in ROS 2 workspaces
 
 ROS 2 projects tend to grow into large multi-repository workspaces.  A production
-autonomous driving stack may contain 200+ packages across 50+ repositories.  The
+autonomous driving stack may contain 400+ packages across ~30 repositories.  The
 standard development workflow looks like this:
 
 ```bash
-vcs import src < project.repos       # clone all repositories
+vcs import src < project.repos       # clone ~30 repositories
 rosdep install --from-paths src      # install ALL system dependencies
 colcon build                         # build ALL packages
 source install/setup.bash
@@ -55,7 +55,7 @@ Cargo's `Cargo.lock`, Pixi's `pixi.lock`).  ROS 2 has had no equivalent.
 
 ### Whole-workspace operations are expensive
 
-A full workspace build takes **30–60 minutes** on a reasonably powerful
+A full workspace build takes **1+ hours** on a reasonably powerful
 machine.  During active development, most changes affect only a handful of
 packages, yet the entire workspace must be cloned, dependency-resolved, and
 built before anything can run.
@@ -119,7 +119,11 @@ rosdep install --from-paths src           # install all deps
 colcon build                              # build everything
 ros2 launch my_pkg my_launch.xml          # launch
 
-# roscope: 1 tool, launch-file-driven
+# roscope: inspect topology without building
+roscope resolve -d my_pkg my_launch.xml \
+  --visualize                             # interactive graph — no build needed
+
+# roscope: targeted build from the same launch file
 roscope build my_pkg my_launch.xml \
   --clean --rosdep                        # fetch + deps + build (only what's needed)
 ros2 launch my_pkg my_launch.xml          # launch
@@ -133,6 +137,7 @@ ros2 launch my_pkg my_launch.xml          # launch
 | Build all packages | Build minimal transitive closure |
 | Manual per-ECU configs | Automatic dependency tracing |
 | Separate build lists per target | Per-ECU launch file = per-ECU build set |
+| Topology hidden behind full build | Interactive graph visualizer — no build needed |
 
 With roscope, the multi-ECU problem reduces to:
 

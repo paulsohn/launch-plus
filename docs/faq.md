@@ -105,8 +105,7 @@ roscope resolve -d my_pkg my_launch.xml \
 
 `--show-args` is automatically enabled in visualizer mode so launch argument
 values appear in the graph.  Use `--viz-id <name>` to label the snapshot for
-later reference.  Snapshots are cached in `~/.cache/roscope-viz/` and can be
-reopened without re-resolving.
+later reference.  Snapshots are written to `~/.cache/roscope-viz/` and labelled by `--viz-id`.
 
 ### Why doesn't the graph show whether a topic connection is a publisher or subscriber?
 

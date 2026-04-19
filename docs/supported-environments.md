@@ -248,9 +248,10 @@ XML.
 missing shim types: a top-level import causes the entire file to fail with
 `ImportError`; an import inside an `OpaqueFunction` body causes only that
 function's topology fragment to be lost.  XML launch files using
-`$(exec-in-pkg ...)` are not affected (that substitution is handled
-separately).  There is no drop-in replacement; use post-build mode with an
-installed workspace if this substitution is required.
+`$(exec-in-pkg ...)` are also unsupported — the substitution is not implemented
+in the XML resolver and will cause resolution to fail for that file.  There is
+no drop-in replacement; use post-build mode with an installed workspace if this
+substitution is required.
 
 ### Event handler callbacks
 

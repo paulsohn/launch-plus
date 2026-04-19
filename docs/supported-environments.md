@@ -212,26 +212,45 @@ resolving a Humble launch file on a Jazzy host) is not supported.
 
 Third-party `Action` or `Substitution` subclasses defined outside the standard
 `launch` / `launch_ros` packages are not resolved.  roscope's resolver only
-covers the closed vocabulary of the standard API.  In XML launch files, unknown
-elements are skipped with a warning.  In Python launch files, importing or
-instantiating unrecognized types may raise an `ImportError` or cause resolution
-to fail for that file.
+covers the closed vocabulary of the standard API.
+
+In **XML launch files**, unknown elements are skipped with a warning and
+resolution continues.
+
+In **Python launch files**, the failure mode depends on where the unknown type
+appears:
+
+- **Top-level import** (before `generate_launch_description` is called) —
+  raises `ImportError`, causing resolution of the entire file to fail.  All
+  topology from that file is lost.
+- **Inside an `OpaqueFunction` body** — the function raises on import or
+  instantiation; the function's return value is discarded and a warning is
+  emitted, but resolution continues.  Only the topology fragment that function
+  would have produced is lost.
+- **Unknown action type returned by `OpaqueFunction`** — rejected with
+  `"expected Action, got ..."` and dropped from the resolved output.
 
 ### `$(command ...)` substitution
 
 The `$(command ...)` substitution executes a shell command and substitutes its
 output.  It is currently left unresolved: roscope preserves the literal
-`$(command ...)` expression in the output rather than executing it.  The only
-known call site in Autoware is xacro invocations — the resulting unresolved
-substitution is visible in the resolved XML.
+`$(command ...)` expression in the output rather than executing it.  No warning
+is emitted when this substitution is encountered, even when it appears in a
+conditional attribute or path component where the unresolved value may cause
+incorrect topology analysis.  The only known call site in Autoware is xacro
+invocations — the resulting unresolved substitution is visible in the resolved
+XML.
 
 ### `ExecutableInPackage` substitution
 
 `ExecutableInPackage` is not available in roscope's Python shim for
-`launch_ros.substitutions`.  Python launch files that import or use it will
-fail to resolve.  XML launch files using `$(exec-in-pkg ...)` are not affected
-(that substitution is handled separately).  There is no drop-in replacement;
-use post-build mode with an installed workspace if this substitution is required.
+`launch_ros.substitutions`.  The failure mode follows the same pattern as other
+missing shim types: a top-level import causes the entire file to fail with
+`ImportError`; an import inside an `OpaqueFunction` body causes only that
+function's topology fragment to be lost.  XML launch files using
+`$(exec-in-pkg ...)` are not affected (that substitution is handled
+separately).  There is no drop-in replacement; use post-build mode with an
+installed workspace if this substitution is required.
 
 ### Event handler callbacks
 
@@ -247,9 +266,11 @@ The current implementation covers the subset of standard `Action` and
 `Substitution` types needed to resolve Autoware launch files.  Some types in
 the standard `launch` / `launch_ros` API are not yet implemented.  In XML
 launch files, unrecognized elements are skipped with a warning.  In Python
-launch files, importing an unimplemented type from the shim modules will raise
-an `ImportError`, causing resolution of that file to fail.  The complete
-coverage list will be finalized alongside the formal operational semantics work.
+launch files, the failure mode is the same as for custom extensions: a
+top-level import of an unimplemented shim type raises `ImportError` and fails
+the entire file; an import inside an `OpaqueFunction` body loses only that
+function's topology fragment.  The complete coverage list will be finalized
+alongside the formal operational semantics work.
 
 ## Assumptions
 

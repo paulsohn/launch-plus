@@ -3,7 +3,7 @@
 ## Overview
 
 roscope is a pure Python application whose core is a **launch file resolver**:
-a partial evaluator that derives the full runtime topology of a ROS 2 system
+a partial evaluator that derives the launch topology of a ROS 2 system
 from its launch description, without a running environment.  Targeted builds
 and on-demand package fetching are built on top of the resolver.  The CLI is
 built with Click; all modules are importable as a Python library.

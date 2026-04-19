@@ -120,7 +120,7 @@ addresses each:
   roscope inlines all parameter files at resolve time, with override order visible.
 - **Startup latency obscures topology**: ROS 2 argument validation alone adds
   13+ seconds in Autoware before any node starts, meaning you must wait through a
-  launch just to observe what runs.  roscope delivers the full topology before any
+  launch just to observe what runs.  roscope delivers the launch topology before any
   build or launch.
 - **No audit trail**: system behavior cannot be reviewed without running it.
   roscope's resolved XML is a complete static record of what the system would do
@@ -156,8 +156,9 @@ determine exactly which packages are needed.
 ## What roscope provides
 
 roscope's primary contribution is the **resolver**: a launch file evaluator
-that derives the full runtime topology — every node, parameter, remap, and
-include boundary — without a build or a running ROS environment.  No existing
+that derives the launch topology — every node, parameter, remap, and
+include boundary declared in the launch description — without a build or
+a running ROS environment.  No existing
 launchers need to be rewritten.  No new format needs to be learned.  The launch
 files you already have are the system description; roscope evaluates them.
 

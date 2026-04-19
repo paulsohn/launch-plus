@@ -1,6 +1,6 @@
 # roscope
 
-**ROS 2 launch system inspector** — evaluate your full system topology
+**ROS 2 launch system inspector** — evaluate your launch topology
 without a ROS 2 runtime.
 
 ![Visualizer screenshot](docs/visualizer-screenshot.png)

@@ -384,6 +384,8 @@ class _GraphBuilder:
                 self._edges.append({"source": node_id, "target": tid, "type": "remap"})
 
     def to_dict(self) -> dict:
+        from roscope import __version__
+
         topic_list = [
             {"id": tid, **self._topic_meta[tid]} for tid in sorted(set(self._topics.values()))
         ]
@@ -392,6 +394,7 @@ class _GraphBuilder:
                 "package": self.package,
                 "launcher": self.launcher,
                 "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "version": __version__,
             },
             "nodes": self._nodes,
             "groups": self._groups,

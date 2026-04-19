@@ -237,14 +237,15 @@ function GraphStats({ graph }: { graph: GraphData }) {
   );
   const packageCount = new Set(nodes.map((n) => n.package).filter(Boolean)).size;
 
-  const { package: pkg, launcher, timestamp } = graph.metadata;
+  const { package: pkg, launcher, timestamp, version } = graph.metadata;
   const ts = new Date(timestamp).toLocaleString();
 
   return (
     <>
       <div style={{ color: "#8888aa", fontSize: "11px", marginBottom: "12px" }}>
         <div style={{ marginBottom: "2px" }}>{pkg} / {launcher}</div>
-        <div>{ts}</div>
+        <div style={{ marginBottom: "2px" }}>{ts}</div>
+        <div>roscope v{version}</div>
       </div>
 
       <h3>Vertices</h3>

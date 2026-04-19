@@ -72,7 +72,7 @@ defined outside `launch` / `launch_ros` — fall outside the closed language by
 definition and are not resolved.  In XML launch files, unknown elements are
 skipped with a warning.  In Python launch files, importing or instantiating
 unrecognized types typically causes an `ImportError` or resolution failure for
-that file; see [Supported Environments → Known limitations](../docs/supported-environments.md#known-limitations)
+that file; see [Supported Environments → Known limitations](supported-environments.md#known-limitations)
 for the exact failure modes.
 
 > **Note on formal foundations:** The semantics described above — partial evaluation, oracle treatment of OpaqueFunction, and the expected soundness property — are stated informally here.
@@ -123,7 +123,7 @@ This means:
 - The resolver captures the launch description structure without scheduling
   anything for execution
 - The standard `launch` / `launch_ros` API patterns needed for Autoware are
-  supported; see [Supported Environments → Known limitations](../docs/supported-environments.md#known-limitations)
+  supported; see [Supported Environments → Known limitations](supported-environments.md#known-limitations)
   for types not yet covered
 
 ## Package path resolution

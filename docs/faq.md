@@ -37,11 +37,16 @@ Bazel in an existing ROS 2 project is a significant undertaking:
   wrapped with Bazel build rules
 - Teams must learn and maintain a parallel build system
 
-roscope takes the opposite approach: **zero migration**.  It works with the
+roscope takes the opposite approach: **minimal migration**.  It works with the
 ROS 2 conventions your project already uses — `.repos` manifests, `package.xml`,
 `colcon build`, `rosdep` — and layers the dependency-tracing and sparse-checkout
-capabilities on top.  You can adopt it incrementally without changing any existing
-build files.
+capabilities on top.  Launch files that use the standard `launch`/`launch_ros`
+API work without modification.  Where any migration is needed, it is limited
+to replacing patterns that reach outside the standard API — e.g.
+`get_package_share_directory()` instead of `FindPackageShare`, or custom
+`Action` subclasses — with their standard `launch`/`launch_ros` equivalents.
+No new tools, no new formats, and the result is more portable launch files
+regardless of roscope.
 
 Additionally, roscope provides **launch-graph-aware static analysis** that
 Bazel does not: argument validation, namespace composition, conditional evaluation,

@@ -167,9 +167,13 @@ determine exactly which packages are needed.
 roscope's primary contribution is the **resolver**: a launch file evaluator
 that derives the launch topology — every node, parameter, remap, and
 include boundary declared in the launch description — without a build or
-a running ROS environment.  No existing
-launchers need to be rewritten.  No new format needs to be learned.  The launch
-files you already have are the system description; roscope evaluates them.
+a running ROS environment.  No new format needs to be learned, and no build
+system needs to be replaced.  Launch files that use the standard
+`launch`/`launch_ros` API work without modification.  Where project-specific
+patterns reach outside that API — direct calls to `get_package_share_directory()`
+or custom `Action` subclasses — targeted refactoring to the standard equivalents
+is straightforward and results in more portable launch files.  The launch files
+you already have are the system description; roscope evaluates them.
 
 ```
 # Traditional: build first, then launch to see the topology

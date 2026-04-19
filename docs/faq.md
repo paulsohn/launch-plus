@@ -78,20 +78,18 @@ Yes.  roscope reads standard [vcstool](https://github.com/dirk-thomas/vcstool)
 
 ### Does this replace `ros2 launch`?
 
-Not yet.  Today roscope is a **build-time** tool: it resolves and builds the
-packages you need, but you still use `ros2 launch` (or your preferred launcher)
-to actually run the system.  The `resolve` command produces a flattened XML that
-shows what `ros2 launch` would do — useful for debugging and CI.
+No — and that is by design.  roscope and `ros2 launch` are **complementary
+tools serving different phases**: roscope operates at build time, resolving
+the launch topology and building exactly the packages needed; `ros2 launch`
+operates at runtime, spawning and managing processes.  The `resolve` command
+produces a flattened XML that shows what `ros2 launch` would do — useful for
+debugging, CI, and auditing before any build.
 
-**Execution support is planned.**  The roadmap includes:
-- A **built-in executor** that directly consumes the resolved launch structure
-  to spawn and manage processes
-- **Integration with existing launchers** — `ros2 launch`, and third-party
-  reimplementations — so you can choose the execution backend that fits your
-  project
-
-The goal is a complete `resolve → build → launch` pipeline in a single tool,
-while remaining compatible with the broader ROS 2 launch ecosystem.
+Deeper integration is on the roadmap: launching directly from a resolved graph,
+tighter feedback between resolution and runtime, and integration hooks for
+third-party launchers.  The goal is not to replace `ros2 launch` but to make
+the path from a resolved graph to a running system smoother, while remaining
+compatible with the broader ROS 2 launch ecosystem.
 
 ### How do I use the interactive visualizer?
 

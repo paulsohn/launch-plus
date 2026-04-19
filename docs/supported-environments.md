@@ -224,8 +224,8 @@ appears:
   raises `ImportError`, causing resolution of the entire file to fail.  All
   topology from that file is lost.
 - **Inside an `OpaqueFunction` body** — the function raises on import or
-  instantiation; the function's return value is discarded and a warning is
-  emitted, but resolution continues.  Only the topology fragment that function
+  instantiation; the function's return value is discarded and an error is
+  logged, but resolution continues.  Only the topology fragment that function
   would have produced is lost.
 - **Unknown action type returned by `OpaqueFunction`** — rejected with
   `"expected Action, got ..."` and dropped from the resolved output.
@@ -255,11 +255,15 @@ substitution is required.
 
 ### Event handler callbacks
 
-`RegisterEventHandler` and related constructs (`OnProcessExit`,
-`OnProcessStart`, etc.) are shimmed as no-ops: the resolver records that they
-were encountered but does not track them in the resolved output.  Event handlers
-are effectively invisible in the resolved graph.  This is a known gap;
-event-handler-driven topology changes will not appear in the output.
+Event handlers (`RegisterEventHandler`, `OnProcessExit`, `OnProcessStart`,
+etc.) are a **Python launch file construct only** — XML launch files have no
+event handler syntax.
+
+In Python launch files, these constructs are shimmed as no-ops: the resolver
+captures that they were encountered but does not track them in the resolved
+output.  Event handlers are effectively invisible in the resolved graph.  This
+is a known gap; event-handler-driven topology changes will not appear in the
+output.
 
 ### Incomplete coverage of standard types
 

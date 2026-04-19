@@ -8,10 +8,10 @@ system topology and build only what you need, without a ROS 2 runtime.
 roscope evaluates launch descriptions following ROS 2 semantics — resolving
 substitutions, evaluating conditionals, and executing Python
 `generate_launch_description()` callables — without a running ROS environment
-or a built workspace. From a single launch file it derives every node,
-parameter, remap, topic, package dependency, and include boundary that would be
-active at runtime, and can then fetch and build exactly those packages — nothing
-more.
+or a built workspace. From a single launch file it derives the full
+connectivity graph: every node, parameter, remap, topic connection, package
+dependency, and include boundary that would be active at runtime. It can then
+fetch and build exactly those packages — nothing more.
 
 ## The problem
 
@@ -33,9 +33,10 @@ parameters are set — is locked away behind a full build.
 
 ## The solution
 
-roscope makes the **launch file the source of truth**. It evaluates the launch
-description following the same semantics as `ros2 launch`, but without a
-running ROS environment, fetching only the packages it needs on demand:
+roscope treats the **launch file as the system description language of ROS 2** — not merely a convenience script to collectively start
+nodes, but a sufficient, evaluatable specification of the system topology.
+
+It partially evaluates the description following the same semantics as `ros2 launch`, but without a running ROS environment, fetching only the packages it needs on demand:
 
 ```
 # roscope workflow
@@ -49,15 +50,15 @@ roscope resolve autoware_launch autoware.launch.xml \
 
 The resolved output is a **flattened, fully-resolved XML** with all includes
 inlined, conditionals evaluated, and variables substituted. The visualizer turns
-that into an interactive compound graph — nodes, containers, topics, remaps, and
-include boundaries — all explorable before a single package is built.
+that into an interactive connectivity graph — nodes, containers, topics, remaps,
+and include boundaries — all explorable before a single package is built.
 
 Targeted builds are also supported: from the same launch evaluation, roscope
 knows exactly which packages are needed and can fetch and build only those.
 
 ## Key features
 
-- **No-runtime topology** — evaluate the full launch graph and inspect nodes,
+- **No-runtime topology** — derive the full launch graph and inspect nodes,
   parameters, remaps, and topics without a build or running ROS environment
 - **Interactive visualizer** — compound graph view of the full launch structure,
   with selection, detail panel, and topic tracking

@@ -39,7 +39,7 @@ substitution resolution, argument binding, include traversal, opaque callable
 execution — while leaving everything that requires a live ROS 2 system to
 `ros2 launch`.
 
-### Oracles and the soundness guarantee
+### OpaqueFunction and IncludeLaunchDescription as Oracles
 
 Launch constructs whose internal computation roscope does not model —
 `OpaqueFunction` bodies, dynamically constructed includes — are treated as
@@ -48,9 +48,15 @@ Launch constructs whose internal computation roscope does not model —
 The oracle escape is bounded.  OpaqueFunction outputs must be `Action` objects
 from the launch API: the oracle can produce any combination of `Node`,
 `GroupAction`, `IncludeLaunchDescription`, etc., but it cannot produce terms
-outside the launch vocabulary.  This means the resolved graph is **sound** —
-nothing in it is wrong — even when it may be **incomplete** — a branch the
-oracle did not take at evaluation time is absent.
+outside the launch vocabulary.  This is a contract that launch file authors are
+expected to uphold.
+
+When this contract holds, the resolved graph is expected to be *sound* — nothing
+in it contradicts what `ros2 launch` would produce — even if it may be
+*incomplete*: a branch the oracle did not take at evaluation time is absent, but
+every entry present reflects a real runtime element.  Formal verification of this
+soundness property, via the work-in-progress operational semantics of the launch
+API, is ongoing work (see the note on formal foundations below).
 
 ### Language closure and static verification
 
@@ -66,7 +72,7 @@ defined outside `launch` / `launch_ros` — fall outside the closed language by
 definition and are not resolved.  Projects that rely on them will see those
 constructs as unresolved entries in the output.
 
-> **Note on formal foundations:** The semantics described above — partial evaluation, oracle treatment of OpaqueFunction, and the soundness guarantee — are stated informally here.
+> **Note on formal foundations:** The semantics described above — partial evaluation, oracle treatment of OpaqueFunction, and the expected soundness property — are stated informally here.
 > Precise formal definitions (operational semantics of the launch language) and machine-checked proofs of soundness are ongoing and planned work.
 > In the meantime, empirical validation against large-scale systems like Autoware provides confidence in the implementation.
 > The gap between roscope's behavior and the official `ros2 launch` semantics is tracked and continuously narrowed.

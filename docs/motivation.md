@@ -121,9 +121,9 @@ addresses each:
   and silently overridden at multiple levels; the final runtime state is uncertain.
   roscope inlines all parameter files at resolve time, with override order visible.
 - **Startup latency obscures topology**: ROS 2 argument validation alone adds
-  13+ seconds in Autoware before any node starts, meaning you must wait through a
-  launch just to observe what runs.  roscope delivers the launch topology before any
-  build or launch.
+  13+ seconds in Autoware before any node starts — this is before the build,
+  and before any node actually runs.  roscope resolves the full Autoware topology
+  in under 2 seconds on a pre-fetched workspace, with no build or launch required.
 - **No audit trail**: system behavior cannot be reviewed without running it.
   roscope's resolved XML is a complete static record of what the system would do
   at runtime — every node, namespace, remap, and parameter in one document.

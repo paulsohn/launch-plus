@@ -78,7 +78,9 @@ knows exactly which packages are needed and can fetch and build only those.
 
 > **Current scope:** roscope covers launch evaluation for Autoware without a ROS runtime today.
 > Targeted builds are supported with `colcon build` as the backend.
-> Execution support — a built-in executor and integration with `ros2 launch` — is on the roadmap.
+> roscope is designed as a **build-time companion** to `ros2 launch`, not a replacement —
+> the two tools operate at different phases and serve different purposes.
+> Deeper integration options (e.g. launching directly from a resolved graph) are on the roadmap.
 
 ## Quick start
 

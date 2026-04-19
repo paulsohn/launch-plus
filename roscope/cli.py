@@ -530,7 +530,11 @@ def fetch(
 @click.option("--src", default="src", help="Source directory")
 @click.option("--report", is_flag=True, help="Print dependency report to stderr")
 @click.option("--preview", is_flag=True, help="Resolve from source workspace")
-@click.option("--show-args", is_flag=True)
+@click.option(
+    "--show-args",
+    is_flag=True,
+    help="Print launch arg values at include boundaries (always on with --visualize)",
+)
 @click.option("--rosdep", is_flag=True, help="Install missing packages via rosdep")
 @click.option(
     "--show-empty-includes",
@@ -562,12 +566,23 @@ def resolve(
     viz_id: str,
 ) -> None:
     """Resolve launch file (no build)."""
+    from click.core import ParameterSource  # type: ignore[attr-defined]
+
     from roscope.orchestrator import ResolveWorkflowOptions
 
     initial_args = _parse_launch_args(args)
     workspace_state = _parse_workspace_state(clean, dirty)
 
     _warn_if_lockfile_ignored(ctx, workspace_state, src)
+
+    if visualize:
+        if ctx.get_parameter_source("show_args") == ParameterSource.COMMANDLINE:  # type: ignore[attr-defined]
+            click.echo(
+                "warning: --show-args is redundant in --visualize mode"
+                " (args are always shown in the visualizer)",
+                err=True,
+            )
+        show_args = True
 
     workflow_options = ResolveWorkflowOptions(
         preview=preview,

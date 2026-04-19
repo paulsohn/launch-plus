@@ -185,6 +185,7 @@ ros2 launch my_pkg my_launch.xml          # topology visible only now
 # roscope: inspect topology immediately, no build required
 vcs import src < project.repos            # clone repos (as usual)
 roscope resolve -d my_pkg my_launch.xml \
+  --preview \
   --visualize                             # interactive graph — before any build
 ```
 
@@ -225,9 +226,9 @@ With roscope, the multi-ECU problem reduces to pointing at the right launch
 file.  To inspect the topology each ECU will run:
 
 ```bash
-roscope resolve -d perception_launch perception.launch.xml --visualize
-roscope resolve -d planning_launch planning.launch.xml --visualize
-roscope resolve -d logging_launch logging.launch.xml --visualize
+roscope resolve -d perception_launch perception.launch.xml --preview --visualize
+roscope resolve -d planning_launch planning.launch.xml --preview --visualize
+roscope resolve -d logging_launch logging.launch.xml --preview --visualize
 ```
 
 And to build only the packages each ECU needs:

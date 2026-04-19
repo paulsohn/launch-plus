@@ -34,6 +34,7 @@ vcs import src < my_project.repos
 
 roscope resolve -d my_bringup robot.launch.xml \
   robot_name:=my_robot \
+  --preview \
   --visualize
 ```
 

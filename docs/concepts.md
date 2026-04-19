@@ -119,7 +119,9 @@ This means:
 - No ROS 2 Python packages need to be installed on the resolver host
 - The resolver captures the launch description structure without scheduling
   anything for execution
-- All standard `launch` / `launch_ros` API patterns are supported
+- The standard `launch` / `launch_ros` API patterns needed for Autoware are
+  supported; see [Supported Environments → Known limitations](../docs/supported-environments.md#known-limitations)
+  for types not yet covered
 
 ## Package path resolution
 

@@ -212,8 +212,10 @@ resolving a Humble launch file on a Jazzy host) is not supported.
 
 Third-party `Action` or `Substitution` subclasses defined outside the standard
 `launch` / `launch_ros` packages are not resolved.  roscope's resolver only
-covers the closed vocabulary of the standard API.  Custom constructs appear in
-the output as unresolved entries; they do not cause resolution to fail.
+covers the closed vocabulary of the standard API.  In XML launch files, unknown
+elements are skipped with a warning.  In Python launch files, importing or
+instantiating unrecognized types may raise an `ImportError` or cause resolution
+to fail for that file.
 
 ### `$(command ...)` substitution
 
@@ -225,26 +227,29 @@ substitution is visible in the resolved XML.
 
 ### `ExecutableInPackage` substitution
 
-`ExecutableInPackage` resolves the path to an executable within an installed
-package, using `AMENT_PREFIX_PATH`.  In preview mode, source packages are not
-yet installed, so the substitution produces an incorrect path.  Use post-build
-mode if launch files depend on `ExecutableInPackage`.
+`ExecutableInPackage` is not available in roscope's Python shim for
+`launch_ros.substitutions`.  Python launch files that import or use it will
+fail to resolve.  XML launch files using `$(exec-in-pkg ...)` are not affected
+(that substitution is handled separately).  There is no drop-in replacement;
+use post-build mode with an installed workspace if this substitution is required.
 
 ### Event handler callbacks
 
-`OpaqueFunction` callbacks registered on event handlers (e.g.
-`OnProcessExit(on_exit=my_fn)`) that return arbitrary Python closures are not
-serializable to XML.  Built-in actions (`EmitEvent`, `LogInfo`, `Shutdown`)
-used as event handler targets are supported.  Arbitrary Python function
-callbacks are dropped from the resolved output.
+`RegisterEventHandler` and related constructs (`OnProcessExit`,
+`OnProcessStart`, etc.) are shimmed as no-ops: the resolver records that they
+were encountered but does not track them in the resolved output.  Event handlers
+are effectively invisible in the resolved graph.  This is a known gap;
+event-handler-driven topology changes will not appear in the output.
 
 ### Incomplete coverage of standard types
 
 The current implementation covers the subset of standard `Action` and
 `Substitution` types needed to resolve Autoware launch files.  Some types in
-the standard `launch` / `launch_ros` API are not yet implemented.  Unimplemented
-types are treated as unresolved entries in the output.  The complete coverage
-list will be finalized alongside the formal operational semantics work.
+the standard `launch` / `launch_ros` API are not yet implemented.  In XML
+launch files, unrecognized elements are skipped with a warning.  In Python
+launch files, importing an unimplemented type from the shim modules will raise
+an `ImportError`, causing resolution of that file to fail.  The complete
+coverage list will be finalized alongside the formal operational semantics work.
 
 ## Assumptions
 

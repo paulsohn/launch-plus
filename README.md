@@ -47,6 +47,7 @@ roscope resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   map_path:=/path/to/map \
+  --preview \
   --visualize                            # interactive graph in your browser
 ```
 
@@ -157,6 +158,7 @@ roscope resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   map_path:=/path/to/map \
+  --preview \
   --visualize
 ```
 
@@ -207,7 +209,7 @@ lockfile-based workflow as default:
 roscope index your-project.repos
 
 # 2. Resolve — roscope sparse-clones only the needed packages on demand
-roscope resolve <pkg> <launcher> [args...] --visualize
+roscope resolve <pkg> <launcher> [args...] --preview --visualize
 
 # 3. Build only the resolved packages
 roscope build <pkg> <launcher> [args...] --rosdep

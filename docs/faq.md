@@ -99,6 +99,7 @@ remaps.
 ```bash
 roscope resolve -d my_pkg my_launch.xml \
   arg1:=value1 \
+  --preview \
   --visualize
 ```
 

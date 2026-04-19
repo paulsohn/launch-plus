@@ -22,7 +22,7 @@ built with Click; all modules are importable as a Python library.
 │  │   └── package path resolution                      │
 │  ├── orchestrator — coordinates resolve + fetch loop  │
 │  ├── renderer   — resolved IR → XML output            │
-│  ├── visualizer — graph data + WebSocket server       │
+│  ├── visualizer — graph data + HTTP server             │
 │  ├── builder    — colcon build orchestration          │
 │  └── rosdep     — system dependency resolution        │
 └───────────────────────────────────────────────────────┘

@@ -418,8 +418,9 @@ are built for live execution and cannot be reused for static resolution:
   into a running container.  roscope models this statically from the launch
   description.
 - `ament_index_python`'s `get_package_share_directory()` queries the install
-  tree via `AMENT_PREFIX_PATH`, which does not exist in preview mode.
-  roscope intercepts it and redirects to the source directory instead.
+  tree via `AMENT_PREFIX_PATH`, which has no entry for source-only packages in
+  preview mode.  The call fails, requiring launch files to use `FindPackageShare`
+  substitution instead.
 
 These are not bugs to be fixed — they reflect the fact that the upstream
 launcher is optimized for runtime execution, not static analysis.

@@ -35,7 +35,7 @@ parameters are set — is locked away behind a full build.
 
 ## The solution
 
-Roscope treats the **launch file as the system description language of ROS 2** — not just a convenience script to collectively start nodes,
+roscope treats the **launch file as the system description language of ROS 2** — not just a convenience script to collectively start nodes,
 but a sufficient, inspectable specification of the system topology.
 
 It partially evaluates the description following the same semantics as `ros2 launch`, but without a running ROS environment. You can use it directly on a workspace you already have:

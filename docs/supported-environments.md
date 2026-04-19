@@ -130,7 +130,8 @@ from ament_index_python.packages import get_package_share_directory
 pkg_share = get_package_share_directory("my_pkg")
 
 # Use:
-from launch.substitutions import FindPackageShare, PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
+from launch.substitutions import PathJoinSubstitution
 pkg_share = FindPackageShare("my_pkg")
 config = PathJoinSubstitution([pkg_share, "config", "params.yaml"])
 ```
@@ -144,8 +145,9 @@ string must also be constructed and returned from within the function:
 ```python
 import os
 from launch import LaunchDescription
-from launch.actions import Node, OpaqueFunction
-from launch.substitutions import FindPackageShare
+from launch.actions import OpaqueFunction
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     def setup(context, *args, **kwargs):

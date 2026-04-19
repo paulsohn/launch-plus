@@ -2,17 +2,18 @@
 
 ## Overview
 
-roscope is a pure Python application providing a Bazel-inspired workflow
-for ROS 2: lazy, on-demand package fetching and building based on actual
-launch-time dependencies.  The CLI is built with Click; all modules are
-importable as a Python library.
+roscope is a pure Python application whose core is a **launch file resolver**:
+a partial evaluator that derives the launch topology of a ROS 2 system
+from its launch description, without a running environment.  Targeted builds
+and on-demand package fetching are built on top of the resolver.  The CLI is
+built with Click; all modules are importable as a Python library.
 
 ```
 ┌───────────────────────────────────────────────────────┐
 │  CLI (cli.py)                                         │
 │  Click argument parsing → delegates to modules        │
 ├───────────────────────────────────────────────────────┤
-│  Core Library (roscope)                           │
+│  Core Library (roscope)                               │
 │  ├── indexer    — .repos → lockfile                   │
 │  ├── fetcher    — git sparse-checkout on demand       │
 │  ├── resolver   — launch file resolution              │
@@ -20,9 +21,10 @@ importable as a Python library.
 │  │   ├── OpaqueFunction execution                     │
 │  │   └── package path resolution                      │
 │  ├── orchestrator — coordinates resolve + fetch loop  │
-│  ├── renderer  — resolved IR → XML output             │
-│  ├── builder   — colcon build orchestration           │
-│  └── rosdep    — system dependency resolution         │
+│  ├── renderer   — resolved IR → XML output            │
+│  ├── visualizer — graph data + HTTP server             │
+│  ├── builder    — colcon build orchestration          │
+│  └── rosdep     — system dependency resolution        │
 └───────────────────────────────────────────────────────┘
 ```
 
@@ -161,6 +163,22 @@ orchestrator catches this, fetches the missing package, and retries (up to
 Converts the resolved IR (`ResolvedNode` trees) into human-readable XML output.
 Supports namespace flattening, argument display, parameter inlining, and
 include-chain source comments.
+
+### Visualizer (`visualizer/`)
+
+Turns the resolved launch graph into an interactive browser-based view.
+Key sub-modules:
+
+- **`graph.py`** — converts the resolved action tree into a JSON graph
+  (`GraphData`) containing nodes, edges, topics, groups, and metadata
+  (including the roscope version).  Called at the end of `resolve` when
+  `--visualize` is passed.
+- **`server.py`** — serves the compiled React SPA and streams graph snapshots
+  to connected browsers over HTTP.  Snapshots are cached in
+  `~/.cache/roscope-viz/` so the browser can be opened after the resolve
+  completes.
+- **`schema.py`** — dataclasses that define the canonical graph schema shared
+  between Python and the TypeScript frontend (via `generate_types.py`).
 
 ### Builder (`builder.py`)
 

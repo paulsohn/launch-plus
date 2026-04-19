@@ -37,11 +37,16 @@ Bazel in an existing ROS 2 project is a significant undertaking:
   wrapped with Bazel build rules
 - Teams must learn and maintain a parallel build system
 
-roscope takes the opposite approach: **zero migration**.  It works with the
+roscope takes the opposite approach: **minimal migration**.  It works with the
 ROS 2 conventions your project already uses — `.repos` manifests, `package.xml`,
 `colcon build`, `rosdep` — and layers the dependency-tracing and sparse-checkout
-capabilities on top.  You can adopt it incrementally without changing any existing
-build files.
+capabilities on top.  Launch files that use the standard `launch`/`launch_ros`
+API work without modification.  Where any migration is needed, it is limited
+to replacing patterns that reach outside the standard API — e.g.
+`get_package_share_directory()` instead of `FindPackageShare`, or custom
+`Action` subclasses — with their standard `launch`/`launch_ros` equivalents.
+No new tools, no new formats, and the result is more portable launch files
+regardless of roscope.
 
 Additionally, roscope provides **launch-graph-aware static analysis** that
 Bazel does not: argument validation, namespace composition, conditional evaluation,
@@ -73,20 +78,100 @@ Yes.  roscope reads standard [vcstool](https://github.com/dirk-thomas/vcstool)
 
 ### Does this replace `ros2 launch`?
 
-Not yet.  Today roscope is a **build-time** tool: it resolves and builds the
-packages you need, but you still use `ros2 launch` (or your preferred launcher)
-to actually run the system.  The `resolve` command produces a flattened XML that
-shows what `ros2 launch` would do — useful for debugging and CI.
+Not today.  roscope currently operates as a **build-time companion** to
+`ros2 launch`: it resolves the launch topology and builds exactly the packages
+needed; `ros2 launch` then spawns and manages the processes.  The `resolve`
+command produces a flattened XML that shows what `ros2 launch` would do —
+useful for debugging, CI, and auditing before any build.
 
-**Execution support is planned.**  The roadmap includes:
-- A **built-in executor** that directly consumes the resolved launch structure
-  to spawn and manage processes
-- **Integration with existing launchers** — `ros2 launch`, and third-party
-  reimplementations — so you can choose the execution backend that fits your
-  project
+A native launch backend — consuming the resolved graph directly to spawn
+processes — is a longer-term direction that remains open.  For now, the focus
+is on making resolution and targeted builds first-class, with integration hooks
+that let existing launchers consume the resolved output.
 
-The goal is a complete `resolve → build → launch` pipeline in a single tool,
-while remaining compatible with the broader ROS 2 launch ecosystem.
+### How do I use the interactive visualizer?
+
+Pass `--visualize` to `roscope resolve`.  After resolution completes, roscope
+opens an interactive graph view in your browser showing the full launch
+structure — include boundaries, containers, composable nodes, topics, and
+remaps.
+
+```bash
+roscope resolve -d my_pkg my_launch.xml \
+  arg1:=value1 \
+  --preview \
+  --visualize
+```
+
+`--show-args` is automatically enabled in visualizer mode so launch argument
+values appear in the graph.  Use `--viz-id <name>` to label the snapshot for
+later reference.  Snapshots are written to `~/.cache/roscope-viz/` and labelled by `--viz-id`.
+
+### Why doesn't the graph show whether a topic connection is a publisher or subscriber?
+
+ROS 2 launch files carry no pub/sub direction information.  A `<remap>` rule
+says "rename this topic name" — it does not indicate whether the node publishes
+or subscribes on that name.  The resolver can therefore only record that a
+node is associated with a topic, not in which direction.
+
+This is a limitation of the launch file format as a description language.  If
+`<remap>` (or a new sibling element) allowed annotating direction —
+`type="pub"` / `type="sub"` — the graph could be rendered directionally
+(e.g., left to right as a proper data-flow diagram) and roscope could flag
+obvious mismatches such as a topic with publishers but no subscribers.  We
+consider this a worthwhile addition to the ROS 2 launch API.
+
+### Why are /tf, /tf_static, and /clock not shown in the graph?
+
+roscope only tracks topics that appear in explicit `<remap>` rules.
+Infrastructure topics like `/tf`, `/tf_static`, and `/clock` are consumed or
+published by many nodes implicitly, without any remap declaration in the
+launch file.
+
+Even if a node writes `<remap from="/tf" to="/tf"/>` as an identity remap,
+roscope will pick it up and track it — but this is rarely done in practice.
+
+For well-structured systems this approach already captures the meaningful
+connections.  A common ROS 2 convention — followed in Autoware — is that
+nodes declare their interfaces using local placeholder names (e.g.
+`~/input/points`, `~/output/objects`) and require explicit `<remap>` rules
+in the launch file to bind those names to the actual runtime topics.  In
+such systems the remaps in the launcher are already a comprehensive record
+of the significant topic connections, and roscope tracks all of them.
+
+Tracking infrastructure topics for all nodes automatically would be noisy:
+a `/tf` hub node connected to every node in the graph adds visual clutter
+without much actionable information.  Opt-in tracking via explicit remaps
+strikes a better balance.
+
+There is no architectural barrier to surfacing infrastructure topics more
+prominently — rendering them as a distinct collapsible layer, for instance.
+It is a deliberate prioritization: the benefit does not justify the cost at
+this stage, not a fundamental limitation of what roscope can represent.
+
+More fundamentally, infrastructure topics are structural constants of any
+ROS 2 system — they do not distinguish one configuration from another.  What
+*does* change between configurations is the launch topology: which nodes run,
+which parameters are set, which topics are remapped.  That is exactly what
+roscope captures, making it sufficient in practice for auditing what changed
+between two configurations or two versions of the same system.
+
+### Why are service calls and actions not shown?
+
+ROS 2 launch files have no construct for declaring service clients/servers or
+action clients/servers.  That information lives in the node's source code, not
+in the launch description.  Since roscope works entirely from the launch file,
+it has no way to know which services or actions a node exposes.
+
+Topics appear in the graph because `<remap>` rules give the resolver explicit,
+named connections to track.  Services and actions have no equivalent in the
+launch API — they are entirely implicit at launch time.
+
+On large systems, topic-based communication represents the majority of
+inter-node data flow, so the topic graph is already a useful approximation of
+the system's data pipeline.  Supporting services and actions would require
+either static analysis of node source code or an opt-in annotation in the
+launch file — both are directions worth exploring.
 
 ## Resolution
 
@@ -223,3 +308,145 @@ genuinely required and the teams have explicitly verified interface
 compatibility.  In practice this is rare — the `.repos` files can overlap, and
 roscope already builds only the subset each ECU needs from the shared
 lockfile.
+
+## Design and philosophy
+
+### Is it safe to execute OpaqueFunction code during resolution?
+
+The same question applies to `ros2 launch` — if an OpaqueFunction is malicious,
+it is equally malicious when the system is actually launched.  roscope does not
+introduce new risk here.  In fact, it runs OpaqueFunction bodies *without a
+real ROS 2 runtime*: there is no DDS middleware, no running nodes, and no
+live services.  Side effects that require a running system fail harmlessly
+instead of affecting live infrastructure — a narrower attack surface than a
+live launch.
+
+With a lockfile, roscope can go further than `ros2 launch` on safety: every
+repository in the include chain is pinned to a concrete commit SHA.  Rather
+than trusting a mutable branch reference, you can audit exactly which version
+of each launch file will be evaluated before committing to it.  The lockfile
+and resolved XML together make the full include chain explicit and reproducible.
+
+### How reliable is resolution in dirty mode?
+
+Consider the alternative: without roscope, discovering the topology of a dirty
+workspace requires a full build followed by an actual `ros2 launch` run.  Dirty
+mode gives you that same topology — the nodes, parameters, and remaps that
+would be active at runtime — without the build.  The fidelity is exactly what
+you would observe by running the system.
+
+Dirty mode gives you the same guarantees as the underlying workflow it replaces:
+roscope uses whatever is in `src/` as-is, the same way `ros2 launch` would
+after a `vcs import`.  If `src/` has uncommitted local changes, the resolved
+graph reflects those changes — the same situation arises with a symlink-install
+workspace where source edits take effect immediately without a rebuild.
+
+If you need stronger guarantees — that the resolved graph matches an exact,
+known-good commit — use default or `--clean` mode instead.  Those modes verify
+or enforce that every repository matches its lockfile SHA.
+
+### How does roscope's model of launch files differ from the official `ros2 launch`?
+
+The official `ros2 launch` is designed as an **extensible scripting system**
+with deferred substitution and execution.  The `launch` and `launch_ros`
+packages are intentionally separate, and each ROS 2 distribution adds new
+custom `Action` and `Substitution` types.  In that model, the answer to "what
+is the language of a launch file?" is simply Python — an open-ended scripting
+environment.
+
+roscope takes a different view: it treats the launch action tree as an
+**abstract syntax tree (AST) of a domain-specific language** embedded in
+Python, and resolution as **partial evaluation** of that AST.  The goal is
+to extract the runtime system topology — nodes, parameters, remaps — without
+executing the system.  Launch constructs that cannot be statically analyzed
+(`OpaqueFunction`, `<include>` of externally-defined files) are treated as
+**oracles**: their outputs are observed at evaluation time and taken as given,
+without descending further into Python semantics.
+
+A natural objection is that OpaqueFunction breaks the "closed language" claim
+— if arbitrary Python can run, how is the language closed?  The key is that
+OpaqueFunction outputs are still **constrained to be `Action` objects from the
+launch API**.  The oracle can produce any combination of `Node`, `GroupAction`,
+`IncludeLaunchDescription`, and so on, but it cannot produce terms outside
+the launch language.  The oracle escape is bounded: it affects *completeness*
+(a branch the oracle did not take may be missing from the graph) but not
+*soundness* (nothing in the resolved graph represents a node or connection that
+will not exist at runtime).  This soundness guarantee is what makes the output
+trustworthy even when it is not exhaustive.
+
+Closing the language is what enables **static verification** beyond simple
+topology extraction: argument completeness checks, namespace collision
+detection, and connectivity analysis all become possible precisely because the
+language has defined terms and rules.  An open scripting system cannot support
+these statically.  Formal operational semantics and completeness proofs are
+ongoing work; empirical validation against large-scale systems like Autoware
+confirms correctness in practice in the meantime.
+
+### Why not contribute this directly to the official ROS 2 toolchain?
+
+It helps to first clarify that roscope and `ros2 launch` are **complementary
+tools serving different phases**: `ros2 launch` is a runtime process manager
+that schedules and supervises nodes; roscope is a pre-flight static analysis
+tool that extracts topology without running anything.  They share a grammar
+(the launch file format) but have fundamentally different purposes — much like
+a type checker and a compiler both read the same source language but are not
+merged into one tool.
+
+With that framing, several things make direct upstream integration difficult:
+
+**Architectural mismatch.**  The official launcher is fundamentally
+**event-driven and asynchronous**: all actions are scheduled through an event
+loop that also manages processes, signals, and timers.  A synchronous partial
+evaluator would need to either run inside that event loop (invasive, with deep
+coupling to execution state) or bypass it entirely (a parallel code path that
+diverges from the official implementation immediately).  Neither is a clean
+integration.
+
+**Third-party launch extensions.**  Projects like Nav2 define their own
+`Action` and `Substitution` subclasses outside of the official `launch` /
+`launch_ros` packages.  Even a perfectly sound resolver for the official API
+would not cover these extensions — they are, by design, out of scope for any
+upstream resolver.
+
+**Incompatible runtime semantics.**  Several mechanisms in the official launcher
+are built for live execution and cannot be reused for static resolution:
+
+- `<param from="..."/>` pipes a rewritten YAML file through a temporary file
+  into the node command line.  roscope always inlines parameter files fully
+  into the resolved output instead.
+- `LoadComposableNodes` performs a live ROS 2 service call to insert plugins
+  into a running container.  roscope models this statically from the launch
+  description.
+- `ament_index_python`'s `get_package_share_directory()` queries the install
+  tree via `AMENT_PREFIX_PATH`, which has no entry for source-only packages in
+  preview mode.  The call fails, requiring launch files to use `FindPackageShare`
+  substitution instead.
+
+These are not bugs to be fixed — they reflect the fact that the upstream
+launcher is optimized for runtime execution, not static analysis.
+
+The more productive direction for upstream contribution is **annotation
+support** in the launch API: expressing pub/sub direction on remaps, opting
+in to service/action declaration, or tagging nodes with connectivity metadata.
+These annotations are useful to human readers and static analysis tools
+independently of roscope — they make launch files more expressive as a system
+description language.  roscope can consume such annotations immediately, and
+the ecosystem benefits regardless of whether resolution is ever upstreamed.
+
+### What does preview mode assume about package resources?
+
+Preview mode resolves `FindPackageShare` to a package's source directory
+rather than its install directory.  For this to produce correct results, two
+conditions must hold:
+
+1. **Resources are accessed via portable paths.**  Any launch file, parameter
+   file, or config file referenced at resolve time must be found via
+   `$(find-pkg-share <pkg>)/...` (or the Python equivalent `FindPackageShare`).
+   Hard-coded absolute paths or paths relative to `__file__` will not resolve
+   correctly across source and install trees.
+
+2. **Resources are not generated during the build.**  Files produced by build
+   steps — template expansion, `configure_file`, code generation — do not exist
+   in the source tree and will not be found in preview mode.  Post-build
+   resolution (without `--preview`) handles these correctly since it reads
+   from the install tree.

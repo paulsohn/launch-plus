@@ -25,7 +25,82 @@ cd roscope
 pip install -e .
 ```
 
-## Step 1: Create a .repos manifest
+## Quick start
+
+Clone your workspace as usual, then point roscope at a launch file:
+
+```bash
+vcs import src < my_project.repos
+
+roscope resolve -d my_bringup robot.launch.xml \
+  robot_name:=my_robot \
+  --preview \
+  --visualize
+```
+
+This opens an interactive graph view in your browser showing the full launch
+structure — every node, container, topic, remap, and include boundary — with no
+build required.
+
+To get the flattened XML instead:
+
+```bash
+roscope resolve -d my_bringup robot.launch.xml \
+  robot_name:=my_robot \
+  --preview \
+  > resolved.launch.xml
+```
+
+To build only the packages the launch file needs:
+
+```bash
+roscope build -d my_bringup robot.launch.xml \
+  robot_name:=my_robot \
+  --rosdep
+```
+
+### Useful resolve flags
+
+```bash
+# Open an interactive graph view in your browser
+--visualize
+
+# Show launch arguments at include boundaries (auto-enabled with --visualize)
+--show-args
+
+# Install system deps via rosdep (requires sourced ROS 2)
+--rosdep
+```
+
+## What is `-d`?
+
+The `-d` flag (short for `--dirty`) tells roscope to use whatever is in `src/`
+as-is.  roscope walks the directory looking for `package.xml` files and treats
+each one as a package — no git operations, no version pinning.
+
+Without `-d`, roscope requires a **lockfile** (`manifest.lock.repos`): a
+snapshot of your workspace that pins every repository to a concrete commit SHA
+and records which packages each repository contains.  The lockfile enables
+on-demand sparse checkout (fetching only the packages a launch file actually
+needs) and reproducible builds.
+
+If you want that — read on.
+
+## Lockfile workflow
+
+The lockfile workflow is roscope's native mode: instead of importing all
+repositories up front, roscope fetches only the packages a launch file
+references, on demand, pinned to exact commit SHAs.
+
+> **Note:** the default and `--clean` modes assume that all package repositories
+> are described in one or more `.repos` files and will be checked out under a
+> single source directory (default: `src/`).  The `.repos` files are also what
+> `roscope index` reads to generate the lockfile in the first place.  This is
+> the same convention Autoware and most large ROS 2 projects follow.  If your
+> workspace is already structured this way, the lockfile workflow works out of
+> the box.
+
+### Step 1: Create a .repos manifest
 
 Write a `.repos` file listing the git repositories your project uses.  This is
 the standard [vcstool](https://github.com/dirk-thomas/vcstool) format:
@@ -52,7 +127,7 @@ repositories:
 If you already have a `.repos` file (e.g. from an existing vcstool workflow),
 you can use it directly.
 
-## Step 2: Generate a lockfile
+### Step 2: Generate a lockfile
 
 ```bash
 roscope index my_project.repos
@@ -76,68 +151,27 @@ roscope update              # re-resolve all refs
 roscope update core/my_msgs # update a specific repo (uses lockfile key)
 ```
 
-## Step 3: Resolve a launch file
+### Step 3: Resolve a launch file
 
 ```bash
-roscope resolve -d my_bringup robot.launch.xml \
+roscope resolve my_bringup robot.launch.xml \
   robot_name:=my_robot \
   --preview \
   > resolved.launch.xml
 ```
 
 This will:
-1. Look up `my_bringup` in the lockfile (or scan `src/` in dirty mode)
-2. Sparse-checkout just the `my_bringup` package (lockfile modes only)
+1. Look up `my_bringup` in the lockfile
+2. Sparse-checkout just the `my_bringup` package
 3. Parse `robot.launch.xml`, following all `<include>` tags
 4. Fetch additional packages as they're discovered in the launch graph
 5. Output a single flattened XML with all includes inlined, variables
    substituted, and conditionals evaluated
 
-The `-d` (dirty) flag tells roscope to use `src/` as-is — no lockfile
-required, no git operations performed.  Use `-c` (clean) for CI to ensure
-reproducibility.
+Use `-c` (clean) in CI to guarantee reproducibility by resetting repos to
+lockfile SHAs.
 
-### Useful resolve flags
-
-```bash
-# Show launch arguments at include boundaries
---show-args
-
-# Install system deps via rosdep (requires sourced ROS 2)
---rosdep
-```
-
-## Lockfile-free workflow (dirty mode)
-
-If you already manage your source directory with `vcs import` and do not want
-to generate a lockfile first, you can use dirty mode (`-d`) directly:
-
-```bash
-# Populate src/ from your .repos file
-vcs import src < my_project.repos
-
-# Resolve without a lockfile — roscope scans src/ for packages
-roscope resolve -d my_bringup robot.launch.xml \
-  robot_name:=my_robot \
-  --preview \
-  > resolved.launch.xml
-
-# Build likewise
-roscope build -d my_bringup robot.launch.xml \
-  robot_name:=my_robot \
-  --rosdep
-```
-
-In dirty mode roscope walks `src/` exhaustively to discover all packages.
-It does not perform any git operations; whatever is on disk is used as-is.
-Packages not found in `src/` must be available via rosdep (with `--rosdep`)
-or already installed in `AMENT_PREFIX_PATH`; otherwise resolution fails with
-an error.
-
-To switch to the full lockfile workflow later, run `roscope index` to generate
-a lockfile from your `.repos` manifest and commit it to your repository.
-
-## Step 4: Build
+### Step 4: Build
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -152,7 +186,7 @@ This resolves the launch file, computes the transitive build-dependency closure,
 fetches any missing packages, installs system dependencies via rosdep, and runs
 `colcon build` with only the needed packages.
 
-### Colcon flagfile
+#### Colcon flagfile
 
 Extra colcon arguments are passed via a **flagfile** — one shell token per line:
 
@@ -165,7 +199,7 @@ Extra colcon arguments are passed via a **flagfile** — one shell token per lin
 4
 ```
 
-## Step 5: Verify (optional)
+### Step 5: Verify (optional)
 
 After building, you can verify that the pre-build (preview) resolution matches
 the post-build resolution:
@@ -176,12 +210,12 @@ source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
 source install/setup.bash
 
 # Preview resolve (pre-build, source paths)
-roscope resolve --preview -d my_bringup robot.launch.xml \
+roscope resolve --preview my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > preview.launch.xml
 
 # Post-build resolve (install paths)
-roscope resolve -d my_bringup robot.launch.xml \
+roscope resolve my_bringup robot.launch.xml \
   robot_name:=my_robot \
   > postbuild.launch.xml
 
@@ -192,7 +226,7 @@ diff preview_clean.xml postbuild.launch.xml
 
 ## Directory layout
 
-After running roscope, your workspace will look like:
+After running the lockfile workflow, your workspace will look like:
 
 ```
 my_workspace/

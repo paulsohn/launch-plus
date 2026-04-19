@@ -130,15 +130,47 @@ from ament_index_python.packages import get_package_share_directory
 pkg_share = get_package_share_directory("my_pkg")
 
 # Use:
-from launch.substitutions import FindPackageShare, PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
+from launch.substitutions import PathJoinSubstitution
 pkg_share = FindPackageShare("my_pkg")
 config = PathJoinSubstitution([pkg_share, "config", "params.yaml"])
 ```
 
-If a string path is required (e.g. to pass into a Python function that does not
-accept substitutions), wrap the lookup in an `OpaqueFunction` and call
-`get_package_share_directory()` there — `OpaqueFunction` bodies run after the
-environment is resolved, so installed packages are available.
+If a string path is required, move the affected logic into an `OpaqueFunction`
+and call `FindPackageShare("my_pkg").perform(context)` there.  The launch
+context is available inside `OpaqueFunction`, and `FindPackageShare` resolves
+correctly in both preview and post-build mode.  Any actions that depend on the
+string must also be constructed and returned from within the function:
+
+```python
+import os
+from launch import LaunchDescription
+from launch.actions import OpaqueFunction
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+
+def generate_launch_description():
+    def setup(context, *args, **kwargs):
+        pkg_share = FindPackageShare("my_pkg").perform(context)
+        config = os.path.join(pkg_share, "config", "params.yaml")
+        return [
+            Node(
+                package="my_pkg",
+                executable="my_node",
+                parameters=[config],
+            )
+        ]
+
+    return LaunchDescription([OpaqueFunction(function=setup)])
+```
+
+> **Note:** This is the most general migration pattern, but many simple cases
+> do not require `OpaqueFunction` at all.  In the example above, the
+> `parameters` argument of `Node` accepts substitutions directly, so
+> `PathJoinSubstitution([FindPackageShare("my_pkg"), "config", "params.yaml"])`
+> would suffice without performing any substitution manually.  Reserve
+> `OpaqueFunction` for cases where a plain string is genuinely required by a
+> context that does not accept substitutions.
 
 **Source/install path assumption:** roscope assumes that any resource file
 referenced by path in a launch file (launcher files, parameter files, etc.) is
@@ -175,6 +207,75 @@ are excluded.
 The resolver runs on a single machine and produces output for that machine's
 architecture and ROS distribution.  Cross-distribution resolution (e.g.
 resolving a Humble launch file on a Jazzy host) is not supported.
+
+### Custom `Action` and `Substitution` extensions
+
+Third-party `Action` or `Substitution` subclasses defined outside the standard
+`launch` / `launch_ros` packages are not resolved.  roscope's resolver only
+covers the closed vocabulary of the standard API.
+
+In **XML launch files**, unknown elements are skipped with a warning and
+resolution continues.
+
+In **Python launch files**, the failure mode depends on where the unknown type
+appears:
+
+- **Top-level import** (before `generate_launch_description` is called) —
+  raises `ImportError`, causing resolution of the entire file to fail.  All
+  topology from that file is lost.
+- **Inside an `OpaqueFunction` body** — the function raises on import or
+  instantiation; the function's return value is discarded and an error is
+  logged, but resolution continues.  Only the topology fragment that function
+  would have produced is lost.
+- **Unknown action type returned by `OpaqueFunction`** — rejected with
+  `"expected Action, got ..."` and dropped from the resolved output.
+
+### `$(command ...)` substitution
+
+The `$(command ...)` substitution executes a shell command and substitutes its
+output.  It is currently left unresolved: roscope preserves the literal
+`$(command ...)` expression in the output rather than executing it.  No warning
+is emitted when this substitution is encountered, even when it appears in a
+conditional attribute or path component where the unresolved value may cause
+incorrect topology analysis.  The only known call site in Autoware is xacro
+invocations — the resulting unresolved substitution is visible in the resolved
+XML.
+
+### `ExecutableInPackage` substitution
+
+`ExecutableInPackage` is not available in roscope's Python shim for
+`launch_ros.substitutions`.  The failure mode follows the same pattern as other
+missing shim types: a top-level import causes the entire file to fail with
+`ImportError`; an import inside an `OpaqueFunction` body causes only that
+function's topology fragment to be lost.  XML launch files using
+`$(exec-in-pkg ...)` are also unsupported — the substitution is not implemented
+in the XML resolver and will cause resolution to fail for that file.  There is
+no drop-in replacement; use post-build mode with an installed workspace if this
+substitution is required.
+
+### Event handler callbacks
+
+Event handlers (`RegisterEventHandler`, `OnProcessExit`, `OnProcessStart`,
+etc.) are a **Python launch file construct only** — XML launch files have no
+event handler syntax.
+
+In Python launch files, these constructs are shimmed as no-ops: the resolver
+captures that they were encountered but does not track them in the resolved
+output.  Event handlers are effectively invisible in the resolved graph.  This
+is a known gap; event-handler-driven topology changes will not appear in the
+output.
+
+### Incomplete coverage of standard types
+
+The current implementation covers the subset of standard `Action` and
+`Substitution` types needed to resolve Autoware launch files.  Some types in
+the standard `launch` / `launch_ros` API are not yet implemented.  In XML
+launch files, unrecognized elements are skipped with a warning.  In Python
+launch files, the failure mode is the same as for custom extensions: a
+top-level import of an unimplemented shim type raises `ImportError` and fails
+the entire file; an import inside an `OpaqueFunction` body loses only that
+function's topology fragment.  The complete coverage list will be finalized
+alongside the formal operational semantics work.
 
 ## Assumptions
 

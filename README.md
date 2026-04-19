@@ -8,10 +8,12 @@ without a ROS 2 runtime.
 roscope evaluates launch descriptions following ROS 2 semantics — resolving
 substitutions, evaluating conditionals, and executing Python
 `generate_launch_description()` callables — without a running ROS environment
-or a built workspace. From a single launch file it derives the full
-connectivity graph: every node, parameter, remap, topic connection, package
-dependency, and include boundary that would be active at runtime. Targeted
-builds of exactly those packages are also supported.
+or a built workspace. From a single launch file it derives the launch
+topology: every node, parameter, remap, topic connection, package dependency,
+and include boundary that would be active at runtime. In practice this is the
+right level of detail — nodes, parameters, and remaps are what vary between
+configurations, and changes there are what you actually need to detect and
+audit. Targeted builds of exactly those packages are also supported.
 
 ## The problem
 

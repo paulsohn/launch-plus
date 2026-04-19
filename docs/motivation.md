@@ -125,6 +125,9 @@ addresses each:
 - **No audit trail**: system behavior cannot be reviewed without running it.
   roscope's resolved XML is a complete static record of what the system would do
   at runtime — every node, namespace, remap, and parameter in one document.
+  In practice the launch topology is the right level of detail for change
+  detection: nodes, parameters, and remaps are what differ between
+  configurations, while infrastructure topics remain constant across them.
 - **Cross-repository opacity**: include chains span multiple repositories; no
   single view shows the full picture.  A single `roscope resolve` traces the
   chain across all repository boundaries.

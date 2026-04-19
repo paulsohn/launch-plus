@@ -136,6 +136,13 @@ much actionable information.  Opt-in tracking via explicit remaps strikes a
 better balance.  Smarter handling — perhaps rendering infrastructure topics
 as a distinct layer or collapsing them — is a possible future improvement.
 
+More fundamentally, infrastructure topics are structural constants of any
+ROS 2 system — they do not distinguish one configuration from another.  What
+*does* change between configurations is the launch topology: which nodes run,
+which parameters are set, which topics are remapped.  That is exactly what
+roscope captures, making it sufficient in practice for auditing what changed
+between two configurations or two versions of the same system.
+
 ### Why are service calls and actions not shown?
 
 ROS 2 launch files have no construct for declaring service clients/servers or

@@ -119,7 +119,7 @@ cd example/autoware
 roscope resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
-  "map_path:={map_path}" \
+  map_path:=/path/to/map \
   --show-args \
   --rosdep \
   --preview \
@@ -140,7 +140,7 @@ To build the resolved packages (requires a sourced ROS 2 environment and `colcon
 roscope build -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
-  "map_path:={map_path}" \
+  map_path:=/path/to/map \
   --rosdep \
   --colcon-flagfile colcon-flags.txt
 ```
@@ -180,7 +180,7 @@ graph view of the resolved launch structure in your browser:
 roscope resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
-  "map_path:={map_path}" \
+  map_path:=/path/to/map \
   --visualize
 ```
 

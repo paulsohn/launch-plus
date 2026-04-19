@@ -295,22 +295,31 @@ lockfile.
 
 The same question applies to `ros2 launch` — if an OpaqueFunction is malicious,
 it is equally malicious when the system is actually launched.  roscope does not
-introduce new risk here.
+introduce new risk here.  In fact, it runs OpaqueFunction bodies *without a
+real ROS 2 runtime*: there is no DDS middleware, no running nodes, and no
+live services.  Side effects that require a running system fail harmlessly
+instead of affecting live infrastructure — a narrower attack surface than a
+live launch.
 
-What roscope *does* add is transparency: rather than blindly executing whatever
-an include chain pulls in, you can inspect the full chain first.  Every package
-and launch file that will be evaluated is visible in the resolved output before
-anything is built or launched.  Users are responsible for what repositories they
-include and at what version — the lockfile and the resolved XML together make
-that chain explicit and auditable.
+With a lockfile, roscope can go further than `ros2 launch` on safety: every
+repository in the include chain is pinned to a concrete commit SHA.  Rather
+than trusting a mutable branch reference, you can audit exactly which version
+of each launch file will be evaluated before committing to it.  The lockfile
+and resolved XML together make the full include chain explicit and reproducible.
 
 ### How reliable is resolution in dirty mode?
 
-Dirty mode gives you exactly the same guarantees as the underlying workflow it
-replaces: roscope uses whatever is in `src/` as-is, the same way `ros2 launch`
-would after a `vcs import`.  If `src/` has uncommitted local changes, the
-resolved graph reflects those changes — the same situation arises with a
-symlink-install workspace where source edits are visible immediately.
+Consider the alternative: without roscope, discovering the topology of a dirty
+workspace requires a full build followed by an actual `ros2 launch` run.  Dirty
+mode gives you that same topology — the nodes, parameters, and remaps that
+would be active at runtime — without the build.  The fidelity is exactly what
+you would observe by running the system.
+
+Dirty mode gives you the same guarantees as the underlying workflow it replaces:
+roscope uses whatever is in `src/` as-is, the same way `ros2 launch` would
+after a `vcs import`.  If `src/` has uncommitted local changes, the resolved
+graph reflects those changes — the same situation arises with a symlink-install
+workspace where source edits take effect immediately without a rebuild.
 
 If you need stronger guarantees — that the resolved graph matches an exact,
 known-good commit — use default or `--clean` mode instead.  Those modes verify
@@ -334,25 +343,53 @@ executing the system.  Launch constructs that cannot be statically analyzed
 **oracles**: their outputs are observed at evaluation time and taken as given,
 without descending further into Python semantics.
 
-Under this view, the "launch language" is a closed, evaluatable specification
-of a ROS 2 system.  Closing the language is what makes it possible to define
-precise operational semantics and to reason about the soundness of partial
-evaluation.  Formal semantics and completeness proofs are ongoing work; in
-the meantime, roscope continuously closes the gap between its behavior and
-the official implementation.
+A natural objection is that OpaqueFunction breaks the "closed language" claim
+— if arbitrary Python can run, how is the language closed?  The key is that
+OpaqueFunction outputs are still **constrained to be `Action` objects from the
+launch API**.  The oracle can produce any combination of `Node`, `GroupAction`,
+`IncludeLaunchDescription`, and so on, but it cannot produce terms outside
+the launch language.  The oracle escape is bounded: it affects *completeness*
+(a branch the oracle did not take may be missing from the graph) but not
+*soundness* (nothing in the resolved graph represents a node or connection that
+will not exist at runtime).  This soundness guarantee is what makes the output
+trustworthy even when it is not exhaustive.
+
+Closing the language is what enables **static verification** beyond simple
+topology extraction: argument completeness checks, namespace collision
+detection, and connectivity analysis all become possible precisely because the
+language has defined terms and rules.  An open scripting system cannot support
+these statically.  Formal operational semantics and completeness proofs are
+ongoing work; empirical validation against large-scale systems like Autoware
+confirms correctness in practice in the meantime.
 
 ### Why not contribute this directly to the official ROS 2 toolchain?
 
-Several things make a direct upstream contribution difficult today.
+It helps to first clarify that roscope and `ros2 launch` are **complementary
+tools serving different phases**: `ros2 launch` is a runtime process manager
+that schedules and supervises nodes; roscope is a pre-flight static analysis
+tool that extracts topology without running anything.  They share a grammar
+(the launch file format) but have fundamentally different purposes — much like
+a type checker and a compiler both read the same source language but are not
+merged into one tool.
+
+With that framing, several things make direct upstream integration difficult:
+
+**Architectural mismatch.**  The official launcher is fundamentally
+**event-driven and asynchronous**: all actions are scheduled through an event
+loop that also manages processes, signals, and timers.  A synchronous partial
+evaluator would need to either run inside that event loop (invasive, with deep
+coupling to execution state) or bypass it entirely (a parallel code path that
+diverges from the official implementation immediately).  Neither is a clean
+integration.
 
 **Third-party launch extensions.**  Projects like Nav2 define their own
 `Action` and `Substitution` subclasses outside of the official `launch` /
 `launch_ros` packages.  Even a perfectly sound resolver for the official API
-would not cover these extensions — they are, by design, out of scope.
+would not cover these extensions — they are, by design, out of scope for any
+upstream resolver.
 
-**Incompatible runtime semantics.**  The official launcher is built around
-runtime execution, and several of its mechanisms cannot be reused for static
-resolution without substantial modification:
+**Incompatible runtime semantics.**  Several mechanisms in the official launcher
+are built for live execution and cannot be reused for static resolution:
 
 - `<param from="..."/>` pipes a rewritten YAML file through a temporary file
   into the node command line.  roscope always inlines parameter files fully
@@ -364,15 +401,16 @@ resolution without substantial modification:
   tree via `AMENT_PREFIX_PATH`, which does not exist in preview mode.
   roscope intercepts it and redirects to the source directory instead.
 
-These divergences are not bugs — they reflect a deliberate design choice to
-extract topology **without a runtime**.  Applying them to the upstream launcher
-would change its execution semantics in ways that are not generally desirable.
+These are not bugs to be fixed — they reflect the fact that the upstream
+launcher is optimized for runtime execution, not static analysis.
 
 The more productive direction for upstream contribution is **annotation
 support** in the launch API: expressing pub/sub direction on remaps, opting
 in to service/action declaration, or tagging nodes with connectivity metadata.
-roscope can consume such annotations immediately; the launch system gains
-richer descriptions that other tools can use too.
+These annotations are useful to human readers and static analysis tools
+independently of roscope — they make launch files more expressive as a system
+description language.  roscope can consume such annotations immediately, and
+the ecosystem benefits regardless of whether resolution is ever upstreamed.
 
 ### What does preview mode assume about package resources?
 

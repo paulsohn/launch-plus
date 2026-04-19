@@ -8,10 +8,10 @@ system topology and build only what you need, without a ROS 2 runtime.
 roscope evaluates launch descriptions following ROS 2 semantics — resolving
 substitutions, evaluating conditionals, and executing Python
 `generate_launch_description()` callables — without a running ROS environment
-or a built workspace. From a single launch file it derives every node,
-parameter, remap, topic, package dependency, and include boundary that would be
-active at runtime, and can then fetch and build exactly those packages — nothing
-more.
+or a built workspace. From a single launch file it derives the full
+connectivity graph: every node, parameter, remap, topic connection, package
+dependency, and include boundary that would be active at runtime. It can then
+fetch and build exactly those packages — nothing more.
 
 ## The problem
 
@@ -33,46 +33,47 @@ parameters are set — is locked away behind a full build.
 
 ## The solution
 
-roscope makes the **launch file the source of truth**. It evaluates the launch
-description following the same semantics as `ros2 launch`, but without a
-running ROS environment, fetching only the packages it needs on demand:
+roscope treats the **launch file as the system description language of ROS 2** — not merely a convenience script to collectively start
+nodes, but a sufficient, evaluatable specification of the system topology.
+
+It partially evaluates the description following the same semantics as `ros2 launch`, but without a running ROS environment. You can use it directly on a workspace you already have:
 
 ```
-# roscope workflow
-roscope index autoware.repos     # generate lockfile (one-time)
-roscope resolve autoware_launch autoware.launch.xml \
+# roscope workflow — no build required
+vcs import src < autoware.repos          # clone repos (as usual)
+roscope resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
   map_path:=/path/to/map \
-  --visualize                        # interactive graph in your browser
+  --visualize                            # interactive graph in your browser
 ```
 
 The resolved output is a **flattened, fully-resolved XML** with all includes
 inlined, conditionals evaluated, and variables substituted. The visualizer turns
-that into an interactive compound graph — nodes, containers, topics, remaps, and
-include boundaries — all explorable before a single package is built.
+that into an interactive connectivity graph — nodes, containers, topics, remaps,
+and include boundaries — all explorable before a single package is built.
 
 Targeted builds are also supported: from the same launch evaluation, roscope
 knows exactly which packages are needed and can fetch and build only those.
 
 ## Key features
 
-- **No-runtime topology** — evaluate the full launch graph and inspect nodes,
+- **No-runtime topology** — derive the full launch graph and inspect nodes,
   parameters, remaps, and topics without a build or running ROS environment
-- **Interactive visualizer** — compound graph view of the full launch structure,
-  with selection, detail panel, and topic tracking
-- **On-demand sparse checkout** — packages are sparse-cloned only when
-  referenced by the launch file, via
-  [git sparse-checkout](https://git-scm.com/docs/git-sparse-checkout)
-- **Targeted builds** — the packages required by your launch target are derived
-  from the evaluation; only those are fetched and built
 - **Python launch support** — executes `generate_launch_description()` with
   shimmed `launch`/`launch_ros` imports; no installed ROS 2 Python packages needed
 - **OpaqueFunction handling** — executes arbitrary Python callables,
   transparently fetching packages as they are accessed
-- **Lockfile pinning** — reproducible analysis and builds via commit-SHA-pinned lockfiles
+- **Interactive visualizer** — compound graph view of the full launch structure,
+  with selection, detail panel, and topic tracking
 - **rosdep integration** — automatically installs system dependencies for the
   packages being built
+- **Targeted builds** — the packages required by your launch target are derived
+  from the evaluation; only those are fetched and built
+- **Lockfile pinning** — reproducible analysis and builds via commit-SHA-pinned lockfiles
+- **On-demand sparse checkout** — combined with lockfile, packages are sparse-cloned only when
+  referenced by the launch file, via
+  [git sparse-checkout](https://git-scm.com/docs/git-sparse-checkout)
 
 > **Current scope:** roscope covers launch evaluation without a ROS runtime and
 > targeted builds today. Execution support — a built-in executor and integration
@@ -105,55 +106,82 @@ pip install -e .
 
 ### Try the bundled Autoware example
 
-A pre-generated lockfile for a full [Autoware workspace](https://github.com/autowarefoundation/autoware)
-is included in [`example/autoware/`](example/autoware/).  You can run the
-resolver immediately without writing a manifest or running `index` first.
+An [Autoware workspace](https://github.com/autowarefoundation/autoware) example is included in [`example/autoware/`](example/autoware/).
+You can run the resolver immediately once after you clone everything in `manifest.repos` (which is a mirror of the official `autoware.repos`).
 
 ```bash
-# Source ROS 2 first (only needed for --rosdep)
-source /opt/ros/humble/setup.bash
-
 cd example/autoware
+
+# Source ROS 2 first
+source /opt/ros/<distro>/setup.bash
+
+# For the first time, to initialize the workspace
+vcs import src < manifest.repos
 
 # Preview-resolve: produces flattened XML without building
 roscope resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
-  "map_path:={map_path}" \
+  map_path:=/path/to/map \
   --show-args \
   --rosdep \
   --preview \
   > resolved.launch.xml
 ```
 
-On first run, the resolver sparse-clones only the packages it needs into
-`example/autoware/src/` (this may take a few minutes).  Subsequent runs reuse
-the already-fetched packages and are fast.
-
 The pre-generated output files are included for reference:
 - [`example/autoware/resolved.launch.xml`](example/autoware/resolved.launch.xml)
 - [`example/autoware/resolver.log`](example/autoware/resolver.log)
 
-To build the resolved packages (requires a sourced ROS 2 environment and `colcon`):
+To build only the packages the launch file needs:
 
 ```bash
 roscope build -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
-  "map_path:={map_path}" \
+  map_path:=/path/to/map \
   --rosdep \
   --colcon-flagfile colcon-flags.txt
 ```
 
-### Use your own project
+### Use your own workspace
 
-1. Write a `.repos` file listing your repositories (standard
-   [vcstool](https://github.com/dirk-thomas/vcstool) format)
-2. Generate a lockfile: `roscope index`
-3. Resolve: `roscope resolve <pkg> <launcher> [args...]`
-4. Build: `roscope build <pkg> <launcher> [args...] --clean --rosdep`
+If you already have a workspace cloned with `vcs import` (or any other way),
+pass `--dirty` / `-d` and roscope will scan your `src/` directory for packages:
+
+```bash
+vcs import src < your-project.repos    # clone repos as usual
+roscope resolve -d <pkg> <launcher> [args...]   # inspect without building
+roscope build -d <pkg> <launcher> [args...] --rosdep   # build only what's needed
+```
 
 See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
+
+## Lockfile workflow
+
+For reproducible analysis and targeted sparse-checkout (fetching only the
+packages a launch file needs rather than cloning everything), roscope has a
+lockfile-based workflow:
+
+```bash
+# 1. Generate a lockfile from a .repos manifest (one-time)
+roscope index your-project.repos
+
+# 2. Resolve — roscope sparse-clones only the needed packages on demand
+roscope resolve <pkg> <launcher> [args...] --visualize
+
+# 3. Build only the resolved packages
+roscope build <pkg> <launcher> [args...] --rosdep
+
+# 4. For CI / reproducible runs, add --clean to reset repos to lockfile SHAs
+roscope build <pkg> <launcher> [args...] --clean --rosdep
+```
+
+With a lockfile, roscope pins every repository to a specific commit SHA, so
+analyses and builds are fully reproducible across machines.  Packages are
+sparse-cloned on demand rather than importing the entire workspace up front.
+
+See [Core Concepts](docs/concepts.md) for more on lockfiles and sparse checkout.
 
 ## Commands
 
@@ -180,7 +208,7 @@ graph view of the resolved launch structure in your browser:
 roscope resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
-  "map_path:={map_path}" \
+  map_path:=/path/to/map \
   --visualize
 ```
 

@@ -65,6 +65,7 @@ export interface GraphMetadata {
   package: string;
   launcher: string;
   timestamp: string;
+  version: string;
 }
 
 export interface GraphData {

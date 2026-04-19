@@ -97,6 +97,7 @@ class GraphMetadata:
     package: str
     launcher: str
     timestamp: str
+    version: str
 
 
 @dataclass

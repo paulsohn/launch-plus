@@ -6,12 +6,15 @@ Covers: <on_process_start>, <on_process_exit>, <on_state_transition>,
 
 from __future__ import annotations
 
+import logging
 import xml.etree.ElementTree as ET
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
 from roscope.entities.parsing import _ActionParser
 from roscope.parsers.entity import Entity
+
+logger = logging.getLogger("roscope")
 
 
 class EventHandler(Action):
@@ -241,8 +244,21 @@ class Shutdown(Action):
 
 
 class RegisterEventHandler(Action):
-    """Python shim for ``launch.actions.RegisterEventHandler``."""
+    """Python shim for ``launch.actions.RegisterEventHandler``.
+
+    Event-handler-driven topology changes are not resolved — the resolved output
+    will not include nodes or actions that are only launched in response to an
+    event.  A warning is emitted so that users are aware of this gap.
+    """
 
     def __init__(self, event_handler=None, **kwargs):
         super().__init__(**kwargs)
         self._event_handler = event_handler
+
+    def execute(self, context) -> list:
+        logger.warning(
+            "RegisterEventHandler encountered — event-handler-driven topology "
+            "is not resolved; nodes or actions triggered by events will not "
+            "appear in the resolved output"
+        )
+        return []

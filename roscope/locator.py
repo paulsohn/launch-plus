@@ -217,9 +217,12 @@ class PackageLocator:
     # ========================================================================
 
     def all_package_shares(self) -> dict[str, str]:
-        """All known package share paths (workspace + AMENT_PREFIX_PATH).
+        """All known package share paths (workspace source + AMENT_PREFIX_PATH).
 
-        Used in preview mode to pass workspace package locations to the resolver.
+        Used in **preview mode only** — source paths are listed first so the
+        resolver finds them before the (possibly absent) install paths.
+        In post-build mode use :meth:`all_install_shares` instead so that only
+        the installed workspace is consulted.
         """
         result: dict[str, str] = {}
         if self.lockfile is not None and self.workspace_src is not None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from roscope.entities.expose import expose_substitution
@@ -9,6 +10,8 @@ from roscope.entities.substitution import Substitution
 
 if TYPE_CHECKING:
     from roscope.entities.state import LaunchContext
+
+logger = logging.getLogger("roscope")
 
 
 @expose_substitution("command")
@@ -36,6 +39,11 @@ class CommandSubstitution(Substitution):
         return cls, {"arguments": arguments}
 
     def perform(self, ctx: LaunchContext) -> str:
+        logger.warning(
+            "$(command ...) substitution is not executed by roscope; "
+            "the literal expression will appear in the resolved output — "
+            "topology depending on this value may be incorrect"
+        )
         from roscope.entities.helpers import resolve_substitutions_from_tokens
 
         resolved_args: list[str] = []

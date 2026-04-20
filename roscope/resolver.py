@@ -60,7 +60,7 @@ from roscope.entities.launch_description_source import (
 )
 from roscope.entities.parsing import _ActionParser
 from roscope.entities.state import LaunchContext, ResolverState
-from roscope.entities.substitutions.environment_variable import DeferredEnvironmentVariable
+from roscope.entities.substitutions.env import EnvironmentVariable as _EnvironmentVariable
 from roscope.entities.substitutions.find_pkg_share import FindPackageShare
 from roscope.entities.substitutions.launch_config import LaunchConfiguration
 from roscope.entities.substitutions.path_join import PathJoinSubstitution
@@ -69,6 +69,69 @@ from roscope.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_ent
 from roscope.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
 
 logger = logging.getLogger("roscope")
+
+
+# ─── Shim helpers ─────────────────────────────────────────────────────────────
+
+
+def _make_shim_getattr(module_name: str, *, is_substitution_module: bool = False):
+    """Return a ``__getattr__`` for shim modules.
+
+    When a Python launch file does ``from launch.actions import UnknownClass``
+    and the class is absent from our shim, Python falls through to
+    ``module.__getattr__('UnknownClass')``.  Without this hook the import
+    raises ``ImportError`` and the entire file's topology is lost.
+
+    The hook returns a stub class that:
+    - subclasses ``Action`` (for action modules) or ``Substitution`` (for
+      substitution modules) so type checks in the resolver behave correctly
+    - preserves the ``condition`` kwarg so ``Action.visit()`` still gates
+      execution correctly even for unknown actions
+    - warns once per unknown name so the user knows topology may be incomplete
+    """
+    from roscope.entities.substitution import Substitution
+
+    _warned: set[str] = set()
+
+    def __getattr__(attr_name: str):  # noqa: N807
+        if attr_name.startswith("__"):
+            raise AttributeError(attr_name)
+
+        if attr_name not in _warned:
+            logger.warning(
+                "unimplemented shim: %s.%s — topology that depends on this "
+                "class will be missing from the resolved output",
+                module_name,
+                attr_name,
+            )
+            _warned.add(attr_name)
+
+        if is_substitution_module:
+
+            class _UnimplementedShim(Substitution):  # type: ignore[valid-type]
+                def __init__(self, *_a, **_kw):
+                    pass
+
+                def perform(self, context) -> str:
+                    return ""
+
+        else:
+
+            class _UnimplementedShim(Action):  # type: ignore[no-redef]
+                def __init__(self, *_a, **_kw):
+                    super().__init__(condition=_kw.get("condition"))
+
+                def execute(self, context) -> list:
+                    return []
+
+                def perform(self, context) -> str:
+                    return ""
+
+        _UnimplementedShim.__name__ = attr_name
+        _UnimplementedShim.__qualname__ = attr_name
+        return _UnimplementedShim
+
+    return __getattr__
 
 
 # ─── Import system patcher ──────────────────────────────��─────────────────────
@@ -103,6 +166,7 @@ def _build_patched_launch_ros_actions():
     mod.SetRemap = lambda *a, **kw: None
     mod.PushRosNamespace = PushRosNamespace
     mod.SetParametersCallback = lambda *a, **kw: None
+    mod.__getattr__ = _make_shim_getattr("launch_ros.actions")
     return mod
 
 
@@ -135,9 +199,10 @@ def _build_patched_launch_substitutions():
     mod.FindPackageShare = FindPackageShare
     mod.PathJoinSubstitution = PathJoinSubstitution
     mod.LaunchConfiguration = LaunchConfiguration
-    mod.EnvironmentVariable = DeferredEnvironmentVariable
+    mod.EnvironmentVariable = _EnvironmentVariable
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None
+    mod.__getattr__ = _make_shim_getattr("launch.substitutions", is_substitution_module=True)
     return mod
 
 
@@ -170,6 +235,7 @@ def _build_patched_launch_actions():
     mod.ExecuteLocal = lambda *a, **kw: None
     mod.OnProcessExit = OnProcessExit
     mod.OnProcessStart = OnProcessStart
+    mod.__getattr__ = _make_shim_getattr("launch.actions")
     return mod
 
 
@@ -212,8 +278,12 @@ def _build_patched_launch_launch_description_sources():
 
 
 def _build_patched_launch_ros_substitutions():
+    from roscope.entities.substitutions.executable_in_package import ExecutableInPackage
+
     mod = types.ModuleType("launch_ros.substitutions")
     mod.FindPackageShare = FindPackageShare
+    mod.ExecutableInPackage = ExecutableInPackage
+    mod.__getattr__ = _make_shim_getattr("launch_ros.substitutions", is_substitution_module=True)
     return mod
 
 

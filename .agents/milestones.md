@@ -26,7 +26,7 @@ Handles all standard ROS 2 launch XML elements: `<node>`, `<include>`,
 `<push_ros_namespace>`, `<node_container>`, `<load_composable_node>`.
 
 ### Resolver
-Substitution engine supporting `$(arg ...)`, `$(var ...)`, `$(env ...)`,
+Substitution engine supporting `$(var ...)`, `$(env ...)`,
 `$(find-pkg-share ...)`, `$(find-pkg-prefix ...)`, `$(dirname)`, and
 `$(eval ...)`.  Evaluates conditions (`if=`, `unless=`), resolves includes
 recursively, tracks file and package dependencies, computes effective

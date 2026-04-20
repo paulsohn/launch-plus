@@ -149,7 +149,14 @@ class ResolverState:
 
         from roscope.fetcher import ensure_package_available
 
-        lockfile = self._build_lockfile() if self.lockfile_data else None
+        # In post-build mode, source paths are not authoritative — only the
+        # installed workspace (AMENT_PREFIX_PATH) is.  Pass lockfile=None to
+        # ensure_package_available so it skips the lockfile/source lookup and
+        # goes straight to AMENT_PREFIX_PATH.
+        if self.preview_mode:
+            lockfile = self._build_lockfile() if self.lockfile_data else None
+        else:
+            lockfile = None
         fetch_dir = Path(self.fetch_dir)
         result = ensure_package_available(
             package,

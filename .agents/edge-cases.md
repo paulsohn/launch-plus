@@ -1037,7 +1037,7 @@ outside the original include hierarchy.
 
 | Priority | Pattern | Reason |
 |----------|---------|--------|
-| P0 | Basic substitutions (`$(arg)`, `$(var)`, `$(find-pkg-share)`) | Core functionality |
+| P0 | Basic substitutions (`$(var)`, `$(find-pkg-share)`) | Core functionality |
 | P0 | Node/include elements | Core functionality |
 | P0 | If/unless conditions | Very common |
 | P1 | Nested namespace stacking | Common in sensor setups |

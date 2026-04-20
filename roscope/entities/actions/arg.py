@@ -104,9 +104,13 @@ def _track_arg_default(name: str, default: str, state) -> None:
 def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
     """Resolve a DeclareLaunchArgument default and apply it to the launch context.
 
-    Used in the Python-shim path (``_inline_resolve_python_launch``) to apply arg
-    defaults before executing OpaqueFunction actions — matching official behaviour
-    where DeclareLaunchArgument.execute() is called during the walk.
+    Matches official ``DeclareLaunchArgument.execute()`` behavior: if the arg is
+    already set in context (e.g. from a parent include or command line), leave it
+    unchanged; otherwise apply the declared default.
+
+    Condition handling mirrors ``Action.visit()``: if the condition evaluates to
+    False the declaration is skipped; if evaluation raises, a warning is emitted
+    and the declaration is conservatively applied (unknown condition = assume active).
     """
     from roscope.entities.helpers import resolve_value
 

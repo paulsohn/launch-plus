@@ -8,13 +8,13 @@
 
   <group if="$(var use_sim)">
     <include file="$(find-pkg-share sample_pkg)/launch/sim.launch.xml">
-      <arg name="vehicle_model" value="$(arg vehicle_model)"/>
+      <arg name="vehicle_model" value="$(var vehicle_model)"/>
     </include>
   </group>
 
   <node pkg="sample_pkg" exec="sample_node" name="sample">
     <param name="config_file" value="$(var config_dir)/params.yaml"/>
-    <param name="vehicle_model" value="$(arg vehicle_model)"/>
+    <param name="vehicle_model" value="$(var vehicle_model)"/>
     <remap from="/input" to="/output"/>
   </node>
 </launch>

@@ -569,10 +569,10 @@ class TestParseXmlLaunch:
         assert e.get_attr("value") == "123"
 
     def test_parse_let_with_condition(self):
-        xml = '<launch><let name="v" value="1" if="$(arg flag)"/></launch>'
+        xml = '<launch><let name="v" value="1" if="$(var flag)"/></launch>'
         elems = parse_xml_launch(xml, "test.xml")
         e = elems[0]
-        assert e.get_attr("if") == "$(arg flag)"
+        assert e.get_attr("if") == "$(var flag)"
 
     def test_parse_node(self):
         xml = textwrap.dedent("""\
@@ -605,7 +605,7 @@ class TestParseXmlLaunch:
     def test_parse_group_scoped(self):
         xml = textwrap.dedent("""\
             <launch>
-                <group scoped="false" if="$(arg x)">
+                <group scoped="false" if="$(var x)">
                     <arg name="nested" default="val"/>
                 </group>
             </launch>
@@ -614,7 +614,7 @@ class TestParseXmlLaunch:
         e = elems[0]
         assert e.type_name == "group"
         assert e.get_attr("scoped") == "false"
-        assert e.get_attr("if") == "$(arg x)"
+        assert e.get_attr("if") == "$(var x)"
         children = e.children
         assert len(children) == 1
         assert children[0].type_name == "arg"
@@ -640,7 +640,7 @@ class TestParseXmlLaunch:
         xml = textwrap.dedent("""\
             <launch>
                 <set_env name="X" value="1"/>
-                <unset_env name="Y" unless="$(arg flag)"/>
+                <unset_env name="Y" unless="$(var flag)"/>
             </launch>
         """)
         elems = parse_xml_launch(xml, "test.xml")
@@ -648,7 +648,7 @@ class TestParseXmlLaunch:
         assert elems[0].get_attr("name") == "X"
         assert elems[1].type_name == "unset_env"
         assert elems[1].get_attr("name") == "Y"
-        assert elems[1].get_attr("unless") == "$(arg flag)"
+        assert elems[1].get_attr("unless") == "$(var flag)"
 
     def test_parse_push_ros_namespace(self):
         xml = '<launch><push-ros-namespace namespace="/my_ns"/></launch>'
@@ -743,9 +743,9 @@ class TestParseXmlLaunch:
         assert params[0].get_attr("name", optional=True) is None
 
     def test_substitutions_preserved_as_raw_strings(self):
-        xml = '<launch><node pkg="$(arg pkg)" exec="$(var exe)"/></launch>'
+        xml = '<launch><node pkg="$(var pkg)" exec="$(var exe)"/></launch>'
         elems = parse_xml_launch(xml, "test.xml")
-        assert elems[0].get_attr("pkg") == "$(arg pkg)"
+        assert elems[0].get_attr("pkg") == "$(var pkg)"
         assert elems[0].get_attr("exec") == "$(var exe)"
 
 
@@ -848,7 +848,7 @@ class TestResolveSubstitutions:
 
     def test_resolve_arg(self):
         ctx = _fresh_subst_ctx(args={"vehicle": "sample_vehicle"})
-        result = resolve_substitutions("$(arg vehicle)", ctx)
+        result = resolve_substitutions("$(var vehicle)", ctx)
         assert result == "sample_vehicle"
 
     def test_resolve_var(self):
@@ -931,7 +931,7 @@ class TestResolveSubstitutions:
         ctx = _fresh_subst_ctx(
             args={"vehicle": "sample"},
             vars={
-                # In the new system, <let> resolves $(arg vehicle) before storing
+                # In the new system, <let> resolves $(var vehicle) before storing
                 "config_path": "$(find-pkg-share sample_description)/config",
             },
             preview_mode=True,
@@ -942,9 +942,9 @@ class TestResolveSubstitutions:
     def test_resolve_error_undefined_arg(self, caplog):
         ctx = _fresh_subst_ctx()
         with caplog.at_level(logging.WARNING):
-            result = resolve_substitutions("$(arg undefined)", ctx)
-        assert "$(arg undefined)" in result
-        assert "undefined argument" in caplog.text
+            result = resolve_substitutions("$(var undefined)", ctx)
+        assert "$(var undefined)" in result
+        assert "undefined variable" in caplog.text
 
     def test_resolve_error_undefined_var(self, caplog):
         ctx = _fresh_subst_ctx()
@@ -1089,7 +1089,7 @@ class TestResolveXmlElements:
         xml = textwrap.dedent("""\
             <launch>
               <arg name="vehicle" default="sample"/>
-              <node pkg="$(arg vehicle)_pkg" exec="node" name="n"/>
+              <node pkg="$(var vehicle)_pkg" exec="node" name="n"/>
             </launch>
         """)
         _, state = _parse_and_walk(xml)
@@ -1110,7 +1110,7 @@ class TestResolveXmlElements:
         xml = textwrap.dedent("""\
             <launch>
               <arg name="flag" default="false"/>
-              <let name="x" value="set" if="$(arg flag)"/>
+              <let name="x" value="set" if="$(var flag)"/>
               <node pkg="$(var x)" exec="e" name="n"/>
             </launch>
         """)
@@ -1135,7 +1135,7 @@ class TestResolveXmlElements:
             child_xml = textwrap.dedent("""\
                 <launch>
                   <arg name="param1"/>
-                  <node pkg="included_pkg" exec="node" name="$(arg param1)_node"/>
+                  <node pkg="included_pkg" exec="node" name="$(var param1)_node"/>
                 </launch>
             """)
             child_path = os.path.join(tmpdir, "child.launch.xml")
@@ -1258,7 +1258,7 @@ class TestActionRegistry:
     def test_errors_and_warnings(self, caplog):
         xml = textwrap.dedent("""\
             <launch>
-              <node pkg="$(arg undefined)" exec="e" name="n"/>
+              <node pkg="$(var undefined)" exec="e" name="n"/>
               <foobar/>
             </launch>
         """)
@@ -1313,7 +1313,7 @@ class TestApplyDeclaredArg:
         ctx = LaunchContext()
         elements = parse_xml_launch('<launch><arg name="x" default="hello"/></launch>', "test.xml")
         resolve_xml_elements(elements, ctx)
-        assert resolve_substitutions("$(arg x)", ctx) == "hello"
+        assert resolve_substitutions("$(var x)", ctx) == "hello"
 
 
 # ─── _resolve_pkg_share and FindPackageShare ─────────────────────────
@@ -1399,7 +1399,7 @@ class TestResolveYamlElements:
                   name: vehicle
                   default: sample
               - node:
-                  pkg: "$(arg vehicle)_pkg"
+                  pkg: "$(var vehicle)_pkg"
                   exec: node
                   name: n
         """)

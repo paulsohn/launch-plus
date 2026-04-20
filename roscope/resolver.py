@@ -302,6 +302,42 @@ def _build_patched_launch_xml_launch_description_sources():
     return mod
 
 
+# ── Per-class submodule shims ─────────────────────────────────────────────────
+# Upstream code may import via the per-class submodule path, e.g.:
+#   from launch.launch_description_sources.python_launch_description_source \
+#       import PythonLaunchDescriptionSource
+
+
+def _build_patched_launch_lds_python():
+    mod_name = "launch.launch_description_sources.python_launch_description_source"
+    mod = types.ModuleType(mod_name)
+    mod.PythonLaunchDescriptionSource = PythonLaunchDescriptionSource
+    return mod
+
+
+def _build_patched_launch_lds_any():
+    mod_name = "launch.launch_description_sources.any_launch_description_source"
+    mod = types.ModuleType(mod_name)
+    mod.AnyLaunchDescriptionSource = AnyLaunchDescriptionSource
+    return mod
+
+
+def _build_patched_launch_lds_frontend():
+    from roscope.entities.launch_description_sources import FrontendLaunchDescriptionSource
+
+    mod_name = "launch.launch_description_sources.frontend_launch_description_source"
+    mod = types.ModuleType(mod_name)
+    mod.FrontendLaunchDescriptionSource = FrontendLaunchDescriptionSource
+    return mod
+
+
+def _build_patched_launch_xml_lds_xml():
+    mod_name = "launch_xml.launch_description_sources.xml_launch_description_source"
+    mod = types.ModuleType(mod_name)
+    mod.XMLLaunchDescriptionSource = XMLLaunchDescriptionSource
+    return mod
+
+
 def _build_patched_launch_ros_substitutions():
     from roscope.entities.substitutions.executable_in_package import ExecutableInPackage
 
@@ -363,6 +399,10 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
         "launch.launch_description_sources": _build_patched_launch_launch_description_sources,
         "launch_xml": _build_patched_launch_xml,
         "launch_xml.launch_description_sources": _build_patched_launch_xml_launch_description_sources,
+        "launch_xml.launch_description_sources.xml_launch_description_source": _build_patched_launch_xml_lds_xml,
+        "launch.launch_description_sources.python_launch_description_source": _build_patched_launch_lds_python,
+        "launch.launch_description_sources.any_launch_description_source": _build_patched_launch_lds_any,
+        "launch.launch_description_sources.frontend_launch_description_source": _build_patched_launch_lds_frontend,
         "launch_ros.events": _build_patched_launch_ros_events,
         "launch_ros.events.lifecycle": _build_patched_launch_ros_events_lifecycle,
         "launch_ros.event_handlers": _build_patched_launch_ros_event_handlers,

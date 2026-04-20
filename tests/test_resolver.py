@@ -1961,3 +1961,36 @@ class TestLaunchXmlShim:
         from launch.launch_description_source import LaunchDescriptionSource as Shimmed
 
         assert Shimmed is LaunchDescriptionSource
+
+    def test_per_class_submodule_shims(self):
+        """Per-class submodule import paths resolve to the roscope implementations."""
+        import sys
+
+        from roscope.entities.launch_description_sources import (
+            FrontendLaunchDescriptionSource,
+            PythonLaunchDescriptionSource,
+            XMLLaunchDescriptionSource,
+        )
+
+        self._install_shims()
+
+        assert "launch.launch_description_sources.python_launch_description_source" in sys.modules
+        from launch.launch_description_sources.python_launch_description_source import (
+            PythonLaunchDescriptionSource as ShimmedPython,
+        )
+
+        assert ShimmedPython is PythonLaunchDescriptionSource
+
+        assert "launch.launch_description_sources.frontend_launch_description_source" in sys.modules
+        from launch.launch_description_sources.frontend_launch_description_source import (
+            FrontendLaunchDescriptionSource as ShimmedFrontend,
+        )
+
+        assert ShimmedFrontend is FrontendLaunchDescriptionSource
+
+        assert "launch_xml.launch_description_sources.xml_launch_description_source" in sys.modules
+        from launch_xml.launch_description_sources.xml_launch_description_source import (
+            XMLLaunchDescriptionSource as ShimmedXML,
+        )
+
+        assert ShimmedXML is XMLLaunchDescriptionSource

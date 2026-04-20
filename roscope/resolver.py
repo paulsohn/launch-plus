@@ -382,6 +382,11 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
             _PATCHED_MODULES[fullname] = self.PATCHED[fullname]()
         mod = _PATCHED_MODULES[fullname]
         sys.modules[fullname] = mod
+        if "." in fullname:
+            parent_name, _, child_name = fullname.rpartition(".")
+            parent = sys.modules.get(parent_name)
+            if parent is not None:
+                setattr(parent, child_name, mod)
         return mod
 
 
@@ -542,6 +547,11 @@ def resolve_file(
         if mod_name not in _PATCHED_MODULES:
             _PATCHED_MODULES[mod_name] = builder()
         sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+        if "." in mod_name:
+            parent_name, _, child_name = mod_name.rpartition(".")
+            parent = sys.modules.get(parent_name)
+            if parent is not None:
+                setattr(parent, child_name, sys.modules[mod_name])
 
     # ── Resolve by file type ─────────────────────────────────────────────
     if launch_file_str.endswith((".launch.xml", ".xml", ".yaml", ".yml")):

@@ -1949,3 +1949,15 @@ class TestLaunchXmlShim:
         )
 
         assert Shimmed is FrontendLaunchDescriptionSource
+
+    def test_launch_description_source_base_module_shim(self):
+        """LaunchDescriptionSource base-module shim resolves to the roscope implementation."""
+        import sys
+
+        from roscope.entities.launch_description_source import LaunchDescriptionSource
+
+        self._install_shims()
+        assert "launch.launch_description_source" in sys.modules
+        from launch.launch_description_source import LaunchDescriptionSource as Shimmed
+
+        assert Shimmed is LaunchDescriptionSource

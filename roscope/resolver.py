@@ -271,6 +271,14 @@ def _build_patched_launch_conditions():
     return mod
 
 
+def _build_patched_launch_launch_description_source():
+    from roscope.entities.launch_description_source import LaunchDescriptionSource
+
+    mod = types.ModuleType("launch.launch_description_source")
+    mod.LaunchDescriptionSource = LaunchDescriptionSource
+    return mod
+
+
 def _build_patched_launch_launch_description_sources():
     from roscope.entities.launch_description_sources import FrontendLaunchDescriptionSource
 
@@ -351,6 +359,7 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
         "launch.events": _build_patched_launch_events,
         "launch.event_handlers": _build_patched_launch_event_handlers,
         "launch.conditions": _build_patched_launch_conditions,
+        "launch.launch_description_source": _build_patched_launch_launch_description_source,
         "launch.launch_description_sources": _build_patched_launch_launch_description_sources,
         "launch_xml": _build_patched_launch_xml,
         "launch_xml.launch_description_sources": _build_patched_launch_xml_launch_description_sources,

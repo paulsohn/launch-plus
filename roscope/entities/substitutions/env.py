@@ -60,6 +60,8 @@ class EnvironmentVariable(Substitution):
         """Parse ``$(env NAME [default])``."""
         if not args:
             raise ValueError("$(env ...) requires at least a name argument")
+        if len(args) > 2:
+            raise ValueError("$(env ...) accepts only NAME and an optional default value")
         name = args[0] if isinstance(args[0], list) else [args[0]]
         kwargs: dict[str, Any] = {"name": name}
         if len(args) > 1:

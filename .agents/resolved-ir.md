@@ -64,7 +64,7 @@ Substitutions appear in attribute values and are resolved eagerly at `execute()`
 
 ```
 Substitution       ::= TextSubstitution            (* literal string *)
-                      | LaunchConfiguration        (* $(arg name) — access launch config *)
+                      | LaunchConfiguration        (* $(var name) — access launch config *)
                       | EnvironmentVariable        (* $(env NAME default?) *)
                       | FindPackageShare           (* $(find-pkg-share pkg) *)
                       | FindPackagePrefix          (* $(find-pkg-prefix pkg) *)

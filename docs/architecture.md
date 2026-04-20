@@ -65,7 +65,7 @@ roscope resolve <pkg> <launcher>
     │
     ├─── XML launch file?
     │    ├── parse with xml.etree.ElementTree
-    │    ├── evaluate substitutions: $(var), $(arg), $(find-pkg-share), $(eval)
+    │    ├── evaluate substitutions: $(var), $(find-pkg-share), $(eval)
     │    ├── evaluate conditionals: if="...", unless="..."
     │    ├── follow <include> tags → recurse
     │    └── collect <node>, <param>, <remap>, <composable_node>

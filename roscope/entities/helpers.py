@@ -101,8 +101,8 @@ def _to_str(value: object, context: Any = None) -> str | None:
 
 # ─── Substitution Engine (for XML/YAML resolution) ───────────────────────────
 #
-# Parses and resolves ROS 2 substitution syntax: $(arg x), $(env Y default),
-# $(find-pkg-share pkg), $(var x), $(dirname), $(eval expr), $(command ...).
+# Parses and resolves ROS 2 substitution syntax: $(var x), $(env Y default),
+# $(find-pkg-share pkg), $(dirname), $(eval expr), $(command ...).
 # Used by the XML/YAML element walker — Python launch files use the
 # existing .perform() mechanism instead.
 

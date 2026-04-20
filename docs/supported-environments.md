@@ -63,7 +63,7 @@ Fully supported.  All standard ROS 2 XML launch constructs are handled:
 - `<group>` with scoping and `<push-ros-namespace>`
 - `<arg>`, `<let>`, `<set_env>`, `<unset_env>`
 - `if=` / `unless=` conditional attributes
-- Substitutions: `$(var)`, `$(arg)`, `$(find-pkg-share)`, `$(find-pkg-prefix)`,
+- Substitutions: `$(var)`, `$(find-pkg-share)`, `$(find-pkg-prefix)`,
   `$(env)`, `$(eval)`, `$(dirname)`
 
 ### Python launch files (`*.launch.py`)

@@ -180,15 +180,14 @@ Here is what the resolver can and cannot verify.
   or on `AMENT_PREFIX_PATH`
 - **Launch file existence** — included launch files must exist on disk (or be
   fetchable from the lockfile)
-- **Argument completeness** — every `$(var name)` / `$(arg name)` reference must
-  have a corresponding `<arg name="...">` declaration or be supplied on the
-  command line
+- **Argument completeness** — every `$(var name)` reference must have a
+  corresponding `<arg name="...">` declaration or be supplied on the command line
 - **Argument forwarding** — arguments used in an included file must be
   explicitly forwarded via `<arg name="..." value="..."/>` in the `<include>`
   tag
 - **Conditional evaluation** — `if="..."` and `unless="..."` attributes are
   fully evaluated, so only the active branches appear in the output
-- **Substitution resolution** — all `$(var)`, `$(arg)`, `$(env)`, `$(eval)`,
+- **Substitution resolution** — all `$(var)`, `$(env)`, `$(eval)`,
   `$(find-pkg-share)` expressions are resolved; unresolvable substitutions are
   errors
 - **Parameter file inlining** — YAML parameter files referenced by

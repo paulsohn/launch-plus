@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class Substitution(ABC):
-    """A single substitution token (e.g. ``$(arg name)``, ``$(find-pkg-share pkg)``)."""
+    """A single substitution token (e.g. ``$(var name)``, ``$(find-pkg-share pkg)``)."""
 
     @abstractmethod
     def perform(self, ctx: LaunchContext) -> str:

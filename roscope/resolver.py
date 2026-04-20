@@ -60,7 +60,7 @@ from roscope.entities.launch_description_source import (
 )
 from roscope.entities.parsing import _ActionParser
 from roscope.entities.state import LaunchContext, ResolverState
-from roscope.entities.substitutions.environment_variable import DeferredEnvironmentVariable
+from roscope.entities.substitutions.env import EnvironmentVariable as _EnvironmentVariable
 from roscope.entities.substitutions.find_pkg_share import FindPackageShare
 from roscope.entities.substitutions.launch_config import LaunchConfiguration
 from roscope.entities.substitutions.path_join import PathJoinSubstitution
@@ -199,7 +199,7 @@ def _build_patched_launch_substitutions():
     mod.FindPackageShare = FindPackageShare
     mod.PathJoinSubstitution = PathJoinSubstitution
     mod.LaunchConfiguration = LaunchConfiguration
-    mod.EnvironmentVariable = DeferredEnvironmentVariable
+    mod.EnvironmentVariable = _EnvironmentVariable
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None
     mod.__getattr__ = _make_shim_getattr("launch.substitutions", is_substitution_module=True)

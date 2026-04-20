@@ -1505,6 +1505,73 @@ class TestTrackedFindPackageShare:
 # ─── Faithfulness fixes (issue #54) ──────────────────────────────────────────
 
 
+class TestEnvironmentVariable:
+    """EnvironmentVariable: unified XML+Python substitution."""
+
+    def test_xml_path_set(self, monkeypatch):
+        """$(env VAR) resolves when the variable is set."""
+        from roscope.parsers.parse_substitution import parse_substitution
+
+        monkeypatch.setenv("TEST_ENV_VAR_XYZ", "hello")
+        ctx = _make_context()
+        result = "".join(s.perform(ctx) for s in parse_substitution("$(env TEST_ENV_VAR_XYZ)"))
+        assert result == "hello"
+
+    def test_xml_path_missing_logs_error(self, monkeypatch, caplog):
+        """$(env VAR) without default logs an error and returns empty string."""
+        from roscope.parsers.parse_substitution import parse_substitution
+
+        monkeypatch.delenv("TEST_ENV_MISSING_XYZ", raising=False)
+        ctx = _make_context()
+        with caplog.at_level(logging.ERROR):
+            result = "".join(
+                s.perform(ctx) for s in parse_substitution("$(env TEST_ENV_MISSING_XYZ)")
+            )
+        assert result == ""
+        assert "TEST_ENV_MISSING_XYZ" in caplog.text
+
+    def test_xml_path_default(self, monkeypatch):
+        """$(env VAR default) returns default when the variable is unset."""
+        from roscope.parsers.parse_substitution import parse_substitution
+
+        monkeypatch.delenv("TEST_ENV_MISSING_XYZ", raising=False)
+        ctx = _make_context()
+        result = "".join(
+            s.perform(ctx) for s in parse_substitution("$(env TEST_ENV_MISSING_XYZ fallback)")
+        )
+        assert result == "fallback"
+
+    def test_python_api_str_name(self, monkeypatch):
+        """EnvironmentVariable('VAR') works with a plain string name."""
+        from roscope.entities.substitutions.env import EnvironmentVariable
+
+        monkeypatch.setenv("TEST_ENV_VAR_XYZ", "world")
+        ctx = _make_context()
+        assert EnvironmentVariable("TEST_ENV_VAR_XYZ").perform(ctx) == "world"
+
+    def test_python_api_missing_logs_error(self, monkeypatch, caplog):
+        """EnvironmentVariable('VAR') logs an error and returns '' when var is unset."""
+        from roscope.entities.substitutions.env import EnvironmentVariable
+
+        monkeypatch.delenv("TEST_ENV_MISSING_XYZ", raising=False)
+        ctx = _make_context()
+        with caplog.at_level(logging.ERROR):
+            result = EnvironmentVariable("TEST_ENV_MISSING_XYZ").perform(ctx)
+        assert result == ""
+        assert "TEST_ENV_MISSING_XYZ" in caplog.text
+
+    def test_python_api_default_value(self, monkeypatch):
+        """EnvironmentVariable('VAR', default_value='x') returns default when unset."""
+        from roscope.entities.substitutions.env import EnvironmentVariable
+
+        monkeypatch.delenv("TEST_ENV_MISSING_XYZ", raising=False)
+        ctx = _make_context()
+        assert (
+            EnvironmentVariable("TEST_ENV_MISSING_XYZ", default_value="fallback").perform(ctx)
+            == "fallback"
+        )
+
+
 class TestCommandSubstitutionWarning:
     """Issue 4: $(command ...) should warn when encountered."""
 

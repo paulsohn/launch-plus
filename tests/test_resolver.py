@@ -1920,7 +1920,13 @@ class TestLaunchXmlShim:
         for mod_name, builder in _PatchingFinder.PATCHED.items():
             if mod_name not in _PATCHED_MODULES:
                 _PATCHED_MODULES[mod_name] = builder()
-            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+            mod = _PATCHED_MODULES[mod_name]
+            sys.modules[mod_name] = mod
+            if "." in mod_name:
+                parent_name, _, child_name = mod_name.rpartition(".")
+                parent = sys.modules.get(parent_name)
+                if parent is not None:
+                    setattr(parent, child_name, mod)
 
     def test_xml_launch_description_source_shim(self):
         """XMLLaunchDescriptionSource shim resolves to the roscope implementation."""
@@ -1994,3 +2000,14 @@ class TestLaunchXmlShim:
         )
 
         assert ShimmedXML is XMLLaunchDescriptionSource
+
+    def test_launch_ros_submodule_is_exposed_as_parent_attribute(self):
+        """Submodule shims must be accessible as attributes on the parent shim."""
+        from roscope.entities.parameter_descriptions import ParameterFile
+
+        self._install_shims()
+
+        import launch_ros
+
+        assert hasattr(launch_ros, "parameter_descriptions")
+        assert launch_ros.parameter_descriptions.ParameterFile is ParameterFile

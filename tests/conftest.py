@@ -14,7 +14,13 @@ def _install_import_patching():
     for mod_name, builder in _PatchingFinder.PATCHED.items():
         if mod_name not in _PATCHED_MODULES:
             _PATCHED_MODULES[mod_name] = builder()
-        sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+        mod = _PATCHED_MODULES[mod_name]
+        sys.modules[mod_name] = mod
+        if "." in mod_name:
+            parent_name, _, child_name = mod_name.rpartition(".")
+            parent = sys.modules.get(parent_name)
+            if parent is not None:
+                setattr(parent, child_name, mod)
 
 
 _install_import_patching()

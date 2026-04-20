@@ -3,8 +3,13 @@ and inline Python include resolution."""
 
 import logging
 import os
+import sys
 import tempfile
 import textwrap
+import uuid
+
+import pytest
+from conftest import _install_import_patching
 
 from roscope.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
 from roscope.entities.actions.composable_node_container import (
@@ -463,7 +468,6 @@ class TestEnvStack:
 
     def test_unset_env_nonexistent_errors(self, caplog):
         """UnsetEnvironmentVariable on a var that doesn't exist → 'not set' error."""
-        import uuid
 
         name = f"NONEXISTENT_VAR_{uuid.uuid4().hex[:8]}"
         assert name not in os.environ, f"precondition: {name} must not be in process env"
@@ -474,7 +478,6 @@ class TestEnvStack:
 
     def test_unset_env_override_only_accepted(self):
         """UnsetEnv on an override-only var (not in process env) → accepted."""
-        import uuid
 
         name = f"OVERRIDE_ONLY_{uuid.uuid4().hex[:8]}"
         assert name not in os.environ, f"precondition: {name} must not be in process env"
@@ -514,7 +517,6 @@ class TestEnvStack:
         overrides = env_overrides(ctx)
         assert overrides["NEW_VAR"] == "new_val"
         # Process env vars must NOT appear in overrides.
-        import os
 
         assert "PATH" in os.environ, "PATH should exist in process env for this test"
         assert "PATH" not in overrides
@@ -911,7 +913,6 @@ class TestResolveSubstitutions:
         assert "my_pkg" in ctx._state.packages
 
     def test_resolve_find_pkg_prefix_preview_errors(self):
-        import pytest
 
         ctx = _fresh_subst_ctx(preview_mode=True)
         ctx._state.package_shares["my_pkg"] = "/ws/src/my_pkg"
@@ -1216,7 +1217,6 @@ class TestResolveXmlElements:
         assert _is_truthy("false") is False
         assert _is_truthy("0") is False
         # Invalid values raise ValueError
-        import pytest
 
         for invalid in ("yes", "on", "no", ""):
             with pytest.raises(ValueError, match="invalid condition expression"):
@@ -1269,7 +1269,6 @@ class TestActionRegistry:
 
 
 # ─── rosdep resolve parser tests ─────────────────────────────────────────────
-# Mirror the Rust-side tests in rosdep.rs.
 
 
 # ─── _apply_declared_arg ─────────────────────────────────────────────────────
@@ -1331,7 +1330,6 @@ class TestResolvePkgShare:
     def test_preview_unknown_pkg_raises(self):
         state = ResolverState()
         state.preview_mode = True
-        import pytest
 
         with pytest.raises(LookupError, match="not found"):
             state.resolve_pkg_share("unknown_pkg")
@@ -1345,7 +1343,6 @@ class TestResolvePkgShare:
     def test_postbuild_unknown_pkg_raises(self):
         state = ResolverState()
         state.preview_mode = False
-        import pytest
 
         with pytest.raises(LookupError, match="not found"):
             state.resolve_pkg_share("unknown_pkg")
@@ -1362,7 +1359,6 @@ class TestResolvePkgShare:
                 "version": "abc123",
             }
         }
-        import pytest
 
         # Should raise, not attempt to fetch
         with pytest.raises(LookupError, match="not found"):
@@ -1478,7 +1474,6 @@ class TestTrackedFindPackageShare:
         ctx = LaunchContext()
         ctx._state.preview_mode = True
         fps = FindPackageShare("unknown_pkg")
-        import pytest
 
         with pytest.raises(LookupError, match="not found"):
             fps.perform(ctx)
@@ -1496,7 +1491,6 @@ class TestTrackedFindPackageShare:
         ctx = LaunchContext()
         ctx._state.preview_mode = False
         fps = FindPackageShare("missing_pkg")
-        import pytest
 
         with pytest.raises(LookupError, match="not found"):
             fps.perform(ctx)
@@ -1731,17 +1725,7 @@ class TestShimUnknownAction:
 
     def test_unknown_launch_action_warns_not_crashes(self, caplog):
         """from launch.actions import UnknownFutureAction must not crash."""
-        import sys
-
-        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
-
-        # Re-install patcher (may already be present from other tests)
-        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
-            sys.meta_path.insert(0, _PatchingFinder())
-        for mod_name, builder in _PatchingFinder.PATCHED.items():
-            if mod_name not in _PATCHED_MODULES:
-                _PATCHED_MODULES[mod_name] = builder()
-            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+        _install_import_patching()
 
         launch_actions = sys.modules["launch.actions"]
         with caplog.at_level(logging.WARNING):
@@ -1751,17 +1735,10 @@ class TestShimUnknownAction:
 
     def test_unknown_shim_returns_action_subclass(self):
         """The stub class must be an Action subclass usable by _execute_actions."""
-        import sys
 
         from roscope.entities.action import Action
-        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
 
-        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
-            sys.meta_path.insert(0, _PatchingFinder())
-        for mod_name, builder in _PatchingFinder.PATCHED.items():
-            if mod_name not in _PATCHED_MODULES:
-                _PATCHED_MODULES[mod_name] = builder()
-            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+        _install_import_patching()
 
         launch_actions = sys.modules["launch.actions"]
         stub_cls = getattr(launch_actions, "AnotherUnknownAction_ABC", None)
@@ -1774,19 +1751,9 @@ class TestShimUnknownAction:
 
     def test_dunder_attr_raises_attribute_error(self):
         """__dunder__ attribute access on shim action modules must raise AttributeError."""
-        import sys
-
-        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
-
-        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
-            sys.meta_path.insert(0, _PatchingFinder())
-        for mod_name, builder in _PatchingFinder.PATCHED.items():
-            if mod_name not in _PATCHED_MODULES:
-                _PATCHED_MODULES[mod_name] = builder()
-            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+        _install_import_patching()
 
         launch_actions = sys.modules["launch.actions"]
-        import pytest
 
         with pytest.raises(AttributeError):
             _ = launch_actions.__some_dunder__
@@ -1797,17 +1764,10 @@ class TestShimUnknownSubstitution:
 
     def test_unknown_substitution_shim_returns_substitution_subclass(self):
         """Unknown attributes on substitution shim modules must return a Substitution subclass."""
-        import sys
 
         from roscope.entities.substitution import Substitution
-        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
 
-        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
-            sys.meta_path.insert(0, _PatchingFinder())
-        for mod_name, builder in _PatchingFinder.PATCHED.items():
-            if mod_name not in _PATCHED_MODULES:
-                _PATCHED_MODULES[mod_name] = builder()
-            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+        _install_import_patching()
 
         launch_subs = sys.modules["launch.substitutions"]
         stub_cls = getattr(launch_subs, "SomeUnknownSubstitution_XYZ", None)
@@ -1818,18 +1778,7 @@ class TestShimUnknownSubstitution:
 
     def test_dunder_attr_raises_attribute_error(self):
         """__dunder__ attribute access on shim substitution modules must raise AttributeError."""
-        import sys
-
-        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
-
-        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
-            sys.meta_path.insert(0, _PatchingFinder())
-        for mod_name, builder in _PatchingFinder.PATCHED.items():
-            if mod_name not in _PATCHED_MODULES:
-                _PATCHED_MODULES[mod_name] = builder()
-            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
-
-        import pytest
+        _install_import_patching()
 
         launch_subs = sys.modules["launch.substitutions"]
         with pytest.raises(AttributeError):
@@ -1841,7 +1790,6 @@ class TestExecutableInPackage:
 
     def test_raises_in_preview(self):
         """ExecutableInPackage must raise LookupError in preview mode."""
-        import pytest
 
         from roscope.entities.substitution import TextSubstitution
         from roscope.entities.substitutions.executable_in_package import ExecutableInPackage
@@ -1863,17 +1811,10 @@ class TestExecutableInPackage:
 
     def test_launch_ros_substitutions_exposes_class(self):
         """launch_ros.substitutions shim must expose ExecutableInPackage."""
-        import sys
 
         from roscope.entities.substitutions.executable_in_package import ExecutableInPackage
-        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
 
-        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
-            sys.meta_path.insert(0, _PatchingFinder())
-        for mod_name, builder in _PatchingFinder.PATCHED.items():
-            if mod_name not in _PATCHED_MODULES:
-                _PATCHED_MODULES[mod_name] = builder()
-            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+        _install_import_patching()
 
         lr_subs = sys.modules["launch_ros.substitutions"]
         assert hasattr(lr_subs, "ExecutableInPackage")
@@ -1905,3 +1846,95 @@ class TestExecutableInPackage:
         )
         result = shim.perform(ctx)
         assert result == str(exe_path)
+
+
+class TestLaunchXmlShim:
+    """launch_xml.launch_description_sources shim resolves to roscope implementation."""
+
+    def test_xml_launch_description_source_shim(self):
+        """XMLLaunchDescriptionSource shim resolves to the roscope implementation."""
+
+        from roscope.entities.launch_description_sources import XMLLaunchDescriptionSource
+
+        _install_import_patching()
+        assert "launch_xml.launch_description_sources" in sys.modules
+        from launch_xml.launch_description_sources import (
+            XMLLaunchDescriptionSource as Shimmed,
+        )
+
+        assert Shimmed is XMLLaunchDescriptionSource
+
+    def test_frontend_launch_description_source_in_launch_shim(self):
+        """FrontendLaunchDescriptionSource shim resolves to the roscope implementation."""
+
+        from roscope.entities.launch_description_sources import FrontendLaunchDescriptionSource
+
+        _install_import_patching()
+        assert "launch.launch_description_sources" in sys.modules
+        from launch.launch_description_sources import (
+            FrontendLaunchDescriptionSource as Shimmed,
+        )
+
+        assert Shimmed is FrontendLaunchDescriptionSource
+
+    def test_launch_description_source_base_module_shim(self):
+        """LaunchDescriptionSource base-module shim resolves to the roscope implementation."""
+
+        from roscope.entities.launch_description_source import LaunchDescriptionSource
+
+        _install_import_patching()
+        assert "launch.launch_description_source" in sys.modules
+        from launch.launch_description_source import LaunchDescriptionSource as Shimmed
+
+        assert Shimmed is LaunchDescriptionSource
+
+    def test_per_class_submodule_shims(self):
+        """Per-class submodule import paths resolve to the roscope implementations."""
+
+        from roscope.entities.launch_description_sources import (
+            AnyLaunchDescriptionSource,
+            FrontendLaunchDescriptionSource,
+            PythonLaunchDescriptionSource,
+            XMLLaunchDescriptionSource,
+        )
+
+        _install_import_patching()
+
+        assert "launch.launch_description_sources.any_launch_description_source" in sys.modules
+        from launch.launch_description_sources.any_launch_description_source import (
+            AnyLaunchDescriptionSource as ShimmedAny,
+        )
+
+        assert ShimmedAny is AnyLaunchDescriptionSource
+
+        assert "launch.launch_description_sources.python_launch_description_source" in sys.modules
+        from launch.launch_description_sources.python_launch_description_source import (
+            PythonLaunchDescriptionSource as ShimmedPython,
+        )
+
+        assert ShimmedPython is PythonLaunchDescriptionSource
+
+        assert "launch.launch_description_sources.frontend_launch_description_source" in sys.modules
+        from launch.launch_description_sources.frontend_launch_description_source import (
+            FrontendLaunchDescriptionSource as ShimmedFrontend,
+        )
+
+        assert ShimmedFrontend is FrontendLaunchDescriptionSource
+
+        assert "launch_xml.launch_description_sources.xml_launch_description_source" in sys.modules
+        from launch_xml.launch_description_sources.xml_launch_description_source import (
+            XMLLaunchDescriptionSource as ShimmedXML,
+        )
+
+        assert ShimmedXML is XMLLaunchDescriptionSource
+
+    def test_launch_ros_submodule_is_exposed_as_parent_attribute(self):
+        """Submodule shims must be accessible as attributes on the parent shim."""
+        from roscope.entities.parameter_descriptions import ParameterFile
+
+        _install_import_patching()
+
+        import launch_ros
+
+        assert hasattr(launch_ros, "parameter_descriptions")
+        assert launch_ros.parameter_descriptions.ParameterFile is ParameterFile

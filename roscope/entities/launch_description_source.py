@@ -1,6 +1,6 @@
-"""LaunchDescriptionSource — deferred location resolution.
+"""LaunchDescriptionSource — base class for launch description sources.
 
-Matches official ``launch.launch_description_sources.PythonLaunchDescriptionSource``.
+Matches official ``launch.launch_description_source.LaunchDescriptionSource``.
 """
 
 from __future__ import annotations
@@ -8,14 +8,20 @@ from __future__ import annotations
 from roscope.entities.substitution import Substitution
 
 
-class PythonLaunchDescriptionSource:
+class LaunchDescriptionSource:
     """Stores raw location substitutions, resolves lazily.
 
     Matching official: ``__init__`` does NOT resolve substitutions.
     Resolution is deferred to ``_resolve_location(context)``.
     """
 
-    def __init__(self, location=None, **kwargs):
+    def __init__(
+        self,
+        location=None,
+        method: str = "unspecified mechanism from a script",
+        **_kwargs,
+    ) -> None:
+        self._method = method
         if location is None:
             self._location_subs = None
             self._location: str | None = None
@@ -54,8 +60,7 @@ class PythonLaunchDescriptionSource:
             return None
         return " + ".join(str(sub) for sub in self._location_subs)
 
-
-class AnyLaunchDescriptionSource(PythonLaunchDescriptionSource):
-    """Matches official AnyLaunchDescriptionSource."""
-
-    pass
+    @property
+    def method(self) -> str:
+        """Getter for method."""
+        return self._method

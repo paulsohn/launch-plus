@@ -54,9 +54,10 @@ from roscope.entities.conditions import (
 )
 from roscope.entities.descriptions import ComposableNode
 from roscope.entities.launch_description import LaunchDescription as _LaunchDescription
-from roscope.entities.launch_description_source import (
+from roscope.entities.launch_description_sources import (
     AnyLaunchDescriptionSource,
     PythonLaunchDescriptionSource,
+    XMLLaunchDescriptionSource,
 )
 from roscope.entities.parsing import _ActionParser
 from roscope.entities.state import LaunchContext, ResolverState
@@ -270,10 +271,74 @@ def _build_patched_launch_conditions():
     return mod
 
 
+def _build_patched_launch_launch_description_source():
+    from roscope.entities.launch_description_source import LaunchDescriptionSource
+
+    mod = types.ModuleType("launch.launch_description_source")
+    mod.LaunchDescriptionSource = LaunchDescriptionSource
+    return mod
+
+
 def _build_patched_launch_launch_description_sources():
+    from roscope.entities.launch_description_sources import FrontendLaunchDescriptionSource
+
     mod = types.ModuleType("launch.launch_description_sources")
+    mod.__path__ = []
+    mod.__package__ = "launch.launch_description_sources"
     mod.PythonLaunchDescriptionSource = PythonLaunchDescriptionSource
     mod.AnyLaunchDescriptionSource = AnyLaunchDescriptionSource
+    mod.FrontendLaunchDescriptionSource = FrontendLaunchDescriptionSource
+    return mod
+
+
+def _build_patched_launch_xml():
+    mod = types.ModuleType("launch_xml")
+    mod.__path__ = []
+    mod.__package__ = "launch_xml"
+    return mod
+
+
+def _build_patched_launch_xml_launch_description_sources():
+    mod = types.ModuleType("launch_xml.launch_description_sources")
+    mod.__path__ = []
+    mod.__package__ = "launch_xml.launch_description_sources"
+    mod.XMLLaunchDescriptionSource = XMLLaunchDescriptionSource
+    return mod
+
+
+# ── Per-class submodule shims ─────────────────────────────────────────────────
+# Upstream code may import via the per-class submodule path, e.g.:
+#   from launch.launch_description_sources.python_launch_description_source \
+#       import PythonLaunchDescriptionSource
+
+
+def _build_patched_launch_lds_python():
+    mod_name = "launch.launch_description_sources.python_launch_description_source"
+    mod = types.ModuleType(mod_name)
+    mod.PythonLaunchDescriptionSource = PythonLaunchDescriptionSource
+    return mod
+
+
+def _build_patched_launch_lds_any():
+    mod_name = "launch.launch_description_sources.any_launch_description_source"
+    mod = types.ModuleType(mod_name)
+    mod.AnyLaunchDescriptionSource = AnyLaunchDescriptionSource
+    return mod
+
+
+def _build_patched_launch_lds_frontend():
+    from roscope.entities.launch_description_sources import FrontendLaunchDescriptionSource
+
+    mod_name = "launch.launch_description_sources.frontend_launch_description_source"
+    mod = types.ModuleType(mod_name)
+    mod.FrontendLaunchDescriptionSource = FrontendLaunchDescriptionSource
+    return mod
+
+
+def _build_patched_launch_xml_lds_xml():
+    mod_name = "launch_xml.launch_description_sources.xml_launch_description_source"
+    mod = types.ModuleType(mod_name)
+    mod.XMLLaunchDescriptionSource = XMLLaunchDescriptionSource
     return mod
 
 
@@ -334,7 +399,14 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
         "launch.events": _build_patched_launch_events,
         "launch.event_handlers": _build_patched_launch_event_handlers,
         "launch.conditions": _build_patched_launch_conditions,
+        "launch.launch_description_source": _build_patched_launch_launch_description_source,
         "launch.launch_description_sources": _build_patched_launch_launch_description_sources,
+        "launch_xml": _build_patched_launch_xml,
+        "launch_xml.launch_description_sources": _build_patched_launch_xml_launch_description_sources,
+        "launch_xml.launch_description_sources.xml_launch_description_source": _build_patched_launch_xml_lds_xml,
+        "launch.launch_description_sources.python_launch_description_source": _build_patched_launch_lds_python,
+        "launch.launch_description_sources.any_launch_description_source": _build_patched_launch_lds_any,
+        "launch.launch_description_sources.frontend_launch_description_source": _build_patched_launch_lds_frontend,
         "launch_ros.events": _build_patched_launch_ros_events,
         "launch_ros.events.lifecycle": _build_patched_launch_ros_events_lifecycle,
         "launch_ros.event_handlers": _build_patched_launch_ros_event_handlers,
@@ -354,6 +426,11 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
             _PATCHED_MODULES[fullname] = self.PATCHED[fullname]()
         mod = _PATCHED_MODULES[fullname]
         sys.modules[fullname] = mod
+        if "." in fullname:
+            parent_name, _, child_name = fullname.rpartition(".")
+            parent = sys.modules.get(parent_name)
+            if parent is not None:
+                setattr(parent, child_name, mod)
         return mod
 
 
@@ -514,6 +591,11 @@ def resolve_file(
         if mod_name not in _PATCHED_MODULES:
             _PATCHED_MODULES[mod_name] = builder()
         sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+        if "." in mod_name:
+            parent_name, _, child_name = mod_name.rpartition(".")
+            parent = sys.modules.get(parent_name)
+            if parent is not None:
+                setattr(parent, child_name, sys.modules[mod_name])
 
     # ── Resolve by file type ─────────────────────────────────────────────
     if launch_file_str.endswith((".launch.xml", ".xml", ".yaml", ".yml")):

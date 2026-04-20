@@ -1744,3 +1744,51 @@ class TestShimUnknownImport:
         lr_subs = sys.modules["launch_ros.substitutions"]
         assert hasattr(lr_subs, "ExecutableInPackage")
         assert lr_subs.ExecutableInPackage is ExecutableInPackage
+
+    def test_executable_in_package_resolves_in_postbuild(self, tmp_path, monkeypatch):
+        """ExecutableInPackage must resolve the executable path in post-build mode."""
+        from roscope.entities.substitution import TextSubstitution
+        from roscope.entities.substitutions.executable_in_package import ExecutableInPackage
+
+        # Build a fake AMENT prefix with index marker and libexec executable.
+        prefix = tmp_path / "prefix"
+        pkg_marker = prefix / "share" / "ament_index" / "resource_index" / "packages" / "my_pkg"
+        pkg_marker.parent.mkdir(parents=True)
+        pkg_marker.touch()
+        libexec = prefix / "lib" / "my_pkg"
+        libexec.mkdir(parents=True)
+        exe_path = libexec / "my_exec"
+        exe_path.write_text("#!/bin/bash\n")
+        exe_path.chmod(0o755)
+
+        monkeypatch.setenv("AMENT_PREFIX_PATH", str(prefix))
+
+        ctx = _make_context()
+        ctx._state.preview_mode = False
+        shim = ExecutableInPackage(
+            executable=[TextSubstitution(text="my_exec")],
+            package=[TextSubstitution(text="my_pkg")],
+        )
+        result = shim.perform(ctx)
+        assert result == str(exe_path)
+
+    def test_unknown_substitution_shim_returns_substitution_subclass(self):
+        """Unknown attributes on substitution shim modules must return a Substitution subclass."""
+        import sys
+
+        from roscope.entities.substitution import Substitution
+        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
+
+        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
+            sys.meta_path.insert(0, _PatchingFinder())
+        for mod_name, builder in _PatchingFinder.PATCHED.items():
+            if mod_name not in _PATCHED_MODULES:
+                _PATCHED_MODULES[mod_name] = builder()
+            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+
+        launch_subs = sys.modules["launch.substitutions"]
+        stub_cls = getattr(launch_subs, "SomeUnknownSubstitution_XYZ", None)
+        assert stub_cls is not None
+        assert issubclass(stub_cls, Substitution)
+        ctx = _make_context()
+        assert stub_cls().perform(ctx) == ""

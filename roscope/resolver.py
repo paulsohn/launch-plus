@@ -74,7 +74,7 @@ logger = logging.getLogger("roscope")
 # ─── Shim helpers ─────────────────────────────────────────────────────────────
 
 
-def _make_shim_getattr(module_name: str):
+def _make_shim_getattr(module_name: str, *, is_substitution_module: bool = False):
     """Return a ``__getattr__`` for shim modules.
 
     When a Python launch file does ``from launch.actions import UnknownClass``
@@ -83,15 +83,18 @@ def _make_shim_getattr(module_name: str):
     raises ``ImportError`` and the entire file's topology is lost.
 
     The hook returns a stub class that:
-    - subclasses ``Action`` so ``_execute_actions`` does not log an error
-    - has a ``perform()`` method returning ``""`` for substitution use-sites
-    - accepts any constructor arguments
+    - subclasses ``Action`` (for action modules) or ``Substitution`` (for
+      substitution modules) so type checks in the resolver behave correctly
+    - preserves the ``condition`` kwarg so ``Action.visit()`` still gates
+      execution correctly even for unknown actions
     - warns once per unknown name so the user knows topology may be incomplete
     """
+    from roscope.entities.substitution import Substitution
+
     _warned: set[str] = set()
 
     def __getattr__(attr_name: str):  # noqa: N807
-        if attr_name not in _warned:
+        if attr_name not in _warned and not attr_name.startswith("__"):
             logger.warning(
                 "unimplemented shim: %s.%s — topology that depends on this "
                 "class will be missing from the resolved output",
@@ -100,15 +103,26 @@ def _make_shim_getattr(module_name: str):
             )
             _warned.add(attr_name)
 
-        class _UnimplementedShim(Action):
-            def __init__(self, *_a, **_kw):
-                super().__init__()
+        if is_substitution_module:
 
-            def execute(self, context) -> list:
-                return []
+            class _UnimplementedShim(Substitution):  # type: ignore[valid-type]
+                def __init__(self, *_a, **_kw):
+                    pass
 
-            def perform(self, context) -> str:
-                return ""
+                def perform(self, context) -> str:
+                    return ""
+
+        else:
+
+            class _UnimplementedShim(Action):  # type: ignore[no-redef]
+                def __init__(self, *_a, **_kw):
+                    super().__init__(condition=_kw.get("condition"))
+
+                def execute(self, context) -> list:
+                    return []
+
+                def perform(self, context) -> str:
+                    return ""
 
         _UnimplementedShim.__name__ = attr_name
         _UnimplementedShim.__qualname__ = attr_name
@@ -185,7 +199,7 @@ def _build_patched_launch_substitutions():
     mod.EnvironmentVariable = DeferredEnvironmentVariable
     mod.TextSubstitution = lambda text="", **kw: str(text)
     mod.PythonExpression = lambda expression=None, **kw: None
-    mod.__getattr__ = _make_shim_getattr("launch.substitutions")
+    mod.__getattr__ = _make_shim_getattr("launch.substitutions", is_substitution_module=True)
     return mod
 
 
@@ -266,7 +280,7 @@ def _build_patched_launch_ros_substitutions():
     mod = types.ModuleType("launch_ros.substitutions")
     mod.FindPackageShare = FindPackageShare
     mod.ExecutableInPackage = ExecutableInPackage
-    mod.__getattr__ = _make_shim_getattr("launch_ros.substitutions")
+    mod.__getattr__ = _make_shim_getattr("launch_ros.substitutions", is_substitution_module=True)
     return mod
 
 

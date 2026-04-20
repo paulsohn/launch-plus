@@ -60,6 +60,7 @@ class ExecutableInPackage(Substitution):
 
         exe = resolve_substitutions_from_tokens(self._executable, ctx)
         pkg = resolve_substitutions_from_tokens(self._package, ctx)
+        ctx._state.track_package(pkg)
 
         if ctx._state.preview_mode:
             logger.error(

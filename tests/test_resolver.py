@@ -1973,12 +1973,20 @@ class TestLaunchXmlShim:
         import sys
 
         from roscope.entities.launch_description_sources import (
+            AnyLaunchDescriptionSource,
             FrontendLaunchDescriptionSource,
             PythonLaunchDescriptionSource,
             XMLLaunchDescriptionSource,
         )
 
         self._install_shims()
+
+        assert "launch.launch_description_sources.any_launch_description_source" in sys.modules
+        from launch.launch_description_sources.any_launch_description_source import (
+            AnyLaunchDescriptionSource as ShimmedAny,
+        )
+
+        assert ShimmedAny is AnyLaunchDescriptionSource
 
         assert "launch.launch_description_sources.python_launch_description_source" in sys.modules
         from launch.launch_description_sources.python_launch_description_source import (

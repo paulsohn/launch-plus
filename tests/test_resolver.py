@@ -1911,22 +1911,9 @@ class TestLaunchXmlShim:
     """launch_xml.launch_description_sources shim resolves to roscope implementation."""
 
     def _install_shims(self):
-        import sys
+        from conftest import _install_import_patching
 
-        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
-
-        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
-            sys.meta_path.insert(0, _PatchingFinder())
-        for mod_name, builder in _PatchingFinder.PATCHED.items():
-            if mod_name not in _PATCHED_MODULES:
-                _PATCHED_MODULES[mod_name] = builder()
-            mod = _PATCHED_MODULES[mod_name]
-            sys.modules[mod_name] = mod
-            if "." in mod_name:
-                parent_name, _, child_name = mod_name.rpartition(".")
-                parent = sys.modules.get(parent_name)
-                if parent is not None:
-                    setattr(parent, child_name, mod)
+        _install_import_patching()
 
     def test_xml_launch_description_source_shim(self):
         """XMLLaunchDescriptionSource shim resolves to the roscope implementation."""

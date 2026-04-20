@@ -94,7 +94,10 @@ def _make_shim_getattr(module_name: str, *, is_substitution_module: bool = False
     _warned: set[str] = set()
 
     def __getattr__(attr_name: str):  # noqa: N807
-        if attr_name not in _warned and not attr_name.startswith("__"):
+        if attr_name.startswith("__"):
+            raise AttributeError(attr_name)
+
+        if attr_name not in _warned:
             logger.warning(
                 "unimplemented shim: %s.%s — topology that depends on this "
                 "class will be missing from the resolved output",

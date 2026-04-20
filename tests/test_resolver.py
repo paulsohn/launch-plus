@@ -1659,8 +1659,8 @@ class TestEventHandlerWarning:
             assert "RegisterEventHandler" in caplog.text
 
 
-class TestShimUnknownImport:
-    """Issue 8: unknown imports from shim modules must produce a no-op stub."""
+class TestShimUnknownAction:
+    """Issue 8: unknown imports from action shim modules must produce a no-op Action stub."""
 
     def test_unknown_launch_action_warns_not_crashes(self, caplog):
         """from launch.actions import UnknownFutureAction must not crash."""
@@ -1705,7 +1705,74 @@ class TestShimUnknownImport:
         ctx = _make_context()
         assert instance.execute(ctx) == []
 
-    def test_executable_in_package_raises_in_preview(self):
+    def test_dunder_attr_raises_attribute_error(self):
+        """__dunder__ attribute access on shim action modules must raise AttributeError."""
+        import sys
+
+        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
+
+        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
+            sys.meta_path.insert(0, _PatchingFinder())
+        for mod_name, builder in _PatchingFinder.PATCHED.items():
+            if mod_name not in _PATCHED_MODULES:
+                _PATCHED_MODULES[mod_name] = builder()
+            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+
+        launch_actions = sys.modules["launch.actions"]
+        import pytest
+
+        with pytest.raises(AttributeError):
+            _ = launch_actions.__some_dunder__
+
+
+class TestShimUnknownSubstitution:
+    """Issue 8: unknown imports from substitution shim modules must produce a Substitution stub."""
+
+    def test_unknown_substitution_shim_returns_substitution_subclass(self):
+        """Unknown attributes on substitution shim modules must return a Substitution subclass."""
+        import sys
+
+        from roscope.entities.substitution import Substitution
+        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
+
+        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
+            sys.meta_path.insert(0, _PatchingFinder())
+        for mod_name, builder in _PatchingFinder.PATCHED.items():
+            if mod_name not in _PATCHED_MODULES:
+                _PATCHED_MODULES[mod_name] = builder()
+            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+
+        launch_subs = sys.modules["launch.substitutions"]
+        stub_cls = getattr(launch_subs, "SomeUnknownSubstitution_XYZ", None)
+        assert stub_cls is not None
+        assert issubclass(stub_cls, Substitution)
+        ctx = _make_context()
+        assert stub_cls().perform(ctx) == ""
+
+    def test_dunder_attr_raises_attribute_error(self):
+        """__dunder__ attribute access on shim substitution modules must raise AttributeError."""
+        import sys
+
+        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
+
+        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
+            sys.meta_path.insert(0, _PatchingFinder())
+        for mod_name, builder in _PatchingFinder.PATCHED.items():
+            if mod_name not in _PATCHED_MODULES:
+                _PATCHED_MODULES[mod_name] = builder()
+            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+
+        import pytest
+
+        launch_subs = sys.modules["launch.substitutions"]
+        with pytest.raises(AttributeError):
+            _ = launch_subs.__some_dunder__
+
+
+class TestExecutableInPackage:
+    """ExecutableInPackage substitution: preview raises, post-build resolves."""
+
+    def test_raises_in_preview(self):
         """ExecutableInPackage must raise LookupError in preview mode."""
         import pytest
 
@@ -1721,13 +1788,13 @@ class TestShimUnknownImport:
         with pytest.raises(LookupError, match="preview mode"):
             shim.perform(ctx)
 
-    def test_executable_in_package_xml_registered(self):
+    def test_xml_registered(self):
         """exec-in-pkg must be registered as an XML substitution."""
         from roscope.entities.expose import substitution_parse_methods
 
         assert "exec-in-pkg" in substitution_parse_methods
 
-    def test_launch_ros_substitutions_has_executable_in_package(self):
+    def test_launch_ros_substitutions_exposes_class(self):
         """launch_ros.substitutions shim must expose ExecutableInPackage."""
         import sys
 
@@ -1745,7 +1812,7 @@ class TestShimUnknownImport:
         assert hasattr(lr_subs, "ExecutableInPackage")
         assert lr_subs.ExecutableInPackage is ExecutableInPackage
 
-    def test_executable_in_package_resolves_in_postbuild(self, tmp_path, monkeypatch):
+    def test_resolves_in_postbuild(self, tmp_path, monkeypatch):
         """ExecutableInPackage must resolve the executable path in post-build mode."""
         from roscope.entities.substitution import TextSubstitution
         from roscope.entities.substitutions.executable_in_package import ExecutableInPackage
@@ -1771,24 +1838,3 @@ class TestShimUnknownImport:
         )
         result = shim.perform(ctx)
         assert result == str(exe_path)
-
-    def test_unknown_substitution_shim_returns_substitution_subclass(self):
-        """Unknown attributes on substitution shim modules must return a Substitution subclass."""
-        import sys
-
-        from roscope.entities.substitution import Substitution
-        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
-
-        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
-            sys.meta_path.insert(0, _PatchingFinder())
-        for mod_name, builder in _PatchingFinder.PATCHED.items():
-            if mod_name not in _PATCHED_MODULES:
-                _PATCHED_MODULES[mod_name] = builder()
-            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
-
-        launch_subs = sys.modules["launch.substitutions"]
-        stub_cls = getattr(launch_subs, "SomeUnknownSubstitution_XYZ", None)
-        assert stub_cls is not None
-        assert issubclass(stub_cls, Substitution)
-        ctx = _make_context()
-        assert stub_cls().perform(ctx) == ""

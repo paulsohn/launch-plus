@@ -82,10 +82,12 @@ Supported via shimmed imports.  Standard patterns work:
 - Event handlers: `OnProcessExit`, `OnProcessStart`, etc.
 - `EmitEvent` and other built-in event actions
 
-**Lifecycle and event handling caveats:**  `LifecycleNode` and event-related
-constructs (`RegisterEventHandler`, `OnProcessExit`, `OnProcessStart`, etc.)
-are captured by the shims and appear as static elements in the resolved XML
-(e.g. `<lifecycle_node>`, `<on_process_exit>`).  However:
+**Lifecycle and event handling caveats:**  `LifecycleNode` is captured by the
+shim and appears as a `<lifecycle_node>` element in the resolved XML.
+`OnProcessExit`, `OnProcessStart`, etc. similarly produce XML elements when
+visited directly.  `RegisterEventHandler` is a no-op — it emits a warning and
+produces no resolved output (see [Event handler callbacks](#event-handler-callbacks)
+below).  Additional caveats:
 
 - There is currently **no executor that recognizes these extended XML elements**.
   The resolved output preserves the structure for inspection, but `ros2 launch`
@@ -220,9 +222,13 @@ resolution continues.
 In **Python launch files**, the failure mode depends on where the unknown type
 appears:
 
-- **Top-level import** (before `generate_launch_description` is called) —
-  raises `ImportError`, causing resolution of the entire file to fail.  All
-  topology from that file is lost.
+- **Top-level import or attribute access on a shim module** — the shim's
+  `__getattr__` hook intercepts the lookup and returns a no-op stub with a
+  warning, so resolution continues.  The stub is an `Action` subclass that
+  produces no resolved output; topology that depends on it will be absent.
+- **Import of a package entirely outside the shim** (e.g. a third-party
+  library) — raises `ImportError`, causing resolution of the entire file to
+  fail.  All topology from that file is lost.
 - **Inside an `OpaqueFunction` body** — the function raises on import or
   instantiation; the function's return value is discarded and an error is
   logged, but resolution continues.  Only the topology fragment that function
@@ -233,25 +239,24 @@ appears:
 ### `$(command ...)` substitution
 
 The `$(command ...)` substitution executes a shell command and substitutes its
-output.  It is currently left unresolved: roscope preserves the literal
-`$(command ...)` expression in the output rather than executing it.  No warning
-is emitted when this substitution is encountered, even when it appears in a
-conditional attribute or path component where the unresolved value may cause
-incorrect topology analysis.  The only known call site in Autoware is xacro
-invocations — the resulting unresolved substitution is visible in the resolved
-XML.
+output.  roscope does not execute the command; it preserves the literal
+`$(command ...)` expression in the resolved output.  A warning is emitted
+whenever this substitution is encountered, because an unresolved value in a
+conditional attribute or path component may cause incorrect topology analysis.
+The only known call site in Autoware is xacro invocations — the resulting
+unresolved substitution is visible in the resolved XML.
 
 ### `ExecutableInPackage` substitution
 
-`ExecutableInPackage` is not available in roscope's Python shim for
-`launch_ros.substitutions`.  The failure mode follows the same pattern as other
-missing shim types: a top-level import causes the entire file to fail with
-`ImportError`; an import inside an `OpaqueFunction` body causes only that
-function's topology fragment to be lost.  XML launch files using
-`$(exec-in-pkg ...)` are also unsupported — the substitution is not implemented
-in the XML resolver and will cause resolution to fail for that file.  There is
-no drop-in replacement; use post-build mode with an installed workspace if this
-substitution is required.
+`ExecutableInPackage` / `$(exec-in-pkg <executable> <package>)` locates an
+executable in a package's libexec directory (`<prefix>/lib/<package>/`).
+roscope implements this substitution with mode-dependent behavior:
+
+- **Preview mode** — raises a `LookupError`.  The install tree is not available
+  before `colcon build`, so the executable path cannot be resolved.
+- **Post-build mode** — resolves the executable path from `AMENT_PREFIX_PATH`
+  using the same logic as the official implementation: locate the package prefix
+  via the AMENT index, then find the executable in `<prefix>/lib/<package>/`.
 
 ### Event handler callbacks
 
@@ -259,11 +264,10 @@ Event handlers (`RegisterEventHandler`, `OnProcessExit`, `OnProcessStart`,
 etc.) are a **Python launch file construct only** — XML launch files have no
 event handler syntax.
 
-In Python launch files, these constructs are shimmed as no-ops: the resolver
-captures that they were encountered but does not track them in the resolved
-output.  Event handlers are effectively invisible in the resolved graph.  This
-is a known gap; event-handler-driven topology changes will not appear in the
-output.
+In Python launch files, `RegisterEventHandler` is shimmed as a no-op: when
+encountered, a warning is emitted and no resolved output is produced.  Event
+handlers are effectively invisible in the resolved graph.  This is a known gap;
+event-handler-driven topology changes will not appear in the output.
 
 ### Incomplete coverage of standard types
 
@@ -271,11 +275,13 @@ The current implementation covers the subset of standard `Action` and
 `Substitution` types needed to resolve Autoware launch files.  Some types in
 the standard `launch` / `launch_ros` API are not yet implemented.  In XML
 launch files, unrecognized elements are skipped with a warning.  In Python
-launch files, the failure mode is the same as for custom extensions: a
-top-level import of an unimplemented shim type raises `ImportError` and fails
-the entire file; an import inside an `OpaqueFunction` body loses only that
-function's topology fragment.  The complete coverage list will be finalized
-alongside the formal operational semantics work.
+launch files, accessing an unimplemented attribute on a shim module
+(`launch.actions`, `launch_ros.actions`, `launch.substitutions`,
+`launch_ros.substitutions`) returns a no-op stub with a warning — resolution
+continues but topology that depends on the missing type will be absent.
+Importing a package that is entirely outside the shim (a third-party library)
+still raises `ImportError` and fails the file.  The complete coverage list will
+be finalized alongside the formal operational semantics work.
 
 ## Assumptions
 

@@ -70,9 +70,11 @@ allows arbitrary subclassing cannot support these analyses statically.
 Third-party extensions — custom `Action` subclasses, non-standard substitutions
 defined outside `launch` / `launch_ros` — fall outside the closed language by
 definition and are not resolved.  In XML launch files, unknown elements are
-skipped with a warning.  In Python launch files, importing or instantiating
-unrecognized types typically causes an `ImportError` or resolution failure for
-that file; see [Supported Environments → Known limitations](supported-environments.md#known-limitations)
+skipped with a warning.  In Python launch files, accessing an unimplemented
+attribute on one of the shim modules (`launch.actions`, `launch_ros.actions`,
+etc.) returns a no-op stub with a warning rather than raising `ImportError`;
+importing a package entirely outside the shims still fails the file.
+See [Supported Environments → Known limitations](supported-environments.md#known-limitations)
 for the exact failure modes.
 
 > **Note on formal foundations:** The semantics described above — partial evaluation, oracle treatment of OpaqueFunction, and the expected soundness property — are stated informally here.

@@ -19,6 +19,7 @@ class LaunchDescriptionSource:
         self,
         location=None,
         method: str = "unspecified mechanism from a script",
+        **_kwargs,
     ) -> None:
         self._method = method
         if location is None:

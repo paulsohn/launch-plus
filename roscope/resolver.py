@@ -272,9 +272,12 @@ def _build_patched_launch_conditions():
 
 
 def _build_patched_launch_launch_description_sources():
+    from roscope.entities.launch_description_sources import FrontendLaunchDescriptionSource
+
     mod = types.ModuleType("launch.launch_description_sources")
     mod.PythonLaunchDescriptionSource = PythonLaunchDescriptionSource
     mod.AnyLaunchDescriptionSource = AnyLaunchDescriptionSource
+    mod.FrontendLaunchDescriptionSource = FrontendLaunchDescriptionSource
     return mod
 
 

@@ -1905,3 +1905,47 @@ class TestExecutableInPackage:
         )
         result = shim.perform(ctx)
         assert result == str(exe_path)
+
+
+class TestLaunchXmlShim:
+    """launch_xml.launch_description_sources shim resolves to roscope implementation."""
+
+    def _install_shims(self):
+        import sys
+
+        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
+
+        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
+            sys.meta_path.insert(0, _PatchingFinder())
+        for mod_name, builder in _PatchingFinder.PATCHED.items():
+            if mod_name not in _PATCHED_MODULES:
+                _PATCHED_MODULES[mod_name] = builder()
+            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+
+    def test_xml_launch_description_source_shim(self):
+        """XMLLaunchDescriptionSource shim resolves to the roscope implementation."""
+        import sys
+
+        from roscope.entities.launch_description_sources import XMLLaunchDescriptionSource
+
+        self._install_shims()
+        assert "launch_xml.launch_description_sources" in sys.modules
+        from launch_xml.launch_description_sources import (
+            XMLLaunchDescriptionSource as Shimmed,
+        )
+
+        assert Shimmed is XMLLaunchDescriptionSource
+
+    def test_frontend_launch_description_source_in_launch_shim(self):
+        """FrontendLaunchDescriptionSource shim resolves to the roscope implementation."""
+        import sys
+
+        from roscope.entities.launch_description_sources import FrontendLaunchDescriptionSource
+
+        self._install_shims()
+        assert "launch.launch_description_sources" in sys.modules
+        from launch.launch_description_sources import (
+            FrontendLaunchDescriptionSource as Shimmed,
+        )
+
+        assert Shimmed is FrontendLaunchDescriptionSource

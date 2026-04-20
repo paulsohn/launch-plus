@@ -54,9 +54,10 @@ from roscope.entities.conditions import (
 )
 from roscope.entities.descriptions import ComposableNode
 from roscope.entities.launch_description import LaunchDescription as _LaunchDescription
-from roscope.entities.launch_description_source import (
+from roscope.entities.launch_description_sources import (
     AnyLaunchDescriptionSource,
     PythonLaunchDescriptionSource,
+    XMLLaunchDescriptionSource,
 )
 from roscope.entities.parsing import _ActionParser
 from roscope.entities.state import LaunchContext, ResolverState
@@ -277,6 +278,19 @@ def _build_patched_launch_launch_description_sources():
     return mod
 
 
+def _build_patched_launch_xml():
+    mod = types.ModuleType("launch_xml")
+    mod.__path__ = []
+    mod.__package__ = "launch_xml"
+    return mod
+
+
+def _build_patched_launch_xml_launch_description_sources():
+    mod = types.ModuleType("launch_xml.launch_description_sources")
+    mod.XMLLaunchDescriptionSource = XMLLaunchDescriptionSource
+    return mod
+
+
 def _build_patched_launch_ros_substitutions():
     from roscope.entities.substitutions.executable_in_package import ExecutableInPackage
 
@@ -335,6 +349,8 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
         "launch.event_handlers": _build_patched_launch_event_handlers,
         "launch.conditions": _build_patched_launch_conditions,
         "launch.launch_description_sources": _build_patched_launch_launch_description_sources,
+        "launch_xml": _build_patched_launch_xml,
+        "launch_xml.launch_description_sources": _build_patched_launch_xml_launch_description_sources,
         "launch_ros.events": _build_patched_launch_ros_events,
         "launch_ros.events.lifecycle": _build_patched_launch_ros_events_lifecycle,
         "launch_ros.event_handlers": _build_patched_launch_ros_event_handlers,

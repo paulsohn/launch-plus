@@ -1500,3 +1500,247 @@ class TestTrackedFindPackageShare:
 
         with pytest.raises(LookupError, match="not found"):
             fps.perform(ctx)
+
+
+# ─── Faithfulness fixes (issue #54) ──────────────────────────────────────────
+
+
+class TestCommandSubstitutionWarning:
+    """Issue 4: $(command ...) should warn when encountered."""
+
+    def test_command_substitution_warns(self, caplog):
+        """$(command ...) must emit a warning when perform() is called."""
+        from roscope.entities.substitutions.command import CommandSubstitution
+        from roscope.parsers.parse_substitution import parse_substitution
+
+        ctx = _make_context()
+        substs = parse_substitution("$(command echo hello)")
+        assert len(substs) == 1
+        assert isinstance(substs[0], CommandSubstitution)
+        with caplog.at_level(logging.WARNING):
+            result = substs[0].perform(ctx)
+        # Value is preserved as literal
+        assert result == "$(command echo hello)"
+        # Warning emitted
+        assert "$(command" in caplog.text
+
+    def test_command_substitution_in_attribute_warns(self, caplog):
+        """$(command ...) in an XML attribute warns during resolution."""
+        xml = '<launch><node pkg="$(command echo pkg)" exec="e" name="n"/></launch>'
+        with caplog.at_level(logging.WARNING):
+            _parse_and_walk(xml)
+        assert "$(command" in caplog.text
+
+
+class TestPostBuildSourceIgnored:
+    """Issue 6: post-build mode must not consult source/lockfile paths."""
+
+    def test_resolve_pkg_share_postbuild_skips_lockfile(self, monkeypatch):
+        """In post-build mode, resolve_pkg_share() must not use lockfile paths."""
+        from roscope.entities.state import ResolverState
+
+        state = ResolverState()
+        state.preview_mode = False
+        # Populate lockfile data as if a package is in the lockfile
+        state.lockfile_data = {
+            "my_pkg": {
+                "repo": "my_repo",
+                "path": "my_pkg",
+                "url": "https://example.com/repo.git",
+                "version": "abc123",
+            }
+        }
+        state.fetch_dir = "/ws/src"
+
+        # Patch ensure_package_available to record what lockfile it receives
+        received_lockfile = []
+
+        def fake_ensure(package, lockfile, fetch_dir, options, *, rosdep_fallback=False):
+            received_lockfile.append(lockfile)
+            return None
+
+        import roscope.fetcher as _fetcher
+
+        monkeypatch.setattr(_fetcher, "ensure_package_available", fake_ensure)
+
+        try:
+            state.resolve_pkg_share("my_pkg")
+        except LookupError:
+            pass  # expected — fake returns None
+
+        # lockfile must be None in post-build mode
+        assert received_lockfile, "ensure_package_available was never called"
+        assert received_lockfile[0] is None, (
+            "post-build mode must pass lockfile=None to ensure_package_available"
+        )
+
+    def test_resolve_pkg_share_preview_uses_lockfile(self, monkeypatch):
+        """In preview mode, resolve_pkg_share() must still use the lockfile."""
+        from roscope.entities.state import ResolverState
+
+        state = ResolverState()
+        state.preview_mode = True
+        state.lockfile_data = {
+            "my_pkg": {
+                "repo": "my_repo",
+                "path": "my_pkg",
+                "url": "https://example.com/repo.git",
+                "version": "abc123",
+            }
+        }
+        state.fetch_dir = "/ws/src"
+
+        received_lockfile = []
+
+        def fake_ensure(package, lockfile, fetch_dir, options, *, rosdep_fallback=False):
+            received_lockfile.append(lockfile)
+            return None
+
+        import roscope.fetcher as _fetcher
+
+        monkeypatch.setattr(_fetcher, "ensure_package_available", fake_ensure)
+
+        try:
+            state.resolve_pkg_share("my_pkg")
+        except LookupError:
+            pass
+
+        assert received_lockfile
+        assert received_lockfile[0] is not None, (
+            "preview mode must pass lockfile to ensure_package_available"
+        )
+
+
+class TestEventHandlerWarning:
+    """Issue 7: RegisterEventHandler must warn when executed."""
+
+    def test_register_event_handler_warns(self, caplog):
+        """RegisterEventHandler.execute() must emit a warning."""
+        from roscope.entities.actions.event_handler import RegisterEventHandler
+
+        ctx = _make_context()
+        handler = RegisterEventHandler(event_handler=None)
+        with caplog.at_level(logging.WARNING):
+            result = handler.execute(ctx)
+        assert result == []
+        assert "RegisterEventHandler" in caplog.text
+
+    def test_register_event_handler_via_visit_warns(self, caplog):
+        """visit() path (via Python shim) also emits the warning."""
+        from roscope.entities.actions.event_handler import RegisterEventHandler
+
+        ctx = _make_context()
+        handler = RegisterEventHandler()
+        with caplog.at_level(logging.WARNING):
+            handler.visit(ctx)
+        assert "RegisterEventHandler" in caplog.text
+
+    def test_register_event_handler_in_py_launch_warns(self, caplog):
+        """End-to-end: RegisterEventHandler in a Python launch file warns."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            child_path = _write_launch_py(
+                tmpdir,
+                "evh.launch.py",
+                """\
+                from launch import LaunchDescription
+                from launch.actions import RegisterEventHandler
+
+                def generate_launch_description():
+                    return LaunchDescription([
+                        RegisterEventHandler(event_handler=None),
+                    ])
+            """,
+            )
+            ctx = _make_context()
+            with caplog.at_level(logging.WARNING):
+                from roscope.entities.actions.include import _inline_resolve_python_launch
+
+                _inline_resolve_python_launch(ctx._state, child_path, ctx, {})
+            assert "RegisterEventHandler" in caplog.text
+
+
+class TestShimUnknownImport:
+    """Issue 8: unknown imports from shim modules must produce a no-op stub."""
+
+    def test_unknown_launch_action_warns_not_crashes(self, caplog):
+        """from launch.actions import UnknownFutureAction must not crash."""
+        import sys
+
+        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
+
+        # Re-install patcher (may already be present from other tests)
+        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
+            sys.meta_path.insert(0, _PatchingFinder())
+        for mod_name, builder in _PatchingFinder.PATCHED.items():
+            if mod_name not in _PATCHED_MODULES:
+                _PATCHED_MODULES[mod_name] = builder()
+            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+
+        launch_actions = sys.modules["launch.actions"]
+        with caplog.at_level(logging.WARNING):
+            stub_cls = getattr(launch_actions, "SomeFutureAction_XYZ_123", None)
+        assert stub_cls is not None
+        assert "SomeFutureAction_XYZ_123" in caplog.text
+
+    def test_unknown_shim_returns_action_subclass(self):
+        """The stub class must be an Action subclass usable by _execute_actions."""
+        import sys
+
+        from roscope.entities.action import Action
+        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
+
+        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
+            sys.meta_path.insert(0, _PatchingFinder())
+        for mod_name, builder in _PatchingFinder.PATCHED.items():
+            if mod_name not in _PATCHED_MODULES:
+                _PATCHED_MODULES[mod_name] = builder()
+            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+
+        launch_actions = sys.modules["launch.actions"]
+        stub_cls = getattr(launch_actions, "AnotherUnknownAction_ABC", None)
+        assert stub_cls is not None
+        assert issubclass(stub_cls, Action)
+        # Can instantiate with arbitrary args
+        instance = stub_cls(foo="bar", baz=42)
+        ctx = _make_context()
+        assert instance.execute(ctx) == []
+
+    def test_executable_in_package_raises_in_preview(self):
+        """ExecutableInPackage must raise LookupError in preview mode."""
+        import pytest
+
+        from roscope.entities.substitution import TextSubstitution
+        from roscope.entities.substitutions.executable_in_package import ExecutableInPackage
+
+        ctx = _make_context()
+        ctx._state.preview_mode = True
+        shim = ExecutableInPackage(
+            executable=[TextSubstitution(text="my_exec")],
+            package=[TextSubstitution(text="my_pkg")],
+        )
+        with pytest.raises(LookupError, match="preview mode"):
+            shim.perform(ctx)
+
+    def test_executable_in_package_xml_registered(self):
+        """exec-in-pkg must be registered as an XML substitution."""
+        from roscope.entities.expose import substitution_parse_methods
+
+        assert "exec-in-pkg" in substitution_parse_methods
+
+    def test_launch_ros_substitutions_has_executable_in_package(self):
+        """launch_ros.substitutions shim must expose ExecutableInPackage."""
+        import sys
+
+        from roscope.entities.substitutions.executable_in_package import ExecutableInPackage
+        from roscope.resolver import _PATCHED_MODULES, _PatchingFinder
+
+        if not any(isinstance(f, _PatchingFinder) for f in sys.meta_path):
+            sys.meta_path.insert(0, _PatchingFinder())
+        for mod_name, builder in _PatchingFinder.PATCHED.items():
+            if mod_name not in _PATCHED_MODULES:
+                _PATCHED_MODULES[mod_name] = builder()
+            sys.modules[mod_name] = _PATCHED_MODULES[mod_name]
+
+        lr_subs = sys.modules["launch_ros.substitutions"]
+        assert hasattr(lr_subs, "ExecutableInPackage")
+        assert lr_subs.ExecutableInPackage is ExecutableInPackage

@@ -8,6 +8,7 @@ import roscope.entities.substitutions.dirname  # noqa: F401
 import roscope.entities.substitutions.env  # noqa: F401
 import roscope.entities.substitutions.equals  # noqa: F401
 import roscope.entities.substitutions.eval  # noqa: F401
+import roscope.entities.substitutions.executable_in_package  # noqa: F401
 import roscope.entities.substitutions.find_pkg_prefix  # noqa: F401
 import roscope.entities.substitutions.find_pkg_share  # noqa: F401
 import roscope.entities.substitutions.if_else  # noqa: F401

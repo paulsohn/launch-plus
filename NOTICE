@@ -1,0 +1,8 @@
+This project includes code derived from ROS 2 launch (ros2launch),
+which is composed of [launch](https://github.com/ros2/launch) and [launch_ros](https://github.com/ros2/launch_ros) repositories.
+
+ROS 2 launch is licensed under the Apache License 2.0.
+
+Copyright (c) Open Robotics.
+
+Modifications were made by Taeseung Sohn, 2026.

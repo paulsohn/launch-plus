@@ -124,7 +124,10 @@ class ExecuteProcess(Action):
         for e in items:
             name_raw = e.get_attr("name", optional=True) or ""
             if not name_raw.strip():
-                logger.error("%s: skipping <env> child with missing or empty name attribute", _current_file(parser.ctx))
+                logger.error(
+                    "%s: skipping <env> child with missing or empty name attribute",
+                    _current_file(parser.ctx),
+                )
                 continue
             result[tuple(parser.parse_substitution(name_raw))] = parser.parse_substitution(
                 e.get_attr("value", optional=True) or ""

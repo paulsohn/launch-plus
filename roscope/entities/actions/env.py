@@ -106,7 +106,9 @@ class UnsetEnvironmentVariable(Action):
             del context.environment[name]
         else:
             logger.error(
-                "%s: unset_env: environment variable '%s' is not set", _current_file(context), name
+                "%s: unset_env: environment variable '%s' is not set",
+                _current_file(context),
+                name,
             )
         return None
 

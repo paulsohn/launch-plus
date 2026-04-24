@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from roscope.entities.actions.composable_node_container import ComposableNodeContainer
-from roscope.entities.actions.executable import ExecuteProcess
+from roscope.entities.actions.execute_process import ExecuteProcess
 from roscope.entities.actions.group import GroupAction
 from roscope.entities.actions.load_composable_nodes import LoadComposableNodes
 from roscope.entities.actions.marker import SourceMarker

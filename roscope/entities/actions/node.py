@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 import xml.etree.ElementTree as ET
 
-from roscope.entities.actions.executable import ExecuteProcess
+from roscope.entities.actions.execute_process import ExecuteProcess
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file, _ros2_namespace_join
 from roscope.entities.parameter_descriptions import Parameter, ParameterFile

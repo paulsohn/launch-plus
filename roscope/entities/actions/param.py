@@ -17,18 +17,15 @@
 # - https://github.com/ros2/launch_ros/blob/rolling/launch_ros/launch_ros/actions/set_parameter.py
 # Modified for roscope project by Taeseung Sohn, 2026.
 
-"""Parameter-related action handlers and tracked Python-shim actions.
+"""Parameter-related action handlers.
 
-Covers: <let> (XML), SetLaunchConfiguration / SetParameter / ParameterFile (Python shim).
+Covers: SetLaunchConfiguration / SetParameter.
 """
 
 from __future__ import annotations
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
-from roscope.entities.parameter_descriptions import (
-    ParameterFile,  # noqa: F401 — re-exported for import_patcher
-)
 from roscope.entities.parsing import _ActionParser
 from roscope.parsers.entity import Entity
 

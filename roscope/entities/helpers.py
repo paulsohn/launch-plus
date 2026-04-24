@@ -20,7 +20,8 @@ logger = logging.getLogger("roscope")
 def _current_file(context) -> str:
     """Return the current launch file path for diagnostic messages."""
     try:
-        return str(context._state.current_source_key())
+        key = context._state.current_source_key()
+        return str(key) if key else "<unknown>"
     except Exception:
         return "<unknown>"
 

@@ -23,8 +23,8 @@ into the :data:`~roscope.entities.expose.action_parse_methods` registry.
 """
 
 from roscope.entities.actions import (  # noqa: F401
-    arg,
     composable_node_container,
+    declare_launch_argument,
     emit_event,
     event_handler,
     execute_process,

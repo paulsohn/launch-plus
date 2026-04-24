@@ -16,7 +16,7 @@
 # - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/declare_launch_argument.py
 # Modified for roscope project by Taeseung Sohn, 2026.
 
-"""Action handler for <arg> element."""
+"""Module for the DeclareLaunchArgument action."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ logger = logging.getLogger("roscope")
 
 @expose_action("arg")
 class DeclareLaunchArgument(Action):
-    """Stub for DeclareLaunchArgument / <arg>.
+    """Stub for DeclareLaunchArgument.
 
     Matching official ``DeclareLaunchArgument.execute()``:
     - If the argument is already set (passed from a parent include), record it for

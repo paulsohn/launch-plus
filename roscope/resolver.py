@@ -24,8 +24,11 @@ from pathlib import Path
 from typing import Any
 
 from roscope.entities.action import Action
-from roscope.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
 from roscope.entities.actions.composable_node_container import ComposableNodeContainer
+from roscope.entities.actions.declare_launch_argument import (
+    DeclareLaunchArgument,
+    _apply_declared_arg,
+)
 from roscope.entities.actions.emit_event import EmitEvent
 from roscope.entities.actions.event_handler import (
     OnProcessExit,
@@ -56,7 +59,7 @@ from roscope.entities.conditions import (
 )
 from roscope.entities.descriptions import ComposableNode
 from roscope.entities.helpers import _current_file
-from roscope.entities.launch_description import LaunchDescription as _LaunchDescription
+from roscope.entities.launch_description import LaunchDescription
 from roscope.entities.launch_description_sources import (
     AnyLaunchDescriptionSource,
     PythonLaunchDescriptionSource,
@@ -149,7 +152,7 @@ def _build_patched_launch():
     mod = types.ModuleType("launch")
     mod.__path__ = []
     mod.__package__ = "launch"
-    mod.LaunchDescription = _LaunchDescription
+    mod.LaunchDescription = LaunchDescription
     mod.LaunchContext = LaunchContext
     return mod
 

@@ -57,10 +57,13 @@ class CommandSubstitution(Substitution):
         return cls, {"arguments": arguments}
 
     def perform(self, ctx: LaunchContext) -> str:
+        from roscope.entities.helpers import _current_file
+
         logger.warning(
-            "$(command ...) substitution is not executed by roscope; "
+            "%s: $(command ...) substitution is not executed by roscope; "
             "the literal expression will appear in the resolved output — "
-            "topology depending on this value may be incorrect"
+            "topology depending on this value may be incorrect",
+            _current_file(ctx),
         )
         from roscope.entities.helpers import resolve_substitutions_from_tokens
 

@@ -24,14 +24,17 @@ Matching official ``launch_ros.actions.Node`` and ``LifecycleNode``.
 
 from __future__ import annotations
 
+import logging
 import xml.etree.ElementTree as ET
 
 from roscope.entities.actions.executable import ExecuteProcess
 from roscope.entities.expose import expose_action
-from roscope.entities.helpers import _ros2_namespace_join
+from roscope.entities.helpers import _current_file, _ros2_namespace_join
 from roscope.entities.parameter_descriptions import Parameter, ParameterFile
 from roscope.entities.parsing import _ActionParser
 from roscope.parsers.entity import Entity
+
+logger = logging.getLogger("roscope")
 
 
 def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
@@ -157,15 +160,29 @@ class Node(ExecuteProcess):
         self.respawn_delay = kwargs.get("respawn_delay")
         self.ros_namespace: str | None = None
         self.explicit_namespace: str | None = None
+        self.name_guessed: bool = False
 
     def execute(self, context) -> list:
         """Resolve substitutions and return a clean resolved Node."""
         state = context._state
 
+        # Delegate cmd/name/env resolution to parent; cmd is ignored in Node.
+        parent_result = super().execute(context)
+        base = parent_result[0] if parent_result else None
+
         pkg = context.perform_substitution(self.package) or ""
         exe = context.perform_substitution(self.executable) or ""
-        name = context.perform_substitution(self.name) or ""
+        name = base.name if base else (context.perform_substitution(self.name) or "")
         ns = context.perform_substitution(self.namespace) if self.namespace else None
+        name_guessed = not name and bool(exe)
+        if name_guessed:
+            logger.warning(
+                "%s: node (pkg=%r exec=%r) has no name set; FQN is guessed from executable name",
+                _current_file(context),
+                pkg,
+                exe,
+            )
+            name = exe
         if pkg:
             state.track_package(pkg)
 
@@ -211,7 +228,7 @@ class Node(ExecuteProcess):
                 dst = context.perform_substitution(r[1])
                 remaps.append([src or str(r[0]), dst or str(r[1])])
 
-        env = self._resolve_env(context)
+        env = base.env if base else {}
 
         def _resolve_opt(attr):
             raw = getattr(self, attr, None)
@@ -220,6 +237,7 @@ class Node(ExecuteProcess):
             return context.perform_substitution(raw) or None
 
         resolved = type(self)(package=pkg, executable=exe, name=name or None)
+        resolved.name_guessed = name_guessed
         resolved.ros_namespace = ros_ns
         resolved.explicit_namespace = ns
         resolved.namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
@@ -244,7 +262,7 @@ class Node(ExecuteProcess):
         elem = ET.Element(self._tag_name)
         elem.set("pkg", self.package)
         elem.set("exec", self.executable or "")
-        if self.name:
+        if self.name and not self.name_guessed:
             elem.set("name", self.name)
         if self.namespace:
             elem.set("namespace", self.namespace)

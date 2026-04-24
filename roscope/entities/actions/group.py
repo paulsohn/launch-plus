@@ -25,6 +25,7 @@ import xml.etree.ElementTree as ET
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
+from roscope.entities.helpers import _current_file
 from roscope.entities.parsing import _ActionParser
 from roscope.parsers.entity import Entity
 
@@ -82,7 +83,11 @@ class GroupAction(Action):
                     if children:
                         results.extend(children)
                 else:
-                    logger.error("expected Action or Entity, got %s", type(child).__name__)
+                    logger.error(
+                        "%s: expected Action or Entity, got %s",
+                        _current_file(context),
+                        type(child).__name__,
+                    )
         finally:
             if self.scoped:
                 context._pop_environment()
@@ -118,7 +123,12 @@ class OpaqueFunction(Action):
 
                     return _execute_actions(result, context)
             except Exception as e:
-                logger.error("OpaqueFunction failed: %s", e)
+                logger.error(
+                    "OpaqueFunction failed in %s: %s",
+                    _current_file(context),
+                    e,
+                    exc_info=True,
+                )
         return []
 
 
@@ -135,6 +145,8 @@ class TimerAction(Action):
 
     def execute(self, context) -> list:
         logger.error(
-            "TimerAction cannot be statically resolved: context execution timing is not sequential"
+            "%s: TimerAction cannot be statically resolved: "
+            "context execution timing is not sequential",
+            _current_file(context),
         )
         return []

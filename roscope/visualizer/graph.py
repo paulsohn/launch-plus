@@ -153,14 +153,6 @@ class _GraphBuilder:
         ns = action.namespace or "/"
         # Fallback to executable is best-effort; users should set name= explicitly.
         name = action.name or action.executable or ""
-        if not action.name:
-            logger.warning(
-                "Node in package %r has no name set (executable=%r, namespace=%r); "
-                "FQN is best-effort.",
-                action.package,
-                action.executable,
-                ns,
-            )
         fqn = f"{ns.rstrip('/')}/{name}"
         nid = self._uid("node", action.package, fqn)
 

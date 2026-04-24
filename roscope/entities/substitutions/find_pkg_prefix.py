@@ -67,10 +67,13 @@ class FindPackagePrefixSubstitution(Substitution):
             # In preview mode, packages are resolved to source workspace directories
             # which have no install prefix structure.  $(find-pkg-prefix) requires a
             # built install tree — it cannot be resolved statically from source.
+            from roscope.entities.helpers import _current_file
+
             logger.error(
-                "$(find-pkg-prefix %s) is not supported in preview mode "
+                "%s: $(find-pkg-prefix %s) is not supported in preview mode "
                 "(source directories have no install prefix); "
                 "build the workspace first or avoid this substitution in preview",
+                _current_file(ctx),
                 pkg,
             )
             raise LookupError(f"$(find-pkg-prefix {pkg}) unavailable in preview mode")
@@ -89,9 +92,12 @@ class FindPackagePrefixSubstitution(Substitution):
             if marker.exists():
                 return prefix_str
 
+        from roscope.entities.helpers import _current_file
+
         logger.error(
-            "$(find-pkg-prefix %s): package not found in AMENT index "
+            "%s: $(find-pkg-prefix %s): package not found in AMENT index "
             "(AMENT_PREFIX_PATH=%r); source /opt/ros/<distro>/setup.bash",
+            _current_file(ctx),
             pkg,
             ament_prefix_path or "<unset>",
         )

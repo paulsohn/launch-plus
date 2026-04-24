@@ -96,7 +96,13 @@ class EnvironmentVariable(Substitution):
         if value is None and self._default is not None:
             value = resolve_substitutions_from_tokens(self._default, ctx)
         if value is None:
-            logger.error("environment variable '%s' is not set; using empty string", name)
+            from roscope.entities.helpers import _current_file
+
+            logger.error(
+                "%s: environment variable '%s' is not set; using empty string",
+                _current_file(ctx),
+                name,
+            )
             return ""
         return str(value)
 

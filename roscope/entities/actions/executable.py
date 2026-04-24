@@ -29,16 +29,19 @@ Method definition order follows the official implementation.
 
 from __future__ import annotations
 
+import logging
 import shlex
 import xml.etree.ElementTree as ET
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
-from roscope.entities.helpers import env_overrides, resolve_value
+from roscope.entities.helpers import _current_file, env_overrides, resolve_value
 from roscope.entities.parsing import _ActionParser
 from roscope.entities.substitution import Substitution, TextSubstitution
 from roscope.entities.utilities import normalize_to_list_of_substitutions, perform_substitutions
 from roscope.parsers.entity import Entity
+
+logger = logging.getLogger("roscope")
 
 
 @expose_action("executable")
@@ -63,7 +66,11 @@ class ExecuteProcess(Action):
         else:
             # From Python shim: list of mixed str/Substitution items
             self.cmd = [normalize_to_list_of_substitutions(x) for x in cmd]
-        self.name = normalize_to_list_of_substitutions(name) if name is not None else name
+        # str → already resolved; anything else → normalize to list[Substitution]
+        if name is None or isinstance(name, str):
+            self.name = name
+        else:
+            self.name = normalize_to_list_of_substitutions(name)
         self.additional_env = kwargs.pop("additional_env", None)
         self.env: dict = {}
 
@@ -108,18 +115,24 @@ class ExecuteProcess(Action):
         return result_args
 
     @staticmethod
-    def parse_envs(entity: Entity, parser: _ActionParser) -> list:
-        """Extract <env> children as unresolved token pairs."""
+    def parse_envs(entity: Entity, parser: _ActionParser) -> dict:
+        """Extract <env> children as a dict of unresolved token lists."""
         items = entity.get_attr("env", data_type=list, optional=True)
         if not items:
-            return []
-        return [
-            (
-                parser.parse_substitution(e.get_attr("name", optional=True) or ""),
-                parser.parse_substitution(e.get_attr("value", optional=True) or ""),
+            return {}
+        result = {}
+        for e in items:
+            name_raw = e.get_attr("name", optional=True) or ""
+            if not name_raw.strip():
+                logger.error(
+                    "%s: skipping <env> child with missing or empty name attribute",
+                    _current_file(parser.ctx),
+                )
+                continue
+            result[tuple(parser.parse_substitution(name_raw))] = parser.parse_substitution(
+                e.get_attr("value", optional=True) or ""
             )
-            for e in items
-        ]
+        return result
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser, ignore: list | None = None):
@@ -140,23 +153,22 @@ class ExecuteProcess(Action):
             if isinstance(self.cmd, list)
             else [self.cmd]
         )
-        name = (
-            perform_substitutions(context, self.name)
-            if self.name is not None and not isinstance(self.name, str)
-            else self.name
-        )
+        name = context.perform_substitution(self.name) if self.name is not None else None
 
-        resolved = ExecuteProcess(cmd=" ".join(cmd_parts), name=name)
-        resolved.env = self._resolve_env(context)
-        return [resolved]
-
-    def _resolve_env(self, context) -> dict:
-        """Resolve additional_env into a flat env dict, starting from context overrides."""
         env = env_overrides(context)
         if self.additional_env is not None:
-            for k_tokens, v_tokens in self.additional_env:
-                env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
-        return env
+            for k_tokens, v_tokens in self.additional_env.items():
+                k = resolve_value(k_tokens, context) or ""
+                if not k:
+                    logger.error(
+                        "%s: additional_env entry has an empty variable name; skipping",
+                        _current_file(context),
+                    )
+                    continue
+                env[k] = resolve_value(v_tokens, context) or ""
+        resolved = ExecuteProcess(cmd=" ".join(cmd_parts), name=name)
+        resolved.env = env
+        return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:
         if not self.cmd:
@@ -165,4 +177,8 @@ class ExecuteProcess(Action):
         elem.set("cmd", self.cmd if isinstance(self.cmd, str) else "")
         if self.name:
             elem.set("name", self.name if isinstance(self.name, str) else "")
+        for k, v in sorted((self.env or {}).items()):
+            e = ET.SubElement(elem, "env")
+            e.set("name", k)
+            e.set("value", v)
         return [elem]

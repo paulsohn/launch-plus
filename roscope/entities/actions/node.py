@@ -294,6 +294,11 @@ class Node(ExecuteProcess):
             r.set("from", from_)
             r.set("to", to)
 
+        for k, v in (self.env or {}).items():
+            e = ET.SubElement(parent, "env")
+            e.set("name", k)
+            e.set("value", v)
+
         if isinstance(self.env, dict):
             for ename, value in sorted(self.env.items()):
                 e = ET.SubElement(parent, "env")

@@ -157,4 +157,8 @@ class ExecuteProcess(Action):
         elem.set("cmd", self.cmd if isinstance(self.cmd, str) else "")
         if self.name:
             elem.set("name", self.name if isinstance(self.name, str) else "")
+        for k, v in (self.env or {}).items():
+            e = ET.SubElement(elem, "env")
+            e.set("name", k)
+            e.set("value", v)
         return [elem]

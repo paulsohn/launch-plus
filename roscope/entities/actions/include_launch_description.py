@@ -16,7 +16,7 @@
 # - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/include_launch_description.py
 # Modified for roscope project by Taeseung Sohn, 2026.
 
-"""Action handler for <include> element."""
+"""Module for the IncludeLaunchDescription action."""
 
 from __future__ import annotations
 
@@ -37,11 +37,7 @@ logger = logging.getLogger("roscope")
 
 @expose_action("include")
 class IncludeLaunchDescription(Action):
-    """Include another launch file — XML, YAML, or Python.
-
-    Handles both XML parse path (``file=`` attribute with substitution tokens)
-    and Python shim path (``launch_description_source`` object).
-    """
+    """Action that includes a launch description source and yields its entities when visited."""
 
     @classmethod
     def parse(cls, entity: Entity, parser: Parser):
@@ -122,10 +118,12 @@ class IncludeLaunchDescription(Action):
         # that were not explicitly passed — use the stored declared default, not the
         # current _launch_configurations value (which may have been overwritten by <let>
         # or inherited from a different context).
-        child_declared_defaults: dict[str, str] = {}
-        for name, declared_default in state.declared_arg_names_by_file.get(file_path, {}).items():
+        child_declared_defaults: dict[str, tuple[str, bool]] = {}
+        for name, (declared_default, effective) in state.declared_arg_names_by_file.get(
+            file_path, {}
+        ).items():
             if name not in child_args:
-                child_declared_defaults[name] = declared_default
+                child_declared_defaults[name] = (effective, effective == declared_default)
 
         # Step 8: Wrap with markers
         return _wrap_with_markers(children, file_path, child_args, child_declared_defaults, state)
@@ -185,15 +183,16 @@ class IncludeLaunchDescription(Action):
 
 
 def _wrap_with_markers(
-    children, file_path, args, child_declared_defaults: dict[str, str], state
+    children, file_path, args, child_declared_defaults: dict[str, tuple[str, bool]], state
 ) -> list:
     """Wrap resolved children in a GroupAction with SourceMarker as first child.
 
     The GroupAction holds [SourceMarker, ArgComment..., ...children].
 
     ``args`` — explicitly passed include arguments (name → resolved value).
-    ``child_declared_defaults`` — args declared in the child with defaults but not
-    explicitly passed (name → resolved default value from _launch_configurations).
+    ``child_declared_defaults`` — args declared in the child but not explicitly passed
+    (name → (effective_value, is_default)).  ``is_default`` is True when the effective
+    value matches the declared default, False when it was inherited from a parent context.
     """
     has_content = any(not isinstance(c, SourceMarker) for c in children)
     if has_content or state.show_empty_includes:
@@ -204,8 +203,8 @@ def _wrap_with_markers(
             merged: dict[str, tuple[str, bool]] = {}
             for name, value in args.items():
                 merged[name] = (value, False)
-            for name, value in child_declared_defaults.items():
-                merged.setdefault(name, (value, True))
+            for name, (value, is_def) in child_declared_defaults.items():
+                merged.setdefault(name, (value, is_def))
             group_children.extend(
                 ArgComment(name=k, value=v, is_default=is_def)
                 for k, (v, is_def) in sorted(merged.items())

@@ -96,7 +96,9 @@ class DeclareLaunchArgument(Action):
         # Matching official DeclareLaunchArgument.execute():
         # if already set (passed by parent include), leave unchanged.
         if name in context._launch_configurations:
-            _track_arg_default(name, declared_default, state)
+            _track_arg_default(
+                name, declared_default, state, effective=context._launch_configurations[name]
+            )
             return None
 
         # Not set — apply default immediately (matching official: no deferred resolution).
@@ -111,13 +113,26 @@ class DeclareLaunchArgument(Action):
         return None
 
 
-def _track_arg_default(name: str, default: str, state) -> None:
-    """Record a declared arg name and its resolved default in global and per-file dicts."""
+def _track_arg_default(
+    name: str, declared_default: str, state, effective: str | None = None
+) -> None:
+    """Record a declared arg and its effective value in global and per-file dicts.
+
+    ``declared_default`` — the default string written in the XML/Python declaration.
+    ``effective``        — the actual value in context at declaration time; equals
+                          ``declared_default`` when the arg was not already set by a
+                          parent include, and equals the inherited value otherwise.
+                          Stored as ``(declared_default, effective)`` so callers can
+                          tell the difference for ``--show-args`` display.
+    """
     state.declared_arg_names.add(name)
     key = state.current_source_key()
     if key:
-        # setdefault preserves the first-seen default value for repeated declarations.
-        state.declared_arg_names_by_file.setdefault(key, {}).setdefault(name, default)
+        eff = effective if effective is not None else declared_default
+        # setdefault preserves the first-seen record for repeated declarations.
+        state.declared_arg_names_by_file.setdefault(key, {}).setdefault(
+            name, (declared_default, eff)
+        )
 
 
 def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
@@ -161,7 +176,12 @@ def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
 
     already_set = context is not None and arg.name in context._launch_configurations
     if already_set:
-        _track_arg_default(arg.name, declared_default, context._state)
+        _track_arg_default(
+            arg.name,
+            declared_default,
+            context._state,
+            effective=context._launch_configurations[arg.name],
+        )
         return
 
     # Apply default immediately — matching official DeclareLaunchArgument.execute()

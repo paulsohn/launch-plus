@@ -1678,7 +1678,7 @@ class TestEventHandlerWarning:
 
     def test_register_event_handler_warns(self, caplog):
         """RegisterEventHandler.execute() must emit a warning."""
-        from roscope.entities.actions.event_handler import RegisterEventHandler
+        from roscope.entities.actions.register_event_handler import RegisterEventHandler
 
         ctx = _make_context()
         handler = RegisterEventHandler(event_handler=None)
@@ -1689,7 +1689,7 @@ class TestEventHandlerWarning:
 
     def test_register_event_handler_via_visit_warns(self, caplog):
         """visit() path (via Python shim) also emits the warning."""
-        from roscope.entities.actions.event_handler import RegisterEventHandler
+        from roscope.entities.actions.register_event_handler import RegisterEventHandler
 
         ctx = _make_context()
         handler = RegisterEventHandler()
@@ -1715,7 +1715,9 @@ class TestEventHandlerWarning:
             )
             ctx = _make_context()
             with caplog.at_level(logging.WARNING):
-                from roscope.entities.actions.include import _inline_resolve_python_launch
+                from roscope.entities.actions.include_launch_description import (
+                    _inline_resolve_python_launch,
+                )
 
                 _inline_resolve_python_launch(ctx._state, child_path, ctx, {})
             assert "RegisterEventHandler" in caplog.text

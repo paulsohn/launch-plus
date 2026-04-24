@@ -108,18 +108,17 @@ class ExecuteProcess(Action):
         return result_args
 
     @staticmethod
-    def parse_envs(entity: Entity, parser: _ActionParser) -> list:
-        """Extract <env> children as unresolved token pairs."""
+    def parse_envs(entity: Entity, parser: _ActionParser) -> dict:
+        """Extract <env> children as a dict of unresolved token lists."""
         items = entity.get_attr("env", data_type=list, optional=True)
         if not items:
-            return []
-        return [
-            (
-                parser.parse_substitution(e.get_attr("name", optional=True) or ""),
-                parser.parse_substitution(e.get_attr("value", optional=True) or ""),
+            return {}
+        return {
+            tuple(parser.parse_substitution(e.get_attr("name", optional=True) or "")): (
+                parser.parse_substitution(e.get_attr("value", optional=True) or "")
             )
             for e in items
-        ]
+        }
 
     @classmethod
     def parse(cls, entity: Entity, parser: _ActionParser, ignore: list | None = None):
@@ -151,10 +150,9 @@ class ExecuteProcess(Action):
         return [resolved]
 
     def _resolve_env(self, context) -> dict:
-        """Resolve additional_env into a flat env dict, starting from context overrides."""
         env = env_overrides(context)
         if self.additional_env is not None:
-            for k_tokens, v_tokens in self.additional_env:
+            for k_tokens, v_tokens in self.additional_env.items():
                 env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
         return env
 

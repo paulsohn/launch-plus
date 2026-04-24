@@ -26,7 +26,7 @@ from roscope.entities.expose import expose_substitution
 from roscope.entities.substitution import Substitution
 
 if TYPE_CHECKING:
-    from roscope.entities.state import LaunchContext
+    from roscope.entities.launch_context import LaunchContext
 
 
 @expose_substitution("dirname")

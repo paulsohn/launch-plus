@@ -33,7 +33,7 @@ import yaml
 from roscope.entities.utilities import normalize_to_list_of_substitutions, perform_substitutions
 
 if TYPE_CHECKING:
-    from roscope.entities.state import LaunchContext
+    from roscope.entities.launch_context import LaunchContext
     from roscope.entities.substitution import Substitution
 
 logger = logging.getLogger("roscope")

@@ -56,6 +56,7 @@ from roscope.entities.conditions import (
 )
 from roscope.entities.descriptions import ComposableNode
 from roscope.entities.helpers import _current_file
+from roscope.entities.launch_context import LaunchContext, ResolverState
 from roscope.entities.launch_description import LaunchDescription
 from roscope.entities.launch_description_sources import (
     AnyLaunchDescriptionSource,
@@ -64,7 +65,6 @@ from roscope.entities.launch_description_sources import (
 )
 from roscope.entities.parameter_descriptions import ParameterFile
 from roscope.entities.parsing import Parser
-from roscope.entities.state import LaunchContext, ResolverState
 from roscope.entities.substitutions.env import EnvironmentVariable as _EnvironmentVariable
 from roscope.entities.substitutions.find_pkg_share import FindPackageShare
 from roscope.entities.substitutions.launch_config import LaunchConfiguration

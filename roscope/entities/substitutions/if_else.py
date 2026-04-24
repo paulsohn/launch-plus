@@ -27,7 +27,7 @@ from roscope.entities.substitution import Substitution
 from roscope.entities.substitutions.boolean import _coerce_bool
 
 if TYPE_CHECKING:
-    from roscope.entities.state import LaunchContext
+    from roscope.entities.launch_context import LaunchContext
 
 
 def _resolve_tokens(tokens: list, ctx: LaunchContext) -> str:

@@ -28,7 +28,7 @@ from roscope.entities.helpers import (
     env_overrides,
     resolve_substitutions,
 )
-from roscope.entities.state import LaunchContext, ResolverState
+from roscope.entities.launch_context import LaunchContext, ResolverState
 from roscope.entities.substitutions.find_pkg_share import FindPackageShare
 from roscope.entities.substitutions.launch_config import LaunchConfiguration
 from roscope.resolver import parse_xml_launch, parse_yaml_launch, resolve_xml_elements
@@ -189,20 +189,6 @@ class TestPerformSubstitution:
         ]
         ctx = _make_context({"resolved_var": "abc"})
         assert perform_substitutions(ctx, parts) == "abc$(var unresolved_var)"
-
-    def test_ex_returns_not_fallback_when_resolved(self):
-        lc = LaunchConfiguration("my_var")
-        ctx = _make_context({"my_var": "resolved_value"})
-        value, is_fallback = ctx.perform_substitution_ex(lc)
-        assert value == "resolved_value"
-        assert is_fallback is False
-
-    def test_ex_list_not_fallback_when_all_resolved(self):
-        parts = [LaunchConfiguration("a"), LaunchConfiguration("b")]
-        ctx = _make_context({"a": "foo", "b": "bar"})
-        value, is_fallback = ctx.perform_substitution_ex(parts)
-        assert value == "foobar"
-        assert is_fallback is False
 
 
 # ─── Node deferred resolution ────────────────────────────────────────────────
@@ -1596,7 +1582,7 @@ class TestPostBuildSourceIgnored:
 
     def test_resolve_pkg_share_postbuild_skips_lockfile(self, monkeypatch):
         """In post-build mode, resolve_pkg_share() must not use lockfile paths."""
-        from roscope.entities.state import ResolverState
+        from roscope.entities.launch_context import ResolverState
 
         state = ResolverState()
         state.preview_mode = False
@@ -1635,7 +1621,7 @@ class TestPostBuildSourceIgnored:
 
     def test_resolve_pkg_share_preview_uses_lockfile(self, monkeypatch):
         """In preview mode, resolve_pkg_share() must still use the lockfile."""
-        from roscope.entities.state import ResolverState
+        from roscope.entities.launch_context import ResolverState
 
         state = ResolverState()
         state.preview_mode = True

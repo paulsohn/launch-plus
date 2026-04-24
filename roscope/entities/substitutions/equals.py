@@ -27,7 +27,7 @@ from roscope.entities.expose import expose_substitution
 from roscope.entities.substitution import Substitution
 
 if TYPE_CHECKING:
-    from roscope.entities.state import LaunchContext
+    from roscope.entities.launch_context import LaunchContext
 
 _BOOL_STRINGS = frozenset(("true", "false", "1", "0"))
 _BOOL_TRUE = frozenset(("true", "1"))

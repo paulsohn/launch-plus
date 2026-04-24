@@ -1,7 +1,7 @@
 """Pure helper functions extracted from resolver.py.
 
 These functions track packages, nodes, includes, parameters, and event
-handlers in :class:`~roscope.entities.state.ResolverState`.  They are
+handlers in :class:`~roscope.entities.launch_context.ResolverState`.  They are
 intentionally stateless with respect to module-level variables — every
 function receives the state object explicitly.
 """
@@ -12,7 +12,7 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any
 
-from roscope.entities.state import LaunchContext
+from roscope.entities.launch_context import LaunchContext
 
 logger = logging.getLogger("roscope")
 

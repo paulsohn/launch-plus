@@ -160,6 +160,7 @@ class Node(ExecuteProcess):
         self.respawn_delay = kwargs.get("respawn_delay")
         self.ros_namespace: str | None = None
         self.explicit_namespace: str | None = None
+        self.name_guessed: bool = False
 
     def execute(self, context) -> list:
         """Resolve substitutions and return a clean resolved Node."""
@@ -173,7 +174,8 @@ class Node(ExecuteProcess):
         exe = context.perform_substitution(self.executable) or ""
         name = base.name if base else (context.perform_substitution(self.name) or "")
         ns = context.perform_substitution(self.namespace) if self.namespace else None
-        if not name and exe:
+        name_guessed = not name and bool(exe)
+        if name_guessed:
             logger.warning(
                 "%s: node (pkg=%r exec=%r) has no name set; FQN is guessed from executable name",
                 _current_file(context),
@@ -235,6 +237,7 @@ class Node(ExecuteProcess):
             return context.perform_substitution(raw) or None
 
         resolved = type(self)(package=pkg, executable=exe, name=name or None)
+        resolved.name_guessed = name_guessed
         resolved.ros_namespace = ros_ns
         resolved.explicit_namespace = ns
         resolved.namespace = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
@@ -259,7 +262,7 @@ class Node(ExecuteProcess):
         elem = ET.Element(self._tag_name)
         elem.set("pkg", self.package)
         elem.set("exec", self.executable or "")
-        if self.name:
+        if self.name and not self.name_guessed:
             elem.set("name", self.name)
         if self.namespace:
             elem.set("namespace", self.namespace)

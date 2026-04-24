@@ -26,11 +26,6 @@ from typing import Any
 from roscope.entities.action import Action
 from roscope.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
 from roscope.entities.actions.composable_node_container import ComposableNodeContainer
-from roscope.entities.actions.env import (
-    PushRosNamespace,
-    SetEnvironmentVariable,
-    UnsetEnvironmentVariable,
-)
 from roscope.entities.actions.event_handler import (
     OnProcessExit,
     OnProcessStart,
@@ -45,8 +40,12 @@ from roscope.entities.actions.group import GroupAction, OpaqueFunction, TimerAct
 from roscope.entities.actions.include import IncludeLaunchDescription
 from roscope.entities.actions.load_composable_nodes import LoadComposableNodes
 from roscope.entities.actions.node import LifecycleNode, Node
+from roscope.entities.actions.push_ros_namespace import PushROSNamespace
+from roscope.entities.actions.set_environment_variable import SetEnvironmentVariable
 from roscope.entities.actions.set_launch_configuration import SetLaunchConfiguration
 from roscope.entities.actions.set_parameter import SetParameter
+from roscope.entities.actions.set_remap import SetRemap
+from roscope.entities.actions.unset_environment_variable import UnsetEnvironmentVariable
 from roscope.entities.conditions import (
     IfCondition,
     LaunchConfigurationEquals,
@@ -167,8 +166,9 @@ def _build_patched_launch_ros_actions():
     mod.ComposableNodeContainer = ComposableNodeContainer
     mod.LoadComposableNodes = LoadComposableNodes
     mod.SetParameter = SetParameter
-    mod.SetRemap = lambda *a, **kw: None
-    mod.PushRosNamespace = PushRosNamespace
+    mod.SetRemap = SetRemap
+    mod.PushRosNamespace = PushROSNamespace  # legacy name for backward compatibility
+    mod.PushROSNamespace = PushROSNamespace
     mod.SetParametersCallback = lambda *a, **kw: None
     mod.__getattr__ = _make_shim_getattr("launch_ros.actions")
     return mod

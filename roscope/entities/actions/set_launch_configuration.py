@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Originally from (planned to split and refactor):
+# Originally from:
 # - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/set_launch_configuration.py
-# - https://github.com/ros2/launch_ros/blob/rolling/launch_ros/launch_ros/actions/set_parameter.py
 # Modified for roscope project by Taeseung Sohn, 2026.
 
 """Parameter-related action handlers.
@@ -57,41 +56,4 @@ class SetLaunchConfiguration(Action):
         # Set _launch_configurations — single source of truth for $(var name)
         if context is not None and hasattr(context, "_launch_configurations"):
             context._launch_configurations[name] = resolved_value
-        return None
-
-
-@expose_action("set_parameter")
-class SetParameter(Action):
-    """Mirrors launch_ros SetParameter / <set_parameter>."""
-
-    @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
-        _, kwargs = super().parse(entity, parser)
-        kwargs["name"] = parser.parse_substitution(entity.get_attr("name", optional=True) or "")
-        kwargs["value"] = parser.parse_substitution(entity.get_attr("value", optional=True) or "")
-        return cls, kwargs
-
-    def __init__(self, name=None, value=None, **kwargs):
-        super().__init__(**kwargs)
-        self._name = name
-        self._value = value
-
-    def execute(self, context) -> list | None:
-        from roscope.entities.helpers import resolve_value
-
-        name = resolve_value(self._name, context)
-        if not name:
-            return None
-        value: object = resolve_value(self._value, context)
-        if isinstance(value, str):
-            try:
-                value = int(value)
-            except (ValueError, TypeError):
-                try:
-                    value = float(value)
-                except (ValueError, TypeError):
-                    pass
-        # Matching official SetParameter: write to launch_configurations['global_params']
-        gp_list = context._launch_configurations.setdefault("global_params", [])
-        gp_list.append((name, value))
         return None

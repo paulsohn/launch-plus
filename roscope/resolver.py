@@ -45,7 +45,8 @@ from roscope.entities.actions.group import GroupAction, OpaqueFunction, TimerAct
 from roscope.entities.actions.include import IncludeLaunchDescription
 from roscope.entities.actions.load_composable_nodes import LoadComposableNodes
 from roscope.entities.actions.node import LifecycleNode, Node
-from roscope.entities.actions.param import SetLaunchConfiguration, SetParameter
+from roscope.entities.actions.set_launch_configuration import SetLaunchConfiguration
+from roscope.entities.actions.set_parameter import SetParameter
 from roscope.entities.conditions import (
     IfCondition,
     LaunchConfigurationEquals,

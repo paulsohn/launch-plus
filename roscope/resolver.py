@@ -26,26 +26,26 @@ from typing import Any
 from roscope.entities.action import Action
 from roscope.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
 from roscope.entities.actions.composable_node_container import ComposableNodeContainer
+from roscope.entities.actions.emit_event import EmitEvent
 from roscope.entities.actions.event_handler import (
     OnProcessExit,
     OnProcessStart,
     OnShutdown,
     OnStateTransition,
-    RegisterEventHandler,
-    Shutdown,
-    TrackedEmitEvent,
 )
 from roscope.entities.actions.execute_process import ExecuteProcess
 from roscope.entities.actions.group_action import GroupAction
-from roscope.entities.actions.include import IncludeLaunchDescription
+from roscope.entities.actions.include_launch_description import IncludeLaunchDescription
 from roscope.entities.actions.load_composable_nodes import LoadComposableNodes
 from roscope.entities.actions.node import LifecycleNode, Node
 from roscope.entities.actions.opaque_function import OpaqueFunction
 from roscope.entities.actions.push_ros_namespace import PushROSNamespace
+from roscope.entities.actions.register_event_handler import RegisterEventHandler
 from roscope.entities.actions.set_environment_variable import SetEnvironmentVariable
 from roscope.entities.actions.set_launch_configuration import SetLaunchConfiguration
 from roscope.entities.actions.set_parameter import SetParameter
 from roscope.entities.actions.set_remap import SetRemap
+from roscope.entities.actions.shutdown_action import Shutdown
 from roscope.entities.actions.timer_action import TimerAction
 from roscope.entities.actions.unset_environment_variable import UnsetEnvironmentVariable
 from roscope.entities.conditions import (
@@ -231,7 +231,7 @@ def _build_patched_launch_actions():
     mod.LogInfo = lambda *a, **kw: None
     mod.TimerAction = TimerAction
     mod.RegisterEventHandler = RegisterEventHandler
-    mod.EmitEvent = TrackedEmitEvent
+    mod.EmitEvent = EmitEvent
     mod.Shutdown = Shutdown
     mod.PushLaunchConfigurations = lambda *a, **kw: None
     mod.PopLaunchConfigurations = lambda *a, **kw: None
@@ -667,9 +667,7 @@ def resolve_file(
         if isinstance(entity, DeclareLaunchArgument):
             _apply_declared_arg(entity, ctx)
 
-    from roscope.entities.actions.group import GroupAction as _GroupAction
-
-    resolved = _GroupAction(actions=list(entities), scoped=False).visit(ctx) or []
+    resolved = GroupAction(actions=list(entities), scoped=False).visit(ctx) or []
 
     return _tracked_to_parsed_launch_file(state, ctx), resolved
 

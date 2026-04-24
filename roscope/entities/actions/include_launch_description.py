@@ -24,7 +24,7 @@ import logging
 import os
 
 from roscope.entities.action import Action
-from roscope.entities.actions.group import GroupAction
+from roscope.entities.actions.group_action import GroupAction
 from roscope.entities.actions.marker import ArgComment, SourceMarker
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file

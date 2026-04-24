@@ -24,14 +24,17 @@ Matching official ``launch_ros.actions.Node`` and ``LifecycleNode``.
 
 from __future__ import annotations
 
+import logging
 import xml.etree.ElementTree as ET
 
 from roscope.entities.actions.executable import ExecuteProcess
 from roscope.entities.expose import expose_action
-from roscope.entities.helpers import _ros2_namespace_join
+from roscope.entities.helpers import _current_file, _ros2_namespace_join
 from roscope.entities.parameter_descriptions import Parameter, ParameterFile
 from roscope.entities.parsing import _ActionParser
 from roscope.parsers.entity import Entity
+
+logger = logging.getLogger("roscope")
 
 
 def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
@@ -170,6 +173,13 @@ class Node(ExecuteProcess):
         exe = context.perform_substitution(self.executable) or ""
         name = base.name if base else (context.perform_substitution(self.name) or "")
         ns = context.perform_substitution(self.namespace) if self.namespace else None
+        if not name:
+            logger.warning(
+                "%s: node (pkg=%r exec=%r) has no name set; FQN cannot be fully resolved",
+                _current_file(context),
+                pkg,
+                exe,
+            )
         if pkg:
             state.track_package(pkg)
 

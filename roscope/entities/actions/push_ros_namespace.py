@@ -24,7 +24,7 @@ import logging
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 logger = logging.getLogger("roscope")
@@ -44,7 +44,7 @@ class PushROSNamespace(Action):
         self._namespace = namespace
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         """Return `PushROSNamespace` action and kwargs for constructing it."""
         _, kwargs = super().parse(entity, parser)
         kwargs["namespace"] = parser.parse_substitution(entity.get_attr("namespace"))

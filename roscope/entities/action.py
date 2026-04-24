@@ -24,7 +24,7 @@ import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from roscope.entities.parsing import _ActionParser
+    from roscope.entities.parsing import Parser
     from roscope.parsers.entity import Entity
 
 
@@ -44,7 +44,7 @@ class Action:
     """
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser) -> tuple[type, dict[str, Any]]:
+    def parse(cls, entity: Entity, parser: Parser) -> tuple[type, dict[str, Any]]:
         """Parse if=/unless= and return a (cls, kwargs) base.
 
         Matches official ``Action.parse()`` which extracts the condition and

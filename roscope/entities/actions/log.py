@@ -24,7 +24,7 @@ import xml.etree.ElementTree as ET
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 
@@ -33,7 +33,7 @@ class LogInfo(Action):
     """<log> — records a log message."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         _, kwargs = super().parse(entity, parser)
         msg_raw = entity.get_attr("message", optional=True) or ""
         kwargs["message"] = parser.parse_substitution(msg_raw)

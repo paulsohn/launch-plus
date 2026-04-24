@@ -28,7 +28,7 @@ from roscope.entities.actions.group_action import GroupAction
 from roscope.entities.actions.marker import ArgComment, SourceMarker
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.entities.substitution import Substitution
 from roscope.parsers.entity import Entity
 
@@ -44,7 +44,7 @@ class IncludeLaunchDescription(Action):
     """
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         _, kwargs = super().parse(entity, parser)
         raw_file = entity.get_attr("file")
         kwargs["launch_description_source"] = None

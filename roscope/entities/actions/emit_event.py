@@ -38,7 +38,7 @@ class EmitEvent(Action):
         self.event = event
 
     # @classmethod
-    # def parse(cls, entity: Entity, parser: _ActionParser):
+    # def parse(cls, entity: Entity, parser: Parser):
     #     event = entity.get_attr("event", optional=True) or ""
     #     return cls(event=event)
 

@@ -29,7 +29,7 @@ import xml.etree.ElementTree as ET
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 logger = logging.getLogger("roscope")
@@ -76,7 +76,7 @@ class EventHandler(Action):
         self.actions: list = []
 
     @classmethod
-    def _parse_xml(cls, entity: Entity, parser: _ActionParser):
+    def _parse_xml(cls, entity: Entity, parser: Parser):
         """Shared XML parse logic for all event handler types.
 
         Ad-hoc — event handlers have no official XML counterpart.
@@ -163,7 +163,7 @@ class OnProcessStart(EventHandler):
     """<on_process_start> / Python OnProcessStart shim."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         return cls._parse_xml(entity, parser)
 
 
@@ -172,7 +172,7 @@ class OnProcessExit(EventHandler):
     """<on_process_exit> / Python OnProcessExit shim."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         return cls._parse_xml(entity, parser)
 
 
@@ -181,7 +181,7 @@ class OnStateTransition(EventHandler):
     """<on_state_transition> / Python OnStateTransition shim."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         return cls._parse_xml(entity, parser)
 
 
@@ -190,7 +190,7 @@ class OnShutdown(EventHandler):
     """<on_shutdown> / Python OnShutdown shim."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         return cls._parse_xml(entity, parser)
 
 

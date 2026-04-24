@@ -31,7 +31,7 @@ import xml.etree.ElementTree as ET
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file, env_overrides, resolve_value
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.entities.substitution import Substitution, TextSubstitution
 from roscope.entities.utilities import normalize_to_list_of_substitutions, perform_substitutions
 from roscope.parsers.entity import Entity
@@ -68,7 +68,7 @@ class ExecuteProcess(Action):
         self.env: dict = {}
 
     @classmethod
-    def _parse_cmdline(cls, cmd: str, parser: _ActionParser) -> list[list[Substitution]]:
+    def _parse_cmdline(cls, cmd: str, parser: Parser) -> list[list[Substitution]]:
         """Parse text apt for command line execution.
 
         Matching official ``ExecuteProcess._parse_cmdline``: splits on
@@ -108,7 +108,7 @@ class ExecuteProcess(Action):
         return result_args
 
     @staticmethod
-    def parse_envs(entity: Entity, parser: _ActionParser) -> dict:
+    def parse_envs(entity: Entity, parser: Parser) -> dict:
         """Extract <env> children as a dict of unresolved token lists."""
         items = entity.get_attr("env", data_type=list, optional=True)
         if not items:
@@ -128,7 +128,7 @@ class ExecuteProcess(Action):
         return result
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser, ignore: list | None = None):
+    def parse(cls, entity: Entity, parser: Parser, ignore: list | None = None):
         _, kwargs = super().parse(entity, parser)
         ignore = ignore or []
         if "cmd" not in ignore:

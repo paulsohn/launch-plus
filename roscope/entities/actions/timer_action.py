@@ -25,7 +25,7 @@ import logging
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 logger = logging.getLogger("roscope")
@@ -45,7 +45,7 @@ class TimerAction(Action):
         self.actions: list = list(actions or [])
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         """Return the `Timer` action and kwargs for constructing it."""
         _, kwargs = super().parse(entity, parser)
 

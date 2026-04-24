@@ -19,7 +19,7 @@
 
 """Action parser facade for XML/YAML action handlers.
 
-Provides :class:`_ActionParser`, a stateless parsing helper that action
+Provides :class:`Parser`, a stateless parsing helper that action
 ``parse()`` classmethods use to build unresolved action instances.
 """
 
@@ -58,7 +58,7 @@ class _ParsedCondition:
         return f"_ParsedCondition({self.kind!r}, {self.tokens!r})"
 
 
-class _ActionParser:
+class Parser:
     """Stateless parsing helper for action ``parse()`` classmethods.
 
     Provides substitution token parsing and condition evaluation.

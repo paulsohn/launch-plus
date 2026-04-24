@@ -66,7 +66,7 @@ from roscope.entities.launch_description_sources import (
     XMLLaunchDescriptionSource,
 )
 from roscope.entities.parameter_descriptions import ParameterFile
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.entities.state import LaunchContext, ResolverState
 from roscope.entities.substitutions.env import EnvironmentVariable as _EnvironmentVariable
 from roscope.entities.substitutions.find_pkg_share import FindPackageShare
@@ -483,7 +483,7 @@ def _resolve_element(
 
     tag = elem.type_name
     if tag in action_parse_methods:
-        parser = _ActionParser(ctx, include_stack)
+        parser = Parser(ctx, include_stack)
         action = action_parse_methods[tag](elem, parser)
         if isinstance(action, Action):
             return action.visit(ctx) or []

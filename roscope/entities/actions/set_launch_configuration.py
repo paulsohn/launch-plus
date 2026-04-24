@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 
@@ -34,7 +34,7 @@ class SetLaunchConfiguration(Action):
     """Implements SetLaunchConfiguration / <let>: updates launch_configurations."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         _, kwargs = super().parse(entity, parser)
         kwargs["name"] = entity.get_attr("name", optional=True) or ""
         kwargs["value"] = parser.parse_substitution(entity.get_attr("value", optional=True) or "")

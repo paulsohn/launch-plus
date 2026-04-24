@@ -25,7 +25,7 @@ import logging
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file, resolve_value
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 logger = logging.getLogger("roscope")
@@ -40,7 +40,7 @@ class UnsetEnvironmentVariable(Action):
         self._name = name
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         _, kwargs = super().parse(entity, parser)
         kwargs["name"] = parser.parse_substitution(entity.get_attr("name"))
         return cls, kwargs

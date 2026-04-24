@@ -28,6 +28,23 @@ from roscope.entities.helpers import _current_file
 logger = logging.getLogger("roscope")
 
 
+def visit_actions(actions, context) -> list:
+    """Execute a list of actions and collect resolved results."""
+    results: list = []
+    for action in actions or []:
+        if action is None:
+            continue
+        if not isinstance(action, Action):
+            logger.error(
+                "%s: expected Action, got %s", _current_file(context), type(action).__name__
+            )
+            continue
+        children = action.visit(context)
+        if children:
+            results.extend(children)
+    return results
+
+
 class OpaqueFunction(Action):
     """Action that executes a Python function."""
 
@@ -41,9 +58,7 @@ class OpaqueFunction(Action):
         try:
             result = self.function(context, *self.args, **self.kwargs) or []
 
-            from roscope.resolver import _execute_actions
-
-            return _execute_actions(result, context)
+            return visit_actions(result, context)
         except Exception as e:
             logger.error(
                 "OpaqueFunction failed in %s: %s",

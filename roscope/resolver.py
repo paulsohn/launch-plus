@@ -475,23 +475,6 @@ def _resolve_element(
     return []
 
 
-def _execute_actions(actions, context) -> list:
-    """Execute a list of actions and collect resolved results."""
-    results: list = []
-    for action in actions or []:
-        if action is None:
-            continue
-        if not isinstance(action, Action):
-            logger.error(
-                "%s: expected Action, got %s", _current_file(context), type(action).__name__
-            )
-            continue
-        children = action.visit(context)
-        if children:
-            results.extend(children)
-    return results
-
-
 # ─── Main entry point ─────────────────────────────────────────────���──────────
 
 

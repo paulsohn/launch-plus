@@ -1720,7 +1720,7 @@ class TestShimUnknownAction:
         assert "SomeFutureAction_XYZ_123" in caplog.text
 
     def test_unknown_shim_returns_action_subclass(self):
-        """The stub class must be an Action subclass usable by _execute_actions."""
+        """The stub class must be an Action subclass usable by visit_actions."""
 
         from roscope.entities.action import Action
 

@@ -26,6 +26,7 @@ import os
 from roscope.entities.action import Action
 from roscope.entities.actions.group_action import GroupAction
 from roscope.entities.actions.marker import ArgComment, SourceMarker
+from roscope.entities.actions.opaque_function import visit_actions
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file
 from roscope.entities.parsing import Parser
@@ -219,8 +220,6 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
     """Load a Python launch file and walk its actions in the parent context."""
     import importlib.util
 
-    from roscope.resolver import _execute_actions
-
     real_path = launch_file
     if not os.path.isfile(real_path):
         return []
@@ -254,7 +253,7 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
         for k, v in child_args.items():
             parent_context._launch_configurations[k] = v
 
-        return _execute_actions(entities, parent_context)
+        return visit_actions(entities, parent_context)
     finally:
         state.declared_arg_names.clear()
         state.declared_arg_names.update(saved_declared_arg_names)

@@ -139,22 +139,16 @@ class ExecuteProcess(Action):
             if isinstance(self.cmd, list)
             else [self.cmd]
         )
-        name = (
-            perform_substitutions(context, self.name)
-            if self.name is not None and not isinstance(self.name, str)
-            else self.name
-        )
+        name = context.perform_substitution(self.name) if self.name is not None else None
 
-        resolved = ExecuteProcess(cmd=" ".join(cmd_parts), name=name)
-        resolved.env = self._resolve_env(context)
-        return [resolved]
-
-    def _resolve_env(self, context) -> dict:
         env = env_overrides(context)
         if self.additional_env is not None:
             for k_tokens, v_tokens in self.additional_env.items():
                 env[resolve_value(k_tokens, context) or ""] = resolve_value(v_tokens, context) or ""
-        return env
+        resolved = ExecuteProcess(cmd=" ".join(cmd_parts), name=name)
+        resolved.name = name  # keep as resolved string; __init__ normalizes to list
+        resolved.env = env
+        return [resolved]
 
     def serialize_resolved(self) -> list[ET.Element]:
         if not self.cmd:

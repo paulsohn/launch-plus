@@ -219,10 +219,6 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
     """Load a Python launch file and walk its actions in the parent context."""
     import importlib.util
 
-    from roscope.entities.actions.declare_launch_argument import (
-        DeclareLaunchArgument,
-        _apply_declared_arg,
-    )
     from roscope.resolver import _execute_actions
 
     real_path = launch_file
@@ -257,10 +253,6 @@ def _inline_resolve_python_launch(state, launch_file, parent_context, child_args
 
         for k, v in child_args.items():
             parent_context._launch_configurations[k] = v
-
-        for entity in entities:
-            if isinstance(entity, DeclareLaunchArgument):
-                _apply_declared_arg(entity, parent_context)
 
         return _execute_actions(entities, parent_context)
     finally:

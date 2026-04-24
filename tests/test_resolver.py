@@ -15,10 +15,7 @@ from roscope.entities.actions.composable_node_container import (
     ComposableNodeContainer,
     _resolve_plugins,
 )
-from roscope.entities.actions.declare_launch_argument import (
-    DeclareLaunchArgument,
-    _apply_declared_arg,
-)
+from roscope.entities.actions.declare_launch_argument import DeclareLaunchArgument
 from roscope.entities.actions.include_launch_description import _inline_resolve_python_launch
 from roscope.entities.actions.node import Node
 from roscope.entities.actions.set_environment_variable import SetEnvironmentVariable
@@ -1272,10 +1269,10 @@ class TestActionRegistry:
 # ─── rosdep resolve parser tests ─────────────────────────────────────────────
 
 
-# ─── _apply_declared_arg ─────────────────────────────────────────────────────
+# ─── DeclareLaunchArgument.execute() ─────────────────────────────────────────
 
 
-class TestApplyDeclaredArg:
+class TestDeclareLaunchArgumentExecute:
     """DeclareLaunchArgument.execute() resolves defaults immediately (matching official)."""
 
     def test_arg_already_set_is_preserved(self, caplog):
@@ -1290,7 +1287,7 @@ class TestApplyDeclaredArg:
             ],
         )
         with caplog.at_level(logging.WARNING):
-            _apply_declared_arg(arg, ctx)
+            arg.execute(ctx)
         # Arg value unchanged (caller's value preserved).
         assert ctx._launch_configurations["my_arg"] == "already_set_value"
 
@@ -1303,7 +1300,7 @@ class TestApplyDeclaredArg:
             "my_arg",
             default_value="simple_default",
         )
-        _apply_declared_arg(arg, ctx)
+        arg.execute(ctx)
         # Resolved immediately (no deferred default).
         assert ctx._launch_configurations["my_arg"] == "simple_default"
         assert LaunchConfiguration("my_arg").perform(ctx) == "simple_default"

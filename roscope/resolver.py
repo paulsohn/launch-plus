@@ -25,10 +25,7 @@ from typing import Any
 
 from roscope.entities.action import Action
 from roscope.entities.actions.composable_node_container import ComposableNodeContainer
-from roscope.entities.actions.declare_launch_argument import (
-    DeclareLaunchArgument,
-    _apply_declared_arg,
-)
+from roscope.entities.actions.declare_launch_argument import DeclareLaunchArgument
 from roscope.entities.actions.emit_event import EmitEvent
 from roscope.entities.actions.event_handler import (
     OnProcessExit,
@@ -665,10 +662,6 @@ def resolve_file(
         return _tracked_to_parsed_launch_file(state), []
 
     entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
-
-    for entity in entities:
-        if isinstance(entity, DeclareLaunchArgument):
-            _apply_declared_arg(entity, ctx)
 
     resolved = GroupAction(actions=list(entities), scoped=False).visit(ctx) or []
 

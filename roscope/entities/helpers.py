@@ -17,6 +17,14 @@ from roscope.entities.state import LaunchContext
 logger = logging.getLogger("roscope")
 
 
+def _current_file(context) -> str:
+    """Return the current launch file path for diagnostic messages."""
+    try:
+        return str(context._state.current_source_key())
+    except Exception:
+        return "<unknown>"
+
+
 def env_overrides(context: LaunchContext) -> dict[str, str]:
     """Return env vars explicitly set via SetEnvironmentVariable (overrides only).
 
@@ -183,7 +191,7 @@ def _evaluate_condition(
     try:
         truthy = _is_truthy(resolved)
     except ValueError as e:
-        logger.error("%s", e)
+        logger.error("%s: %s", _current_file(ctx), e)
         return False
     if kind == "If":
         return truthy

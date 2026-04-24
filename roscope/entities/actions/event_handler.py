@@ -34,6 +34,7 @@ import xml.etree.ElementTree as ET
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
+from roscope.entities.helpers import _current_file
 from roscope.entities.parsing import _ActionParser
 from roscope.parsers.entity import Entity
 
@@ -280,8 +281,9 @@ class RegisterEventHandler(Action):
 
     def execute(self, context) -> list:
         logger.warning(
-            "RegisterEventHandler encountered — event-handler-driven topology "
+            "%s: RegisterEventHandler encountered — event-handler-driven topology "
             "is not resolved; nodes or actions triggered by events will not "
-            "appear in the resolved output"
+            "appear in the resolved output",
+            _current_file(context),
         )
         return []

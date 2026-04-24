@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Originally from (planned to split and refactor):
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/event_handler.py
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/event_handlers/on_process_start.py
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/event_handlers/on_process_exit.py
-# - https://github.com/ros2/launch_ros/blob/rolling/launch_ros/launch_ros/event_handlers/on_state_transition.py
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/event_handlers/on_shutdown.py
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/emit_event.py
+# Originally from:
+# - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/execute_process.py
 # Modified for roscope project by Taeseung Sohn, 2026.
 
 """Action handler for <executable> / ExecuteProcess.
@@ -55,9 +50,7 @@ class ExecuteProcess(Action):
     def __init__(self, *, cmd=None, name=None, condition=None, **kwargs):
         super().__init__(condition=condition)
         # Normalize cmd: list of argument lists, matching official Executable
-        if cmd is None:
-            self.cmd: list[list[Substitution]] | str = []
-        elif isinstance(cmd, str):
+        if isinstance(cmd, str):
             # Already resolved string (from resolved object)
             self.cmd = cmd
         elif isinstance(cmd, list) and cmd and isinstance(cmd[0], list):

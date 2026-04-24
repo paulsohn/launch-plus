@@ -69,9 +69,8 @@ from roscope.entities.substitutions.env import EnvironmentVariable as _Environme
 from roscope.entities.substitutions.find_pkg_share import FindPackageShare
 from roscope.entities.substitutions.launch_config import LaunchConfiguration
 from roscope.entities.substitutions.path_join import PathJoinSubstitution
-from roscope.parsers.entity import Entity
-from roscope.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
-from roscope.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
+from roscope.parsers.xml_parser import parse_xml_launch
+from roscope.parsers.yaml_parser import parse_yaml_launch
 
 logger = logging.getLogger("roscope")
 
@@ -437,19 +436,6 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
             if parent is not None:
                 setattr(parent, child_name, mod)
         return mod
-
-
-# ─── XML/YAML parsing ────────────────────────────────────────────────────────
-
-
-def parse_xml_launch(content: str, file_path: str) -> list[Entity]:
-    """Parse an XML launch file to a list of Entity objects."""
-    return list(_parse_xml_launch_entity(content, file_path))
-
-
-def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
-    """Parse a YAML launch file to a list of Entity objects."""
-    return list(_parse_yaml_launch_entity(content, file_path))
 
 
 # ─── XML/YAML element resolution ────────��────────────────────────────────────

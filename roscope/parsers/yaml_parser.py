@@ -171,8 +171,8 @@ class YamlEntity(Entity):
 # ── Parser entry point ───────────────────────────────────────────────────────
 
 
-def parse_yaml_launch(content: str, file_path: str) -> list[YamlEntity]:
-    """Parse a YAML launch file and return a list of root-level :class:`YamlEntity` objects.
+def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
+    """Parse a YAML launch file and return a list of root-level :class:`Entity` objects.
 
     Expects::
 
@@ -196,7 +196,7 @@ def parse_yaml_launch(content: str, file_path: str) -> list[YamlEntity]:
         logger.warning("YAML 'launch' key in '%s' is not a list", file_path)
         return []
 
-    entities: list[YamlEntity] = []
+    entities: list[Entity] = []
     for entry in launch_list:
         if not isinstance(entry, dict) or len(entry) != 1:
             continue

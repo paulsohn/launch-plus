@@ -143,8 +143,8 @@ class XmlEntity(Entity):
 # ── Parser entry point ───────────────────────────────────────────────────────
 
 
-def parse_xml_launch(content: str, file_path: str) -> list[XmlEntity]:
-    """Parse an XML launch file and return a list of root-level :class:`XmlEntity` objects."""
+def parse_xml_launch(content: str, file_path: str) -> list[Entity]:
+    """Parse an XML launch file and return a list of root-level :class:`Entity` objects."""
     root = ET.fromstring(content)  # noqa: S314
     if root.tag != "launch":
         logger.warning("XML launch file '%s' has unexpected root tag <%s>", file_path, root.tag)

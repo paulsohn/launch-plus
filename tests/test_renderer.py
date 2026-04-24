@@ -122,6 +122,26 @@ def test_executable() -> None:
     assert "echo hello" in snippet
 
 
+def test_executable_env_children() -> None:
+    ctx = _make_ctx()
+    ep = ExecuteProcess(cmd=["echo"], additional_env={"ROSCOPE_TEST_VAR": "hello"})
+    resolved = ep.execute(ctx)
+    elems = resolved[0].serialize_resolved()
+    assert len(elems) == 1
+    env_map = {e.get("name"): e.get("value") for e in elems[0].findall("env")}
+    assert env_map.get("ROSCOPE_TEST_VAR") == "hello"
+
+
+def test_node_env_children() -> None:
+    ctx = _make_ctx()
+    node = Node(package="p", executable="e", additional_env={"ROSCOPE_TEST_VAR": "world"})
+    resolved = node.execute(ctx)
+    elems = resolved[0].serialize_resolved()
+    assert len(elems) == 1
+    env_map = {e.get("name"): e.get("value") for e in elems[0].findall("env")}
+    assert env_map.get("ROSCOPE_TEST_VAR") == "world"
+
+
 # ─── Source group nesting ────────────────────────────────────────────────────
 
 

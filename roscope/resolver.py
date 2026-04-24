@@ -36,15 +36,17 @@ from roscope.entities.actions.event_handler import (
     TrackedEmitEvent,
 )
 from roscope.entities.actions.execute_process import ExecuteProcess
-from roscope.entities.actions.group import GroupAction, OpaqueFunction, TimerAction
+from roscope.entities.actions.group_action import GroupAction
 from roscope.entities.actions.include import IncludeLaunchDescription
 from roscope.entities.actions.load_composable_nodes import LoadComposableNodes
 from roscope.entities.actions.node import LifecycleNode, Node
+from roscope.entities.actions.opaque_function import OpaqueFunction
 from roscope.entities.actions.push_ros_namespace import PushROSNamespace
 from roscope.entities.actions.set_environment_variable import SetEnvironmentVariable
 from roscope.entities.actions.set_launch_configuration import SetLaunchConfiguration
 from roscope.entities.actions.set_parameter import SetParameter
 from roscope.entities.actions.set_remap import SetRemap
+from roscope.entities.actions.timer_action import TimerAction
 from roscope.entities.actions.unset_environment_variable import UnsetEnvironmentVariable
 from roscope.entities.conditions import (
     IfCondition,

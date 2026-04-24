@@ -74,7 +74,7 @@ class ExecutableInPackage(Substitution):
         return cls, {"executable": exe_arg, "package": pkg_arg}
 
     def perform(self, ctx: LaunchContext) -> str:
-        from roscope.entities.helpers import resolve_substitutions_from_tokens
+        from roscope.entities.helpers import _current_file, resolve_substitutions_from_tokens
 
         exe = resolve_substitutions_from_tokens(self._executable, ctx)
         pkg = resolve_substitutions_from_tokens(self._package, ctx)
@@ -82,8 +82,9 @@ class ExecutableInPackage(Substitution):
 
         if ctx._state.preview_mode:
             logger.error(
-                "$(exec-in-pkg %s %s) requires a built install tree and cannot be "
+                "%s: $(exec-in-pkg %s %s) requires a built install tree and cannot be "
                 "resolved in preview mode; build the workspace first",
+                _current_file(ctx),
                 exe,
                 pkg,
             )
@@ -105,7 +106,8 @@ class ExecutableInPackage(Substitution):
 
         if package_prefix is None:
             logger.error(
-                "$(exec-in-pkg %s %s): package '%s' not found in AMENT_PREFIX_PATH",
+                "%s: $(exec-in-pkg %s %s): package '%s' not found in AMENT_PREFIX_PATH",
+                _current_file(ctx),
                 exe,
                 pkg,
                 pkg,
@@ -115,7 +117,8 @@ class ExecutableInPackage(Substitution):
         libexec_dir = os.path.join(package_prefix, "lib", pkg)
         if not os.path.isdir(libexec_dir):
             logger.error(
-                "$(exec-in-pkg %s %s): libexec directory '%s' does not exist",
+                "%s: $(exec-in-pkg %s %s): libexec directory '%s' does not exist",
+                _current_file(ctx),
                 exe,
                 pkg,
                 libexec_dir,
@@ -130,7 +133,8 @@ class ExecutableInPackage(Substitution):
             return candidate
 
         logger.error(
-            "$(exec-in-pkg %s %s): executable '%s' not found in '%s'",
+            "%s: $(exec-in-pkg %s %s): executable '%s' not found in '%s'",
+            _current_file(ctx),
             exe,
             pkg,
             exe,

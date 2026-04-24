@@ -24,6 +24,7 @@ import logging
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
+from roscope.entities.helpers import _current_file
 from roscope.entities.parsing import _ActionParser
 from roscope.parsers.entity import Entity
 
@@ -101,7 +102,7 @@ class DeclareLaunchArgument(Action):
         # Not set — apply default immediately (matching official: no deferred resolution).
         if self.default_value is None:
             # No default and not set: at runtime this raises InvalidLaunchArgument.
-            logger.error("arg '%s' is required but not set", name)
+            logger.error("%s: arg '%s' is required but not set", _current_file(context), name)
             _track_arg_default(name, "", state)
             return None
 
@@ -141,8 +142,9 @@ def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
                 return
         except Exception as e:
             logger.warning(
-                "condition on DeclareLaunchArgument '%s' failed to evaluate: %s; "
+                "%s: condition on DeclareLaunchArgument '%s' failed to evaluate: %s; "
                 "assuming condition is satisfied",
+                _current_file(context),
                 arg.name,
                 e,
             )
@@ -153,7 +155,7 @@ def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
 
     if arg.default_value is None:
         if arg.name not in context._launch_configurations:
-            logger.error("arg '%s' is required but not set", arg.name)
+            logger.error("%s: arg '%s' is required but not set", _current_file(context), arg.name)
         _track_arg_default(arg.name, "", context._state)
         return
 

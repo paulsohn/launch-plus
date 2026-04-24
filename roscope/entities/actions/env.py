@@ -31,6 +31,7 @@ import os
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
+from roscope.entities.helpers import _current_file
 from roscope.entities.parsing import _ActionParser
 from roscope.parsers.entity import Entity
 
@@ -58,7 +59,10 @@ class SetEnvironmentVariable(Action):
 
         name = resolve_value(self._name, context)
         if not name:
-            logger.error("SetEnvironmentVariable: resolved name is empty or None — skipping")
+            logger.error(
+                "%s: SetEnvironmentVariable: resolved name is empty or None — skipping",
+                _current_file(context),
+            )
             return None
         value = resolve_value(self._value, context) or ""
         context.environment[name] = value
@@ -84,20 +88,26 @@ class UnsetEnvironmentVariable(Action):
 
         name = resolve_value(self._name, context)
         if not name:
-            logger.error("UnsetEnvironmentVariable: resolved name is empty or None — skipping")
+            logger.error(
+                "%s: UnsetEnvironmentVariable: resolved name is empty or None — skipping",
+                _current_file(context),
+            )
             return None
         if name in os.environ:
             logger.error(
-                "unset_env: '%s' exists in the process env and cannot be unset. "
+                "%s: unset_env: '%s' exists in the process env and cannot be unset. "
                 'Use SetEnvironmentVariable(name="%s", value="") '
                 "or a scoped group instead",
+                _current_file(context),
                 name,
                 name,
             )
         elif name in context.environment:
             del context.environment[name]
         else:
-            logger.error("unset_env: environment variable '%s' is not set", name)
+            logger.error(
+                "%s: unset_env: environment variable '%s' is not set", _current_file(context), name
+            )
         return None
 
 

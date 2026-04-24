@@ -83,7 +83,11 @@ class GroupAction(Action):
                     if children:
                         results.extend(children)
                 else:
-                    logger.error("expected Action or Entity, got %s", type(child).__name__)
+                    logger.error(
+                        "%s: expected Action or Entity, got %s",
+                        _current_file(context),
+                        type(child).__name__,
+                    )
         finally:
             if self.scoped:
                 context._pop_environment()

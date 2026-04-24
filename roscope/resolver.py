@@ -53,6 +53,7 @@ from roscope.entities.conditions import (
     UnlessCondition,
 )
 from roscope.entities.descriptions import ComposableNode
+from roscope.entities.helpers import _current_file
 from roscope.entities.launch_description import LaunchDescription as _LaunchDescription
 from roscope.entities.launch_description_sources import (
     AnyLaunchDescriptionSource,
@@ -480,7 +481,7 @@ def _resolve_element(
         if isinstance(action, Action):
             return action.visit(ctx) or []
         return []
-    logger.warning("unknown element: <%s>", tag)
+    logger.warning("%s: unknown element: <%s>", _current_file(ctx), tag)
     return []
 
 
@@ -491,7 +492,9 @@ def _execute_actions(actions, context) -> list:
         if action is None:
             continue
         if not isinstance(action, Action):
-            logger.error("expected Action, got %s", type(action).__name__)
+            logger.error(
+                "%s: expected Action, got %s", _current_file(context), type(action).__name__
+            )
             continue
         children = action.visit(context)
         if children:

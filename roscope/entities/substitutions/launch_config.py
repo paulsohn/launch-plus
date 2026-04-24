@@ -94,7 +94,9 @@ class LaunchConfiguration(Substitution):
         if self._default is not None:
             return str(self._default)
         # Not found
-        logger.error("undefined variable: %s", name)
+        from roscope.entities.helpers import _current_file
+
+        logger.error("%s: undefined variable: %s", _current_file(context), name)
         return f"$(var {name})"
 
     def __str__(self):

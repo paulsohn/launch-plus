@@ -27,6 +27,7 @@ from roscope.entities.action import Action
 from roscope.entities.actions.group import GroupAction
 from roscope.entities.actions.marker import ArgComment, SourceMarker
 from roscope.entities.expose import expose_action
+from roscope.entities.helpers import _current_file
 from roscope.entities.parsing import _ActionParser
 from roscope.entities.substitution import Substitution
 from roscope.parsers.entity import Entity
@@ -81,15 +82,19 @@ class IncludeLaunchDescription(Action):
         # Step 1: Resolve file path
         file_path = self._resolve_file_path(context)
         if not file_path:
-            logger.error("include: 'file' attribute resolved to empty string")
+            logger.error(
+                "%s: include: 'file' attribute resolved to empty string", _current_file(context)
+            )
             return []
 
         # Step 2: Validate
         if file_path in self.include_stack:
-            logger.error("circular include detected: %s", file_path)
+            logger.error("%s: circular include detected: %s", _current_file(context), file_path)
             return []
         if len(self.include_stack) > 20:
-            logger.warning("max include depth exceeded for %s", file_path)
+            logger.warning(
+                "%s: max include depth exceeded for %s", _current_file(context), file_path
+            )
             return []
 
         # Step 3: Track include
@@ -103,7 +108,9 @@ class IncludeLaunchDescription(Action):
 
         # Step 5: Check file exists
         if not os.path.isfile(file_path):
-            logger.error("included launch file not found: %s", file_path)
+            logger.error(
+                "%s: included launch file not found: %s", _current_file(context), file_path
+            )
             return []
 
         # Step 6: Resolve children
@@ -140,7 +147,11 @@ class IncludeLaunchDescription(Action):
                 try:
                     self.path = src.perform(context)
                 except Exception as e:
-                    logger.warning("failed to resolve IncludeLaunchDescription source: %s", e)
+                    logger.warning(
+                        "%s: failed to resolve IncludeLaunchDescription source: %s",
+                        _current_file(context),
+                        e,
+                    )
 
         return self.path
 

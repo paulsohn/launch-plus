@@ -68,7 +68,9 @@ class EvalSubstitution(Substitution):
             result = eval(expr)  # noqa: S307
             return str(result)
         except Exception as e:
-            logger.error("$(eval %s) failed: %s", expr, e)
+            from roscope.entities.helpers import _current_file
+
+            logger.error("%s: $(eval %s) failed: %s", _current_file(ctx), expr, e)
             if ctx.preview_mode:
                 return f"$(eval {expr})"
             return ""

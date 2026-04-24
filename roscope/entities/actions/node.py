@@ -173,13 +173,14 @@ class Node(ExecuteProcess):
         exe = context.perform_substitution(self.executable) or ""
         name = base.name if base else (context.perform_substitution(self.name) or "")
         ns = context.perform_substitution(self.namespace) if self.namespace else None
-        if not name:
+        if not name and exe:
             logger.warning(
-                "%s: node (pkg=%r exec=%r) has no name set; FQN cannot be fully resolved",
+                "%s: node (pkg=%r exec=%r) has no name set; FQN is guessed from executable name",
                 _current_file(context),
                 pkg,
                 exe,
             )
+            name = exe
         if pkg:
             state.track_package(pkg)
 

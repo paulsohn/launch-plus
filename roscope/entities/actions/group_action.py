@@ -26,7 +26,7 @@ import xml.etree.ElementTree as ET
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 logger = logging.getLogger("roscope")
@@ -42,7 +42,7 @@ class GroupAction(Action):
     """
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         _, kwargs = super().parse(entity, parser)
         scoped_raw = entity.get_attr("scoped", optional=True)
         if scoped_raw is None:
@@ -104,49 +104,3 @@ class GroupAction(Action):
             for elem in child.serialize_resolved():
                 group.append(elem)
         return [group]
-
-
-class OpaqueFunction(Action):
-    """Stores an OpaqueFunction's callable so the walker can invoke it."""
-
-    def __init__(self, *, function=None, **kwargs):
-        super().__init__(**kwargs)
-        self.function = function
-
-    def execute(self, context) -> list:
-        fn = self.function
-        if fn and context:
-            try:
-                result = fn(context)
-                if result:
-                    from roscope.resolver import _execute_actions
-
-                    return _execute_actions(result, context)
-            except Exception as e:
-                logger.error(
-                    "OpaqueFunction failed in %s: %s",
-                    _current_file(context),
-                    e,
-                    exc_info=True,
-                )
-        return []
-
-
-class TimerAction(Action):
-    """TimerAction cannot be statically resolved.
-
-    Timer-based actions depend on runtime timing which is not sequential
-    and cannot be determined during static analysis.
-    """
-
-    def __init__(self, *, period=None, actions=None, **kwargs):
-        super().__init__(**kwargs)
-        self.actions: list = list(actions or [])
-
-    def execute(self, context) -> list:
-        logger.error(
-            "%s: TimerAction cannot be statically resolved: "
-            "context execution timing is not sequential",
-            _current_file(context),
-        )
-        return []

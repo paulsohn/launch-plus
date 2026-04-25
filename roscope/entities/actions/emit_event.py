@@ -1,4 +1,4 @@
-# Copyright 2025 Open Source Robotics Foundation, Inc.
+# Copyright 2018 Open Source Robotics Foundation, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,46 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Originally from:
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/log.py
+# Originally from (planned to split and refactor):
+# - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/emit_event.py
 # Modified for roscope project by Taeseung Sohn, 2026.
 
-"""Action handler for <log> element."""
+"""Module for the EmitEvent action."""
 
 from __future__ import annotations
 
+import logging
 import xml.etree.ElementTree as ET
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
-from roscope.entities.parsing import Parser
-from roscope.parsers.entity import Entity
+
+logger = logging.getLogger("roscope")
 
 
-@expose_action("log")
-class LogInfo(Action):
-    """<log> — records a log message."""
+@expose_action("emit_event")
+class EmitEvent(Action):
+    """Action that emits an event when executed (TODO)."""
 
-    @classmethod
-    def parse(cls, entity: Entity, parser: Parser):
-        _, kwargs = super().parse(entity, parser)
-        msg_raw = entity.get_attr("message", optional=True) or ""
-        kwargs["message"] = parser.parse_substitution(msg_raw)
-        return cls, kwargs
-
-    def __init__(self, message="", **kwargs):
+    def __init__(self, *, event, **kwargs):
         super().__init__(**kwargs)
-        self.message = message
+        self.event = event
+
+    # @classmethod
+    # def parse(cls, entity: Entity, parser: Parser):
+    #     event = entity.get_attr("event", optional=True) or ""
+    #     return cls(event=event)
 
     def execute(self, context) -> list:
         from roscope.entities.helpers import resolve_value
 
-        msg = resolve_value(self.message, context) or ""
-        return [LogInfo(message=msg)]
+        event = resolve_value(self.event, context) or ""
+        return [EmitEvent(event=event)]
 
     def serialize_resolved(self) -> list[ET.Element]:
-        if not self.message or not isinstance(self.message, str):
+        if not self.event:
             return []
-        elem = ET.Element("log")
-        elem.set("message", self.message)
+        elem = ET.Element("emit_event")
+        elem.set("event", self.event)
         return [elem]

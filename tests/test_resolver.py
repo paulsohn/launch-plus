@@ -11,17 +11,15 @@ import uuid
 import pytest
 from conftest import _install_import_patching
 
-from roscope.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
 from roscope.entities.actions.composable_node_container import (
     ComposableNodeContainer,
     _resolve_plugins,
 )
-from roscope.entities.actions.env import (
-    SetEnvironmentVariable,
-    UnsetEnvironmentVariable,
-)
-from roscope.entities.actions.include import _inline_resolve_python_launch
+from roscope.entities.actions.declare_launch_argument import DeclareLaunchArgument
+from roscope.entities.actions.include_launch_description import _inline_resolve_python_launch
 from roscope.entities.actions.node import Node
+from roscope.entities.actions.set_environment_variable import SetEnvironmentVariable
+from roscope.entities.actions.unset_environment_variable import UnsetEnvironmentVariable
 from roscope.entities.descriptions import ComposableNode
 from roscope.entities.helpers import (
     _effective_namespace,
@@ -30,7 +28,7 @@ from roscope.entities.helpers import (
     env_overrides,
     resolve_substitutions,
 )
-from roscope.entities.state import LaunchContext, ResolverState
+from roscope.entities.launch_context import LaunchContext, ResolverState
 from roscope.entities.substitutions.find_pkg_share import FindPackageShare
 from roscope.entities.substitutions.launch_config import LaunchConfiguration
 from roscope.resolver import parse_xml_launch, parse_yaml_launch, resolve_xml_elements
@@ -191,20 +189,6 @@ class TestPerformSubstitution:
         ]
         ctx = _make_context({"resolved_var": "abc"})
         assert perform_substitutions(ctx, parts) == "abc$(var unresolved_var)"
-
-    def test_ex_returns_not_fallback_when_resolved(self):
-        lc = LaunchConfiguration("my_var")
-        ctx = _make_context({"my_var": "resolved_value"})
-        value, is_fallback = ctx.perform_substitution_ex(lc)
-        assert value == "resolved_value"
-        assert is_fallback is False
-
-    def test_ex_list_not_fallback_when_all_resolved(self):
-        parts = [LaunchConfiguration("a"), LaunchConfiguration("b")]
-        ctx = _make_context({"a": "foo", "b": "bar"})
-        value, is_fallback = ctx.perform_substitution_ex(parts)
-        assert value == "foobar"
-        assert is_fallback is False
 
 
 # ─── Node deferred resolution ────────────────────────────────────────────────
@@ -1171,9 +1155,9 @@ class TestResolveXmlElements:
             # The explicitly-passed arg is applied to the shared context
             assert ctx._launch_configurations.get("x") == "42"
 
-    def test_circular_include_detected(self, caplog):
+    def test_recursive_include_hits_depth_limit(self, caplog):
         with tempfile.TemporaryDirectory() as tmpdir:
-            # File includes itself
+            # File includes itself — depth limit (>20) terminates the recursion
             self_path = os.path.join(tmpdir, "self.launch.xml")
             with open(self_path, "w") as f:
                 f.write(f'<launch><include file="{self_path}"/></launch>')
@@ -1184,7 +1168,7 @@ class TestResolveXmlElements:
             )
             with caplog.at_level(logging.WARNING):
                 resolve_xml_elements(elements, ctx)
-            assert "circular" in caplog.text
+            assert "max include depth" in caplog.text
 
     # ── Unknown element ──
 
@@ -1271,10 +1255,10 @@ class TestActionRegistry:
 # ─── rosdep resolve parser tests ─────────────────────────────────────────────
 
 
-# ─── _apply_declared_arg ─────────────────────────────────────────────────────
+# ─── DeclareLaunchArgument.execute() ─────────────────────────────────────────
 
 
-class TestApplyDeclaredArg:
+class TestDeclareLaunchArgumentExecute:
     """DeclareLaunchArgument.execute() resolves defaults immediately (matching official)."""
 
     def test_arg_already_set_is_preserved(self, caplog):
@@ -1289,7 +1273,7 @@ class TestApplyDeclaredArg:
             ],
         )
         with caplog.at_level(logging.WARNING):
-            _apply_declared_arg(arg, ctx)
+            arg.execute(ctx)
         # Arg value unchanged (caller's value preserved).
         assert ctx._launch_configurations["my_arg"] == "already_set_value"
 
@@ -1302,7 +1286,7 @@ class TestApplyDeclaredArg:
             "my_arg",
             default_value="simple_default",
         )
-        _apply_declared_arg(arg, ctx)
+        arg.execute(ctx)
         # Resolved immediately (no deferred default).
         assert ctx._launch_configurations["my_arg"] == "simple_default"
         assert LaunchConfiguration("my_arg").perform(ctx) == "simple_default"
@@ -1598,7 +1582,7 @@ class TestPostBuildSourceIgnored:
 
     def test_resolve_pkg_share_postbuild_skips_lockfile(self, monkeypatch):
         """In post-build mode, resolve_pkg_share() must not use lockfile paths."""
-        from roscope.entities.state import ResolverState
+        from roscope.entities.launch_context import ResolverState
 
         state = ResolverState()
         state.preview_mode = False
@@ -1637,7 +1621,7 @@ class TestPostBuildSourceIgnored:
 
     def test_resolve_pkg_share_preview_uses_lockfile(self, monkeypatch):
         """In preview mode, resolve_pkg_share() must still use the lockfile."""
-        from roscope.entities.state import ResolverState
+        from roscope.entities.launch_context import ResolverState
 
         state = ResolverState()
         state.preview_mode = True
@@ -1677,7 +1661,7 @@ class TestEventHandlerWarning:
 
     def test_register_event_handler_warns(self, caplog):
         """RegisterEventHandler.execute() must emit a warning."""
-        from roscope.entities.actions.event_handler import RegisterEventHandler
+        from roscope.entities.actions.register_event_handler import RegisterEventHandler
 
         ctx = _make_context()
         handler = RegisterEventHandler(event_handler=None)
@@ -1688,7 +1672,7 @@ class TestEventHandlerWarning:
 
     def test_register_event_handler_via_visit_warns(self, caplog):
         """visit() path (via Python shim) also emits the warning."""
-        from roscope.entities.actions.event_handler import RegisterEventHandler
+        from roscope.entities.actions.register_event_handler import RegisterEventHandler
 
         ctx = _make_context()
         handler = RegisterEventHandler()
@@ -1714,7 +1698,9 @@ class TestEventHandlerWarning:
             )
             ctx = _make_context()
             with caplog.at_level(logging.WARNING):
-                from roscope.entities.actions.include import _inline_resolve_python_launch
+                from roscope.entities.actions.include_launch_description import (
+                    _inline_resolve_python_launch,
+                )
 
                 _inline_resolve_python_launch(ctx._state, child_path, ctx, {})
             assert "RegisterEventHandler" in caplog.text
@@ -1734,7 +1720,7 @@ class TestShimUnknownAction:
         assert "SomeFutureAction_XYZ_123" in caplog.text
 
     def test_unknown_shim_returns_action_subclass(self):
-        """The stub class must be an Action subclass usable by _execute_actions."""
+        """The stub class must be an Action subclass usable by visit_actions."""
 
         from roscope.entities.action import Action
 

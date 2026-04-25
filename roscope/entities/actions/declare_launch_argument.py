@@ -16,7 +16,7 @@
 # - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/declare_launch_argument.py
 # Modified for roscope project by Taeseung Sohn, 2026.
 
-"""Action handler for <arg> element."""
+"""Module for the DeclareLaunchArgument action."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ import logging
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 logger = logging.getLogger("roscope")
@@ -33,7 +33,7 @@ logger = logging.getLogger("roscope")
 
 @expose_action("arg")
 class DeclareLaunchArgument(Action):
-    """Stub for DeclareLaunchArgument / <arg>.
+    """Stub for DeclareLaunchArgument.
 
     Matching official ``DeclareLaunchArgument.execute()``:
     - If the argument is already set (passed from a parent include), record it for
@@ -45,7 +45,7 @@ class DeclareLaunchArgument(Action):
     """
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         _, kwargs = super().parse(entity, parser)
         kwargs["name"] = entity.get_attr("name", optional=True) or ""
         default = entity.get_attr("default", optional=True)
@@ -96,7 +96,9 @@ class DeclareLaunchArgument(Action):
         # Matching official DeclareLaunchArgument.execute():
         # if already set (passed by parent include), leave unchanged.
         if name in context._launch_configurations:
-            _track_arg_default(name, declared_default, state)
+            _track_arg_default(
+                name, declared_default, state, effective=context._launch_configurations[name]
+            )
             return None
 
         # Not set — apply default immediately (matching official: no deferred resolution).
@@ -111,59 +113,23 @@ class DeclareLaunchArgument(Action):
         return None
 
 
-def _track_arg_default(name: str, default: str, state) -> None:
-    """Record a declared arg name and its resolved default in global and per-file dicts."""
+def _track_arg_default(
+    name: str, declared_default: str, state, effective: str | None = None
+) -> None:
+    """Record a declared arg and its effective value in global and per-file dicts.
+
+    ``declared_default`` — the default string written in the XML/Python declaration.
+    ``effective``        — the actual value in context at declaration time; equals
+                          ``declared_default`` when the arg was not already set by a
+                          parent include, and equals the inherited value otherwise.
+                          Stored as ``(declared_default, effective)`` so callers can
+                          tell the difference for ``--show-args`` display.
+    """
     state.declared_arg_names.add(name)
     key = state.current_source_key()
     if key:
-        # setdefault preserves the first-seen default value for repeated declarations.
-        state.declared_arg_names_by_file.setdefault(key, {}).setdefault(name, default)
-
-
-def _apply_declared_arg(arg: DeclareLaunchArgument, context) -> None:
-    """Resolve a DeclareLaunchArgument default and apply it to the launch context.
-
-    Matches official ``DeclareLaunchArgument.execute()`` behavior: if the arg is
-    already set in context (e.g. from a parent include or command line), leave it
-    unchanged; otherwise apply the declared default.
-
-    Condition handling mirrors ``Action.visit()``: if the condition evaluates to
-    False the declaration is skipped; if evaluation raises, a warning is emitted
-    and the declaration is conservatively applied (unknown condition = assume active).
-    """
-    from roscope.entities.helpers import resolve_value
-
-    if not arg.name:
-        return
-
-    if arg._condition is not None:
-        try:
-            if not arg._condition.evaluate(context):
-                return
-        except Exception as e:
-            logger.warning(
-                "%s: condition on DeclareLaunchArgument '%s' failed to evaluate: %s; "
-                "assuming condition is satisfied",
-                _current_file(context),
-                arg.name,
-                e,
-            )
-
-    declared_default = ""
-    if arg.default_value is not None:
-        declared_default = resolve_value(arg.default_value, context) or ""
-
-    if arg.default_value is None:
-        if arg.name not in context._launch_configurations:
-            logger.error("%s: arg '%s' is required but not set", _current_file(context), arg.name)
-        _track_arg_default(arg.name, "", context._state)
-        return
-
-    already_set = context is not None and arg.name in context._launch_configurations
-    if already_set:
-        _track_arg_default(arg.name, declared_default, context._state)
-        return
-
-    # Apply default immediately — matching official DeclareLaunchArgument.execute()
-    context._launch_configurations[arg.name] = declared_default
-    _track_arg_default(arg.name, declared_default, context._state)
+        eff = effective if effective is not None else declared_default
+        # setdefault preserves the first-seen record for repeated declarations.
+        state.declared_arg_names_by_file.setdefault(key, {}).setdefault(
+            name, (declared_default, eff)
+        )

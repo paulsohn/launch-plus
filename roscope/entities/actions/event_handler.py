@@ -18,14 +18,9 @@
 # - https://github.com/ros2/launch/blob/rolling/launch/launch/event_handlers/on_process_exit.py
 # - https://github.com/ros2/launch_ros/blob/rolling/launch_ros/launch_ros/event_handlers/on_state_transition.py
 # - https://github.com/ros2/launch/blob/rolling/launch/launch/event_handlers/on_shutdown.py
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/emit_event.py
 # Modified for roscope project by Taeseung Sohn, 2026.
 
-"""Action handlers for event-related elements.
-
-Covers: <on_process_start>, <on_process_exit>, <on_state_transition>,
-<on_shutdown>, <emit_event>.
-"""
+"""Event handlers (misclassified as Action by Claude; subject to refactor)."""
 
 from __future__ import annotations
 
@@ -34,8 +29,7 @@ import xml.etree.ElementTree as ET
 
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
-from roscope.entities.helpers import _current_file
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 logger = logging.getLogger("roscope")
@@ -82,7 +76,7 @@ class EventHandler(Action):
         self.actions: list = []
 
     @classmethod
-    def _parse_xml(cls, entity: Entity, parser: _ActionParser):
+    def _parse_xml(cls, entity: Entity, parser: Parser):
         """Shared XML parse logic for all event handler types.
 
         Ad-hoc — event handlers have no official XML counterpart.
@@ -169,7 +163,7 @@ class OnProcessStart(EventHandler):
     """<on_process_start> / Python OnProcessStart shim."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         return cls._parse_xml(entity, parser)
 
 
@@ -178,7 +172,7 @@ class OnProcessExit(EventHandler):
     """<on_process_exit> / Python OnProcessExit shim."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         return cls._parse_xml(entity, parser)
 
 
@@ -187,7 +181,7 @@ class OnStateTransition(EventHandler):
     """<on_state_transition> / Python OnStateTransition shim."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         return cls._parse_xml(entity, parser)
 
 
@@ -196,61 +190,8 @@ class OnShutdown(EventHandler):
     """<on_shutdown> / Python OnShutdown shim."""
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         return cls._parse_xml(entity, parser)
-
-
-@expose_action("emit_event")
-class EmitEvent(Action):
-    """<emit_event> — an event emission.
-
-    Ad-hoc XML parse — no official XML counterpart.
-    """
-
-    def __init__(self, *, event: str = "", target_node=None, namespace=None, **kwargs):
-        super().__init__(**kwargs)
-        self.event = event
-        self.target_node = target_node
-        self.namespace = namespace
-
-    @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
-        event = entity.get_attr("event", optional=True) or ""
-        target_node = entity.get_attr("target_node", optional=True)
-        ee_ns = entity.get_attr("namespace", optional=True)
-        return cls(event=event, target_node=target_node, namespace=ee_ns)
-
-    def execute(self, context) -> list:
-        from roscope.entities.helpers import resolve_value
-
-        event = resolve_value(self.event, context) or ""
-        target_node = resolve_value(self.target_node, context)
-        namespace = resolve_value(self.namespace, context)
-        return [EmitEvent(event=event, target_node=target_node, namespace=namespace)]
-
-    def serialize_resolved(self) -> list[ET.Element]:
-        if not self.event:
-            return []
-        elem = ET.Element("emit_event")
-        elem.set("event", self.event)
-        if self.target_node:
-            elem.set("target_node", self.target_node)
-        if self.namespace:
-            elem.set("namespace", self.namespace)
-        return [elem]
-
-
-# ─── Python-shim-only classes ────────────────────────────────────────────────
-# These exist solely so the import patcher can install them for user Python
-# launch files.  They don't produce resolved output.
-
-
-class TrackedEmitEvent(Action):
-    """Python shim for ``launch.actions.EmitEvent``."""
-
-    def __init__(self, event=None, **kwargs):
-        super().__init__(**kwargs)
-        self._event = event
 
 
 class ChangeState(Action):
@@ -258,32 +199,3 @@ class ChangeState(Action):
 
     def __init__(self, lifecycle_node_matcher=None, transition_id=None, **kwargs):
         super().__init__(**kwargs)
-
-
-class Shutdown(Action):
-    """Python shim for ``launch.actions.Shutdown``."""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-
-class RegisterEventHandler(Action):
-    """Python shim for ``launch.actions.RegisterEventHandler``.
-
-    Event-handler-driven topology changes are not resolved — the resolved output
-    will not include nodes or actions that are only launched in response to an
-    event.  A warning is emitted so that users are aware of this gap.
-    """
-
-    def __init__(self, event_handler=None, **kwargs):
-        super().__init__(**kwargs)
-        self._event_handler = event_handler
-
-    def execute(self, context) -> list:
-        logger.warning(
-            "%s: RegisterEventHandler encountered — event-handler-driven topology "
-            "is not resolved; nodes or actions triggered by events will not "
-            "appear in the resolved output",
-            _current_file(context),
-        )
-        return []

@@ -33,7 +33,7 @@ from roscope.entities.actions.composable_node_container import (
 from roscope.entities.actions.node import Node, _parse_optional
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _ros2_namespace_join
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 
@@ -45,7 +45,7 @@ class LoadComposableNodes(Action):
     """
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser):
+    def parse(cls, entity: Entity, parser: Parser):
         _, kwargs = super().parse(entity, parser)
         target_raw = entity.get_attr("target", optional=True)
         ns_raw = entity.get_attr("namespace", optional=True)

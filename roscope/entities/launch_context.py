@@ -346,36 +346,3 @@ class LaunchContext:
             return str(result) if result is not None else str(sub)
         except Exception:
             return str(sub)
-
-    def perform_substitution_ex(self, sub) -> tuple[str | None, bool]:
-        """Resolve with fallback tracking. Returns (value, is_fallback).
-
-        *is_fallback* is True when perform() returned None or raised and the
-        display name was used instead.
-        """
-        if sub is None:
-            return None, False
-        if isinstance(sub, str):
-            return sub, False
-        if isinstance(sub, (list, tuple)):
-            parts = []
-            any_fallback = False
-            for s in sub:
-                try:
-                    result = s.perform(self) if not isinstance(s, str) else s
-                    if result is not None:
-                        parts.append(str(result))
-                    else:
-                        parts.append(str(s))
-                        any_fallback = True
-                except Exception:
-                    parts.append(str(s))
-                    any_fallback = True
-            return "".join(parts), any_fallback
-        try:
-            result = sub.perform(self)
-            if result is None:
-                return str(sub), True
-            return str(result), False
-        except Exception:
-            return str(sub), True

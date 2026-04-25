@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Originally from (planned to split and refactor):
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/event_handler.py
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/event_handlers/on_process_start.py
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/event_handlers/on_process_exit.py
-# - https://github.com/ros2/launch_ros/blob/rolling/launch_ros/launch_ros/event_handlers/on_state_transition.py
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/event_handlers/on_shutdown.py
-# - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/emit_event.py
+# Originally from:
+# - https://github.com/ros2/launch/blob/rolling/launch/launch/actions/execute_process.py
 # Modified for roscope project by Taeseung Sohn, 2026.
 
 """Action handler for <executable> / ExecuteProcess.
@@ -36,7 +31,7 @@ import xml.etree.ElementTree as ET
 from roscope.entities.action import Action
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file, env_overrides, resolve_value
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.entities.substitution import Substitution, TextSubstitution
 from roscope.entities.utilities import normalize_to_list_of_substitutions, perform_substitutions
 from roscope.parsers.entity import Entity
@@ -55,9 +50,7 @@ class ExecuteProcess(Action):
     def __init__(self, *, cmd=None, name=None, condition=None, **kwargs):
         super().__init__(condition=condition)
         # Normalize cmd: list of argument lists, matching official Executable
-        if cmd is None:
-            self.cmd: list[list[Substitution]] | str = []
-        elif isinstance(cmd, str):
+        if isinstance(cmd, str):
             # Already resolved string (from resolved object)
             self.cmd = cmd
         elif isinstance(cmd, list) and cmd and isinstance(cmd[0], list):
@@ -75,7 +68,7 @@ class ExecuteProcess(Action):
         self.env: dict = {}
 
     @classmethod
-    def _parse_cmdline(cls, cmd: str, parser: _ActionParser) -> list[list[Substitution]]:
+    def _parse_cmdline(cls, cmd: str, parser: Parser) -> list[list[Substitution]]:
         """Parse text apt for command line execution.
 
         Matching official ``ExecuteProcess._parse_cmdline``: splits on
@@ -115,7 +108,7 @@ class ExecuteProcess(Action):
         return result_args
 
     @staticmethod
-    def parse_envs(entity: Entity, parser: _ActionParser) -> dict:
+    def parse_envs(entity: Entity, parser: Parser) -> dict:
         """Extract <env> children as a dict of unresolved token lists."""
         items = entity.get_attr("env", data_type=list, optional=True)
         if not items:
@@ -135,7 +128,7 @@ class ExecuteProcess(Action):
         return result
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser, ignore: list | None = None):
+    def parse(cls, entity: Entity, parser: Parser, ignore: list | None = None):
         _, kwargs = super().parse(entity, parser)
         ignore = ignore or []
         if "cmd" not in ignore:

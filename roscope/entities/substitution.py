@@ -25,7 +25,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from roscope.entities.state import LaunchContext
+    from roscope.entities.launch_context import LaunchContext
 
 
 class Substitution(ABC):

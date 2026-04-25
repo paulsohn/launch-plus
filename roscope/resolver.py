@@ -24,28 +24,30 @@ from pathlib import Path
 from typing import Any
 
 from roscope.entities.action import Action
-from roscope.entities.actions.arg import DeclareLaunchArgument, _apply_declared_arg
 from roscope.entities.actions.composable_node_container import ComposableNodeContainer
-from roscope.entities.actions.env import (
-    PushRosNamespace,
-    SetEnvironmentVariable,
-    UnsetEnvironmentVariable,
-)
+from roscope.entities.actions.declare_launch_argument import DeclareLaunchArgument
+from roscope.entities.actions.emit_event import EmitEvent
 from roscope.entities.actions.event_handler import (
     OnProcessExit,
     OnProcessStart,
     OnShutdown,
     OnStateTransition,
-    RegisterEventHandler,
-    Shutdown,
-    TrackedEmitEvent,
 )
-from roscope.entities.actions.executable import ExecuteProcess
-from roscope.entities.actions.group import GroupAction, OpaqueFunction, TimerAction
-from roscope.entities.actions.include import IncludeLaunchDescription
+from roscope.entities.actions.execute_process import ExecuteProcess
+from roscope.entities.actions.group_action import GroupAction
+from roscope.entities.actions.include_launch_description import IncludeLaunchDescription
 from roscope.entities.actions.load_composable_nodes import LoadComposableNodes
 from roscope.entities.actions.node import LifecycleNode, Node
-from roscope.entities.actions.param import ParameterFile, SetLaunchConfiguration, SetParameter
+from roscope.entities.actions.opaque_function import OpaqueFunction
+from roscope.entities.actions.push_ros_namespace import PushROSNamespace
+from roscope.entities.actions.register_event_handler import RegisterEventHandler
+from roscope.entities.actions.set_environment_variable import SetEnvironmentVariable
+from roscope.entities.actions.set_launch_configuration import SetLaunchConfiguration
+from roscope.entities.actions.set_parameter import SetParameter
+from roscope.entities.actions.set_remap import SetRemap
+from roscope.entities.actions.shutdown_action import Shutdown
+from roscope.entities.actions.timer_action import TimerAction
+from roscope.entities.actions.unset_environment_variable import UnsetEnvironmentVariable
 from roscope.entities.conditions import (
     IfCondition,
     LaunchConfigurationEquals,
@@ -54,21 +56,21 @@ from roscope.entities.conditions import (
 )
 from roscope.entities.descriptions import ComposableNode
 from roscope.entities.helpers import _current_file
-from roscope.entities.launch_description import LaunchDescription as _LaunchDescription
+from roscope.entities.launch_context import LaunchContext, ResolverState
+from roscope.entities.launch_description import LaunchDescription
 from roscope.entities.launch_description_sources import (
     AnyLaunchDescriptionSource,
     PythonLaunchDescriptionSource,
     XMLLaunchDescriptionSource,
 )
-from roscope.entities.parsing import _ActionParser
-from roscope.entities.state import LaunchContext, ResolverState
+from roscope.entities.parameter_descriptions import ParameterFile
+from roscope.entities.parsing import Parser
 from roscope.entities.substitutions.env import EnvironmentVariable as _EnvironmentVariable
 from roscope.entities.substitutions.find_pkg_share import FindPackageShare
 from roscope.entities.substitutions.launch_config import LaunchConfiguration
 from roscope.entities.substitutions.path_join import PathJoinSubstitution
-from roscope.parsers.entity import Entity
-from roscope.parsers.xml_parser import parse_xml_launch as _parse_xml_launch_entity
-from roscope.parsers.yaml_parser import parse_yaml_launch as _parse_yaml_launch_entity
+from roscope.parsers.xml_parser import parse_xml_launch
+from roscope.parsers.yaml_parser import parse_yaml_launch
 
 logger = logging.getLogger("roscope")
 
@@ -146,7 +148,7 @@ def _build_patched_launch():
     mod = types.ModuleType("launch")
     mod.__path__ = []
     mod.__package__ = "launch"
-    mod.LaunchDescription = _LaunchDescription
+    mod.LaunchDescription = LaunchDescription
     mod.LaunchContext = LaunchContext
     return mod
 
@@ -165,8 +167,9 @@ def _build_patched_launch_ros_actions():
     mod.ComposableNodeContainer = ComposableNodeContainer
     mod.LoadComposableNodes = LoadComposableNodes
     mod.SetParameter = SetParameter
-    mod.SetRemap = lambda *a, **kw: None
-    mod.PushRosNamespace = PushRosNamespace
+    mod.SetRemap = SetRemap
+    mod.PushRosNamespace = PushROSNamespace  # legacy name for backward compatibility
+    mod.PushROSNamespace = PushROSNamespace
     mod.SetParametersCallback = lambda *a, **kw: None
     mod.__getattr__ = _make_shim_getattr("launch_ros.actions")
     return mod
@@ -227,7 +230,7 @@ def _build_patched_launch_actions():
     mod.LogInfo = lambda *a, **kw: None
     mod.TimerAction = TimerAction
     mod.RegisterEventHandler = RegisterEventHandler
-    mod.EmitEvent = TrackedEmitEvent
+    mod.EmitEvent = EmitEvent
     mod.Shutdown = Shutdown
     mod.PushLaunchConfigurations = lambda *a, **kw: None
     mod.PopLaunchConfigurations = lambda *a, **kw: None
@@ -435,19 +438,6 @@ class _PatchingFinder(importlib.abc.MetaPathFinder):
         return mod
 
 
-# ─── XML/YAML parsing ────────────────────────────────────────────────────────
-
-
-def parse_xml_launch(content: str, file_path: str) -> list[Entity]:
-    """Parse an XML launch file to a list of Entity objects."""
-    return list(_parse_xml_launch_entity(content, file_path))
-
-
-def parse_yaml_launch(content: str, file_path: str) -> list[Entity]:
-    """Parse a YAML launch file to a list of Entity objects."""
-    return list(_parse_yaml_launch_entity(content, file_path))
-
-
 # ─── XML/YAML element resolution ────────��────────────────────────────────────
 
 
@@ -476,30 +466,13 @@ def _resolve_element(
 
     tag = elem.type_name
     if tag in action_parse_methods:
-        parser = _ActionParser(ctx, include_stack)
+        parser = Parser(ctx, include_stack)
         action = action_parse_methods[tag](elem, parser)
         if isinstance(action, Action):
             return action.visit(ctx) or []
         return []
     logger.warning("%s: unknown element: <%s>", _current_file(ctx), tag)
     return []
-
-
-def _execute_actions(actions, context) -> list:
-    """Execute a list of actions and collect resolved results."""
-    results: list = []
-    for action in actions or []:
-        if action is None:
-            continue
-        if not isinstance(action, Action):
-            logger.error(
-                "%s: expected Action, got %s", _current_file(context), type(action).__name__
-            )
-            continue
-        children = action.visit(context)
-        if children:
-            results.extend(children)
-    return results
 
 
 # ─── Main entry point ─────────────────────────────────────────────���──────────
@@ -659,13 +632,7 @@ def resolve_file(
 
     entities = getattr(ld, "entities", None) or getattr(ld, "_actions", None) or []
 
-    for entity in entities:
-        if isinstance(entity, DeclareLaunchArgument):
-            _apply_declared_arg(entity, ctx)
-
-    from roscope.entities.actions.group import GroupAction as _GroupAction
-
-    resolved = _GroupAction(actions=list(entities), scoped=False).visit(ctx) or []
+    resolved = GroupAction(actions=list(entities), scoped=False).visit(ctx) or []
 
     return _tracked_to_parsed_launch_file(state, ctx), resolved
 

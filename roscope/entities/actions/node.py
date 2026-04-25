@@ -27,17 +27,17 @@ from __future__ import annotations
 import logging
 import xml.etree.ElementTree as ET
 
-from roscope.entities.actions.executable import ExecuteProcess
+from roscope.entities.actions.execute_process import ExecuteProcess
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file, _ros2_namespace_join
 from roscope.entities.parameter_descriptions import Parameter, ParameterFile
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 logger = logging.getLogger("roscope")
 
 
-def _parse_optional(parser: _ActionParser, text: str | None) -> list | None:
+def _parse_optional(parser: Parser, text: str | None) -> list | None:
     """Parse an optional attribute to tokens, or return None."""
     if text is None:
         return None
@@ -49,7 +49,7 @@ class Node(ExecuteProcess):
     """Tracks a ROS node."""
 
     @staticmethod
-    def parse_params(entity: Entity, parser: _ActionParser) -> list:
+    def parse_params(entity: Entity, parser: Parser) -> list:
         """Extract <param> children as unresolved parameter objects."""
         from roscope.entities.parameter_descriptions import Parameter, ParameterFile
 
@@ -80,7 +80,7 @@ class Node(ExecuteProcess):
         return result
 
     @staticmethod
-    def parse_remaps(entity: Entity, parser: _ActionParser) -> list:
+    def parse_remaps(entity: Entity, parser: Parser) -> list:
         """Extract <remap> children as unresolved token pairs."""
         items = entity.get_attr("remap", data_type=list, optional=True)
         if not items:
@@ -94,7 +94,7 @@ class Node(ExecuteProcess):
         ]
 
     @staticmethod
-    def parse_composable_plugins(entity: Entity, parser: _ActionParser) -> list:
+    def parse_composable_plugins(entity: Entity, parser: Parser) -> list:
         """Extract <composable_node> children as ComposableNode instances."""
         from roscope.entities.descriptions import ComposableNode
 
@@ -108,7 +108,7 @@ class Node(ExecuteProcess):
         return plugins
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser, ignore: list | None = None):
+    def parse(cls, entity: Entity, parser: Parser, ignore: list | None = None):
         _, kwargs = super().parse(entity, parser, ignore=["cmd"])
         kwargs["package"] = parser.parse_substitution(
             entity.get_attr("pkg", optional=True) or entity.get_attr("package", optional=True) or ""

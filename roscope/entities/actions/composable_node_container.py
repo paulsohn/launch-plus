@@ -30,7 +30,7 @@ from roscope.entities.descriptions import ComposableNode
 from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _ros2_namespace_join
 from roscope.entities.parameter_descriptions import Parameter, ParameterFile
-from roscope.entities.parsing import _ActionParser
+from roscope.entities.parsing import Parser
 from roscope.parsers.entity import Entity
 
 
@@ -128,7 +128,7 @@ class ComposableNodeContainer(Node):
     """
 
     @classmethod
-    def parse(cls, entity: Entity, parser: _ActionParser, ignore: list | None = None):
+    def parse(cls, entity: Entity, parser: Parser, ignore: list | None = None):
         _, kwargs = super().parse(entity, parser)
         kwargs["kind"] = "container"
         kwargs["composable_node_descriptions"] = Node.parse_composable_plugins(entity, parser)

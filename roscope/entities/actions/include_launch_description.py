@@ -28,9 +28,8 @@ from roscope.entities.actions.group_action import GroupAction
 from roscope.entities.actions.marker import ArgComment, SourceMarker
 from roscope.entities.actions.opaque_function import visit_actions
 from roscope.entities.expose import expose_action
-from roscope.entities.helpers import _current_file
+from roscope.entities.helpers import _current_file, resolve_value
 from roscope.entities.parsing import Parser
-from roscope.entities.substitution import Substitution
 from roscope.parsers.entity import Entity
 
 logger = logging.getLogger("roscope")
@@ -40,37 +39,40 @@ logger = logging.getLogger("roscope")
 class IncludeLaunchDescription(Action):
     """Action that includes a launch description source and yields its entities when visited."""
 
-    @classmethod
-    def parse(cls, entity: Entity, parser: Parser):
-        _, kwargs = super().parse(entity, parser)
-        raw_file = entity.get_attr("file")
-        kwargs["launch_description_source"] = None
-        kwargs["file_tokens"] = parser.parse_substitution(raw_file)
-        kwargs["raw_file"] = raw_file
-        kwargs["include_stack"] = list(parser.include_stack)
-        arg_items = entity.get_attr("arg", data_type=list, optional=True) or []
-        args = []
-        for a in arg_items:
-            arg_name = a.get_attr("name", optional=True) or ""
-            arg_value = a.get_attr("value", optional=True)
-            if arg_value is not None:
-                args.append((arg_name, parser.parse_substitution(arg_value)))
-        kwargs["launch_arguments"] = args
-        return cls, kwargs
-
-    def __init__(self, launch_description_source=None, launch_arguments=None, **kwargs):
+    def __init__(self, launch_description_source, *, launch_arguments=None, **kwargs):
         super().__init__(**kwargs)
-        self.source = launch_description_source
+        self.launch_description_source = launch_description_source
         self.launch_arguments = launch_arguments
-        self.file_tokens = kwargs.get("file_tokens")
-        self.raw_file: str = kwargs.get("raw_file", "")
         self.include_stack: list = kwargs.get("include_stack", [])
         # Lazily resolved path (for Python shim sources)
         self.path: str | None = None
-        if launch_description_source is not None:
-            loc = getattr(launch_description_source, "_location", None)
-            if isinstance(loc, str):
-                self.path = loc
+
+        loc = getattr(launch_description_source, "_location", None)
+        if isinstance(loc, str):
+            self.path = loc
+
+    @classmethod
+    def parse(cls, entity: Entity, parser: Parser):
+        _, kwargs = super().parse(entity, parser)
+        file_path = parser.parse_substitution(entity.get_attr("file"))
+        kwargs["launch_description_source"] = file_path
+        kwargs["include_stack"] = list(parser.include_stack)
+        args = []
+        args_arg = entity.get_attr("arg", data_type=list, optional=True)
+        if args_arg is not None:
+            args.extend(args_arg)
+        args_let = entity.get_attr("let", data_type=list, optional=True)
+        if args_let is not None:
+            args.extend(args_let)
+        if args:
+            kwargs["launch_arguments"] = [
+                (
+                    parser.parse_substitution(e.get_attr("name")),
+                    parser.parse_substitution(e.get_attr("value")),
+                )
+                for e in args
+            ]
+        return cls, kwargs
 
     def execute(self, context) -> list:
         """Resolve the included file and return resolved actions wrapped with markers."""
@@ -85,9 +87,6 @@ class IncludeLaunchDescription(Action):
             return []
 
         # Step 2: Validate
-        if file_path in self.include_stack:
-            logger.error("%s: circular include detected: %s", _current_file(context), file_path)
-            return []
         if len(self.include_stack) > 20:
             logger.warning(
                 "%s: max include depth exceeded for %s", _current_file(context), file_path
@@ -101,7 +100,7 @@ class IncludeLaunchDescription(Action):
         )
 
         # Step 4: Resolve include arguments
-        child_args = self._resolve_args(context, file_path, dep_idx)
+        child_args = self._resolve_args(context, dep_idx)
 
         # Step 5: Check file exists
         if not os.path.isfile(file_path):
@@ -130,51 +129,38 @@ class IncludeLaunchDescription(Action):
         return _wrap_with_markers(children, file_path, child_args, child_declared_defaults, state)
 
     def _resolve_file_path(self, context) -> str | None:
-        """Resolve the file path from tokens (XML) or source object (Python shim)."""
-        from roscope.entities.helpers import resolve_value
+        """Resolve the file path.."""
 
-        # XML path: resolve substitution tokens
-        if self.file_tokens is not None:
-            return resolve_value(self.file_tokens, context) or ""
-
-        # Python shim path: resolve location lazily
-        if self.path is None and self.source is not None and context is not None:
-            src = self.source
-            if hasattr(src, "_resolve_location"):
-                self.path = src._resolve_location(context)
-            elif isinstance(src, Substitution):
-                try:
-                    self.path = src.perform(context)
-                except Exception as e:
-                    logger.warning(
-                        "%s: failed to resolve IncludeLaunchDescription source: %s",
-                        _current_file(context),
-                        e,
-                    )
+        src = self.launch_description_source
+        if hasattr(src, "_resolve_location"):
+            self.path = src._resolve_location(context)
+        else:
+            try:
+                self.path = resolve_value(src, context)
+            except Exception as e:
+                logger.warning(
+                    "%s: failed to resolve IncludeLaunchDescription source: %s",
+                    _current_file(context),
+                    e,
+                )
 
         return self.path
 
-    def _resolve_args(self, context, file_path: str, dep_idx: int) -> dict[str, str]:
-        """Resolve include arguments from tokens (XML) or launch_arguments (Python shim)."""
-        from roscope.entities.helpers import resolve_value
+    def _resolve_args(self, context, dep_idx: int) -> dict[str, str]:
+        """Resolve include arguments."""
 
         state = context._state
         child_args: dict[str, str] = {}
 
-        if self.file_tokens is not None:
-            # XML path: resolve tokens sequentially
-            saved_lc = dict(context._launch_configurations)
-            for arg_name, value_tokens in self.launch_arguments or []:
-                child_args[arg_name] = resolve_value(value_tokens, context) or ""
-                context._launch_configurations[arg_name] = child_args[arg_name]
-            context._launch_configurations.clear()
-            context._launch_configurations.update(saved_lc)
-        else:
-            # Python shim path: resolve substitutions
-            for k, v in self.launch_arguments or []:
-                k_str = str(k)
-                resolved = context.perform_substitution(v)
-                child_args[k_str] = resolved if resolved is not None else str(v)
+        # Temporarily set each arg in context so later args can reference earlier ones,
+        # then restore — matching the original XML path behavior.
+        saved_lc = dict(context._launch_configurations)
+        for k, v in self.launch_arguments or []:
+            k_str = resolve_value(k, context) or ""
+            child_args[k_str] = resolve_value(v, context) or ""
+            context._launch_configurations[k_str] = child_args[k_str]
+        context._launch_configurations.clear()
+        context._launch_configurations.update(saved_lc)
 
         # Record args for dependency tracking
         if dep_idx >= 0 and child_args:

@@ -1155,9 +1155,9 @@ class TestResolveXmlElements:
             # The explicitly-passed arg is applied to the shared context
             assert ctx._launch_configurations.get("x") == "42"
 
-    def test_circular_include_detected(self, caplog):
+    def test_recursive_include_hits_depth_limit(self, caplog):
         with tempfile.TemporaryDirectory() as tmpdir:
-            # File includes itself
+            # File includes itself — depth limit (>20) terminates the recursion
             self_path = os.path.join(tmpdir, "self.launch.xml")
             with open(self_path, "w") as f:
                 f.write(f'<launch><include file="{self_path}"/></launch>')
@@ -1168,7 +1168,7 @@ class TestResolveXmlElements:
             )
             with caplog.at_level(logging.WARNING):
                 resolve_xml_elements(elements, ctx)
-            assert "circular" in caplog.text
+            assert "max include depth" in caplog.text
 
     # ── Unknown element ──
 

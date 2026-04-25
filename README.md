@@ -38,7 +38,9 @@ parameters are set — is locked away behind a full build.
 roscope treats the **launch file as the system description language of ROS 2** — not just a convenience script to collectively start nodes,
 but a sufficient, inspectable specification of the system topology.
 
-It partially evaluates the description following the same semantics as `ros2 launch`, but without a running ROS environment. You can use it directly on a workspace you already have:
+It partially evaluates the description following the same semantics as `ros2 launch`, but without a running ROS environment — Python code runs, `OpaqueFunction` bodies execute, and include chains are followed recursively. It stops at the boundary where nodes would be spawned. See the [resolver pipeline diagram](docs/architecture.md#2-resolve-phase) for a visual overview.
+
+You can use it directly on a workspace you already have:
 
 ```
 # roscope workflow — no build required
@@ -51,7 +53,7 @@ roscope resolve -d autoware_launch autoware.launch.xml \
   --visualize                            # interactive graph in your browser
 ```
 
-The resolved output is a **flattened, fully-resolved XML** with all includes
+The resolved output is an **expanded, fully-resolved XML** with all includes
 inlined, conditionals evaluated, and variables substituted. The visualizer turns
 that into an interactive connectivity graph — nodes, containers, topics, remaps,
 and include boundaries — all explorable before a single package is built.
@@ -122,7 +124,7 @@ source /opt/ros/<distro>/setup.bash
 # For the first time, to initialize the workspace
 vcs import src < manifest.repos
 
-# Preview-resolve: produces flattened XML without building
+# Preview-resolve: produces expanded XML without building
 roscope resolve -d autoware_launch autoware.launch.xml \
   sensor_model:=sample_sensor_kit \
   vehicle_model:=sample_vehicle \
@@ -188,7 +190,7 @@ See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
 |---|---|
 | `index` | Parse `.repos` files and generate a lockfile |
 | `update` | Re-resolve refs and update lockfile SHAs |
-| `resolve` | Resolve and flatten a launch file to XML (no build) |
+| `resolve` | Resolve and expand a launch file to XML (no build) |
 | `check` | Like `resolve` but exits non-zero on warnings/errors |
 | `build` | Resolve, fetch dependencies, and run `colcon build` |
 | `build-pkg` | Build package(s) by name with transitive dependency fetching |

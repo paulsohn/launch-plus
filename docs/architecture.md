@@ -52,37 +52,50 @@ dual-indexed lockfile.
 
 ### 2. Resolve phase
 
+roscope is a **launch interpreter running offline** — it evaluates the same
+semantics as `ros2 launch` but stops before spawning processes.  It is a
+partial evaluator, not a static analyzer: Python code runs, `OpaqueFunction`
+bodies execute, and include chains are followed recursively.
+
+```mermaid
+flowchart TD
+    src["**Launch files**\n.xml / .yaml / .py"]
+
+    subgraph ros2launch["ros2 launch"]
+        direction TB
+        r2parse["**parse()**\nEntity → Action instances"]
+        r2exec["**execute()**\nsubstitutions · conditions · includes\narg scoping · OpaqueFunction · env vars"]
+        r2spawn["spawn processes · establish DDS\nmanage node lifecycle"]
+        r2parse --> r2exec --> r2spawn
+    end
+
+    subgraph roscope["roscope resolver"]
+        direction TB
+        rparse["**parse()**\nEntity → Action instances"]
+        rexec["**execute()**\nsubstitutions · conditions · includes\narg scoping · OpaqueFunction · env vars"]
+        rparse --> rexec
+    end
+
+    resolved["**Resolved IR**\nnodes · executables · params · remaps · env · include boundaries"]
+
+    xml["**XML output**\nrenderer — expanded, human-readable, diff-able"]
+    viz["**Interactive graph**\nvisualizer — nodes · topics · remaps · include boundaries"]
+
+    runtime["**ROS 2 runtime**\nprocesses · topics · services · tf"]
+
+    src --> r2parse
+    src --> rparse
+    r2spawn --> runtime
+    rexec --> resolved
+    resolved --> xml
+    resolved --> viz
+    resolved -. "would spawn" .-> runtime
 ```
-roscope resolve <pkg> <launcher>
-    │
-    ▼
-[orchestrator]
-    ├── lockfile lookup: pkg → repo + path
-    ├── fetch launch file via sparse-checkout
-    │
-    ▼
-[resolver] — recursive launch file processing
-    │
-    ├─── XML launch file?
-    │    ├── parse with xml.etree.ElementTree
-    │    ├── evaluate substitutions: $(var), $(find-pkg-share), $(eval)
-    │    ├── evaluate conditionals: if="...", unless="..."
-    │    ├── follow <include> tags → recurse
-    │    └── collect <node>, <param>, <remap>, <composable_node>
-    │
-    └─── Python launch file?
-         ├── import shimmed launch/launch_ros modules
-         ├── call generate_launch_description()
-         ├── walk the LaunchDescription tree
-         ├── execute OpaqueFunction bodies via fn(context)
-         └── return structured ParsedLaunchFile directly
-    │
-    ├── fetch additional packages on demand (sparse-checkout)
-    ├── retry if _PackageNotFetchedError signals missing package
-    │
-    ▼
-[renderer] → resolved launch XML (stdout)
-```
+
+The orchestrator wraps the resolver in a fetch-retry loop: when a package
+has not been sparse-checked out yet, a `_PackageNotFetchedError` is raised,
+the fetcher pulls the missing subtree, and the resolver retries (up to three
+times).
 
 ### 3. Build phase
 

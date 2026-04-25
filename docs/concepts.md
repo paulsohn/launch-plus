@@ -18,6 +18,56 @@ defined, closed vocabulary — `Node`, `GroupAction`, `IncludeLaunchDescription`
 vocabulary a dedicated **operational semantics** for extracting the runtime
 system topology without instantiating the system.
 
+### The AST-generation / interpretation split: launch as an interpreter
+
+This framing becomes clearest when you map launch onto how real interpreters
+handle imports.  Interpreters of standalone languages such as Python or JavaScript do not
+have a single global "parse everything, then execute everything" pass.
+Instead they restart the cycle **per file**: encounter an `import` or
+`require`, locate the module, parse or construct its AST, and interpret that
+AST — all within the same interpreter run.  The cycle is recursive.
+
+The launch system follows the same pattern.  Each `<include>` /
+`IncludeLaunchDescription` restarts the cycle on the included file.  The
+distinction between file formats is only in *how* the Action tree (AST) is
+produced:
+
+```mermaid
+flowchart LR
+    subgraph xml_path["XML / YAML launch file"]
+        direction TB
+        xsrc["source file\n(.xml / .yaml)"]
+        xast["Action tree\n(AST)"]
+        xsrc -- "xml.etree / yaml\nparser" --> xast
+    end
+
+    subgraph py_path["Python launch file"]
+        direction TB
+        psrc["source file\n(.py)"]
+        pgen["generate_launch_description()\nOpaqueFunction bodies"]
+        past["Action tree\n(AST)"]
+        psrc -- "Python interpreter" --> pgen
+        pgen -- "constructs and returns\nLaunchDescription" --> past
+    end
+
+    subgraph exec["Interpreter backend — evaluates the AST"]
+        direction TB
+        ros2["ros2 launch\n(full evaluation)"]
+        roscope_e["roscope\n(partial evaluation)"]
+    end
+
+    xast --> exec
+    past --> exec
+```
+
+The key observation is that **`generate_launch_description()` and
+`OpaqueFunction` bodies are AST constructors**, not runtime programs.
+They produce `Node`, `GroupAction`, `IncludeLaunchDescription`, and other
+Action objects — that is the AST.  They happen to do so by executing Python
+code rather than by having a text parser consume XML, but their role is
+identical: hand a tree of Action nodes to the interpreter backend.
+Who interprets that tree — and how far — is entirely up to the backend.
+
 ### Resolution as partial evaluation
 
 Resolution is not purely static analysis in the traditional sense of inspecting
@@ -41,11 +91,9 @@ execution — while leaving everything that requires a live ROS 2 system to
 
 ### OpaqueFunction and IncludeLaunchDescription as Oracles
 
-Launch constructs whose internal computation roscope does not model —
-`OpaqueFunction` bodies, dynamically constructed includes — are treated as
-**oracles**: roscope executes them and takes their outputs as given.
-
-The oracle escape is bounded.  OpaqueFunction outputs must be `Action` objects
+`OpaqueFunction` bodies and dynamically constructed includes are treated as
+**oracles**: roscope executes them and accepts whatever Action nodes they
+return.  The escape is bounded.  OpaqueFunction outputs must be `Action` objects
 from the launch API: the oracle can produce any combination of `Node`,
 `GroupAction`, `IncludeLaunchDescription`, etc., but it cannot produce terms
 outside the launch vocabulary.  This is a contract that launch file authors are
@@ -182,9 +230,6 @@ Here is what the resolver can and cannot verify.
   fetchable from the lockfile)
 - **Argument completeness** — every `$(var name)` reference must have a
   corresponding `<arg name="...">` declaration or be supplied on the command line
-- **Argument forwarding** — arguments used in an included file must be
-  explicitly forwarded via `<arg name="..." value="..."/>` in the `<include>`
-  tag
 - **Conditional evaluation** — `if="..."` and `unless="..."` attributes are
   fully evaluated, so only the active branches appear in the output
 - **Substitution resolution** — all `$(var)`, `$(env)`, `$(eval)`,
@@ -219,7 +264,7 @@ Here is what the resolver can and cannot verify.
 **error**.  Warnings alone do not cause a non-zero exit unless `--strict` is
 also passed, which promotes warnings to errors.  Use it in CI to catch:
 - Missing packages or launch files
-- Undefined or unforwarded arguments
+- Undefined or unset arguments
 - Broken `$(eval ...)` expressions
 - OpaqueFunction failures
 - Unresolvable `$(find-pkg-share ...)` references

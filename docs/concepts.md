@@ -18,6 +18,63 @@ defined, closed vocabulary — `Node`, `GroupAction`, `IncludeLaunchDescription`
 vocabulary a dedicated **operational semantics** for extracting the runtime
 system topology without instantiating the system.
 
+### The parse/execute split: launch as an interpreter
+
+This framing becomes clearest when you map launch onto a standard interpreter
+architecture.  In any interpreter language, two distinct phases exist:
+
+1. **Parse** — source text → abstract syntax tree (AST); no side effects.
+2. **Execute** — walk the AST, modify the interpreter context, produce results.
+
+The launch system has the same split, but the *source* of the AST differs by
+file format:
+
+```mermaid
+flowchart LR
+    subgraph xml_path["XML / YAML launch file"]
+        direction TB
+        xsrc["source file\n(.xml / .yaml)"]
+        xast["Action tree\n(AST)"]
+        xsrc -- "xml.etree / yaml\nparser" --> xast
+    end
+
+    subgraph py_path["Python launch file"]
+        direction TB
+        psrc["source file\n(.py)"]
+        pgen["generate_launch_description()\nOpaqueFunction bodies"]
+        past["Action tree\n(AST)"]
+        psrc -- "Python interpreter" --> pgen
+        pgen -- "returns LaunchDescription" --> past
+    end
+
+    subgraph exec["Execute — directly manipulates AST"]
+        direction TB
+        ros2["ros2 launch\n(full evaluation)"]
+        roscope_e["roscope\n(partial evaluation)"]
+    end
+
+    xast --> exec
+    past --> exec
+```
+
+The key observation is that **`generate_launch_description()` and
+`OpaqueFunction` bodies sit in the parsing layer**, not the execution layer.
+They are the user's way of writing a parser in Python instead of XML.
+The function runs, constructs `Node`, `GroupAction`, `IncludeLaunchDescription`
+objects, and returns a `LaunchDescription` — that is the AST.
+
+From that point on, both `ros2 launch` and roscope operate on the same tree.
+`ros2 launch` performs a full evaluation (spawning processes, establishing DDS
+connections).  roscope performs a partial evaluation (resolving substitutions,
+following includes, executing `OpaqueFunction` oracles) and stops before
+process creation.
+
+This also explains why supporting Python launch files does not require
+"executing user programs at runtime": roscope executes the user's Python only
+as far as it needs to in order to obtain the AST — it calls
+`generate_launch_description()` and any `OpaqueFunction` bodies, then hands
+the resulting tree to its own evaluator.
+
 ### Resolution as partial evaluation
 
 Resolution is not purely static analysis in the traditional sense of inspecting

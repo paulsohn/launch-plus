@@ -38,7 +38,9 @@ parameters are set — is locked away behind a full build.
 roscope treats the **launch file as the system description language of ROS 2** — not just a convenience script to collectively start nodes,
 but a sufficient, inspectable specification of the system topology.
 
-It partially evaluates the description following the same semantics as `ros2 launch`, but without a running ROS environment. You can use it directly on a workspace you already have:
+It partially evaluates the description following the same semantics as `ros2 launch`, but without a running ROS environment — Python code runs, `OpaqueFunction` bodies execute, and include chains are followed recursively. It stops at the boundary where nodes would be spawned. See the [resolver pipeline diagram](docs/architecture.md#2-resolve-phase) for a visual overview.
+
+You can use it directly on a workspace you already have:
 
 ```
 # roscope workflow — no build required

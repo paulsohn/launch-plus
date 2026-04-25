@@ -81,7 +81,7 @@ Yes.  roscope reads standard [vcstool](https://github.com/dirk-thomas/vcstool)
 Not today.  roscope currently operates as a **build-time companion** to
 `ros2 launch`: it resolves the launch topology and builds exactly the packages
 needed; `ros2 launch` then spawns and manages the processes.  The `resolve`
-command produces a flattened XML that shows what `ros2 launch` would do —
+command produces an expanded XML that shows what `ros2 launch` would do —
 useful for debugging, CI, and auditing before any build.
 
 A native launch backend — consuming the resolved graph directly to spawn

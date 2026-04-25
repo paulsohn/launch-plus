@@ -42,7 +42,7 @@ This opens an interactive graph view in your browser showing the full launch
 structure — every node, container, topic, remap, and include boundary — with no
 build required.
 
-To get the flattened XML instead:
+To get the expanded XML instead:
 
 ```bash
 roscope resolve -d my_bringup robot.launch.xml \
@@ -165,7 +165,7 @@ This will:
 2. Sparse-checkout just the `my_bringup` package
 3. Parse `robot.launch.xml`, following all `<include>` tags
 4. Fetch additional packages as they're discovered in the launch graph
-5. Output a single flattened XML with all includes inlined, variables
+5. Output a single expanded XML with all includes inlined, variables
    substituted, and conditionals evaluated
 
 Use `-c` (clean) in CI to guarantee reproducibility by resetting repos to

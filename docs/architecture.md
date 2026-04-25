@@ -61,22 +61,32 @@ bodies execute, and include chains are followed recursively.
 flowchart TD
     src["**Launch files**\n.xml / .yaml / .py"]
 
-    subgraph roscope["roscope — launch interpreter (offline)"]
+    subgraph ros2launch["ros2 launch"]
         direction TB
-        parse["**parse()**\nEntity → unresolved Action instances"]
-        execute["**execute()**\n• substitutions — $(var), $(find-pkg-share), $(eval)\n• conditions — if= / unless=\n• includes — IncludeLaunchDescription\n• arg scoping — DeclareLaunchArgument\n• Python code — OpaqueFunction, .py files\n• env vars — SetEnvironmentVariable"]
-        parse --> execute
+        r2parse["**parse()**\nEntity → Action instances"]
+        r2exec["**execute()**\nsubstitutions · conditions · includes\narg scoping · OpaqueFunction · env vars"]
+        r2spawn["spawn processes · establish DDS\nmanage node lifecycle"]
+        r2parse --> r2exec --> r2spawn
+    end
+
+    subgraph roscope["roscope resolver"]
+        direction TB
+        rparse["**parse()**\nEntity → Action instances"]
+        rexec["**execute()**\nsubstitutions · conditions · includes\narg scoping · OpaqueFunction · env vars"]
+        rparse --> rexec
     end
 
     resolved["**Resolved IR**\nnodes · executables · params · remaps · env · include boundaries"]
 
-    xml["**resolved.launch.xml**\nrenderer — flattened, human-readable"]
+    xml["**XML output**\nrenderer — expanded, human-readable, diff-able"]
     viz["**Interactive graph**\nvisualizer — nodes · topics · remaps · include boundaries"]
 
-    runtime["**ROS 2 runtime**\nprocesses · topics · services · tf\n*(not evaluated)*"]
+    runtime["**ROS 2 runtime**\nprocesses · topics · services · tf"]
 
-    src --> parse
-    execute --> resolved
+    src --> r2parse
+    src --> rparse
+    r2spawn --> runtime
+    rexec --> resolved
     resolved --> xml
     resolved --> viz
     resolved -. "would spawn" .-> runtime

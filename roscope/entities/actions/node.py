@@ -229,7 +229,9 @@ class Node(ExecuteProcess):
                 dst = context.perform_substitution(r[1])
                 remaps.append([src or str(r[0]), dst or str(r[1])])
 
-        remap_metadata = state.apply_connection_plugin(pkg, exe, dict(active_params), remaps)
+        remap_metadata = state.apply_connection_plugin(
+            pkg, dict(active_params), remaps, executable=exe
+        )
 
         env = base.env if base else {}
 

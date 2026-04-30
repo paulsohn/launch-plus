@@ -98,7 +98,9 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
     if pkg:
         state.track_package(pkg)
 
-    remap_metadata = state.apply_connection_plugin(pkg, plugin_name, dict(active_params), remaps)
+    remap_metadata = state.apply_connection_plugin(
+        pkg, dict(active_params), remaps, plugin_name=plugin_name
+    )
 
     entry: dict = {
         "package": pkg,

@@ -197,9 +197,17 @@ class ResolverState:
         raise LookupError(f"package '{package}' not found")
 
     def apply_connection_plugin(
-        self, pkg: str, exe: str, params: dict, remaps: list
+        self,
+        pkg: str,
+        params: dict,
+        remaps: list,
+        *,
+        executable: str | None = None,
+        plugin_name: str | None = None,
     ) -> dict[str, dict]:
         """Call the connection plugin, extend remaps in-place, register connections.
+
+        Exactly one of *executable* or *plugin_name* must be provided.
 
         Returns the validated remap_metadata dict (keyed by 'from' / connection name).
         Returns {} when no plugin is set, the package cannot be resolved, or the
@@ -214,9 +222,16 @@ class ResolverState:
             return {}
         from roscope.connection_plugin import call_plugin
 
-        meta_by_connection = call_plugin(self.connection_plugin, pkg_share, exe, params)
+        meta_by_connection = call_plugin(
+            self.connection_plugin,
+            pkg_share,
+            params,
+            executable=executable,
+            plugin_name=plugin_name,
+        )
         if not meta_by_connection:
             return {}
+        identifier = executable or plugin_name or ""
         remap_metadata: dict[str, dict] = {}
         existing_froms = {r[0] for r in remaps if isinstance(r, (list, tuple)) and len(r) >= 2}
         for conn, meta in meta_by_connection.items():
@@ -227,7 +242,7 @@ class ResolverState:
         for conn, meta in remap_metadata.items():
             conn_type = meta.get("type")
             if conn_type:
-                self.register_connection(remap_to.get(conn, conn), conn_type, pkg, exe)
+                self.register_connection(remap_to.get(conn, conn), conn_type, pkg, identifier)
         return remap_metadata
 
     def register_connection(self, resolved_to: str, conn_type: str, pkg: str, exe: str) -> None:

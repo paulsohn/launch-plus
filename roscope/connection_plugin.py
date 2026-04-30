@@ -53,10 +53,16 @@ def load_plugin(path: str):
 def call_plugin(
     plugin_fn,
     pkg_share_path: str,
-    executable: str,
     params: dict,
+    *,
+    executable: str | None = None,
+    plugin_name: str | None = None,
 ) -> dict[str, dict]:
     """Invoke the plugin and return validated connection metadata.
+
+    Exactly one of *executable* or *plugin_name* must be provided.
+    The plugin function receives them as keyword arguments so it can
+    distinguish standalone nodes from composable nodes.
 
     - Plugin raises → logged as an error; returns {} (unexpected execution failure).
     - Plugin returns non-dict (including None) → logged as a warning; returns {}
@@ -65,10 +71,11 @@ def call_plugin(
     """
     if plugin_fn is None:
         return {}
+    identifier = executable or plugin_name or "<unknown>"
     try:
-        result = plugin_fn(pkg_share_path, executable, params)
+        result = plugin_fn(pkg_share_path, params, executable=executable, plugin_name=plugin_name)
     except Exception as e:
-        logger.error("--plugin: raised for %s/%s: %s", pkg_share_path, executable, e)
+        logger.error("--plugin: raised for %s/%s: %s", pkg_share_path, identifier, e)
         return {}
 
     if not isinstance(result, dict):
@@ -76,7 +83,7 @@ def call_plugin(
             "--plugin: get_connections returned %s for %s/%s; expected dict",
             type(result).__name__,
             pkg_share_path,
-            executable,
+            identifier,
         )
         return {}
 

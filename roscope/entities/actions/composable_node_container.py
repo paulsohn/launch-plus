@@ -98,6 +98,8 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
     if pkg:
         state.track_package(pkg)
 
+    remap_metadata = state.apply_connection_plugin(pkg, plugin_name, dict(active_params), remaps)
+
     entry: dict = {
         "package": pkg,
         "plugin": plugin_name,
@@ -105,6 +107,7 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
         "namespace": full_ns,
         "parameters": params,
         "remappings": remaps,
+        "remap_metadata": remap_metadata,
     }
     if pf_list:
         entry["param_files"] = pf_list
@@ -126,6 +129,8 @@ class ComposableNodeContainer(Node):
 
     Matching official ``launch_ros.actions.ComposableNodeContainer``.
     """
+
+    _tag_name = "node_container"
 
     @classmethod
     def parse(cls, entity: Entity, parser: Parser, ignore: list | None = None):
@@ -164,49 +169,8 @@ class ComposableNodeContainer(Node):
         resolved.composable_node_descriptions = valid_composable_nodes
         return [resolved]
 
-    def serialize_resolved(self) -> list[ET.Element]:
-        if not self.package:
-            return []
-
-        elem = ET.Element("node_container")
-        elem.set("pkg", self.package)
-        elem.set("exec", self.executable or "")
-        if self.name:
-            elem.set("name", self.name)
-        if self.namespace:
-            elem.set("namespace", self.namespace)
-        if self.output:
-            elem.set("output", self.output)
-        if self.args:
-            elem.set("args", self.args)
-        if self.ros_args:
-            elem.set("ros_args", self.ros_args)
-
-        for pf in self.param_files:
-            path = pf.get("path", "")
-            inlined = pf.get("params")
-            if inlined is not None:
-                elem.append(ET.Comment(f" params from: {path} "))
-                for k, v in inlined:
-                    p = ET.SubElement(elem, "param")
-                    p.set("name", k)
-                    p.set("value", str(v))
-                elem.append(ET.Comment(f" end params from: {path} "))
-        for k, v in self.parameters:
-            p = ET.SubElement(elem, "param")
-            p.set("name", k)
-            p.set("value", v)
-        for from_, to in self.remappings:
-            r = ET.SubElement(elem, "remap")
-            r.set("from", from_)
-            r.set("to", to)
-        for name, value in sorted(self.env.items()) if isinstance(self.env, dict) else []:
-            e = ET.SubElement(elem, "env")
-            e.set("name", name)
-            e.set("value", value)
-
+    def _add_children(self, parent: ET.Element) -> None:
+        super()._add_children(parent)
         for desc in self.composable_node_descriptions:
             for child_elem in desc.serialize_resolved():
-                elem.append(child_elem)
-
-        return [elem]
+                parent.append(child_elem)

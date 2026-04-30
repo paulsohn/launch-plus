@@ -488,6 +488,7 @@ def resolve_file(
     lockfile: Any = None,
     global_params: list | None = None,
     fetch_options: Any = None,
+    connection_plugin: Any = None,
 ) -> Any:
     """Resolve a launch file and return (ParsedLaunchFile, actions).
 
@@ -555,6 +556,7 @@ def resolve_file(
 
     state.fetch_dir = str(fetch_dir)
     state.fetch_options = fetch_options
+    state.connection_plugin = connection_plugin
 
     args_dict = dict(args)
 

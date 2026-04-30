@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any
 
 from roscope.entities.launch_context import LaunchContext
@@ -230,6 +231,46 @@ def _effective_namespace(
 
 
 # ─── XML utilities ────────────────────────────────────────────────────────────
+
+
+def _serialize_param_files(parent: ET.Element, param_files: list) -> None:
+    """Append ``<param>`` sub-elements (and boundary comments) for *param_files*."""
+    for pf in param_files:
+        path = pf.get("path", "")
+        inlined = pf.get("params")
+        if inlined is not None:
+            parent.append(ET.Comment(f" params from: {path} "))
+            for k, v in inlined:
+                p = ET.SubElement(parent, "param")
+                p.set("name", k)
+                p.set("value", str(v))
+            parent.append(ET.Comment(f" end params from: {path} "))
+        else:
+            p = ET.SubElement(parent, "param")
+            p.set("from", path)
+
+
+def _serialize_remaps(
+    parent: ET.Element,
+    remaps: list,
+    remap_metadata: dict | None = None,
+) -> None:
+    """Append ``<remap>`` sub-elements to *parent*, annotating with type/qos comments."""
+    if remap_metadata is None:
+        remap_metadata = {}
+    for from_, to in remaps:
+        r = ET.SubElement(parent, "remap")
+        r.set("from", from_)
+        r.set("to", to)
+        meta = remap_metadata.get(from_)
+        if meta:
+            conn_type = meta.get("type")
+            if conn_type:
+                r.append(ET.Comment(f" type: {conn_type} "))
+            # qos rendering is experimental and not yet enabled
+            # qos = meta.get("qos")
+            # if qos:
+            #     r.append(ET.Comment(sanitize_xml_comment(f" qos: {qos} ")))
 
 
 def sanitize_xml_comment(text: str) -> str:

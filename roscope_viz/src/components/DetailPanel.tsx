@@ -2,6 +2,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ArgEntry, ExtraArgEntry, GraphData, ParamEntry, RemapEntry } from "../types.generated";
 
 interface NodeDetail {
+  id?: string;
   type?: string;
   package?: string;
   executable?: string;
@@ -12,6 +13,7 @@ interface NodeDetail {
   cmd?: string;
   target?: string;
   fullName?: string;
+  connType?: string;
   source?: string;
   params?: ParamEntry[];
   remaps?: RemapEntry[];
@@ -38,8 +40,22 @@ export function DetailPanel({ detail, graph, width, onResizeStart, onClose }: Pr
     composable_node: "Composable node",
     load_composable_node: "Load composable node",
     executable: "Executable",
-    topic: "Topic",
   };
+
+  const connFamilyLabel: Record<string, string> = {
+    topic: "Topic",
+    service: "Service",
+    action: "Action",
+    unknown: "Unknown",
+  };
+
+  function typeLabel(type: string, connType?: string): string {
+    if (type === "connection") {
+      const family = connFamilyLabel[connType ?? ""] ?? connType ?? "Unknown";
+      return `Connection (${family})`;
+    }
+    return displayType[type] ?? type;
+  }
 
   const title = !detail
     ? ""
@@ -62,7 +78,7 @@ export function DetailPanel({ detail, graph, width, onResizeStart, onClose }: Pr
         {!detail && <GraphStats graph={graph} />}
         {detail && <h3>Info</h3>}
         {detail?.type && (
-          <Field label="Type" value={displayType[detail.type] ?? detail.type} />
+          <Field label="Type" value={typeLabel(detail.type, detail.connType as string | undefined)} />
         )}
         {detail?.source && <Field label="Source" value={detail.source} />}
         {detail?.package && <Field label="Package" value={detail.package} />}
@@ -77,7 +93,10 @@ export function DetailPanel({ detail, graph, width, onResizeStart, onClose }: Pr
         {detail?.fqn && <Field label="FQN" value={detail.fqn} />}
         {detail?.cmd && <Field label="Command" value={detail.cmd} />}
         {detail?.target && <Field label="Target" value={detail.target} />}
-        {detail?.fullName && <Field label="Topic" value={detail.fullName} />}
+        {detail?.fullName && <Field label="Name" value={detail.fullName} />}
+        {detail?.type === "connection" && (
+          <ConnectionNodeGroups detail={detail} graph={graph} />
+        )}
 
         {detail?.args && detail.args.length > 0 && (
           <>
@@ -162,6 +181,98 @@ export function DetailPanel({ detail, graph, width, onResizeStart, onClose }: Pr
   );
 }
 
+// Map protocol family to role labels (out = initiator, in = receiver)
+const ROLE_LABELS: Record<string, { out: string; in: string }> = {
+  topic: { out: "Publishers", in: "Subscriptions" },
+  service: { out: "Clients", in: "Servers" },
+  action: { out: "Clients", in: "Servers" },
+};
+
+function ConnectionNodeGroups({
+  detail,
+  graph,
+}: {
+  detail: NodeDetail;
+  graph: GraphData;
+}) {
+  const connId = detail.id;
+  if (!connId) return null;
+
+  const nodeMap = new Map(graph.nodes.map((n) => [n.id, n]));
+
+  const outNodes: { fqn: string; connType: string }[] = [];
+  const inNodes: { fqn: string; connType: string }[] = [];
+  const unknownNodes: { fqn: string }[] = [];
+
+  for (const e of graph.edges) {
+    if (e.type !== "remap") continue;
+    let nodeId: string | undefined;
+    let role: "out" | "in" | "unknown";
+
+    if (e.target === connId) {
+      nodeId = e.source;
+      role = e.directed ? "out" : "unknown";
+    } else if (e.source === connId) {
+      nodeId = e.target;
+      role = e.directed ? "in" : "unknown";
+    } else {
+      continue;
+    }
+
+    const n = nodeMap.get(nodeId);
+    const fqn = n?.fqn ?? n?.name ?? nodeId;
+    if (role === "out") outNodes.push({ fqn, connType: e.connType ?? "" });
+    else if (role === "in") inNodes.push({ fqn, connType: e.connType ?? "" });
+    else unknownNodes.push({ fqn });
+  }
+
+  const labels = ROLE_LABELS[detail.connType ?? ""] ?? null;
+  const hasAny = outNodes.length + inNodes.length + unknownNodes.length > 0;
+  if (!hasAny) return null;
+
+  return (
+    <>
+      <h3>Connected nodes</h3>
+      {outNodes.length > 0 && (
+        <>
+          <h4 style={{ margin: "4px 0 2px", color: "#8888aa", fontWeight: "normal" }}>
+            {labels?.out ?? "Out"}
+          </h4>
+          <table style={{ width: "100%", wordBreak: "break-all" }}>
+            <tbody>
+              {outNodes.map((n, i) => <tr key={i}><td>{n.fqn}</td></tr>)}
+            </tbody>
+          </table>
+        </>
+      )}
+      {inNodes.length > 0 && (
+        <>
+          <h4 style={{ margin: "4px 0 2px", color: "#8888aa", fontWeight: "normal" }}>
+            {labels?.in ?? "In"}
+          </h4>
+          <table style={{ width: "100%", wordBreak: "break-all" }}>
+            <tbody>
+              {inNodes.map((n, i) => <tr key={i}><td>{n.fqn}</td></tr>)}
+            </tbody>
+          </table>
+        </>
+      )}
+      {unknownNodes.length > 0 && (
+        <>
+          <h4 style={{ margin: "4px 0 2px", color: "#8888aa", fontWeight: "normal" }}>
+            Unknown / Mismatched
+          </h4>
+          <table style={{ width: "100%", wordBreak: "break-all" }}>
+            <tbody>
+              {unknownNodes.map((n, i) => <tr key={i}><td>{n.fqn}</td></tr>)}
+            </tbody>
+          </table>
+        </>
+      )}
+    </>
+  );
+}
+
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="field">
@@ -229,7 +340,11 @@ function GraphStats({ graph }: { graph: GraphData }) {
   const executableCount = nodes.filter((n) => n.type === "executable").length;
   const includeCount = groups.filter((g) => g.groupType === "include").length;
   const lcnCallCount = groups.filter((g) => g.groupType === "lcn_wrapper").length;
-  const topicCount = graph.topics.length;
+  const connectionCount = graph.connections.length;
+  const topicConnCount = graph.connections.filter((c) => c.connType === "topic").length;
+  const serviceConnCount = graph.connections.filter((c) => c.connType === "service").length;
+  const actionConnCount = graph.connections.filter((c) => c.connType === "action").length;
+  const unknownConnCount = graph.connections.filter((c) => c.connType === "unknown").length;
   const remapCount = graph.edges.filter((e) => e.type === "remap").length;
   const paramCount = nodes.reduce(
     (s, n) => s + new Set(n.params?.map((p) => p.name) ?? []).size,
@@ -258,7 +373,11 @@ function GraphStats({ graph }: { graph: GraphData }) {
           {containerCount > 0 && <StatRow label="Node containers" value={containerCount} />}
           {lcnCallCount > 0 && <StatRow label="LoadComposableNodes calls" value={lcnCallCount} />}
           {executableCount > 0 && <StatRow label="Executables" value={executableCount} />}
-          <StatRow label="Tracked topics" value={topicCount} />
+          <StatRow label="Connections (total)" value={connectionCount} />
+          {topicConnCount > 0 && <StatRow label="↳ Topics" value={topicConnCount} />}
+          {serviceConnCount > 0 && <StatRow label="↳ Services" value={serviceConnCount} />}
+          {actionConnCount > 0 && <StatRow label="↳ Actions" value={actionConnCount} />}
+          {unknownConnCount > 0 && <StatRow label="↳ Unknown" value={unknownConnCount} />}
         </tbody>
       </table>
 
@@ -270,7 +389,7 @@ function GraphStats({ graph }: { graph: GraphData }) {
         </tbody>
       </table>
 
-      <h3>Connections</h3>
+      <h3>Attributes</h3>
       <table style={{ width: "100%" }}>
         <tbody>
           <StatRow label="Remaps" value={remapCount} />

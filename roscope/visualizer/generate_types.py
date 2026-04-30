@@ -114,7 +114,7 @@ def generate() -> str:
         schema.ArgEntry,
         schema.GraphNode,
         schema.GraphGroup,
-        schema.GraphTopic,
+        schema.GraphConnection,
         schema.GraphEdge,
         schema.GraphMetadata,
         schema.GraphData,

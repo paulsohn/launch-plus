@@ -50,15 +50,18 @@ export interface GraphGroup {
   includeArgs?: Record<string, string> | null;
 }
 
-export interface GraphTopic {
+export interface GraphConnection {
   id: string;
   name: string;
+  connType: string;
 }
 
 export interface GraphEdge {
   source: string;
   target: string;
   type: "remap" | "load_target";
+  directed?: boolean;
+  connType?: string;
 }
 
 export interface GraphMetadata {
@@ -72,7 +75,7 @@ export interface GraphData {
   metadata: GraphMetadata;
   nodes: GraphNode[];
   groups: GraphGroup[];
-  topics: GraphTopic[];
+  connections: GraphConnection[];
   edges: GraphEdge[];
 }
 

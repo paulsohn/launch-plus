@@ -142,11 +142,12 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
     },
   },
   {
-    selector: 'node[type="topic"]',
+    // Base style for all connection vertices (topic/service/action/unknown).
+    selector: 'node[type="connection"]',
     style: {
       shape: "diamond",
-      "background-color": "#e67e22",
-      "border-color": "#d35400",
+      "background-color": "#7f8c8d",
+      "border-color": "#636e72",
       "border-width": 1,
       "min-width": "40px",
       "min-height": "20px",
@@ -164,6 +165,22 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
     },
   },
   {
+    // Topic (pub/sub) — orange
+    selector: 'node[type="connection"][connType="topic"]',
+    style: { "background-color": "#e67e22", "border-color": "#d35400" },
+  },
+  {
+    // Service (client/server) — green
+    selector: 'node[type="connection"][connType="service"]',
+    style: { "background-color": "#27ae60", "border-color": "#1e8449" },
+  },
+  {
+    // Action (client/server) — purple
+    selector: 'node[type="connection"][connType="action"]',
+    style: { "background-color": "#8e44ad", "border-color": "#6c3483" },
+  },
+  {
+    // Base remap edge — undirected, muted gray
     selector: 'edge[type="remap"]',
     style: {
       width: 1,
@@ -172,6 +189,44 @@ const cyStyles: cytoscape.StylesheetStyle[] = [
       "target-arrow-shape": "none",
       opacity: 0.5,
       events: "no",
+    },
+  },
+  {
+    // Directed remap edges — add arrowhead
+    selector: 'edge[type="remap"][?directed]',
+    style: {
+      "target-arrow-shape": "triangle",
+      "target-arrow-color": "data(lineColor)",
+      "arrow-scale": 0.8,
+    },
+  },
+  {
+    // Topic pub/sub edges — orange
+    selector: 'edge[type="remap"][connType="publisher"], edge[type="remap"][connType="subscription"]',
+    style: {
+      "line-color": "#d35400",
+      "target-arrow-color": "#d35400",
+      opacity: 0.6,
+    },
+  },
+  {
+    // Service edges — green
+    selector: 'edge[type="remap"][connType="service_client"], edge[type="remap"][connType="service_server"]',
+    style: {
+      "line-color": "#1e8449",
+      "target-arrow-color": "#1e8449",
+      "line-style": "dashed",
+      opacity: 0.6,
+    },
+  },
+  {
+    // Action edges — purple
+    selector: 'edge[type="remap"][connType="action_client"], edge[type="remap"][connType="action_server"]',
+    style: {
+      "line-color": "#6c3483",
+      "target-arrow-color": "#6c3483",
+      "line-style": "dotted",
+      opacity: 0.6,
     },
   },
   {
@@ -275,9 +330,9 @@ export function GraphView({ graph, cyRef, onNodeTap, onBackgroundTap, sidebarWid
       node.removeClass("faded").addClass("highlighted");
       const ancestors = node.ancestors();
       ancestors.removeClass("faded");
-      // Topics inside ancestor compounds would appear against a full-opacity
+      // Connection vertices inside ancestor compounds would appear against a full-opacity
       // background while faded (0.2 opacity) — unfade them too.
-      ancestors.descendants('[type="topic"]').removeClass("faded");
+      ancestors.descendants('[type="connection"]').removeClass("faded");
       if (node.isParent()) {
         const desc = node.descendants();
         desc.removeClass("faded").addClass("highlighted");

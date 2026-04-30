@@ -80,9 +80,10 @@ class GraphGroup:
 
 
 @dataclass
-class GraphTopic:
+class GraphConnection:
     id: str
     name: str
+    conn_type: str  # "topic" | "service" | "action" | "unknown"
 
 
 @dataclass
@@ -90,6 +91,8 @@ class GraphEdge:
     source: str
     target: str
     type: Literal["remap", "load_target"]
+    directed: bool = False
+    conn_type: str = ""  # raw connection type (publisher/subscription/etc.) for remap edges
 
 
 @dataclass
@@ -105,7 +108,7 @@ class GraphData:
     metadata: GraphMetadata
     nodes: list[GraphNode]
     groups: list[GraphGroup]
-    topics: list[GraphTopic]
+    connections: list[GraphConnection]
     edges: list[GraphEdge]
 
 

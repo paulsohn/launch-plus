@@ -992,7 +992,7 @@ def _cmd_resolve(
 
     connection_plugin = None
     if plugin_path is not None:
-        from roscope.connection_plugin import load_plugin
+        from roscope.plugin import load_plugin
 
         connection_plugin = load_plugin(plugin_path)
 

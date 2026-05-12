@@ -220,7 +220,7 @@ class ResolverState:
             pkg_share = self.resolve_pkg_share(pkg)
         except Exception:
             return {}
-        from roscope.connection_plugin import call_plugin
+        from roscope.plugin import call_plugin
 
         meta_by_connection = call_plugin(
             self.connection_plugin,
@@ -247,7 +247,7 @@ class ResolverState:
 
     def register_connection(self, resolved_to: str, conn_type: str, pkg: str, exe: str) -> None:
         """Record a typed connection and log an error if a protocol-family conflict arises."""
-        from roscope.connection_plugin import PROTOCOL_FAMILY
+        from roscope.plugin import PROTOCOL_FAMILY
 
         family = PROTOCOL_FAMILY.get(conn_type)
         if family is None:

@@ -254,7 +254,7 @@ class _GraphBuilder:
         self._nodes.append(node_entry)
 
         # Connection edges from composable node remaps
-        from roscope.connection_plugin import PROTOCOL_FAMILY
+        from roscope.plugin import PROTOCOL_FAMILY
 
         remap_metadata = data.get("remap_metadata", {})
         for remap in data.get("remappings", []):
@@ -402,7 +402,7 @@ class _GraphBuilder:
         return [{"from": r[0], "to": r[1]} for r in remaps if len(r) == 2]
 
     def _add_topic_edges(self, node_id: str, node_fqn: str, node_ns: str, action) -> None:
-        from roscope.connection_plugin import PROTOCOL_FAMILY
+        from roscope.plugin import PROTOCOL_FAMILY
 
         remaps = getattr(action, "remappings", [])
         remap_metadata = getattr(action, "remap_metadata", {})

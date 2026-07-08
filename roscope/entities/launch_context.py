@@ -224,8 +224,9 @@ class ResolverState:
 
         meta_by_connection = call_plugin(
             self.connection_plugin,
-            pkg_share,
-            params,
+            pkg_share_path=pkg_share,
+            params=params,
+            pkg_name=pkg,
             executable=executable,
             plugin_name=plugin_name,
         )

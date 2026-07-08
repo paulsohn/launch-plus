@@ -1,22 +1,21 @@
 """Example connection metadata plugin that reads per-executable interface definitions.
 
-This example shows one possible convention (a per-executable YAML file under
-``interface/``). The plugin interface is intentionally open-ended — projects can
-use any lookup strategy: a single registry file, a database, generated stubs, or
-anything else, as long as ``get_connections`` returns the expected dict.
+This example stores all interface definitions locally under ``interfaces/``,
+keyed by package name.  This works for both first-party and third-party packages
+— no files need to be written into the package's own share directory.
 
 Usage:
     roscope resolve ... --plugin example/autoware/example_plugin.py
 
-Expected package directory structure for this example
--------------------------------------
-<pkg_share_path>/
-└── interface/
-    ├── MyComponent.yaml
-    ├── my_node.yaml
+Expected directory structure
+-----------------------------
+example/autoware/interfaces/
+└── <pkg_name>/
+    ├── MyComponent.yaml     (composable node, matched by plugin class suffix)
+    ├── my_node.yaml         (standalone node executable)
     └── other_node.yaml
 
-Expected YAML format for this example
+Expected YAML format
 ---------------------
 connections:
   ~/input/points:
@@ -41,30 +40,33 @@ If the interface file does not exist, the node is silently skipped.
 
 Plugin function signature
 --------------------------
-get_connections(pkg_share_path, params, *, executable=None, plugin_name=None)
+get_connections(*, pkg_share_path, params, pkg_name, executable=None, plugin_name=None)
 
 Exactly one of *executable* (standalone node) or *plugin_name* (composable node)
-is provided, so the plugin can adapt its lookup strategy accordingly.
+is provided.  *pkg_name* is always provided and is the ROS package name.
 """
 
 from pathlib import Path
 
 import yaml
 
+_INTERFACES_DIR = Path(__file__).parent / "interfaces"
+
 
 def get_connections(
+    *,
     pkg_share_path: str,
     params: dict,
-    *,
+    pkg_name: str,
     executable: str | None = None,
     plugin_name: str | None = None,
 ) -> dict:
     # For composable nodes the plugin class name (e.g. "my_pkg::MyComponent") is
-    # provided. Use only the final component after "::" as the file name.
+    # provided.  Use only the final part after "::" as the file name.
     name = executable or (plugin_name.split("::")[-1] if plugin_name else None)
     if not name:
         return {}
-    interface_file = Path(pkg_share_path) / "interface" / f"{name}.yaml"
+    interface_file = _INTERFACES_DIR / pkg_name / f"{name}.yaml"
     if not interface_file.exists():
         return {}
     data = yaml.safe_load(interface_file.read_text())

@@ -52,9 +52,10 @@ def load_plugin(path: str):
 
 def call_plugin(
     plugin_fn,
+    *,
     pkg_share_path: str,
     params: dict,
-    *,
+    pkg_name: str,
     executable: str | None = None,
     plugin_name: str | None = None,
 ) -> dict[str, dict]:
@@ -63,6 +64,11 @@ def call_plugin(
     Exactly one of *executable* or *plugin_name* must be provided.
     The plugin function receives them as keyword arguments so it can
     distinguish standalone nodes from composable nodes.
+
+    *pkg_name* is the ROS package name.  It is passed as a keyword argument
+    alongside *pkg_share_path* so plugins that cannot write files into a
+    third-party package's share directory can use the package name to look up
+    interface definitions from a local registry instead.
 
     - Plugin raises → logged as an error; returns {} (unexpected execution failure).
     - Plugin returns non-dict (including None) → logged as a warning; returns {}
@@ -73,7 +79,13 @@ def call_plugin(
         return {}
     identifier = executable or plugin_name or "<unknown>"
     try:
-        result = plugin_fn(pkg_share_path, params, executable=executable, plugin_name=plugin_name)
+        result = plugin_fn(
+            pkg_share_path=pkg_share_path,
+            params=params,
+            pkg_name=pkg_name,
+            executable=executable,
+            plugin_name=plugin_name,
+        )
     except Exception as e:
         logger.error("--plugin: raised for %s/%s: %s", pkg_share_path, identifier, e)
         return {}

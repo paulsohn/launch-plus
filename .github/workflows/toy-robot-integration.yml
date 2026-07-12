@@ -20,8 +20,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
-            ros_distro: humble
           - os: ubuntu-24.04
             ros_distro: jazzy
     steps:

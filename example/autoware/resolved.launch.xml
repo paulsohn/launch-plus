@@ -3060,8 +3060,14 @@
                 <param name="model_params.voxel_size" value="[0.32, 0.32, 10.0]"/>
                 <param name="model_params.downsample_factor" value="2"/>
                 <param name="model_params.encoder_in_feature_size" value="9"/>
-                <param name="model_params.has_twist" value="false"/>
                 <param name="model_params.has_variance" value="false"/>
+                <param name="model_params.has_twist" value="false"/>
+                <param name="model_params.detection_score_thresholds.distance_bin_upper_limits" value="[50.0, 90.0, 121.0, 200.0]"/>
+                <param name="model_params.detection_score_thresholds.min_confidence_scores.CAR" value="[0.35, 0.35, 0.35, 0.35]"/>
+                <param name="model_params.detection_score_thresholds.min_confidence_scores.TRUCK" value="[0.35, 0.35, 0.35, 0.35]"/>
+                <param name="model_params.detection_score_thresholds.min_confidence_scores.BUS" value="[0.35, 0.35, 0.35, 0.35]"/>
+                <param name="model_params.detection_score_thresholds.min_confidence_scores.BICYCLE" value="[0.35, 0.35, 0.35, 0.35]"/>
+                <param name="model_params.detection_score_thresholds.min_confidence_scores.PEDESTRIAN" value="[0.35, 0.35, 0.35, 0.35]"/>
                 <!-- end params from: {home}/autoware_data/lidar_centerpoint/centerpoint_tiny_ml_package.param.yaml -->
                 <!-- params from: {home}/autoware_data/lidar_centerpoint/detection_class_remapper.param.yaml -->
                 <param name="allow_remapping_by_area_matrix" value="[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]"/>

@@ -23,7 +23,6 @@ so no `colcon build` is needed. Run from this directory:
 
 ```bash
 roscope resolve -d toy_robot_bringup toy_robot.launch.xml \
-  --apply-launch-arg-defaults \
   --plugin toy_robot_plugin.py \
   --preview
 ```
@@ -92,7 +91,6 @@ directly:
 
 ```bash
 roscope resolve toy_robot_bringup toy_robot.launch.xml \
-  --apply-launch-arg-defaults \
   --plugin toy_robot_plugin.py \
   --preview
 ```

@@ -66,6 +66,5 @@ jobs:
           source /opt/ros/${{ matrix.ros_distro }}/setup.bash
           source install/setup.bash
           roscope resolve -d toy_robot_bringup toy_robot.launch.xml \
-            --apply-launch-arg-defaults \
             --plugin toy_robot_plugin.py \
             --preview

@@ -1,0 +1,7 @@
+connections:
+  /joint_states:
+    type: subscription
+  /tf:
+    type: publisher
+  /tf_static:
+    type: publisher

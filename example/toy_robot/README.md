@@ -18,8 +18,7 @@ sensor ──► /scan
 
 ## Inspect connections without building
 
-roscope's dirty mode (`-d`) scans `src/` for `package.xml` files directly,
-so no `colcon build` is needed. Run from this directory:
+Run from this directory:
 
 ```bash
 roscope resolve -d toy_robot_bringup toy_robot.launch.xml \
@@ -27,17 +26,23 @@ roscope resolve -d toy_robot_bringup toy_robot.launch.xml \
   --preview
 ```
 
-`--preview` prints the resolved launch XML to stdout instead of writing it to a
-file, which is useful for a quick sanity check.  Drop it to write
-`resolved.launch.xml` to the current directory.
+Two flags work together here:
+
+- **`-d` (dirty mode)**: trust the current working tree as-is rather than
+  checking it out to match a lockfile.  Since this example ships no lockfile,
+  `-d` is required; without it roscope would look for `manifest.lock.repos` and
+  fail.
+- **`--preview`**: resolve `$(find-pkg-share ...)` against source directories in
+  `src/` instead of installed paths in `install/`.  This is what makes a
+  `colcon build` unnecessary — roscope reads package resources directly from the
+  source tree.
 
 The plugin reads interface definitions from two places:
 
 - **Custom packages** (`toy_robot_controller`, `toy_robot_sensor`): definitions
   are shipped inside each package under `interface/<executable>.yaml` and
-  installed to `share/<pkg>/interface/`.  In dirty mode roscope cannot resolve
-  `find-pkg-share`, so the plugin falls back to the local `interfaces/` registry
-  automatically.
+  installed to `share/<pkg>/interface/`.  In preview mode `find-pkg-share`
+  resolves to `src/<pkg>/`, so the plugin finds interface YAMLs there directly.
 - **Standard package** (`robot_state_publisher`): not our package, so no primary
   definition exists.  The plugin falls back to
   `interfaces/robot_state_publisher/robot_state_publisher.yaml`.
@@ -85,12 +90,10 @@ ros2 topic echo /odom
 
 ### 5. Post-build roscope resolve (uses installed share paths)
 
-After sourcing `install/setup.bash`, roscope can resolve `find-pkg-share`
-correctly, so the plugin will find interface YAMLs from the installed packages
-directly:
+After sourcing `install/setup.bash`, drop `--preview` so roscope resolves
+`$(find-pkg-share ...)` against the installed packages rather than `src/`:
 
 ```bash
-roscope resolve toy_robot_bringup toy_robot.launch.xml \
-  --plugin toy_robot_plugin.py \
-  --preview
+roscope resolve -d toy_robot_bringup toy_robot.launch.xml \
+  --plugin toy_robot_plugin.py
 ```

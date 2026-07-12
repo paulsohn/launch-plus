@@ -37,8 +37,8 @@ Do **not** push directly to `devel`.
 
 ### Prerequisites
 
-- Rust toolchain (edition 2024, MSRV 1.85) — https://rustup.rs
-- `python3` in `PATH`
+- Python 3.10+
+- **pnpm v10** — to build the web visualizer ([install](https://pnpm.io/installation)); pnpm v11 is not yet supported
 - (Optional) `pre-commit` — https://pre-commit.com
 
 ### Setup
@@ -46,16 +46,17 @@ Do **not** push directly to `devel`.
 ```bash
 git clone https://github.com/paulsohn/roscope.git
 cd roscope
+pip install -e .
 pre-commit install   # optional but recommended
 ```
 
-### Build and test
+### Test and lint
 
 ```bash
-cargo build --workspace
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-cargo fmt --all -- --check
+python -m pytest tests/ -v
+ruff check
+ruff format --check
+mypy roscope/resolver.py
 ```
 
 ### Integration test (Autoware)
@@ -71,9 +72,8 @@ bash test-autoware.sh -d   # dirty (reuse fetched packages)
 
 ## Code style
 
-- Workspace-level clippy lints are enforced (`clippy::all` + `clippy::pedantic` as warnings).
-- `cargo fmt` with default settings.
-- `unsafe` code is denied by default; use `#[allow(unsafe_code)]` with a `// SAFETY:` comment when necessary.
+- Linting and formatting are enforced via `ruff`.
+- Type checking via `mypy` (gradual adoption — new code should have type hints).
 
 ## License
 

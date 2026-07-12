@@ -33,6 +33,25 @@ connections:
   ~/set_parameters:
     type: service_server
 
+Conditional connections
+------------------------
+A connection entry may carry an optional ``when`` key whose value is a Python
+expression evaluated against the node's resolved parameters.  The expression
+receives a single name ``params`` — the dict of parameter name → resolved value
+passed by roscope.  The connection is included only when the expression
+evaluates to a truthy value.
+
+  ~/output/predicted_objects:
+    type: publisher
+    when: "params.get('use_object_filter', False)"
+
+  ~/input/map_based_prediction:
+    type: subscription
+    when: "params.get('prediction_time_horizon_rate_for_validate_lane_changing_path', 0.0) > 0"
+
+If the expression raises any exception (e.g. unexpected param type), the
+connection is included conservatively.
+
 Recognized types: publisher, subscription, service_client, service_server,
                   action_client, action_server.
 Any other type string is warned and ignored by the resolver.
@@ -51,6 +70,18 @@ from pathlib import Path
 import yaml
 
 _INTERFACES_DIR = Path(__file__).parent / "interfaces"
+
+
+def _evaluate_when(expr: str, params: dict) -> bool:
+    """Evaluate a ``when`` expression against resolved node parameters.
+
+    Returns True (include the connection) on any evaluation error so that
+    missing or unexpected parameter values never silently drop connections.
+    """
+    try:
+        return bool(eval(expr, {"__builtins__": {}}, {"params": params}))
+    except Exception:
+        return True
 
 
 def get_connections(
@@ -72,4 +103,16 @@ def get_connections(
     data = yaml.safe_load(interface_file.read_text())
     if not isinstance(data, dict):
         return {}
-    return data.get("connections") or {}
+    raw = data.get("connections") or {}
+
+    result = {}
+    for topic, meta in raw.items():
+        if not isinstance(meta, dict):
+            result[topic] = meta
+            continue
+        when = meta.get("when")
+        if when is not None and not _evaluate_when(when, params):
+            continue
+        # Strip `when` from the metadata returned to roscope — it's plugin-internal.
+        result[topic] = {k: v for k, v in meta.items() if k != "when"}
+    return result

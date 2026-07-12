@@ -1,0 +1,14 @@
+connections:
+  - topic: ~/input/obstacle_pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/input/raw_pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/output/occupancy_grid_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - topic: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: tier4_debug_msgs/msg/Float64Stamped
+    when: "params.get('publish_processing_time_detail', False)"

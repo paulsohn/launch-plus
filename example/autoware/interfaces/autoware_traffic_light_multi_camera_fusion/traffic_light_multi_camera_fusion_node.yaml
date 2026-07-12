@@ -1,0 +1,13 @@
+# Per-camera subscriptions are created dynamically from the camera_namespaces parameter
+# (a list of strings). For each namespace N in camera_namespaces, 3 topics are subscribed:
+#   <N>/camera_info, <N>/detection/rois, <N>/classification/traffic_signals
+# The number of cameras is not known statically. Only the static map subscription and
+# the single output publisher are recorded here.
+# See todo.md for the dynamic subscription exception.
+connections:
+  - topic: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - topic: ~/output/traffic_signals
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray

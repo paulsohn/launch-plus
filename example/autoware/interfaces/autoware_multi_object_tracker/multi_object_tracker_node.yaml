@@ -1,0 +1,32 @@
+# Dynamic detection inputs: up to 12 input channels (detection01..detection12).
+# Each channel's topic name is a parameter (input/detectionNN/objects).
+# A channel is only subscribed when input/detectionNN/channel != "none" and is not empty.
+# The static entries below use the conventional topic names; actual names are remapped at launch.
+# See todo.md for the dynamic subscription exception.
+connections:
+  - topic: ~/input/detection01/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - topic: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+    when: "params.get('ego_source', 'odometry') == 'odometry'"
+  - topic: ~/output/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  - topic: ~/output/merged_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+    when: "params.get('publish_merged_objects', False)"
+  - topic: ~/debug/tentative_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+    when: "params.get('publish_tentative_objects', False)"
+  - topic: ~/debug/objects_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "params.get('publish_debug_markers', False)"
+  - topic: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: tier4_debug_msgs/msg/Float64Stamped
+    when: "params.get('publish_processing_time_detail', False)"

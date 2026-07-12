@@ -1,0 +1,25 @@
+# Both the car and pedestrian instances use the same class (TrafficLightClassifierNodelet).
+# They are differentiated by the traffic_light_type parameter and model paths at launch time.
+# Subscriptions are lazy: ~/input/image and ~/input/rois are only active when
+# ~/output/traffic_signals has at least one subscriber (managed by a 100ms timer).
+# The debug image topic name depends on classifier_type:
+#   HSVFilter (0): ~/debug/image
+#   CNN (1) / LampRecognizer (2): ~/output/debug/image
+connections:
+  - topic: ~/input/image
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - topic: ~/input/rois
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
+  - topic: ~/output/traffic_signals
+    type: publisher
+    msg_type: tier4_perception_msgs/msg/TrafficLightArray
+  - topic: ~/output/debug/image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+    when: "params.get('classifier_type', 1) in (1, 2)"
+  - topic: ~/debug/image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+    when: "params.get('classifier_type', 1) == 0"

@@ -99,7 +99,12 @@ def _resolve_plugin(desc_or_dict, context) -> dict:
         state.track_package(pkg)
 
     remap_metadata = state.apply_connection_plugin(
-        pkg, dict(active_params), remaps, plugin_name=plugin_name
+        pkg,
+        dict(active_params),
+        remaps,
+        plugin_name=plugin_name,
+        node_ns=full_ns,
+        node_name=name,
     )
 
     entry: dict = {

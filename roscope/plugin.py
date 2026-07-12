@@ -77,6 +77,8 @@ def call_plugin(
     """
     if plugin_fn is None:
         return {}
+    if bool(executable) == bool(plugin_name):
+        raise ValueError("exactly one of executable or plugin_name must be provided")
     identifier = executable or plugin_name or "<unknown>"
     try:
         result = plugin_fn(
@@ -101,6 +103,9 @@ def call_plugin(
 
     validated: dict[str, dict] = {}
     for connection, meta in result.items():
+        if not isinstance(connection, str):
+            logger.warning("--plugin: non-string connection key %r; skipping", connection)
+            continue
         if not isinstance(meta, dict):
             logger.warning("--plugin: entry %r has non-dict metadata; skipping", connection)
             continue

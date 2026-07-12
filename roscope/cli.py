@@ -549,7 +549,7 @@ def fetch(
 @click.option(
     "--plugin",
     default=None,
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, dir_okay=False),
     help="Path to a connection metadata plugin script (Python file with get_connections())",
 )
 @click.pass_context

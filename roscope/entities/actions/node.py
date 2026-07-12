@@ -229,8 +229,14 @@ class Node(ExecuteProcess):
                 dst = context.perform_substitution(r[1])
                 remaps.append([src or str(r[0]), dst or str(r[1])])
 
+        effective_ns = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
         remap_metadata = state.apply_connection_plugin(
-            pkg, dict(active_params), remaps, executable=exe
+            pkg,
+            dict(active_params),
+            remaps,
+            executable=exe,
+            node_ns=effective_ns,
+            node_name=name,
         )
 
         env = base.env if base else {}

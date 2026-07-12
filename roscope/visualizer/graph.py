@@ -181,7 +181,7 @@ class _GraphBuilder:
             "remaps": self._extract_remaps(action),
         }
         self._nodes.append(node_entry)
-        self._add_topic_edges(nid, fqn, ns, action)
+        self._add_connection_edges(nid, fqn, ns, action)
 
     def _handle_container(self, action, parent_id: str | None) -> None:
         if not action.package:
@@ -401,7 +401,7 @@ class _GraphBuilder:
         remaps = getattr(action, "remappings", [])
         return [{"from": r[0], "to": r[1]} for r in remaps if len(r) == 2]
 
-    def _add_topic_edges(self, node_id: str, node_fqn: str, node_ns: str, action) -> None:
+    def _add_connection_edges(self, node_id: str, node_fqn: str, node_ns: str, action) -> None:
         from roscope.plugin import PROTOCOL_FAMILY
 
         remaps = getattr(action, "remappings", [])

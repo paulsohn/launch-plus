@@ -204,10 +204,14 @@ class ResolverState:
         *,
         executable: str | None = None,
         plugin_name: str | None = None,
+        node_ns: str | None = None,
+        node_name: str | None = None,
     ) -> dict[str, dict]:
         """Call the connection plugin, extend remaps in-place, register connections.
 
         Exactly one of *executable* or *plugin_name* must be provided.
+        *node_ns* and *node_name* are used to expand ``~/`` and relative connection
+        names to their absolute form before conflict registration.
 
         Returns the validated remap_metadata dict (keyed by 'from' / connection name).
         Returns {} when no plugin is set, the package cannot be resolved, or the
@@ -239,11 +243,19 @@ class ResolverState:
             remap_metadata[conn] = meta
             if conn not in existing_froms:
                 remaps.append([conn, conn])
+        from roscope.entities.helpers import _expand_connection_name
+
         remap_to = {r[0]: r[1] for r in remaps if isinstance(r, (list, tuple)) and len(r) >= 2}
         for conn, meta in remap_metadata.items():
             conn_type = meta.get("type")
             if conn_type:
-                self.register_connection(remap_to.get(conn, conn), conn_type, pkg, identifier)
+                resolved = remap_to.get(conn, conn)
+                self.register_connection(
+                    _expand_connection_name(resolved, node_ns, node_name),
+                    conn_type,
+                    pkg,
+                    identifier,
+                )
         return remap_metadata
 
     def register_connection(self, resolved_to: str, conn_type: str, pkg: str, exe: str) -> None:

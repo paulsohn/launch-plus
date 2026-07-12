@@ -217,6 +217,35 @@ def _ros2_namespace_join(base: str | None, next_ns: str | None) -> str | None:
     return make_namespace_absolute(prefix_namespace(base, next_ns))
 
 
+def _expand_connection_name(
+    name: str,
+    node_ns: str | None,
+    node_name: str | None,
+) -> str:
+    """Expand a ROS 2 connection name to absolute form.
+
+    - ``/absolute`` — returned unchanged.
+    - ``~/private`` — expanded to ``<node_ns>/<node_name>/private``.
+    - ``relative`` — expanded to ``<node_ns>/relative``.
+
+    Falls back to the raw name when namespace/node info is unavailable.
+    """
+    if name.startswith("/"):
+        return name
+    ns = (node_ns or "").rstrip("/")
+    if name.startswith("~/"):
+        suffix = name[2:]
+        if ns and node_name:
+            return f"{ns}/{node_name}/{suffix}"
+        if node_name:
+            return f"/{node_name}/{suffix}"
+        return f"/{suffix}" if suffix else "/"
+    # relative name
+    if ns:
+        return f"{ns}/{name}"
+    return f"/{name}"
+
+
 def _effective_namespace(
     stack: list[str],
     explicit_ns: str | None = None,
@@ -239,12 +268,12 @@ def _serialize_param_files(parent: ET.Element, param_files: list) -> None:
         path = pf.get("path", "")
         inlined = pf.get("params")
         if inlined is not None:
-            parent.append(ET.Comment(f" params from: {path} "))
+            parent.append(ET.Comment(sanitize_xml_comment(f" params from: {path} ")))
             for k, v in inlined:
                 p = ET.SubElement(parent, "param")
                 p.set("name", k)
                 p.set("value", str(v))
-            parent.append(ET.Comment(f" end params from: {path} "))
+            parent.append(ET.Comment(sanitize_xml_comment(f" end params from: {path} ")))
         else:
             p = ET.SubElement(parent, "param")
             p.set("from", path)

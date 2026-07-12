@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="use_sim_time" default="false"
+       description="Use simulation clock (set to true when running in Gazebo)"/>
+
+  <!-- robot_state_publisher: standard ROS 2 node, interfaces defined in
+       example/toy_robot/interfaces/robot_state_publisher/ -->
+  <node pkg="robot_state_publisher" exec="robot_state_publisher"
+        name="robot_state_publisher">
+    <param from="$(find-pkg-share toy_robot_bringup)/config/robot_description.yaml"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+  <!-- controller_node: custom node, interfaces installed to
+       share/toy_robot_controller/interface/controller_node.yaml -->
+  <node pkg="toy_robot_controller" exec="controller_node" name="controller">
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <param name="wheel_radius" value="0.05"/>
+    <param name="wheel_separation" value="0.2"/>
+  </node>
+
+  <!-- sensor_node: custom node, interfaces installed to
+       share/toy_robot_sensor/interface/sensor_node.yaml -->
+  <node pkg="toy_robot_sensor" exec="sensor_node" name="sensor">
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <param name="frame_id" value="laser_link"/>
+    <param name="range_max" value="10.0"/>
+  </node>
+</launch>

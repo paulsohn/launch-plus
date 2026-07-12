@@ -12,6 +12,16 @@
     <param name="use_sim_time" value="$(var use_sim_time)"/>
   </node>
 
+  <!-- NOTE: roscope's resolver primarily infers node interfaces from
+       <remap> elements.  /tf and /tf_static are used with absolute names
+       internally (TransformBroadcaster/TransformListener) and therefore
+       never appear as remaps, so roscope cannot see them from the launch
+       file alone.  Two options to make them visible in the topology:
+         1. Declare them in the node's interface YAML (preferred — see
+            toy_robot_interface_plugin.py and the per-node interface/ dirs).
+         2. Add a no-op remap such as <remap from="/tf" to="/tf"/> so that
+            roscope sees the topic at the launch-file level even without a plugin. -->
+
   <!-- controller_node: differential drive controller
        Internal: ~/cmd_vel (sub), ~/joint_states (pub), ~/odom (pub), /tf (pub) -->
   <node pkg="toy_robot_controller" exec="controller_node" name="controller">

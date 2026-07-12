@@ -73,7 +73,8 @@ jobs:
         run: bash example/autoware/install-acados.sh
 
       - name: Install Autoware ML param files
-        run: cp -r .github/assets/autoware_data "$HOME/autoware_data"
+        run: |
+          cp -r .github/assets/autoware_data "$HOME/autoware_data"
 
       - name: Run integration test
         working-directory: example/autoware

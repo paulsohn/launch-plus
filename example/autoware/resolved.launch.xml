@@ -51,8 +51,9 @@
   </group>
   <group>
     <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_system_component.launch.xml -->
-    <!-- arg name="diagnostic_graph_aggregator_graph_path" default="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/diagnostics/autoware-main.yaml" -->
+    <!-- arg name="diagnostic_graph_aggregator_graph_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/system/diagnostics/autoware-main.yaml" -->
     <!-- arg name="diagnostic_graph_aggregator_param_path" default="{workspace}/src/universe/autoware_universe/system/autoware_diagnostic_graph_aggregator/config/default.param.yaml" -->
+    <!-- arg name="planning_setting" default="rule_based" -->
     <!-- arg name="use_sim_time" default="false" -->
     <group>
       <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_system_launch/launch/system.launch.xml -->
@@ -305,6 +306,7 @@
           <param name="right_overhang" value="0.128"/>
           <param name="vehicle_height" value="2.5"/>
           <param name="max_steer_angle" value="0.7"/>
+          <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
         </node>
       </group>
       <group>
@@ -762,6 +764,9 @@
             <remap from="~/output/mrm/comfortable_stop/status" to="/system/mrm/comfortable_stop/status"/>
             <remap from="~/output/velocity_limit" to="/planning/scenario_planning/max_velocity_candidates"/>
             <remap from="~/output/velocity_limit/clear" to="/planning/scenario_planning/clear_velocity_limit"/>
+            <remap from="~/input/driving_mode_request" to="/system/driving_mode/request"/>
+            <remap from="~/input/driving_mode_info" to="/system/driving_mode/info"/>
+            <remap from="~/output/mrm_state" to="/system/driving_mode/mrm_state"/>
           </composable_node>
         </node_container>
       </group>
@@ -786,6 +791,9 @@
             <param name="target_jerk" value="-1.5"/>
             <remap from="~/input/mrm/emergency_stop/operate" to="/system/mrm/emergency_stop/operate"/>
             <remap from="~/input/control/control_cmd" to="/control/command/control_cmd"/>
+            <remap from="~/input/driving_mode_request" to="/system/driving_mode/request"/>
+            <remap from="~/input/driving_mode_info" to="/system/driving_mode/info"/>
+            <remap from="~/output/mrm_state" to="/system/driving_mode/mrm_state"/>
             <remap from="~/output/mrm/emergency_stop/status" to="/system/mrm/emergency_stop/status"/>
             <remap from="~/output/mrm/emergency_stop/control_cmd" to="/system/emergency/control_cmd"/>
           </composable_node>
@@ -810,8 +818,11 @@
           <param name="rate" value="10.0"/>
           <param name="input_qos_depth" value="1000"/>
           <param name="graph_qos_depth" value="1"/>
+          <param name="allow_override_for_debugging" value="false"/>
           <param name="use_command_mode_mappings" value="true"/>
           <param name="command_mode_mappings" value="[{mode: 1001, path: /autoware/modes/stop}, {mode: 1002, path: /autoware/modes/autonomous}, {mode: 1003, path: /autoware/modes/local}, {mode: 1004, path: /autoware/modes/remote}, {mode: 2001, path: /autoware/modes/emergency_stop}, {mode: 2002, path: /autoware/modes/comfortable_stop}, {mode: 2003, path: /autoware/modes/pull_over}]"/>
+          <param name="use_driving_mode_mappings" value="true"/>
+          <param name="driving_mode_mappings" value="[{mode: 1001, path: /autoware/modes/stop}, {mode: 1002, path: /autoware/modes/autonomous}, {mode: 1003, path: /autoware/modes/local}, {mode: 1004, path: /autoware/modes/remote}, {mode: 2001, path: /autoware/modes/emergency_stop}, {mode: 2002, path: /autoware/modes/comfortable_stop}, {mode: 2003, path: /autoware/modes/pull_over}]"/>
           <!-- end params from: {workspace}/src/universe/autoware_universe/system/autoware_diagnostic_graph_aggregator/config/default.param.yaml -->
           <param name="use_sim_time" value="false"/>
           <param name="wheel_radius" value="0.383"/>
@@ -975,6 +986,7 @@
     <group>
       <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_map_launch/launch/map.launch.xml -->
       <!-- arg name="lanelet2_map_loader_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/map/lanelet2_map_loader.param.yaml" -->
+      <!-- arg name="lanelet2_map_metadata_path" value="{map_path}/lanelet2_map_metadata.yaml" -->
       <!-- arg name="lanelet2_map_path" value="{map_path}/lanelet2_map.osm" -->
       <!-- arg name="map_projection_loader_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/map/map_projection_loader.param.yaml" -->
       <!-- arg name="map_projector_info_path" value="{map_path}/map_projector_info.yaml" -->
@@ -1002,11 +1014,9 @@
           <param name="enable_partial_load" value="true"/>
           <param name="enable_selected_load" value="false"/>
           <param name="leaf_size" value="3.0"/>
-          <param name="pcd_paths_or_directory" value="[$(var pointcloud_map_path)]"/>
-          <param name="pcd_metadata_path" value="$(var pointcloud_map_metadata_path)"/>
-          <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/map/pointcloud_map_loader.param.yaml -->
           <param name="pcd_paths_or_directory" value="[{map_path}/pointcloud_map.pcd]"/>
           <param name="pcd_metadata_path" value="{map_path}/pointcloud_map_metadata.yaml"/>
+          <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/map/pointcloud_map_loader.param.yaml -->
           <remap from="output/pointcloud_map" to="/map/pointcloud_map"/>
           <remap from="output/pointcloud_map_metadata" to="/map/pointcloud_map_metadata"/>
           <remap from="service/get_partial_pcd_map" to="/map/get_partial_pointcloud_map"/>
@@ -1018,10 +1028,13 @@
           <param name="allow_unsupported_version" value="true"/>
           <param name="center_line_resolution" value="5.0"/>
           <param name="use_waypoints" value="true"/>
-          <param name="lanelet2_map_path" value="$(var lanelet2_map_path)"/>
-          <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/map/lanelet2_map_loader.param.yaml -->
           <param name="lanelet2_map_path" value="{map_path}/lanelet2_map.osm"/>
+          <param name="enable_selected_map_loading" value="false"/>
+          <param name="lanelet2_map_metadata_path" value="{map_path}/lanelet2_map_metadata.yaml"/>
+          <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/map/lanelet2_map_loader.param.yaml -->
           <remap from="output/lanelet2_map" to="/map/vector_map"/>
+          <remap from="output/lanelet2_map_metadata" to="/map/vector_map_metadata"/>
+          <remap from="service/get_selected_lanelet2_map" to="/map/get_selected_vector_map"/>
         </composable_node>
         <composable_node pkg="autoware_lanelet2_map_visualizer" plugin="autoware::lanelet2_map_visualizer::Lanelet2MapVisualizationNode" name="lanelet2_map_visualization" namespace="/map">
           <remap from="input/lanelet2_map" to="/map/vector_map"/>
@@ -1883,7 +1896,7 @@
               <param name="estimate_scale_init" value="1.0"/>
               <param name="min_allowed_scale" value="0.9"/>
               <param name="max_allowed_scale" value="1.1"/>
-              <param name="threshold_to_estimate_scale" value="0.1"/>
+              <param name="threshold_to_estimate_scale" value="0.05"/>
               <param name="percentage_scale_rate_allow_correct" value="0.04"/>
               <param name="alpha" value="0.99"/>
               <param name="delay_gyro_ms" value="170"/>
@@ -1904,7 +1917,7 @@
               <param name="ekf_angle.variance_p_angle" value="5e-9"/>
               <param name="ekf_angle.measurement_noise_r_angle" value="5e-05"/>
               <param name="ekf_angle.min_covariance_angle" value="1e-11"/>
-              <param name="ekf_angle.decay_coefficient" value="0.99999998"/>
+              <param name="ekf_angle.decay_coefficient" value="0.9999999998"/>
               <param name="ekf_angle.samples_in_bounds_to_init" value="250"/>
               <param name="ekf_angle.max_reinitialization_retries" value="5"/>
               <param name="scale_imu_injection.modify_imu_scale" value="false"/>
@@ -1963,7 +1976,7 @@
               <param name="estimate_scale_init" value="1.0"/>
               <param name="min_allowed_scale" value="0.9"/>
               <param name="max_allowed_scale" value="1.1"/>
-              <param name="threshold_to_estimate_scale" value="0.1"/>
+              <param name="threshold_to_estimate_scale" value="0.05"/>
               <param name="percentage_scale_rate_allow_correct" value="0.04"/>
               <param name="alpha" value="0.99"/>
               <param name="delay_gyro_ms" value="170"/>
@@ -1984,7 +1997,7 @@
               <param name="ekf_angle.variance_p_angle" value="5e-9"/>
               <param name="ekf_angle.measurement_noise_r_angle" value="5e-05"/>
               <param name="ekf_angle.min_covariance_angle" value="1e-11"/>
-              <param name="ekf_angle.decay_coefficient" value="0.99999998"/>
+              <param name="ekf_angle.decay_coefficient" value="0.9999999998"/>
               <param name="ekf_angle.samples_in_bounds_to_init" value="250"/>
               <param name="ekf_angle.max_reinitialization_retries" value="5"/>
               <param name="scale_imu_injection.modify_imu_scale" value="false"/>
@@ -2212,6 +2225,7 @@
               <param name="dynamic_map_loading.update_distance" value="20.0"/>
               <param name="dynamic_map_loading.map_radius" value="150.0"/>
               <param name="dynamic_map_loading.lidar_radius" value="100.0"/>
+              <param name="dynamic_map_loading.publish_loaded_map" value="false"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/localization/ndt_scan_matcher/ndt_scan_matcher.param.yaml -->
               <param name="use_sim_time" value="false"/>
               <param name="wheel_radius" value="0.383"/>
@@ -2351,10 +2365,10 @@
               <param name="input_frame" value="base_link"/>
               <param name="output_frame" value="base_link"/>
               <param name="min_x" value="-60.0"/>
-              <param name="max_x" value="60.0"/>
               <param name="min_y" value="-60.0"/>
-              <param name="max_y" value="60.0"/>
               <param name="min_z" value="-30.0"/>
+              <param name="max_x" value="60.0"/>
+              <param name="max_y" value="60.0"/>
               <param name="max_z" value="50.0"/>
               <param name="negative" value="false"/>
               <param name="processing_time_threshold_sec" value="0.01"/>
@@ -2591,15 +2605,17 @@
   </group>
   <group>
     <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_perception_component.launch.xml -->
-    <!-- arg name="camera_2d_detector/color_map_path" default="{home}/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
-    <!-- arg name="camera_2d_detector/label_path" default="{home}/autoware_data/tensorrt_yolox/label.txt" -->
-    <!-- arg name="camera_2d_detector/model_path" default="{home}/autoware_data/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
+    <!-- arg name="camera_2d_detector/color_map_path" default="{home}/autoware_data/ml_models/tensorrt_yolox/semseg_color_map.csv" -->
+    <!-- arg name="camera_2d_detector/label_path" default="{home}/autoware_data/ml_models/tensorrt_yolox/label.txt" -->
+    <!-- arg name="camera_2d_detector/model_path" default="{home}/autoware_data/ml_models/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
     <!-- arg name="camera_2d_detector/roi_remap_path" default="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_label_remap.csv" -->
     <!-- arg name="camera_2d_detector/roi_to_semseg_remap_path" default="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_to_semseg_label_remap.csv" -->
     <!-- arg name="camera_vru_detector_rois_ids" default="[0]" -->
-    <!-- arg name="data_path" value="{home}/autoware_data" -->
+    <!-- arg name="data_path" value="{home}/autoware_data/ml_models" -->
     <!-- arg name="detected_objects_filter_method" default="lanelet_filter" -->
     <!-- arg name="detected_objects_validation_method" default="obstacle_pointcloud" -->
+    <!-- arg name="euclidean_clustering/param_path" default="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/euclidean_cluster/label_based_euclidean_cluster.param.yaml" -->
+    <!-- arg name="euclidean_clustering/shape_policy" default="0" -->
     <!-- arg name="input_pointcloud_for_traffic_light_occlusion_predictor" default="/sensing/lidar/top/pointcloud_raw_ex" -->
     <!-- arg name="launch_pointcloud_container" default="false" -->
     <!-- arg name="lidar_detection_model" default="centerpoint" -->
@@ -2613,16 +2629,16 @@
     <!-- arg name="traffic_light_ped_classifier_model" default="ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
     <!-- arg name="traffic_light_recognition/camera_namespaces" default="[camera6, camera7]" -->
     <!-- arg name="traffic_light_recognition/classification/car/classifier_type" default="1" -->
-    <!-- arg name="traffic_light_recognition/classification/car/label_path" default="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt" -->
-    <!-- arg name="traffic_light_recognition/classification/car/model_path" default="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
-    <!-- arg name="traffic_light_recognition/classification/lamp_recognizer_ml_param_path" default="{home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
+    <!-- arg name="traffic_light_recognition/classification/car/label_path" default="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels.txt" -->
+    <!-- arg name="traffic_light_recognition/classification/car/model_path" default="{home}/autoware_data/ml_models/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+    <!-- arg name="traffic_light_recognition/classification/lamp_recognizer_ml_param_path" default="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
     <!-- arg name="traffic_light_recognition/classification/pedestrian/classifier_type" default="1" -->
-    <!-- arg name="traffic_light_recognition/classification/pedestrian/label_path" default="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt" -->
-    <!-- arg name="traffic_light_recognition/classification/pedestrian/model_path" default="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+    <!-- arg name="traffic_light_recognition/classification/pedestrian/label_path" default="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels_ped.txt" -->
+    <!-- arg name="traffic_light_recognition/classification/pedestrian/model_path" default="{home}/autoware_data/ml_models/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
     <!-- arg name="traffic_light_recognition/high_accuracy_detection_type" default="fine_detection" -->
     <!-- arg name="traffic_light_recognition/use_high_accuracy_detection" default="true" -->
     <!-- arg name="use_camera_vru_detector" default="false" -->
-    <!-- arg name="use_detection_by_tracker" default="true" -->
+    <!-- arg name="use_detection_by_tracker" default="false" -->
     <!-- arg name="use_empty_dynamic_object_publisher" default="false" -->
     <!-- arg name="use_image_segmentation_based_filter" default="false" -->
     <!-- arg name="use_irregular_object_detector" default="true" -->
@@ -2636,16 +2652,18 @@
     <!-- arg name="use_perception_online_evaluator" default="false" -->
     <!-- arg name="use_pointcloud_map" default="true" -->
     <!-- arg name="use_radar_tracking_fusion" default="true" -->
+    <!-- arg name="use_roi_detected_object_validator" default="true" -->
+    <!-- arg name="use_semantic_segmentation_ptv3" default="false" -->
     <!-- arg name="use_sim_time" default="false" -->
     <!-- arg name="use_traffic_light_recognition" default="true" -->
     <!-- arg name="use_vector_map" default="true" -->
     <!-- arg name="vehicle_model" default="sample_vehicle" -->
     <group>
       <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/perception.launch.xml -->
-      <!-- arg name="bevfusion_model_path" default="{home}/autoware_data/bevfusion" -->
-      <!-- arg name="camera_2d_detector/color_map_path" value="{home}/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
-      <!-- arg name="camera_2d_detector/label_path" value="{home}/autoware_data/tensorrt_yolox/label.txt" -->
-      <!-- arg name="camera_2d_detector/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
+      <!-- arg name="bevfusion_model_path" default="{home}/autoware_data/ml_models/bevfusion" -->
+      <!-- arg name="camera_2d_detector/color_map_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/semseg_color_map.csv" -->
+      <!-- arg name="camera_2d_detector/label_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/label.txt" -->
+      <!-- arg name="camera_2d_detector/model_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
       <!-- arg name="camera_2d_detector/roi_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_label_remap.csv" -->
       <!-- arg name="camera_2d_detector/roi_to_semseg_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_to_semseg_label_remap.csv" -->
       <!-- arg name="camera_info0" default="/sensing/camera/camera0/camera_info" -->
@@ -2659,13 +2677,13 @@
       <!-- arg name="camera_info8" default="/sensing/camera/camera8/camera_info" -->
       <!-- arg name="camera_vru_detector_rois_ids" value="[0]" -->
       <!-- arg name="car_traffic_light_classifier_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml" -->
-      <!-- arg name="centerpoint_model_path" default="{home}/autoware_data/lidar_centerpoint" -->
+      <!-- arg name="centerpoint_model_path" default="{home}/autoware_data/ml_models/lidar_centerpoint" -->
       <!-- arg name="common_downsample_voxel_size_x" default="0.05" -->
       <!-- arg name="common_downsample_voxel_size_y" default="0.05" -->
       <!-- arg name="common_downsample_voxel_size_z" default="0.05" -->
       <!-- arg name="crosswalk_traffic_light_estimator_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/crosswalk_traffic_light_estimator/crosswalk_traffic_light_estimator.param.yaml" -->
       <!-- arg name="cuda_pointcloud_preprocessing" default="false" -->
-      <!-- arg name="data_path" value="{home}/autoware_data" -->
+      <!-- arg name="data_path" value="{home}/autoware_data/ml_models" -->
       <!-- arg name="detection_rois0" default="/perception/object_recognition/detection/rois0" -->
       <!-- arg name="detection_rois1" default="/perception/object_recognition/detection/rois1" -->
       <!-- arg name="detection_rois2" default="/perception/object_recognition/detection/rois2" -->
@@ -2677,6 +2695,8 @@
       <!-- arg name="detection_rois8" default="/perception/object_recognition/detection/rois8" -->
       <!-- arg name="downsample_perception_common_pointcloud" default="false" -->
       <!-- arg name="each_traffic_light_map_based_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/TRAFFIC_LIGHT_RECOGNITION_CAMERA_NAMESPACE_traffic_light_map_based_detector.param.yaml" -->
+      <!-- arg name="euclidean_clustering/param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/euclidean_cluster/label_based_euclidean_cluster.param.yaml" -->
+      <!-- arg name="euclidean_clustering/shape_policy" value="0" -->
       <!-- arg name="image_number" default="6" -->
       <!-- arg name="image_raw0" default="/sensing/camera/camera0/image_rect_color" -->
       <!-- arg name="image_raw1" default="/sensing/camera/camera1/image_rect_color" -->
@@ -2736,9 +2756,10 @@
       <!-- arg name="output/tracker_merged_objects" default="/perception/object_recognition/detection/objects" -->
       <!-- arg name="pedestrian_traffic_light_classifier_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml" -->
       <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
-      <!-- arg name="pointpainting_model_path" default="{home}/autoware_data/image_projection_based_fusion" -->
+      <!-- arg name="pointpainting_model_path" default="{home}/autoware_data/ml_models/image_projection_based_fusion" -->
+      <!-- arg name="ptv3_model_path" default="{home}/autoware_data/ml_models/ptv3" -->
       <!-- arg name="segmentation_pointcloud_fusion_camera_ids" value="[0,2,4]" -->
-      <!-- arg name="short_range_centerpoint_model_path" default="{home}/autoware_data/lidar_short_range_centerpoint" -->
+      <!-- arg name="short_range_centerpoint_model_path" default="{home}/autoware_data/ml_models/lidar_short_range_centerpoint" -->
       <!-- arg name="tracker_publish_merged_objects" value="false" -->
       <!-- arg name="traffic_light_arbiter_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_arbiter/traffic_light_arbiter.param.yaml" -->
       <!-- arg name="traffic_light_fine_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml" -->
@@ -2746,25 +2767,25 @@
       <!-- arg name="traffic_light_occlusion_predictor_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml" -->
       <!-- arg name="traffic_light_recognition/camera_namespaces" value="[camera6, camera7]" -->
       <!-- arg name="traffic_light_recognition/classification/car/classifier_type" value="1" -->
-      <!-- arg name="traffic_light_recognition/classification/car/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt" -->
-      <!-- arg name="traffic_light_recognition/classification/car/model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
-      <!-- arg name="traffic_light_recognition/classification/lamp_recognizer_ml_param_path" value="{home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
+      <!-- arg name="traffic_light_recognition/classification/car/label_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels.txt" -->
+      <!-- arg name="traffic_light_recognition/classification/car/model_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+      <!-- arg name="traffic_light_recognition/classification/lamp_recognizer_ml_param_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
       <!-- arg name="traffic_light_recognition/classification/pedestrian/classifier_type" value="1" -->
-      <!-- arg name="traffic_light_recognition/classification/pedestrian/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt" -->
-      <!-- arg name="traffic_light_recognition/classification/pedestrian/model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
-      <!-- arg name="traffic_light_recognition/fine_detection/label_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_labels.txt" -->
-      <!-- arg name="traffic_light_recognition/fine_detection/model_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx" -->
+      <!-- arg name="traffic_light_recognition/classification/pedestrian/label_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels_ped.txt" -->
+      <!-- arg name="traffic_light_recognition/classification/pedestrian/model_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+      <!-- arg name="traffic_light_recognition/fine_detection/label_path" value="{home}/autoware_data/ml_models/traffic_light_fine_detector/tlr_labels.txt" -->
+      <!-- arg name="traffic_light_recognition/fine_detection/model_path" value="{home}/autoware_data/ml_models/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx" -->
       <!-- arg name="traffic_light_recognition/fusion_only" value="false" -->
       <!-- arg name="traffic_light_recognition/high_accuracy_detection_type" value="fine_detection" -->
       <!-- arg name="traffic_light_recognition/use_high_accuracy_detection" value="true" -->
-      <!-- arg name="traffic_light_recognition/whole_image_detection/label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
-      <!-- arg name="traffic_light_recognition/whole_image_detection/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
+      <!-- arg name="traffic_light_recognition/whole_image_detection/label_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
+      <!-- arg name="traffic_light_recognition/whole_image_detection/model_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
       <!-- arg name="traffic_light_recognition/whole_image_detection/yolox_roi_label_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv" -->
       <!-- arg name="traffic_light_roi_visualizer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_visualization/traffic_light_roi_visualizer.param.yaml" -->
-      <!-- arg name="transfusion_model_path" default="{home}/autoware_data/lidar_transfusion" -->
+      <!-- arg name="transfusion_model_path" default="{home}/autoware_data/ml_models/lidar_transfusion" -->
       <!-- arg name="use_camera_vru_detector" value="false" -->
       <!-- arg name="use_cuda_ground_segmentation" default="false" -->
-      <!-- arg name="use_detection_by_tracker" value="true" -->
+      <!-- arg name="use_detection_by_tracker" value="false" -->
       <!-- arg name="use_empty_dynamic_object_publisher" value="false" -->
       <!-- arg name="use_image_segmentation_based_filter" value="false" -->
       <!-- arg name="use_irregular_object_detector" value="true" -->
@@ -2772,13 +2793,15 @@
       <!-- arg name="use_low_intensity_cluster_filter" value="true" -->
       <!-- arg name="use_multi_channel_tracker_merger" value="true" -->
       <!-- arg name="use_object_filter" value="true" -->
-      <!-- arg name="use_object_validator" default="true" -->
+      <!-- arg name="use_object_validator" default="false" -->
       <!-- arg name="use_obstacle_segmentation_single_frame_filter" value="false" -->
       <!-- arg name="use_obstacle_segmentation_time_series_filter" value="true" -->
       <!-- arg name="use_perception_analytics_publisher" value="true" -->
       <!-- arg name="use_perception_online_evaluator" value="false" -->
       <!-- arg name="use_pointcloud_map" value="true" -->
       <!-- arg name="use_radar_tracking_fusion" value="true" -->
+      <!-- arg name="use_roi_detected_object_validator" value="true" -->
+      <!-- arg name="use_semantic_segmentation_ptv3" value="false" -->
       <!-- arg name="use_short_range_detection" default="false" -->
       <!-- arg name="use_traffic_light_recognition" value="true" -->
       <!-- arg name="use_vector_map" value="true" -->
@@ -2792,22 +2815,26 @@
         <!-- arg name="obstacle_segmentation_ground_segmentation_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/obstacle_segmentation/ground_segmentation/ground_segmentation.param.yaml" -->
         <!-- arg name="ogm_outlier_filter_param_path" default="{workspace}/src/universe/autoware_universe/perception/autoware_occupancy_grid_map_outlier_filter/config/occupancy_grid_map_outlier_filter.param.yaml" -->
         <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
+        <!-- arg name="ptv3_model_name" default="ptv3" -->
+        <!-- arg name="ptv3_model_path" value="{home}/autoware_data/ml_models/ptv3" -->
+        <!-- arg name="ptv3_use_pointcloud_container" default="True" -->
         <!-- arg name="use_cuda_ground_segmentation" value="false" -->
         <!-- arg name="use_intra_process" value="true" -->
         <!-- arg name="use_multithread" value="true" -->
+        <!-- arg name="use_semantic_segmentation_ptv3" value="false" -->
         <!-- arg name="use_single_frame_filter" value="false" -->
         <!-- arg name="use_time_series_filter" value="true" -->
         <load_composable_node target="/pointcloud_container">
           <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::CropBoxFilterComponent" name="crop_box_filter" namespace="/perception/obstacle_segmentation">
             <param name="input_frame" value="base_link"/>
             <param name="output_frame" value="base_link"/>
-            <param name="max_z" value="2.5"/>
+            <param name="max_z" value="5.0"/>
             <param name="min_z" value="-2.5"/>
             <param name="min_x" value="-100.0"/>
             <param name="max_x" value="150.0"/>
             <param name="min_y" value="-70.0"/>
             <param name="max_y" value="70.0"/>
-            <param name="margin_max_z" value="0.0"/>
+            <param name="margin_max_z" value="2.5"/>
             <param name="margin_min_z" value="-2.5"/>
             <param name="negative" value="False"/>
             <param name="processing_time_threshold_sec" value="0.01"/>
@@ -2824,7 +2851,7 @@
             <param name="non_ground_height_threshold" value="0.2"/>
             <param name="grid_size_m" value="0.5"/>
             <param name="gnd_grid_buffer_size" value="4"/>
-            <param name="detection_range_z_max" value="2.5"/>
+            <param name="detection_range_z_max" value="3.5"/>
             <param name="elevation_grid_mode" value="True"/>
             <param name="use_recheck_ground_cluster" value="True"/>
             <param name="recheck_start_distance" value="20.0"/>
@@ -2928,13 +2955,15 @@
       </group>
       <group>
         <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detection.launch.xml -->
-        <!-- arg name="camera_2d_detector/color_map_path" value="{home}/autoware_data/tensorrt_yolox/semseg_color_map.csv" -->
-        <!-- arg name="camera_2d_detector/label_path" value="{home}/autoware_data/tensorrt_yolox/label.txt" -->
-        <!-- arg name="camera_2d_detector/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
+        <!-- arg name="camera_2d_detector/color_map_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/semseg_color_map.csv" -->
+        <!-- arg name="camera_2d_detector/label_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/label.txt" -->
+        <!-- arg name="camera_2d_detector/model_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/yolox-sPlus-opt-pseudoV2-T4-960x960-T4-seg16cls.onnx" -->
         <!-- arg name="camera_2d_detector/roi_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_label_remap.csv" -->
         <!-- arg name="camera_2d_detector/roi_to_semseg_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/roi_to_semseg_label_remap.csv" -->
         <!-- arg name="camera_vru_detector_rois_ids" value="[0]" -->
         <!-- arg name="detection_by_tracker_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detection_by_tracker/detection_by_tracker.param.yaml" -->
+        <!-- arg name="euclidean_clustering/param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/euclidean_cluster/label_based_euclidean_cluster.param.yaml" -->
+        <!-- arg name="euclidean_clustering/shape_policy" value="0" -->
         <!-- arg name="euclidean_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/clustering/euclidean_cluster.param.yaml" -->
         <!-- arg name="image_topic_name" value="image_rect_color" -->
         <!-- arg name="input/camera0/image" value="/sensing/camera/camera0/image_rect_color" -->
@@ -2993,7 +3022,7 @@
         <!-- arg name="segmentation_pointcloud_fusion_camera_ids" value="[0,2,4]" -->
         <!-- arg name="sync_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/image_projection_based_fusion/fusion_common.param.yaml" -->
         <!-- arg name="use_camera_vru_detector" value="false" -->
-        <!-- arg name="use_detection_by_tracker" value="true" -->
+        <!-- arg name="use_detection_by_tracker" value="false" -->
         <!-- arg name="use_image_segmentation_based_filter" value="false" -->
         <!-- arg name="use_irregular_object_detector" value="true" -->
         <!-- arg name="use_low_height_cropbox" value="false" -->
@@ -3002,13 +3031,15 @@
         <!-- arg name="use_object_filter" value="true" -->
         <!-- arg name="use_pointcloud_map" value="true" -->
         <!-- arg name="use_radar_tracking_fusion" value="true" -->
+        <!-- arg name="use_roi_detected_object_validator" value="true" -->
+        <!-- arg name="use_semantic_segmentation_ptv3" value="false" -->
         <!-- arg name="use_short_range_detection" value="false" -->
-        <!-- arg name="use_validator" value="true" -->
+        <!-- arg name="use_validator" value="false" -->
         <!-- arg name="voxel_grid_based_euclidean_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/clustering/voxel_grid_based_euclidean_cluster.param.yaml" -->
         <group>
           <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/lidar_dnn_detector.launch.xml -->
-          <!-- arg name="bevfusion_model_path" default="{home}/autoware_data/bevfusion" -->
-          <!-- arg name="centerpoint_model_path" default="{home}/autoware_data/lidar_centerpoint" -->
+          <!-- arg name="bevfusion_model_path" default="{home}/autoware_data/ml_models/bevfusion" -->
+          <!-- arg name="centerpoint_model_path" default="{home}/autoware_data/ml_models/lidar_centerpoint" -->
           <!-- arg name="input/pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
           <!-- arg name="lidar_detection_model_name" value="" -->
           <!-- arg name="lidar_detection_model_type" value="centerpoint" -->
@@ -3018,20 +3049,20 @@
           <!-- arg name="node/pointcloud_container" value="pointcloud_container" -->
           <!-- arg name="output/objects" value="/perception/object_recognition/detection/centerpoint/objects" -->
           <!-- arg name="output/short_range_objects" value="/perception/object_recognition/detection/centerpoint_short_range/objects" -->
-          <!-- arg name="short_range_centerpoint_model_path" default="{home}/autoware_data/lidar_short_range_centerpoint" -->
-          <!-- arg name="transfusion_model_path" default="{home}/autoware_data/lidar_transfusion" -->
+          <!-- arg name="short_range_centerpoint_model_path" default="{home}/autoware_data/ml_models/lidar_short_range_centerpoint" -->
+          <!-- arg name="transfusion_model_path" default="{home}/autoware_data/ml_models/lidar_transfusion" -->
           <!-- arg name="use_short_range_detection" value="false" -->
           <group>
             <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_lidar_centerpoint/launch/lidar_centerpoint.launch.xml -->
             <!-- arg name="build_only" default="false" -->
-            <!-- arg name="class_remapper_param_path" value="{home}/autoware_data/lidar_centerpoint/detection_class_remapper.param.yaml" -->
+            <!-- arg name="class_remapper_param_path" value="{home}/autoware_data/ml_models/lidar_centerpoint/detection_class_remapper.param.yaml" -->
             <!-- arg name="common_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/lidar_model/centerpoint_common.param.yaml" -->
-            <!-- arg name="data_path" default="{home}/autoware_data" -->
+            <!-- arg name="data_path" default="{home}/autoware_data/ml_models" -->
             <!-- arg name="input/pointcloud" value="/sensing/lidar/concatenated/pointcloud" -->
-            <!-- arg name="ml_package_param_path" value="{home}/autoware_data/lidar_centerpoint/centerpoint_tiny_ml_package.param.yaml" -->
+            <!-- arg name="ml_package_param_path" value="{home}/autoware_data/ml_models/lidar_centerpoint/centerpoint_tiny_ml_package.param.yaml" -->
             <!-- arg name="model_name" value="centerpoint_tiny" -->
             <!-- arg name="model_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/lidar_model/centerpoint_tiny.param.yaml" -->
-            <!-- arg name="model_path" value="{home}/autoware_data/lidar_centerpoint" -->
+            <!-- arg name="model_path" value="{home}/autoware_data/ml_models/lidar_centerpoint" -->
             <!-- arg name="node_name" value="lidar_centerpoint" -->
             <!-- arg name="output/objects" value="/perception/object_recognition/detection/centerpoint/objects" -->
             <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
@@ -3039,10 +3070,10 @@
             <load_composable_node target="/pointcloud_container">
               <composable_node pkg="autoware_lidar_centerpoint" plugin="autoware::lidar_centerpoint::LidarCenterPointNode" name="lidar_centerpoint" namespace="/perception/object_recognition/detection/centerpoint">
                 <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/lidar_model/centerpoint_tiny.param.yaml -->
-                <param name="encoder_onnx_path" value="{home}/autoware_data/lidar_centerpoint/pts_voxel_encoder_centerpoint_tiny.onnx"/>
-                <param name="encoder_engine_path" value="{home}/autoware_data/lidar_centerpoint/pts_voxel_encoder_centerpoint_tiny.engine"/>
-                <param name="head_onnx_path" value="{home}/autoware_data/lidar_centerpoint/pts_backbone_neck_head_centerpoint_tiny.onnx"/>
-                <param name="head_engine_path" value="{home}/autoware_data/lidar_centerpoint/pts_backbone_neck_head_centerpoint_tiny.engine"/>
+                <param name="encoder_onnx_path" value="{home}/autoware_data/ml_models/lidar_centerpoint/pts_voxel_encoder_centerpoint_tiny.onnx"/>
+                <param name="encoder_engine_path" value="{home}/autoware_data/ml_models/lidar_centerpoint/pts_voxel_encoder_centerpoint_tiny.engine"/>
+                <param name="head_onnx_path" value="{home}/autoware_data/ml_models/lidar_centerpoint/pts_backbone_neck_head_centerpoint_tiny.onnx"/>
+                <param name="head_engine_path" value="{home}/autoware_data/ml_models/lidar_centerpoint/pts_backbone_neck_head_centerpoint_tiny.engine"/>
                 <param name="trt_precision" value="fp16"/>
                 <param name="cloud_capacity" value="2000000"/>
                 <param name="post_process_params.circle_nms_dist_threshold" value="0.5"/>
@@ -3052,7 +3083,7 @@
                 <param name="densification_params.world_frame_id" value="map"/>
                 <param name="densification_params.num_past_frames" value="1"/>
                 <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/lidar_model/centerpoint_tiny.param.yaml -->
-                <!-- params from: {home}/autoware_data/lidar_centerpoint/centerpoint_tiny_ml_package.param.yaml -->
+                <!-- params from: {home}/autoware_data/ml_models/lidar_centerpoint/centerpoint_tiny_ml_package.param.yaml -->
                 <param name="model_params.class_names" value="[CAR, TRUCK, BUS, BICYCLE, PEDESTRIAN]"/>
                 <param name="model_params.point_feature_size" value="4"/>
                 <param name="model_params.max_voxel_size" value="40000"/>
@@ -3068,12 +3099,12 @@
                 <param name="model_params.detection_score_thresholds.min_confidence_scores.BUS" value="[0.35, 0.35, 0.35, 0.35]"/>
                 <param name="model_params.detection_score_thresholds.min_confidence_scores.BICYCLE" value="[0.35, 0.35, 0.35, 0.35]"/>
                 <param name="model_params.detection_score_thresholds.min_confidence_scores.PEDESTRIAN" value="[0.35, 0.35, 0.35, 0.35]"/>
-                <!-- end params from: {home}/autoware_data/lidar_centerpoint/centerpoint_tiny_ml_package.param.yaml -->
-                <!-- params from: {home}/autoware_data/lidar_centerpoint/detection_class_remapper.param.yaml -->
+                <!-- end params from: {home}/autoware_data/ml_models/lidar_centerpoint/centerpoint_tiny_ml_package.param.yaml -->
+                <!-- params from: {home}/autoware_data/ml_models/lidar_centerpoint/detection_class_remapper.param.yaml -->
                 <param name="allow_remapping_by_area_matrix" value="[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]"/>
                 <param name="min_area_matrix" value="[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 12.1, 0.0, 36.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 36.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 36.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]"/>
                 <param name="max_area_matrix" value="[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 36.0, 0.0, 999.999, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 999.999, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 999.999, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]"/>
-                <!-- end params from: {home}/autoware_data/lidar_centerpoint/detection_class_remapper.param.yaml -->
+                <!-- end params from: {home}/autoware_data/ml_models/lidar_centerpoint/detection_class_remapper.param.yaml -->
                 <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/lidar_model/centerpoint_common.param.yaml -->
                 <param name="diagnostics.max_allowed_processing_time_ms" value="200.0"/>
                 <param name="diagnostics.max_acceptable_consecutive_delay_ms" value="1000.0"/>
@@ -3097,6 +3128,7 @@
           <!-- arg name="output/cluster_objects" value="/perception/object_recognition/detection/clustering/objects_with_feature" -->
           <!-- arg name="output/objects" value="/perception/object_recognition/detection/clustering/objects" -->
           <!-- arg name="use_low_height_cropbox" value="false" -->
+          <!-- arg name="use_semantic_segmentation_ptv3" value="false" -->
           <!-- arg name="voxel_grid_based_euclidean_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/clustering/voxel_grid_based_euclidean_cluster.param.yaml" -->
           <group>
             <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_euclidean_cluster/launch/voxel_grid_based_euclidean_cluster.launch.xml -->
@@ -3122,21 +3154,20 @@
               <!-- arg name="voxel_grid_based_euclidean_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/clustering/voxel_grid_based_euclidean_cluster.param.yaml" -->
               <load_composable_node target="/pointcloud_container">
                 <composable_node pkg="autoware_euclidean_cluster" plugin="autoware::euclidean_cluster::VoxelGridBasedEuclideanClusterNode" name="euclidean_cluster" namespace="/perception/object_recognition/detection/clustering">
-                  <param name="tolerance" value="0.7"/>
-                  <param name="voxel_leaf_size" value="0.3"/>
-                  <param name="min_points_number_per_voxel" value="1"/>
-                  <param name="min_cluster_size" value="10"/>
-                  <param name="max_cluster_size" value="3000"/>
-                  <param name="max_voxel_cluster_for_output" value="800"/>
-                  <param name="min_voxel_cluster_size_for_filtering" value="65"/>
-                  <param name="max_points_per_voxel_in_large_cluster" value="10"/>
+                  <param name="tolerance_m" value="0.7"/>
+                  <param name="voxel_leaf_size_m" value="0.3"/>
+                  <param name="min_points_per_voxel" value="1"/>
+                  <param name="min_points_per_cluster" value="10"/>
+                  <param name="max_voxels_per_cluster" value="800"/>
+                  <param name="large_cluster_voxel_count_threshold" value="65"/>
+                  <param name="large_cluster_max_points_per_voxel" value="10"/>
                   <param name="use_height" value="False"/>
                   <param name="input_frame" value="base_link"/>
                   <param name="max_x" value="200.0"/>
                   <param name="min_x" value="-200.0"/>
                   <param name="max_y" value="200.0"/>
                   <param name="min_y" value="-200.0"/>
-                  <param name="max_z" value="2.0"/>
+                  <param name="max_z" value="4.0"/>
                   <param name="min_z" value="-10.0"/>
                   <param name="negative" value="False"/>
                   <param name="processing_time_threshold_sec" value="0.01"/>
@@ -3149,9 +3180,9 @@
           <group>
             <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_shape_estimation/launch/shape_estimation.launch.xml -->
             <!-- arg name="config_file" default="{workspace}/src/universe/autoware_universe/perception/autoware_shape_estimation/config/shape_estimation.param.yaml" -->
-            <!-- arg name="data_path" default="{home}/autoware_data" -->
+            <!-- arg name="data_path" default="{home}/autoware_data/ml_models" -->
             <!-- arg name="input/objects" value="/perception/object_recognition/detection/clustering/clusters" -->
-            <!-- arg name="model_path" default="{home}/autoware_data/shape_estimation/pointnet.onnx" -->
+            <!-- arg name="model_path" default="{home}/autoware_data/ml_models/shape_estimation/pointnet.onnx" -->
             <!-- arg name="node_name" default="shape_estimation" -->
             <!-- arg name="output/objects" value="/perception/object_recognition/detection/clustering/objects_with_feature" -->
             <node pkg="autoware_shape_estimation" exec="shape_estimation_node" name="shape_estimation" namespace="/perception/object_recognition/detection/clustering" output="screen">
@@ -3179,7 +3210,7 @@
               <param name="right_overhang" value="0.128"/>
               <param name="vehicle_height" value="2.5"/>
               <param name="max_steer_angle" value="0.7"/>
-              <param name="model_path" value="{home}/autoware_data/shape_estimation/pointnet.onnx"/>
+              <param name="model_path" value="{home}/autoware_data/ml_models/shape_estimation/pointnet.onnx"/>
               <remap from="input" to="/perception/object_recognition/detection/clustering/clusters"/>
               <remap from="objects" to="/perception/object_recognition/detection/clustering/objects_with_feature"/>
               <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
@@ -3206,47 +3237,6 @@
               <param name="run_convex_hull_conversion" value="false"/>
               <remap from="~/input" to="/perception/object_recognition/detection/clustering/objects_with_feature"/>
               <remap from="~/output" to="/perception/object_recognition/detection/clustering/objects"/>
-              <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
-            </node>
-          </group>
-        </group>
-        <group>
-          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/detector/tracker_based_detector.launch.xml -->
-          <!-- arg name="detection_by_tracker_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detection_by_tracker/detection_by_tracker.param.yaml" -->
-          <!-- arg name="input/clusters" value="/perception/object_recognition/detection/clustering/objects_with_feature" -->
-          <!-- arg name="input/tracked_objects" value="/perception/object_recognition/tracking/objects" -->
-          <!-- arg name="output/objects" value="/perception/object_recognition/detection/detection_by_tracker/objects" -->
-          <group>
-            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_detection_by_tracker/launch/detection_by_tracker.launch.xml -->
-            <!-- arg name="detection_by_tracker_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detection_by_tracker/detection_by_tracker.param.yaml" -->
-            <!-- arg name="input/initial_objects" value="/perception/object_recognition/detection/clustering/objects_with_feature" -->
-            <!-- arg name="input/tracked_objects" value="/perception/object_recognition/tracking/objects" -->
-            <!-- arg name="output" value="/perception/object_recognition/detection/detection_by_tracker/objects" -->
-            <node pkg="autoware_detection_by_tracker" exec="detection_by_tracker_node" name="detection_by_tracker_node" namespace="/perception/object_recognition/detection/detection_by_tracker" output="screen">
-              <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detection_by_tracker/detection_by_tracker.param.yaml -->
-              <param name="tracker_ignore_label.UNKNOWN" value="true"/>
-              <param name="tracker_ignore_label.CAR" value="false"/>
-              <param name="tracker_ignore_label.TRUCK" value="false"/>
-              <param name="tracker_ignore_label.BUS" value="false"/>
-              <param name="tracker_ignore_label.TRAILER" value="false"/>
-              <param name="tracker_ignore_label.MOTORCYCLE" value="false"/>
-              <param name="tracker_ignore_label.BICYCLE" value="false"/>
-              <param name="tracker_ignore_label.PEDESTRIAN" value="false"/>
-              <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detection_by_tracker/detection_by_tracker.param.yaml -->
-              <param name="use_sim_time" value="false"/>
-              <param name="wheel_radius" value="0.383"/>
-              <param name="wheel_width" value="0.235"/>
-              <param name="wheel_base" value="2.79"/>
-              <param name="wheel_tread" value="1.64"/>
-              <param name="front_overhang" value="1.0"/>
-              <param name="rear_overhang" value="1.1"/>
-              <param name="left_overhang" value="0.128"/>
-              <param name="right_overhang" value="0.128"/>
-              <param name="vehicle_height" value="2.5"/>
-              <param name="max_steer_angle" value="0.7"/>
-              <remap from="~/input/tracked_objects" to="/perception/object_recognition/tracking/objects"/>
-              <remap from="~/input/initial_objects" to="/perception/object_recognition/detection/clustering/objects_with_feature"/>
-              <remap from="~/output" to="/perception/object_recognition/detection/detection_by_tracker/objects"/>
               <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
             </node>
           </group>
@@ -3288,44 +3278,6 @@
             </composable_node>
           </load_composable_node>
         </group>
-        <group>
-          <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/detection/filter/object_validator.launch.xml -->
-          <!-- arg name="input/objects" value="/perception/object_recognition/detection/centerpoint/objects" -->
-          <!-- arg name="input/obstacle_pointcloud" value="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud" -->
-          <!-- arg name="objects_validation_method" value="obstacle_pointcloud" -->
-          <!-- arg name="output/objects" value="/perception/object_recognition/detection/centerpoint/validation/objects" -->
-          <group>
-            <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_detected_object_validation/launch/obstacle_pointcloud_based_validator.launch.xml -->
-            <!-- arg name="input/detected_objects" value="/perception/object_recognition/detection/centerpoint/objects" -->
-            <!-- arg name="input/obstacle_pointcloud" value="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud" -->
-            <!-- arg name="obstacle_pointcloud_based_validator_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detected_object_validation/obstacle_pointcloud_based_validator.param.yaml" -->
-            <!-- arg name="output/objects" value="/perception/object_recognition/detection/centerpoint/validation/objects" -->
-            <node pkg="autoware_detected_object_validation" exec="obstacle_pointcloud_based_validator_node" name="obstacle_pointcloud_based_validator_node" namespace="/perception/object_recognition/detection" output="screen">
-              <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detected_object_validation/obstacle_pointcloud_based_validator.param.yaml -->
-              <param name="min_points_num" value="[10, 10, 10, 10, 10, 10, 10, 10]"/>
-              <param name="max_points_num" value="[10, 10, 10, 10, 10, 10, 10, 10]"/>
-              <param name="min_points_and_distance_ratio" value="[800.0, 800.0, 800.0, 800.0, 800.0, 800.0, 800.0, 800.0]"/>
-              <param name="validate_max_distance_m" value="70.0"/>
-              <param name="using_2d_validator" value="true"/>
-              <param name="enable_debugger" value="false"/>
-              <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/detected_object_validation/obstacle_pointcloud_based_validator.param.yaml -->
-              <param name="use_sim_time" value="false"/>
-              <param name="wheel_radius" value="0.383"/>
-              <param name="wheel_width" value="0.235"/>
-              <param name="wheel_base" value="2.79"/>
-              <param name="wheel_tread" value="1.64"/>
-              <param name="front_overhang" value="1.0"/>
-              <param name="rear_overhang" value="1.1"/>
-              <param name="left_overhang" value="0.128"/>
-              <param name="right_overhang" value="0.128"/>
-              <param name="vehicle_height" value="2.5"/>
-              <param name="max_steer_angle" value="0.7"/>
-              <remap from="~/input/detected_objects" to="/perception/object_recognition/detection/centerpoint/objects"/>
-              <remap from="~/input/obstacle_pointcloud" to="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud"/>
-              <remap from="~/output/objects" to="/perception/object_recognition/detection/centerpoint/validation/objects"/>
-            </node>
-          </group>
-        </group>
       </group>
       <group>
         <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/object_recognition/tracking/tracking.launch.xml -->
@@ -3337,6 +3289,8 @@
         <!-- arg name="input/camera_vru/objects" default="/perception/object_recognition/detection/camera_vru/objects" -->
         <!-- arg name="input/irregular_object_detector/channel" default="camera_lidar_fusion_irregular" -->
         <!-- arg name="input/irregular_object_detector/objects" default="/perception/object_recognition/detection/irregular_object/objects" -->
+        <!-- arg name="input/lidar_cluster/channel" default="lidar_clustering" -->
+        <!-- arg name="input/lidar_cluster/objects" default="/perception/object_recognition/detection/clustering/label_based_euclidean_cluster/objects" -->
         <!-- arg name="input/lidar_dnn/channel" default="lidar_centerpoint" -->
         <!-- arg name="input/lidar_dnn/objects" default="/perception/object_recognition/detection/centerpoint/objects" -->
         <!-- arg name="input/lidar_dnn_short_range/channel" default="lidar_centerpoint_short_range" -->
@@ -3360,38 +3314,41 @@
         <!-- arg name="output/objects" default="/perception/object_recognition/tracking/objects" -->
         <!-- arg name="publish_merged_objects" value="false" -->
         <!-- arg name="use_camera_vru_detector" value="false" -->
-        <!-- arg name="use_detection_by_tracker" value="true" -->
+        <!-- arg name="use_detection_by_tracker" value="false" -->
         <!-- arg name="use_multi_channel_tracker_merger" value="true" -->
         <!-- arg name="use_radar_tracking_fusion" value="true" -->
+        <!-- arg name="use_semantic_segmentation_ptv3" value="false" -->
         <!-- arg name="use_short_range_detection" value="false" -->
-        <!-- arg name="use_validator" value="true" -->
+        <!-- arg name="use_validator" value="false" -->
         <group>
           <!-- source: {workspace}/src/universe/autoware_universe/perception/autoware_multi_object_tracker/launch/multi_object_tracker.launch.xml -->
           <!-- arg name="data_association_matrix_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/data_association_matrix.param.yaml" -->
+          <!-- arg name="ego_source" default="tf" -->
           <!-- arg name="input/detection01/channel" value="lidar_centerpoint" -->
-          <!-- arg name="input/detection01/objects" value="/perception/object_recognition/detection/centerpoint/validation/objects" -->
+          <!-- arg name="input/detection01/objects" value="/perception/object_recognition/detection/centerpoint/objects" -->
           <!-- arg name="input/detection02/channel" value="none" -->
           <!-- arg name="input/detection02/objects" value="/perception/object_recognition/detection/centerpoint_short_range/objects" -->
           <!-- arg name="input/detection03/channel" value="none" -->
           <!-- arg name="input/detection03/objects" value="/perception/object_recognition/detection/clustering/camera_lidar_fusion/objects" -->
           <!-- arg name="input/detection04/channel" value="none" -->
-          <!-- arg name="input/detection04/objects" value="/perception/object_recognition/detection/irregular_object/objects" -->
-          <!-- arg name="input/detection05/channel" value="detection_by_tracker" -->
-          <!-- arg name="input/detection05/objects" value="/perception/object_recognition/detection/detection_by_tracker/objects" -->
+          <!-- arg name="input/detection04/objects" value="/perception/object_recognition/detection/clustering/label_based_euclidean_cluster/objects" -->
+          <!-- arg name="input/detection05/channel" value="none" -->
+          <!-- arg name="input/detection05/objects" value="/perception/object_recognition/detection/irregular_object/objects" -->
           <!-- arg name="input/detection06/channel" value="none" -->
-          <!-- arg name="input/detection06/objects" value="/perception/object_recognition/detection/radar/far_objects" -->
+          <!-- arg name="input/detection06/objects" value="/perception/object_recognition/detection/detection_by_tracker/objects" -->
           <!-- arg name="input/detection07/channel" value="none" -->
-          <!-- arg name="input/detection07/objects" value="/perception/object_recognition/detection/camera_vru/objects" -->
-          <!-- arg name="input/detection08/channel" value="camera_streampetr" -->
-          <!-- arg name="input/detection08/objects" value="/perception/object_recognition/detection/camera_only/objects" -->
-          <!-- arg name="input/detection09/channel" default="none" -->
-          <!-- arg name="input/detection09/objects" default="input/objects09" -->
+          <!-- arg name="input/detection07/objects" value="/perception/object_recognition/detection/radar/far_objects" -->
+          <!-- arg name="input/detection08/channel" value="none" -->
+          <!-- arg name="input/detection08/objects" value="/perception/object_recognition/detection/camera_vru/objects" -->
+          <!-- arg name="input/detection09/channel" value="camera_streampetr" -->
+          <!-- arg name="input/detection09/objects" value="/perception/object_recognition/detection/camera_only/objects" -->
           <!-- arg name="input/detection10/channel" default="none" -->
           <!-- arg name="input/detection10/objects" default="input/objects10" -->
           <!-- arg name="input/detection11/channel" default="none" -->
           <!-- arg name="input/detection11/objects" default="input/objects11" -->
           <!-- arg name="input/detection12/channel" default="none" -->
           <!-- arg name="input/detection12/objects" default="input/objects12" -->
+          <!-- arg name="input/odometry" default="/localization/kinematic_state" -->
           <!-- arg name="input_channels_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/input_channels.param.yaml" -->
           <!-- arg name="output/merged_objects" value="/perception/object_recognition/detection/objects" -->
           <!-- arg name="output/objects" value="/perception/object_recognition/tracking/objects" -->
@@ -3399,31 +3356,28 @@
           <!-- arg name="tracker_setting_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/multi_object_tracker_node.param.yaml" -->
           <node pkg="autoware_multi_object_tracker" exec="multi_object_tracker_node" name="multi_object_tracker" namespace="/perception/object_recognition/tracking" output="both">
             <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/multi_object_tracker_node.param.yaml -->
-            <param name="initial_tracker.car" value="multi_vehicle_tracker"/>
-            <param name="initial_tracker.truck" value="multi_vehicle_tracker"/>
-            <param name="initial_tracker.bus" value="multi_vehicle_tracker"/>
-            <param name="initial_tracker.trailer" value="multi_vehicle_tracker"/>
-            <param name="initial_tracker.pedestrian" value="pedestrian_and_bicycle_tracker"/>
-            <param name="initial_tracker.bicycle" value="pedestrian_and_bicycle_tracker"/>
-            <param name="initial_tracker.motorcycle" value="pedestrian_and_bicycle_tracker"/>
-            <param name="publish_rate" value="10.0"/>
             <param name="world_frame_id" value="map"/>
             <param name="ego_frame_id" value="base_link"/>
-            <param name="enable_delay_compensation" value="true"/>
+            <param name="publish_on_timer" value="true"/>
+            <param name="publish_rate" value="10.0"/>
+            <param name="ego_source" value="tf"/>
+            <param name="delay_compensation" value="full"/>
             <param name="consider_odometry_uncertainty" value="false"/>
-            <param name="enable_unknown_object_velocity_estimation" value="true"/>
-            <param name="enable_unknown_object_motion_output" value="false"/>
-            <param name="tracker_lifetime" value="1.0"/>
+            <param name="tracker_configs.polygon_tracker.enable_velocity_estimation" value="true"/>
+            <param name="tracker_configs.polygon_tracker.enable_motion_output.unknown" value="false"/>
+            <param name="tracker_configs.polygon_tracker.enable_motion_output.car" value="true"/>
+            <param name="tracker_configs.polygon_tracker.enable_motion_output.truck" value="true"/>
+            <param name="tracker_configs.polygon_tracker.enable_motion_output.bus" value="true"/>
+            <param name="tracker_configs.polygon_tracker.enable_motion_output.trailer" value="true"/>
+            <param name="tracker_configs.polygon_tracker.enable_motion_output.motorcycle" value="true"/>
+            <param name="tracker_configs.polygon_tracker.enable_motion_output.bicycle" value="true"/>
+            <param name="tracker_configs.polygon_tracker.enable_motion_output.pedestrian" value="true"/>
+            <param name="tracker_configs.polygon_tracker.enable_motion_output.animal" value="true"/>
+            <param name="tracker_configs.polygon_tracker.enable_motion_output.hazard" value="false"/>
+            <param name="tracker_configs.static_tracker.convert_polygon_to_bbox" value="false"/>
             <param name="min_known_object_removal_iou" value="0.1"/>
             <param name="min_unknown_object_removal_iou" value="0.001"/>
-            <param name="pruning_generalized_iou_thresholds.unknown" value="-0.3"/>
-            <param name="pruning_generalized_iou_thresholds.car" value="-0.4"/>
-            <param name="pruning_generalized_iou_thresholds.truck" value="-0.6"/>
-            <param name="pruning_generalized_iou_thresholds.bus" value="-0.6"/>
-            <param name="pruning_generalized_iou_thresholds.trailer" value="-0.6"/>
-            <param name="pruning_generalized_iou_thresholds.motorcycle" value="-0.1"/>
-            <param name="pruning_generalized_iou_thresholds.bicycle" value="-0.1"/>
-            <param name="pruning_generalized_iou_thresholds.pedestrian" value="-0.1"/>
+            <param name="pruning_generalized_iou_threshold" value="0.1"/>
             <param name="pruning_distance_thresholds.unknown" value="9.0"/>
             <param name="pruning_distance_thresholds.car" value="5.0"/>
             <param name="pruning_distance_thresholds.truck" value="9.0"/>
@@ -3432,9 +3386,8 @@
             <param name="pruning_distance_thresholds.motorcycle" value="4.0"/>
             <param name="pruning_distance_thresholds.bicycle" value="3.0"/>
             <param name="pruning_distance_thresholds.pedestrian" value="2.0"/>
-            <param name="pruning_static_object_speed" value="1.38"/>
-            <param name="pruning_moving_object_speed" value="5.5"/>
-            <param name="pruning_static_iou_threshold" value="0.0"/>
+            <param name="pruning_distance_thresholds.animal" value="2.0"/>
+            <param name="pruning_distance_thresholds.hazard" value="2.0"/>
             <param name="publish_processing_time" value="true"/>
             <param name="publish_processing_time_detail" value="false"/>
             <param name="publish_tentative_objects" value="false"/>
@@ -3445,66 +3398,214 @@
             <param name="diagnostics_error_extrapolation" value="1.0"/>
             <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/multi_object_tracker_node.param.yaml -->
             <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/data_association_matrix.param.yaml -->
-            <param name="association.can_assign.unknown" value="[polygon_tracker, multi_vehicle_tracker, pedestrian_and_bicycle_tracker]"/>
-            <param name="association.can_assign.car" value="[multi_vehicle_tracker]"/>
-            <param name="association.can_assign.truck" value="[multi_vehicle_tracker]"/>
-            <param name="association.can_assign.bus" value="[multi_vehicle_tracker]"/>
-            <param name="association.can_assign.trailer" value="[multi_vehicle_tracker]"/>
-            <param name="association.can_assign.motorcycle" value="[pedestrian_and_bicycle_tracker]"/>
-            <param name="association.can_assign.bicycle" value="[pedestrian_and_bicycle_tracker]"/>
-            <param name="association.can_assign.pedestrian" value="[pedestrian_and_bicycle_tracker]"/>
-            <param name="association.max_dist.unknown.polygon_tracker" value="4.0"/>
-            <param name="association.max_dist.unknown.multi_vehicle_tracker" value="4.0"/>
-            <param name="association.max_dist.unknown.pedestrian_and_bicycle_tracker" value="3.0"/>
-            <param name="association.max_dist.car.multi_vehicle_tracker" value="5.0"/>
-            <param name="association.max_dist.truck.multi_vehicle_tracker" value="5.0"/>
-            <param name="association.max_dist.bus.multi_vehicle_tracker" value="5.0"/>
-            <param name="association.max_dist.trailer.multi_vehicle_tracker" value="5.0"/>
-            <param name="association.max_dist.motorcycle.pedestrian_and_bicycle_tracker" value="3.0"/>
-            <param name="association.max_dist.bicycle.pedestrian_and_bicycle_tracker" value="3.0"/>
-            <param name="association.max_dist.pedestrian.pedestrian_and_bicycle_tracker" value="2.0"/>
-            <param name="association.max_area.unknown.polygon_tracker" value="100.0"/>
-            <param name="association.max_area.unknown.multi_vehicle_tracker" value="60.0"/>
-            <param name="association.max_area.unknown.pedestrian_and_bicycle_tracker" value="2.5"/>
-            <param name="association.max_area.car.multi_vehicle_tracker" value="12.1"/>
-            <param name="association.max_area.truck.multi_vehicle_tracker" value="36.0"/>
-            <param name="association.max_area.bus.multi_vehicle_tracker" value="60.0"/>
-            <param name="association.max_area.trailer.multi_vehicle_tracker" value="60.0"/>
-            <param name="association.max_area.motorcycle.pedestrian_and_bicycle_tracker" value="2.5"/>
-            <param name="association.max_area.bicycle.pedestrian_and_bicycle_tracker" value="2.5"/>
-            <param name="association.max_area.pedestrian.pedestrian_and_bicycle_tracker" value="2.0"/>
-            <param name="association.min_area.unknown.polygon_tracker" value="0.0"/>
-            <param name="association.min_area.unknown.multi_vehicle_tracker" value="3.6"/>
-            <param name="association.min_area.unknown.pedestrian_and_bicycle_tracker" value="0.001"/>
-            <param name="association.min_area.car.multi_vehicle_tracker" value="3.6"/>
-            <param name="association.min_area.truck.multi_vehicle_tracker" value="6.0"/>
-            <param name="association.min_area.bus.multi_vehicle_tracker" value="10.0"/>
-            <param name="association.min_area.trailer.multi_vehicle_tracker" value="10.0"/>
-            <param name="association.min_area.motorcycle.pedestrian_and_bicycle_tracker" value="0.1"/>
-            <param name="association.min_area.bicycle.pedestrian_and_bicycle_tracker" value="0.1"/>
-            <param name="association.min_area.pedestrian.pedestrian_and_bicycle_tracker" value="0.1"/>
-            <param name="association.min_iou.unknown.polygon_tracker" value="0.0001"/>
-            <param name="association.min_iou.unknown.multi_vehicle_tracker" value="0.0001"/>
-            <param name="association.min_iou.unknown.pedestrian_and_bicycle_tracker" value="0.0001"/>
-            <param name="association.min_iou.car.multi_vehicle_tracker" value="0.0001"/>
-            <param name="association.min_iou.truck.multi_vehicle_tracker" value="0.1"/>
-            <param name="association.min_iou.bus.multi_vehicle_tracker" value="0.1"/>
-            <param name="association.min_iou.trailer.multi_vehicle_tracker" value="0.1"/>
-            <param name="association.min_iou.motorcycle.pedestrian_and_bicycle_tracker" value="-0.3"/>
-            <param name="association.min_iou.bicycle.pedestrian_and_bicycle_tracker" value="0.0001"/>
-            <param name="association.min_iou.pedestrian.pedestrian_and_bicycle_tracker" value="0.0001"/>
+            <param name="tracker_assignment.bounding_box.unknown.create" value="general_vehicle_tracker"/>
+            <param name="tracker_assignment.bounding_box.unknown.match" value="[general_vehicle_tracker, pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.bounding_box.car.create" value="general_vehicle_tracker"/>
+            <param name="tracker_assignment.bounding_box.car.match" value="[general_vehicle_tracker]"/>
+            <param name="tracker_assignment.bounding_box.truck.create" value="general_vehicle_tracker"/>
+            <param name="tracker_assignment.bounding_box.truck.match" value="[general_vehicle_tracker]"/>
+            <param name="tracker_assignment.bounding_box.bus.create" value="general_vehicle_tracker"/>
+            <param name="tracker_assignment.bounding_box.bus.match" value="[general_vehicle_tracker]"/>
+            <param name="tracker_assignment.bounding_box.trailer.create" value="general_vehicle_tracker"/>
+            <param name="tracker_assignment.bounding_box.trailer.match" value="[general_vehicle_tracker]"/>
+            <param name="tracker_assignment.bounding_box.motorcycle.create" value="pedestrian_and_bicycle_tracker"/>
+            <param name="tracker_assignment.bounding_box.motorcycle.match" value="[pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.bounding_box.bicycle.create" value="pedestrian_and_bicycle_tracker"/>
+            <param name="tracker_assignment.bounding_box.bicycle.match" value="[pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.bounding_box.pedestrian.create" value="pedestrian_and_bicycle_tracker"/>
+            <param name="tracker_assignment.bounding_box.pedestrian.match" value="[pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.bounding_box.animal.create" value="null"/>
+            <param name="tracker_assignment.bounding_box.hazard.create" value="static_tracker"/>
+            <param name="tracker_assignment.bounding_box.hazard.match" value="[static_tracker]"/>
+            <param name="tracker_assignment.polygon.unknown.create" value="polygon_tracker"/>
+            <param name="tracker_assignment.polygon.unknown.match" value="[polygon_tracker, static_tracker, general_vehicle_tracker, pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.polygon.car.create" value="polygon_tracker"/>
+            <param name="tracker_assignment.polygon.car.match" value="[polygon_tracker, general_vehicle_tracker]"/>
+            <param name="tracker_assignment.polygon.truck.create" value="polygon_tracker"/>
+            <param name="tracker_assignment.polygon.truck.match" value="[polygon_tracker, general_vehicle_tracker]"/>
+            <param name="tracker_assignment.polygon.bus.create" value="polygon_tracker"/>
+            <param name="tracker_assignment.polygon.bus.match" value="[polygon_tracker, general_vehicle_tracker]"/>
+            <param name="tracker_assignment.polygon.trailer.create" value="polygon_tracker"/>
+            <param name="tracker_assignment.polygon.trailer.match" value="[polygon_tracker, general_vehicle_tracker]"/>
+            <param name="tracker_assignment.polygon.motorcycle.create" value="polygon_tracker"/>
+            <param name="tracker_assignment.polygon.motorcycle.match" value="[polygon_tracker, pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.polygon.bicycle.create" value="polygon_tracker"/>
+            <param name="tracker_assignment.polygon.bicycle.match" value="[polygon_tracker, pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.polygon.pedestrian.create" value="polygon_tracker"/>
+            <param name="tracker_assignment.polygon.pedestrian.match" value="[polygon_tracker, pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.polygon.animal.create" value="polygon_tracker"/>
+            <param name="tracker_assignment.polygon.animal.match" value="[polygon_tracker]"/>
+            <param name="tracker_assignment.polygon.hazard.create" value="static_tracker"/>
+            <param name="tracker_assignment.polygon.hazard.match" value="[static_tracker]"/>
+            <param name="tracker_assignment.cylinder.unknown.create" value="null"/>
+            <param name="tracker_assignment.cylinder.car.create" value="null"/>
+            <param name="tracker_assignment.cylinder.truck.create" value="null"/>
+            <param name="tracker_assignment.cylinder.bus.create" value="null"/>
+            <param name="tracker_assignment.cylinder.trailer.create" value="null"/>
+            <param name="tracker_assignment.cylinder.motorcycle.create" value="pedestrian_and_bicycle_tracker"/>
+            <param name="tracker_assignment.cylinder.motorcycle.match" value="[pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.cylinder.bicycle.create" value="pedestrian_and_bicycle_tracker"/>
+            <param name="tracker_assignment.cylinder.bicycle.match" value="[pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.cylinder.pedestrian.create" value="pedestrian_and_bicycle_tracker"/>
+            <param name="tracker_assignment.cylinder.pedestrian.match" value="[pedestrian_and_bicycle_tracker]"/>
+            <param name="tracker_assignment.cylinder.animal.create" value="null"/>
+            <param name="tracker_assignment.cylinder.hazard.create" value="static_tracker"/>
+            <param name="tracker_assignment.cylinder.hazard.match" value="[static_tracker]"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.unknown.max_dist" value="4.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.unknown.max_area" value="60.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.unknown.min_area" value="3.6"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.unknown.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.car.max_dist" value="5.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.car.max_area" value="12.1"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.car.min_area" value="3.6"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.car.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.truck.max_dist" value="5.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.truck.max_area" value="36.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.truck.min_area" value="6.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.truck.min_iou" value="0.1"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.bus.max_dist" value="5.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.bus.max_area" value="60.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.bus.min_area" value="10.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.bus.min_iou" value="0.1"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.trailer.max_dist" value="5.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.trailer.max_area" value="60.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.trailer.min_area" value="10.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.bounding_box.trailer.min_iou" value="0.1"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.unknown.max_dist" value="4.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.unknown.max_area" value="75.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.unknown.min_area" value="0.01"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.unknown.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.car.max_dist" value="4.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.car.max_area" value="75.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.car.min_area" value="0.01"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.car.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.truck.max_dist" value="4.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.truck.max_area" value="75.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.truck.min_area" value="0.01"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.truck.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.bus.max_dist" value="4.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.bus.max_area" value="75.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.bus.min_area" value="0.01"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.bus.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.trailer.max_dist" value="4.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.trailer.max_area" value="75.0"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.trailer.min_area" value="0.01"/>
+            <param name="tracker_profiles.general_vehicle_tracker.polygon.trailer.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.unknown.max_dist" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.unknown.max_area" value="3.5"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.unknown.min_area" value="0.01"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.unknown.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.motorcycle.max_dist" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.motorcycle.max_area" value="3.5"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.motorcycle.min_area" value="0.1"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.motorcycle.min_iou" value="-0.3"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.bicycle.max_dist" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.bicycle.max_area" value="3.5"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.bicycle.min_area" value="0.1"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.bicycle.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.pedestrian.max_dist" value="2.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.pedestrian.max_area" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.pedestrian.min_area" value="0.1"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.bounding_box.pedestrian.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.motorcycle.max_dist" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.motorcycle.max_area" value="3.5"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.motorcycle.min_area" value="0.1"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.motorcycle.min_iou" value="-0.3"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.bicycle.max_dist" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.bicycle.max_area" value="3.5"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.bicycle.min_area" value="0.1"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.bicycle.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.pedestrian.max_dist" value="2.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.pedestrian.max_area" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.pedestrian.min_area" value="0.1"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.cylinder.pedestrian.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.unknown.max_dist" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.unknown.max_area" value="3.5"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.unknown.min_area" value="0.01"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.unknown.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.motorcycle.max_dist" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.motorcycle.max_area" value="3.5"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.motorcycle.min_area" value="0.01"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.motorcycle.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.bicycle.max_dist" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.bicycle.max_area" value="3.5"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.bicycle.min_area" value="0.01"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.bicycle.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.pedestrian.max_dist" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.pedestrian.max_area" value="3.0"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.pedestrian.min_area" value="0.01"/>
+            <param name="tracker_profiles.pedestrian_and_bicycle_tracker.polygon.pedestrian.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.unknown.max_dist" value="4.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.unknown.max_area" value="100.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.unknown.min_area" value="0.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.unknown.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.car.max_dist" value="5.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.car.max_area" value="100.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.car.min_area" value="0.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.car.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.truck.max_dist" value="5.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.truck.max_area" value="100.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.truck.min_area" value="0.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.truck.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.bus.max_dist" value="5.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.bus.max_area" value="100.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.bus.min_area" value="0.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.bus.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.trailer.max_dist" value="5.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.trailer.max_area" value="100.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.trailer.min_area" value="0.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.trailer.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.motorcycle.max_dist" value="3.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.motorcycle.max_area" value="3.5"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.motorcycle.min_area" value="0.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.motorcycle.min_iou" value="-0.3"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.bicycle.max_dist" value="3.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.bicycle.max_area" value="3.5"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.bicycle.min_area" value="0.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.bicycle.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.pedestrian.max_dist" value="2.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.pedestrian.max_area" value="3.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.pedestrian.min_area" value="0.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.pedestrian.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.animal.max_dist" value="3.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.animal.max_area" value="3.5"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.animal.min_area" value="0.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.animal.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.hazard.max_dist" value="3.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.hazard.max_area" value="3.5"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.hazard.min_area" value="0.0"/>
+            <param name="tracker_profiles.polygon_tracker.polygon.hazard.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.static_tracker.bounding_box.hazard.max_dist" value="2.0"/>
+            <param name="tracker_profiles.static_tracker.bounding_box.hazard.max_area" value="2.6"/>
+            <param name="tracker_profiles.static_tracker.bounding_box.hazard.min_area" value="0.001"/>
+            <param name="tracker_profiles.static_tracker.bounding_box.hazard.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.static_tracker.cylinder.hazard.max_dist" value="2.0"/>
+            <param name="tracker_profiles.static_tracker.cylinder.hazard.max_area" value="2.6"/>
+            <param name="tracker_profiles.static_tracker.cylinder.hazard.min_area" value="0.001"/>
+            <param name="tracker_profiles.static_tracker.cylinder.hazard.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.static_tracker.polygon.hazard.max_dist" value="2.0"/>
+            <param name="tracker_profiles.static_tracker.polygon.hazard.max_area" value="2.6"/>
+            <param name="tracker_profiles.static_tracker.polygon.hazard.min_area" value="0.001"/>
+            <param name="tracker_profiles.static_tracker.polygon.hazard.min_iou" value="0.0001"/>
+            <param name="tracker_profiles.static_tracker.polygon.unknown.max_dist" value="2.0"/>
+            <param name="tracker_profiles.static_tracker.polygon.unknown.max_area" value="2.6"/>
+            <param name="tracker_profiles.static_tracker.polygon.unknown.min_area" value="0.001"/>
+            <param name="tracker_profiles.static_tracker.polygon.unknown.min_iou" value="0.0001"/>
             <param name="unknown_association_giou_threshold" value="-0.8"/>
             <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/data_association_matrix.param.yaml -->
             <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/tracking/multi_object_tracker/input_channels.param.yaml -->
+            <param name="input_channels.detected_objects.associator_type" value="bev"/>
             <param name="input_channels.detected_objects.optional.name" value="detected_objects"/>
             <param name="input_channels.detected_objects.optional.short_name" value="all"/>
+            <param name="input_channels.lidar_clustering.associator_type" value="polar"/>
             <param name="input_channels.lidar_clustering.flags.can_spawn_new_tracker" value="true"/>
             <param name="input_channels.lidar_clustering.flags.can_trust_existence_probability" value="false"/>
             <param name="input_channels.lidar_clustering.flags.can_trust_extension" value="false"/>
-            <param name="input_channels.lidar_clustering.flags.can_trust_classification" value="false"/>
+            <param name="input_channels.lidar_clustering.flags.can_trust_classification" value="true"/>
             <param name="input_channels.lidar_clustering.flags.can_trust_orientation" value="false"/>
             <param name="input_channels.lidar_clustering.optional.name" value="clustering"/>
             <param name="input_channels.lidar_clustering.optional.short_name" value="Lcl"/>
+            <param name="input_channels.lidar_centerpoint.associator_type" value="bev"/>
             <param name="input_channels.lidar_centerpoint.flags.can_spawn_new_tracker" value="true"/>
             <param name="input_channels.lidar_centerpoint.flags.can_trust_existence_probability" value="true"/>
             <param name="input_channels.lidar_centerpoint.flags.can_trust_extension" value="true"/>
@@ -3512,6 +3613,7 @@
             <param name="input_channels.lidar_centerpoint.flags.can_trust_orientation" value="true"/>
             <param name="input_channels.lidar_centerpoint.optional.name" value="centerpoint"/>
             <param name="input_channels.lidar_centerpoint.optional.short_name" value="Lcp"/>
+            <param name="input_channels.lidar_centerpoint_short_range.associator_type" value="bev"/>
             <param name="input_channels.lidar_centerpoint_short_range.flags.can_spawn_new_tracker" value="true"/>
             <param name="input_channels.lidar_centerpoint_short_range.flags.can_trust_existence_probability" value="true"/>
             <param name="input_channels.lidar_centerpoint_short_range.flags.can_trust_extension" value="true"/>
@@ -3519,6 +3621,7 @@
             <param name="input_channels.lidar_centerpoint_short_range.flags.can_trust_orientation" value="true"/>
             <param name="input_channels.lidar_centerpoint_short_range.optional.name" value="centerpoint_short_range"/>
             <param name="input_channels.lidar_centerpoint_short_range.optional.short_name" value="LcpS"/>
+            <param name="input_channels.lidar_apollo.associator_type" value="bev"/>
             <param name="input_channels.lidar_apollo.flags.can_spawn_new_tracker" value="true"/>
             <param name="input_channels.lidar_apollo.flags.can_trust_existence_probability" value="true"/>
             <param name="input_channels.lidar_apollo.flags.can_trust_extension" value="true"/>
@@ -3526,6 +3629,7 @@
             <param name="input_channels.lidar_apollo.flags.can_trust_orientation" value="true"/>
             <param name="input_channels.lidar_apollo.optional.name" value="apollo"/>
             <param name="input_channels.lidar_apollo.optional.short_name" value="Lap"/>
+            <param name="input_channels.lidar_pointpainting.associator_type" value="bev"/>
             <param name="input_channels.lidar_pointpainting.flags.can_spawn_new_tracker" value="true"/>
             <param name="input_channels.lidar_pointpainting.flags.can_trust_existence_probability" value="true"/>
             <param name="input_channels.lidar_pointpainting.flags.can_trust_extension" value="true"/>
@@ -3533,6 +3637,7 @@
             <param name="input_channels.lidar_pointpainting.flags.can_trust_orientation" value="true"/>
             <param name="input_channels.lidar_pointpainting.optional.name" value="pointpainting"/>
             <param name="input_channels.lidar_pointpainting.optional.short_name" value="Lpp"/>
+            <param name="input_channels.camera_streampetr.associator_type" value="bev"/>
             <param name="input_channels.camera_streampetr.flags.can_spawn_new_tracker" value="true"/>
             <param name="input_channels.camera_streampetr.flags.can_trust_existence_probability" value="true"/>
             <param name="input_channels.camera_streampetr.flags.can_trust_extension" value="true"/>
@@ -3540,6 +3645,7 @@
             <param name="input_channels.camera_streampetr.flags.can_trust_orientation" value="true"/>
             <param name="input_channels.camera_streampetr.optional.name" value="camera_streampetr"/>
             <param name="input_channels.camera_streampetr.optional.short_name" value="Csp"/>
+            <param name="input_channels.camera_lidar_fusion.associator_type" value="polar"/>
             <param name="input_channels.camera_lidar_fusion.flags.can_spawn_new_tracker" value="true"/>
             <param name="input_channels.camera_lidar_fusion.flags.can_trust_existence_probability" value="false"/>
             <param name="input_channels.camera_lidar_fusion.flags.can_trust_extension" value="false"/>
@@ -3547,6 +3653,7 @@
             <param name="input_channels.camera_lidar_fusion.flags.can_trust_orientation" value="false"/>
             <param name="input_channels.camera_lidar_fusion.optional.name" value="camera_lidar_fusion"/>
             <param name="input_channels.camera_lidar_fusion.optional.short_name" value="CLf"/>
+            <param name="input_channels.camera_lidar_fusion_irregular.associator_type" value="polar"/>
             <param name="input_channels.camera_lidar_fusion_irregular.flags.can_spawn_new_tracker" value="true"/>
             <param name="input_channels.camera_lidar_fusion_irregular.flags.can_trust_existence_probability" value="false"/>
             <param name="input_channels.camera_lidar_fusion_irregular.flags.can_trust_extension" value="false"/>
@@ -3554,6 +3661,7 @@
             <param name="input_channels.camera_lidar_fusion_irregular.flags.can_trust_orientation" value="false"/>
             <param name="input_channels.camera_lidar_fusion_irregular.optional.name" value="camera_lidar_fusion_irregular"/>
             <param name="input_channels.camera_lidar_fusion_irregular.optional.short_name" value="Irreg"/>
+            <param name="input_channels.detection_by_tracker.associator_type" value="bev"/>
             <param name="input_channels.detection_by_tracker.flags.can_spawn_new_tracker" value="false"/>
             <param name="input_channels.detection_by_tracker.flags.can_trust_existence_probability" value="false"/>
             <param name="input_channels.detection_by_tracker.flags.can_trust_extension" value="false"/>
@@ -3561,6 +3669,7 @@
             <param name="input_channels.detection_by_tracker.flags.can_trust_orientation" value="false"/>
             <param name="input_channels.detection_by_tracker.optional.name" value="detection_by_tracker"/>
             <param name="input_channels.detection_by_tracker.optional.short_name" value="dbT"/>
+            <param name="input_channels.radar.associator_type" value="bev"/>
             <param name="input_channels.radar.flags.can_spawn_new_tracker" value="true"/>
             <param name="input_channels.radar.flags.can_trust_existence_probability" value="true"/>
             <param name="input_channels.radar.flags.can_trust_extension" value="false"/>
@@ -3568,6 +3677,7 @@
             <param name="input_channels.radar.flags.can_trust_orientation" value="false"/>
             <param name="input_channels.radar.optional.name" value="radar"/>
             <param name="input_channels.radar.optional.short_name" value="Rad"/>
+            <param name="input_channels.camera_vru.associator_type" value="polar"/>
             <param name="input_channels.camera_vru.flags.can_spawn_new_tracker" value="true"/>
             <param name="input_channels.camera_vru.flags.can_trust_existence_probability" value="true"/>
             <param name="input_channels.camera_vru.flags.can_trust_extension" value="false"/>
@@ -3591,29 +3701,31 @@
             <param name="input/detection02/channel" value="none"/>
             <param name="input/detection03/channel" value="none"/>
             <param name="input/detection04/channel" value="none"/>
-            <param name="input/detection05/channel" value="detection_by_tracker"/>
+            <param name="input/detection05/channel" value="none"/>
             <param name="input/detection06/channel" value="none"/>
             <param name="input/detection07/channel" value="none"/>
-            <param name="input/detection08/channel" value="camera_streampetr"/>
-            <param name="input/detection09/channel" value="none"/>
+            <param name="input/detection08/channel" value="none"/>
+            <param name="input/detection09/channel" value="camera_streampetr"/>
             <param name="input/detection10/channel" value="none"/>
             <param name="input/detection11/channel" value="none"/>
             <param name="input/detection12/channel" value="none"/>
             <param name="publish_merged_objects" value="false"/>
-            <remap from="~/input/detection01/objects" to="/perception/object_recognition/detection/centerpoint/validation/objects"/>
+            <remap from="~/input/detection01/objects" to="/perception/object_recognition/detection/centerpoint/objects"/>
             <remap from="~/input/detection02/objects" to="/perception/object_recognition/detection/centerpoint_short_range/objects"/>
             <remap from="~/input/detection03/objects" to="/perception/object_recognition/detection/clustering/camera_lidar_fusion/objects"/>
-            <remap from="~/input/detection04/objects" to="/perception/object_recognition/detection/irregular_object/objects"/>
-            <remap from="~/input/detection05/objects" to="/perception/object_recognition/detection/detection_by_tracker/objects"/>
-            <remap from="~/input/detection06/objects" to="/perception/object_recognition/detection/radar/far_objects"/>
-            <remap from="~/input/detection07/objects" to="/perception/object_recognition/detection/camera_vru/objects"/>
-            <remap from="~/input/detection08/objects" to="/perception/object_recognition/detection/camera_only/objects"/>
-            <remap from="~/input/detection09/objects" to="/perception/object_recognition/tracking/input/objects09"/>
+            <remap from="~/input/detection04/objects" to="/perception/object_recognition/detection/clustering/label_based_euclidean_cluster/objects"/>
+            <remap from="~/input/detection05/objects" to="/perception/object_recognition/detection/irregular_object/objects"/>
+            <remap from="~/input/detection06/objects" to="/perception/object_recognition/detection/detection_by_tracker/objects"/>
+            <remap from="~/input/detection07/objects" to="/perception/object_recognition/detection/radar/far_objects"/>
+            <remap from="~/input/detection08/objects" to="/perception/object_recognition/detection/camera_vru/objects"/>
+            <remap from="~/input/detection09/objects" to="/perception/object_recognition/detection/camera_only/objects"/>
             <remap from="~/input/detection10/objects" to="/perception/object_recognition/tracking/input/objects10"/>
             <remap from="~/input/detection11/objects" to="/perception/object_recognition/tracking/input/objects11"/>
             <remap from="~/input/detection12/objects" to="/perception/object_recognition/tracking/input/objects12"/>
+            <remap from="~/input/odometry" to="/localization/kinematic_state"/>
             <remap from="~/output/objects" to="/perception/object_recognition/tracking/objects"/>
             <remap from="~/output/merged_objects" to="/perception/object_recognition/detection/objects"/>
+            <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
           </node>
         </group>
       </group>
@@ -3694,6 +3806,7 @@
             <remap from="/traffic_signals" to="/perception/traffic_light_recognition/traffic_signals"/>
             <remap from="~/output/objects" to="/perception/object_recognition/objects"/>
             <remap from="~/input/objects" to="/perception/object_recognition/tracking/objects"/>
+            <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
           </node>
         </group>
       </group>
@@ -3702,18 +3815,18 @@
         <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
         <!-- arg name="car_traffic_light_classifier_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml" -->
         <!-- arg name="classification/car/classifier_type" value="1" -->
-        <!-- arg name="classification/car/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt" -->
-        <!-- arg name="classification/car/model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
-        <!-- arg name="classification/lamp_recognizer_ml_param_path" value="{home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
+        <!-- arg name="classification/car/label_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels.txt" -->
+        <!-- arg name="classification/car/model_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+        <!-- arg name="classification/lamp_recognizer_ml_param_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
         <!-- arg name="classification/pedestrian/classifier_type" value="1" -->
-        <!-- arg name="classification/pedestrian/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt" -->
-        <!-- arg name="classification/pedestrian/model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+        <!-- arg name="classification/pedestrian/label_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels_ped.txt" -->
+        <!-- arg name="classification/pedestrian/model_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
         <!-- arg name="crosswalk_traffic_light_estimator_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/crosswalk_traffic_light_estimator/crosswalk_traffic_light_estimator.param.yaml" -->
         <!-- arg name="each_traffic_light_map_based_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/TRAFFIC_LIGHT_RECOGNITION_CAMERA_NAMESPACE_traffic_light_map_based_detector.param.yaml" -->
         <!-- arg name="enable_image_decompressor" default="true" -->
         <!-- arg name="external/traffic_signals" default="/perception/traffic_light_recognition/external/traffic_signals" -->
-        <!-- arg name="fine_detection/label_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_labels.txt" -->
-        <!-- arg name="fine_detection/model_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx" -->
+        <!-- arg name="fine_detection/label_path" value="{home}/autoware_data/ml_models/traffic_light_fine_detector/tlr_labels.txt" -->
+        <!-- arg name="fine_detection/model_path" value="{home}/autoware_data/ml_models/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx" -->
         <!-- arg name="fusion_only" value="false" -->
         <!-- arg name="high_accuracy_detection_type" value="fine_detection" -->
         <!-- arg name="input/route" default="/planning/mission_planning/route" -->
@@ -3729,8 +3842,8 @@
         <!-- arg name="traffic_light_occlusion_predictor_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_occlusion_predictor/traffic_light_occlusion_predictor.param.yaml" -->
         <!-- arg name="traffic_light_roi_visualizer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_visualization/traffic_light_roi_visualizer.param.yaml" -->
         <!-- arg name="use_high_accuracy_detection" value="true" -->
-        <!-- arg name="whole_image_detection/label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
-        <!-- arg name="whole_image_detection/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
+        <!-- arg name="whole_image_detection/label_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
+        <!-- arg name="whole_image_detection/model_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
         <!-- arg name="whole_image_detection/yolox_roi_label_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv" -->
         <!-- arg name="yolox_traffic_light_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml" -->
         <group>
@@ -3788,7 +3901,6 @@
               <param name="max_detection_range" value="200.0"/>
               <param name="min_timestamp_offset" value="-0.3"/>
               <param name="max_timestamp_offset" value="0.0"/>
-              <param name="timestamp_sample_len" value="0.02"/>
               <param name="car_traffic_light_max_angle_range" value="40.0"/>
               <param name="pedestrian_traffic_light_max_angle_range" value="80.0"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/camera6_traffic_light_map_based_detector.param.yaml -->
@@ -3828,7 +3940,6 @@
               <param name="max_detection_range" value="200.0"/>
               <param name="min_timestamp_offset" value="-0.04"/>
               <param name="max_timestamp_offset" value="0.0"/>
-              <param name="timestamp_sample_len" value="0.02"/>
               <param name="car_traffic_light_max_angle_range" value="40.0"/>
               <param name="pedestrian_traffic_light_max_angle_range" value="80.0"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_map_based_detector/camera7_traffic_light_map_based_detector.param.yaml -->
@@ -3856,15 +3967,15 @@
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
           <!-- arg name="car_traffic_light_classifier_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml" -->
           <!-- arg name="classification/car/classifier_type" value="1" -->
-          <!-- arg name="classification/car/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt" -->
-          <!-- arg name="classification/car/model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
-          <!-- arg name="classification/lamp_recognizer_ml_param_path" value="{home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
+          <!-- arg name="classification/car/label_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels.txt" -->
+          <!-- arg name="classification/car/model_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+          <!-- arg name="classification/lamp_recognizer_ml_param_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml" -->
           <!-- arg name="classification/pedestrian/classifier_type" value="1" -->
-          <!-- arg name="classification/pedestrian/label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt" -->
-          <!-- arg name="classification/pedestrian/model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
+          <!-- arg name="classification/pedestrian/label_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels_ped.txt" -->
+          <!-- arg name="classification/pedestrian/model_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx" -->
           <!-- arg name="enable_image_decompressor" value="true" -->
-          <!-- arg name="fine_detection/label_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_labels.txt" -->
-          <!-- arg name="fine_detection/model_path" value="{home}/autoware_data/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx" -->
+          <!-- arg name="fine_detection/label_path" value="{home}/autoware_data/ml_models/traffic_light_fine_detector/tlr_labels.txt" -->
+          <!-- arg name="fine_detection/model_path" value="{home}/autoware_data/ml_models/traffic_light_fine_detector/tlr_car_ped_yolox_s_batch_6.onnx" -->
           <!-- arg name="high_accuracy_detection_type" value="fine_detection" -->
           <!-- arg name="pedestrian_traffic_light_classifier_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml" -->
           <!-- arg name="traffic_light_fine_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_fine_detector/traffic_light_fine_detector.param.yaml" -->
@@ -3872,8 +3983,8 @@
           <!-- arg name="use_high_accuracy_detection" value="true" -->
           <!-- arg name="use_intra_process" value="true" -->
           <!-- arg name="use_multithread" value="true" -->
-          <!-- arg name="whole_image_detection/label_path" value="{home}/autoware_data/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
-          <!-- arg name="whole_image_detection/model_path" value="{home}/autoware_data/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
+          <!-- arg name="whole_image_detection/label_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/car_ped_tl_detector_labels.txt" -->
+          <!-- arg name="whole_image_detection/model_path" value="{home}/autoware_data/ml_models/tensorrt_yolox/yolox_s_car_ped_tl_detector_960_960_batch_1.onnx" -->
           <!-- arg name="whole_image_detection/yolox_roi_label_remap_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/traffic_light_roi_label_remap.csv" -->
           <!-- arg name="yolox_traffic_light_detector_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/tensorrt_yolox/yolox_traffic_light_detector.param.yaml" -->
           <node_container pkg="rclcpp_components" exec="component_container_mt" name="traffic_light_node_container" namespace="/perception/traffic_light_recognition/camera6" output="both">
@@ -3901,7 +4012,7 @@
               <param name="nms_threshold" value="0.2"/>
               <param name="max_batch_size" value="64"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml -->
-              <!-- params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <!-- params from: {home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="model_params.num_anchors" value="3"/>
               <param name="model_params.chans_per_anchor" value="16"/>
               <param name="model_params.x_index" value="0"/>
@@ -3917,10 +4028,10 @@
               <param name="model_params.sin_index" value="15"/>
               <param name="model_params.scale_x_y" value="2.0"/>
               <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
-              <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <!-- end params from: {home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
+              <param name="label_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels.txt"/>
+              <param name="model_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
               <param name="classifier_type" value="1"/>
               <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
@@ -3940,7 +4051,7 @@
               <param name="nms_threshold" value="0.2"/>
               <param name="max_batch_size" value="64"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml -->
-              <!-- params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <!-- params from: {home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="model_params.num_anchors" value="3"/>
               <param name="model_params.chans_per_anchor" value="16"/>
               <param name="model_params.x_index" value="0"/>
@@ -3956,10 +4067,10 @@
               <param name="model_params.sin_index" value="15"/>
               <param name="model_params.scale_x_y" value="2.0"/>
               <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
-              <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <!-- end params from: {home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
+              <param name="label_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels_ped.txt"/>
+              <param name="model_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
               <param name="classifier_type" value="1"/>
               <remap from="~/input/image" to="/sensing/camera/camera6/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera6/detection/rois"/>
@@ -4015,7 +4126,7 @@
               <param name="nms_threshold" value="0.2"/>
               <param name="max_batch_size" value="64"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/car_traffic_light_classifier.param.yaml -->
-              <!-- params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <!-- params from: {home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="model_params.num_anchors" value="3"/>
               <param name="model_params.chans_per_anchor" value="16"/>
               <param name="model_params.x_index" value="0"/>
@@ -4031,10 +4142,10 @@
               <param name="model_params.sin_index" value="15"/>
               <param name="model_params.scale_x_y" value="2.0"/>
               <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
-              <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <!-- end params from: {home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
+              <param name="label_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels.txt"/>
+              <param name="model_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
               <param name="classifier_type" value="1"/>
               <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
@@ -4054,7 +4165,7 @@
               <param name="nms_threshold" value="0.2"/>
               <param name="max_batch_size" value="64"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_classifier/pedestrian_traffic_light_classifier.param.yaml -->
-              <!-- params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <!-- params from: {home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="model_params.num_anchors" value="3"/>
               <param name="model_params.chans_per_anchor" value="16"/>
               <param name="model_params.x_index" value="0"/>
@@ -4070,10 +4181,10 @@
               <param name="model_params.sin_index" value="15"/>
               <param name="model_params.scale_x_y" value="2.0"/>
               <param name="model_params.anchors" value="[7.0, 7.0, 14.0, 14.0, 42.0, 42.0]"/>
-              <!-- end params from: {home}/autoware_data/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
+              <!-- end params from: {home}/autoware_data/ml_models/traffic_light_classifier/lamp_recognizer_ml.param.yaml -->
               <param name="build_only" value="False"/>
-              <param name="label_path" value="{home}/autoware_data/traffic_light_classifier/lamp_labels_ped.txt"/>
-              <param name="model_path" value="{home}/autoware_data/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
+              <param name="label_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/lamp_labels_ped.txt"/>
+              <param name="model_path" value="{home}/autoware_data/ml_models/traffic_light_classifier/ped_traffic_light_classifier_mobilenetv2_batch_6.onnx"/>
               <param name="classifier_type" value="1"/>
               <remap from="~/input/image" to="/sensing/camera/camera7/image_raw"/>
               <remap from="~/input/rois" to="/perception/traffic_light_recognition/camera7/detection/rois"/>
@@ -4201,6 +4312,8 @@
             <param name="message_lifespan" value="0.12"/>
             <param name="approximate_sync" value="false"/>
             <param name="prior_log_odds" value="0.0"/>
+            <param name="signal_consistency_check.enable" value="false"/>
+            <param name="signal_consistency_check.publish_partial_matched_signal" value="false"/>
             <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/traffic_light_recognition/traffic_light_multi_camera_fusion/traffic_light_multi_camera_fusion.param.yaml -->
             <param name="use_sim_time" value="false"/>
             <param name="wheel_radius" value="0.383"/>
@@ -4216,6 +4329,7 @@
             <param name="camera_namespaces" value="[camera6, camera7]"/>
             <remap from="~/input/vector_map" to="/map/vector_map"/>
             <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/internal/traffic_signals"/>
+            <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
           </node>
         </group>
         <group>
@@ -4247,6 +4361,7 @@
             <remap from="~/sub/perception_traffic_signals" to="/perception/traffic_light_recognition/internal/traffic_signals"/>
             <remap from="~/sub/external_traffic_signals" to="/perception/traffic_light_recognition/external/traffic_signals"/>
             <remap from="~/pub/traffic_signals" to="/perception/traffic_light_recognition/judged/traffic_signals"/>
+            <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
           </node>
         </group>
         <group>
@@ -4277,6 +4392,7 @@
             <remap from="~/input/vector_map" to="/map/vector_map"/>
             <remap from="~/input/classified/traffic_signals" to="/perception/traffic_light_recognition/judged/traffic_signals"/>
             <remap from="~/output/traffic_signals" to="/perception/traffic_light_recognition/traffic_signals"/>
+            <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
           </node>
         </group>
         <group>
@@ -4329,11 +4445,13 @@
   </group>
   <group>
     <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_planning_component.launch.xml -->
+    <!-- arg name="data_path" value="{home}/autoware_data/ml_models" -->
     <!-- arg name="enable_all_modules_auto_mode" value="false" -->
     <!-- arg name="is_simulation" value="false" -->
     <!-- arg name="module_preset" value="default" -->
     <!-- arg name="planning_input_objects_topic_name" default="/perception/object_recognition/objects" -->
     <!-- arg name="planning_input_pointcloud_topic_name" default="/perception/obstacle_segmentation/pointcloud" -->
+    <!-- arg name="planning_setting" default="rule_based" -->
     <!-- arg name="use_sim_time" value="false" -->
     <!-- arg name="vehicle_model" value="sample_vehicle" -->
     <group>
@@ -4342,6 +4460,7 @@
       <!-- arg name="behavior_path_config_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner" -->
       <!-- arg name="behavior_path_planner_avoidance_by_lc_module_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/avoidance_by_lane_change/avoidance_by_lane_change.param.yaml" -->
       <!-- arg name="behavior_path_planner_common_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/behavior_path_planner.param.yaml" -->
+      <!-- arg name="behavior_path_planner_direction_change_module_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_direction_change_module/direction_change.param.yaml" -->
       <!-- arg name="behavior_path_planner_drivable_area_expansion_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/drivable_area_expansion.param.yaml" -->
       <!-- arg name="behavior_path_planner_dynamic_obstacle_avoidance_module_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_dynamic_obstacle_avoidance_module/dynamic_obstacle_avoidance.param.yaml" -->
       <!-- arg name="behavior_path_planner_goal_planner_module_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/goal_planner/goal_planner.param.yaml" -->
@@ -4370,8 +4489,12 @@
       <!-- arg name="behavior_velocity_smoother_type_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/autoware_velocity_smoother/Analytical.param.yaml" -->
       <!-- arg name="common_config_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common" -->
       <!-- arg name="common_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/common.param.yaml" -->
+      <!-- arg name="common_smoother_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/common.param.yaml" -->
       <!-- arg name="compare_map_filter_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/perception/object_recognition/detection/pointcloud_filter/pointcloud_map_filter.param.yaml" -->
       <!-- arg name="costmap_generator_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/costmap_generator.param.yaml" -->
+      <!-- arg name="data_path" value="{home}/autoware_data/ml_models" -->
+      <!-- arg name="diffusion_planner_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/diffusion_planner.param.yaml" -->
+      <!-- arg name="elastic_band_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/motion_planning/path_smoother/elastic_band_smoother.param.yaml" -->
       <!-- arg name="elastic_band_smoother_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/motion_planning/path_smoother/elastic_band_smoother.param.yaml" -->
       <!-- arg name="enable_all_modules_auto_mode" value="false" -->
       <!-- arg name="freespace_planner_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/parking/freespace_planner/freespace_planner.param.yaml" -->
@@ -4379,6 +4502,7 @@
       <!-- arg name="input_objects_topic_name" value="/perception/object_recognition/objects" -->
       <!-- arg name="input_pointcloud_topic_name" value="/perception/obstacle_segmentation/pointcloud" -->
       <!-- arg name="is_simulation" value="false" -->
+      <!-- arg name="jerk_filtered_smoother_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/autoware_velocity_smoother/JerkFiltered.param.yaml" -->
       <!-- arg name="launch_remaining_distance_time_calculator" value="true" -->
       <!-- arg name="mission_planner_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/mission_planning/mission_planner/mission_planner.param.yaml" -->
       <!-- arg name="motion_config_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/motion_planning" -->
@@ -4404,6 +4528,16 @@
       <!-- arg name="planning_validator_trajectory_checker_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/planning_validator/trajectory_checker.param.yaml" -->
       <!-- arg name="pointcloud_container_name" value="pointcloud_container" -->
       <!-- arg name="surround_obstacle_checker_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/motion_planning/surround_obstacle_checker/surround_obstacle_checker.param.yaml" -->
+      <!-- arg name="trajectory_extender_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/trajectory_optimizer_plugins/trajectory_extender.param.yaml" -->
+      <!-- arg name="trajectory_kinematic_feasibility_enforcer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/trajectory_optimizer_plugins/trajectory_kinematic_feasibility_enforcer.param.yaml" -->
+      <!-- arg name="trajectory_modifier_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/trajectory_modifier.param.yaml" -->
+      <!-- arg name="trajectory_mpt_optimizer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/trajectory_optimizer_plugins/trajectory_mpt_optimizer.param.yaml" -->
+      <!-- arg name="trajectory_optimizer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/trajectory_optimizer.param.yaml" -->
+      <!-- arg name="trajectory_point_fixer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/trajectory_optimizer_plugins/trajectory_point_fixer.param.yaml" -->
+      <!-- arg name="trajectory_qp_smoother_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/trajectory_optimizer_plugins/trajectory_qp_smoother.param.yaml" -->
+      <!-- arg name="trajectory_spline_smoother_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/trajectory_optimizer_plugins/trajectory_spline_smoother.param.yaml" -->
+      <!-- arg name="trajectory_temporal_mpt_optimizer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/trajectory_optimizer_plugins/trajectory_temporal_mpt_optimizer.param.yaml" -->
+      <!-- arg name="trajectory_velocity_optimizer_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/neural_net_planner/trajectory_optimizer_plugins/trajectory_velocity_optimizer.param.yaml" -->
       <!-- arg name="vehicle_param_file" value="{workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/vehicle_info.param.yaml" -->
       <!-- arg name="velocity_smoother_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/autoware_velocity_smoother/velocity_smoother.param.yaml" -->
       <!-- arg name="velocity_smoother_type_param_path" value="{workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/autoware_velocity_smoother/JerkFiltered.param.yaml" -->
@@ -4458,16 +4592,17 @@
               <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/mission_planning/mission_planner/mission_planner.param.yaml -->
               <param name="map_frame" value="map"/>
               <param name="arrival_check_angle_deg" value="45.0"/>
-              <param name="arrival_check_duration" value="1.0"/>
               <param name="arrival_check_lateral_distance" value="1.0"/>
               <param name="arrival_check_longitudinal_undershoot_distance" value="1.0"/>
               <param name="arrival_check_longitudinal_overshoot_distance" value="2.0"/>
+              <param name="arrival_check_duration" value="1.0"/>
               <param name="goal_angle_threshold_deg" value="45.0"/>
               <param name="enable_correct_goal_pose" value="false"/>
               <param name="reroute_time_threshold" value="10.0"/>
               <param name="minimum_reroute_length" value="30.0"/>
               <param name="consider_no_drivable_lanes" value="false"/>
               <param name="check_footprint_inside_lanes" value="true"/>
+              <param name="allow_area" value="false"/>
               <param name="allow_reroute_in_autonomous_mode" value="true"/>
               <param name="goal_lanelet_transparency" value="0.05"/>
               <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/mission_planning/mission_planner/mission_planner.param.yaml -->
@@ -4541,6 +4676,7 @@
             <param name="th_stopped_time_sec" value="1.0"/>
             <param name="th_stopped_velocity_mps" value="0.01"/>
             <param name="enable_mode_switching" value="true"/>
+            <param name="allow_area" value="false"/>
             <!-- end params from: {workspace}/src/universe/autoware_universe/planning/autoware_scenario_selector/config/scenario_selector.param.yaml -->
             <param name="use_sim_time" value="false"/>
             <param name="wheel_radius" value="0.383"/>
@@ -4777,13 +4913,13 @@
             <!-- arg name="input_route_topic_name" default="/planning/mission_planning/route" -->
             <!-- arg name="input_traffic_light_topic_name" default="/perception/traffic_light_recognition/traffic_signals" -->
             <!-- arg name="input_vector_map_topic_name" default="/map/vector_map" -->
-            <!-- arg name="input_virtual_traffic_light_topic_name" default="/awapi/tmp/virtual_traffic_light_states" -->
             <!-- arg name="is_simulation" value="false" -->
             <!-- arg name="launch_avoidance_by_lane_change_module" default="true" -->
             <!-- arg name="launch_bidirectional_traffic_module" default="true" -->
             <!-- arg name="launch_blind_spot_module" default="true" -->
             <!-- arg name="launch_crosswalk_module" default="true" -->
             <!-- arg name="launch_detection_area_module" default="true" -->
+            <!-- arg name="launch_direction_change_module" default="false" -->
             <!-- arg name="launch_dynamic_obstacle_avoidance" value="false" -->
             <!-- arg name="launch_external_request_lane_change_left_module" value="false" -->
             <!-- arg name="launch_external_request_lane_change_right_module" value="false" -->
@@ -5251,7 +5387,7 @@
                 <remap from="~/input/vector_map_inside_area_filtered_pointcloud" to="/planning/scenario_planning/lane_driving/behavior_planning/vector_map_inside_area_filtered/pointcloud"/>
                 <remap from="~/input/external_velocity_limit_mps" to="/planning/scenario_planning/max_velocity_default"/>
                 <remap from="~/input/traffic_signals" to="/perception/traffic_light_recognition/traffic_signals"/>
-                <remap from="~/input/virtual_traffic_light_states" to="/awapi/tmp/virtual_traffic_light_states"/>
+                <remap from="~/input/virtual_traffic_light_states" to="/perception/virtual_traffic_light_states"/>
                 <remap from="~/input/occupancy_grid" to="/perception/occupancy_grid_map/map"/>
                 <remap from="~/output/path" to="/planning/scenario_planning/lane_driving/behavior_planning/path"/>
                 <remap from="~/output/stop_reasons" to="/planning/scenario_planning/status/stop_reasons"/>
@@ -5296,6 +5432,8 @@
                 <param name="side_shift.min_shifting_distance" value="5.0"/>
                 <param name="side_shift.min_shifting_speed" value="5.56"/>
                 <param name="side_shift.shift_request_time_limit" value="1.0"/>
+                <param name="side_shift.drivable_area_check_mode" value="1"/>
+                <param name="side_shift.min_drivable_area_margin" value="0.3"/>
                 <param name="side_shift.publish_debug_marker" value="false"/>
                 <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/side_shift/side_shift.param.yaml -->
                 <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_static_obstacle_avoidance_module/static_obstacle_avoidance.param.yaml -->
@@ -5584,6 +5722,17 @@
                 <param name="bidirectional_traffic.max_lateral_jerk" value="3.0"/>
                 <param name="bidirectional_traffic.min_lateral_jerk" value="2.0"/>
                 <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_bidirectional_traffic_module/bidirectional_traffic.param.yaml -->
+                <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_direction_change_module/direction_change.param.yaml -->
+                <param name="direction_change.print_debug_info" value="false"/>
+                <param name="direction_change.th_arrived_distance" value="0.5"/>
+                <param name="direction_change.cusp_detection_angle_threshold_deg" value="90.0"/>
+                <param name="direction_change.cusp_detection_distance_threshold" value="1.2"/>
+                <param name="direction_change.cusp_detection_distance_start_approaching" value="10.0"/>
+                <param name="direction_change.stop_velocity_threshold" value="0.5"/>
+                <param name="direction_change.th_stopped_time" value="10.0"/>
+                <param name="direction_change.enable_goal_lateral_shift" value="true"/>
+                <param name="direction_change.max_allowed_yaw_deg" value="10.0"/>
+                <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_direction_change_module/direction_change.param.yaml -->
                 <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/autoware_behavior_path_dynamic_obstacle_avoidance_module/dynamic_obstacle_avoidance.param.yaml -->
                 <param name="dynamic_avoidance.common.enable_debug_info" value="false"/>
                 <param name="dynamic_avoidance.common.use_hatched_road_markings" value="true"/>
@@ -6099,7 +6248,7 @@
                 <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/scene_module_manager.param.yaml -->
                 <param name="slots" value="[slot1, slot2, slot3, slot4]"/>
                 <param name="slot1" value="[start_planner]"/>
-                <param name="slot2" value="[side_shift, avoidance_by_lane_change, static_obstacle_avoidance, lane_change_left, lane_change_right, external_request_lane_change_left, external_request_lane_change_right, bidirectional_traffic]"/>
+                <param name="slot2" value="[side_shift, avoidance_by_lane_change, static_obstacle_avoidance, lane_change_left, lane_change_right, external_request_lane_change_left, external_request_lane_change_right, bidirectional_traffic, direction_change]"/>
                 <param name="slot3" value="[goal_planner]"/>
                 <param name="slot4" value="[dynamic_obstacle_avoidance]"/>
                 <param name="external_request_lane_change_left.enable_rtc" value="false"/>
@@ -6139,6 +6288,9 @@
                 <param name="bidirectional_traffic.enable_rtc" value="false"/>
                 <param name="bidirectional_traffic.enable_simultaneous_execution_as_approved_module" value="true"/>
                 <param name="bidirectional_traffic.enable_simultaneous_execution_as_candidate_module" value="true"/>
+                <param name="direction_change.enable_rtc" value="false"/>
+                <param name="direction_change.enable_simultaneous_execution_as_approved_module" value="false"/>
+                <param name="direction_change.enable_simultaneous_execution_as_candidate_module" value="false"/>
                 <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/scene_module_manager.param.yaml -->
                 <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/behavior_path_planner.param.yaml -->
                 <param name="traffic_light_signal_timeout" value="1.0"/>
@@ -6170,6 +6322,7 @@
                 <param name="enable_cog_on_centerline" value="false"/>
                 <param name="input_path_interval" value="2.0"/>
                 <param name="output_path_interval" value="2.0"/>
+                <param name="allow_area" value="false"/>
                 <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/lane_driving/behavior_planning/behavior_path_planner/behavior_path_planner.param.yaml -->
                 <param name="launch_modules" value="[autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager, autoware::behavior_path_planner::SideShiftModuleManager, autoware::behavior_path_planner::BidirectionalTrafficModuleManager, autoware::behavior_path_planner::StartPlannerModuleManager, autoware::behavior_path_planner::GoalPlannerModuleManager, autoware::behavior_path_planner::LaneChangeRightModuleManager, autoware::behavior_path_planner::LaneChangeLeftModuleManager, autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager, &quot;&quot;]"/>
                 <param name="enable_all_modules_auto_mode" value="false"/>
@@ -6222,6 +6375,7 @@
               <param name="right_overhang" value="0.128"/>
               <param name="vehicle_height" value="2.5"/>
               <param name="max_steer_angle" value="0.7"/>
+              <env name="LD_LIBRARY_PATH" value="/opt/acados/lib:/opt/ros/humble/opt/zmqpp_vendor/lib:/opt/ros/humble/opt/zenoh_cpp_vendor/lib:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib"/>
             </node_container>
             <load_composable_node target="/planning/scenario_planning/lane_driving/motion_planning/motion_planning_container">
               <composable_node pkg="autoware_path_smoother" plugin="autoware::path_smoother::ElasticBandSmoother" name="elastic_band_smoother" namespace="/planning/scenario_planning/lane_driving/motion_planning">
@@ -7074,8 +7228,7 @@
         <!-- arg name="input_pointcloud_topic_name" value="/perception/obstacle_segmentation/pointcloud" -->
         <!-- arg name="input_route_topic_name" default="/planning/mission_planning/route" -->
         <!-- arg name="input_traffic_light_topic_name" default="/perception/traffic_light_recognition/traffic_signals" -->
-        <!-- arg name="input_trajectory" value="/planning/scenario_planning/velocity_smoother/trajectory" -->
-        <!-- arg name="input_trajectory_topic_name" default="/planning/scenario_planning/velocity_smoother/trajectory" -->
+        <!-- arg name="input_trajectory_topic_name" value="/planning/scenario_planning/velocity_smoother/trajectory" -->
         <!-- arg name="input_vector_map_topic_name" default="/map/vector_map" -->
         <!-- arg name="launch_intersection_collision_checker" default="true" -->
         <!-- arg name="launch_latency_checker" default="true" -->
@@ -7111,6 +7264,7 @@
             <param name="soft_stop_deceleration" value="-1.0"/>
             <param name="soft_stop_jerk_lim" value="0.3"/>
             <param name="th_traffic_light_timeout" value="0.5"/>
+            <param name="allow_area" value="false"/>
             <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/planning_validator/planning_validator.param.yaml -->
             <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/planning_validator/latency_checker.param.yaml -->
             <param name="latency_checker.enable" value="true"/>
@@ -7266,9 +7420,9 @@
         <!-- arg name="input/acceleration" default="/localization/acceleration" -->
         <!-- arg name="input/map_topic" default="/map/vector_map" -->
         <!-- arg name="input/modified_goal" default="/planning/scenario_planning/modified_goal" -->
-        <!-- arg name="input/objects" default="/perception/object_recognition/objects" -->
+        <!-- arg name="input/objects" value="/perception/object_recognition/objects" -->
         <!-- arg name="input/odometry" default="/localization/kinematic_state" -->
-        <!-- arg name="input/reference_trajectory" default="/planning/scenario_planning/lane_driving/motion_planning/path_optimizer/trajectory" -->
+        <!-- arg name="input/reference_trajectory" value="/planning/scenario_planning/lane_driving/motion_planning/path_optimizer/trajectory" -->
         <!-- arg name="input/route_topic" default="/planning/mission_planning/route" -->
         <!-- arg name="input/steering_status" default="/vehicle/status/steering_status" -->
         <!-- arg name="input/trajectory" default="/planning/trajectory" -->
@@ -7364,21 +7518,6 @@
       </group>
     </group>
   </group>
-  <node pkg="topic_tools" exec="relay" name="trajectory_relay">
-    <param name="use_sim_time" value="false"/>
-    <param name="wheel_radius" value="0.383"/>
-    <param name="wheel_width" value="0.235"/>
-    <param name="wheel_base" value="2.79"/>
-    <param name="wheel_tread" value="1.64"/>
-    <param name="front_overhang" value="1.0"/>
-    <param name="rear_overhang" value="1.1"/>
-    <param name="left_overhang" value="0.128"/>
-    <param name="right_overhang" value="0.128"/>
-    <param name="vehicle_height" value="2.5"/>
-    <param name="max_steer_angle" value="0.7"/>
-    <param name="input_topic" value="/planning/trajectory"/>
-    <param name="output_topic" value="/planning/scenario_planning/trajectory"/>
-  </node>
   <group>
     <!-- source: {workspace}/src/launcher/autoware_launch/autoware_launch/launch/components/tier4_control_component.launch.xml -->
     <!-- arg name="control_input_objects_topic_name" default="/perception/object_recognition/objects" -->
@@ -7867,16 +8006,13 @@
           <param name="include_left_lanes" value="false"/>
           <param name="include_opposite_lanes" value="false"/>
           <param name="include_conflicting_lanes" value="false"/>
+          <param name="allow_area" value="false"/>
           <param name="boundary_types_to_detect" value="[curbstone]"/>
           <param name="footprint_margin_scale" value="1.0"/>
           <param name="footprint_extra_margin" value="0.0"/>
           <param name="resample_interval" value="0.3"/>
           <param name="max_deceleration" value="2.8"/>
           <param name="delay_time" value="1.3"/>
-          <param name="max_lateral_deviation" value="2.0"/>
-          <param name="max_longitudinal_deviation" value="2.0"/>
-          <param name="max_yaw_deviation_deg" value="60.0"/>
-          <param name="delta_yaw_threshold_for_closest_point" value="1.57"/>
           <param name="min_braking_distance" value="0.0"/>
           <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/control/lane_departure_checker/lane_departure_checker.param.yaml -->
           <!-- params from: {workspace}/src/launcher/autoware_launch/vehicle/sample_vehicle_launch/sample_vehicle_description/config/vehicle_info.param.yaml -->
@@ -8024,6 +8160,7 @@
           <param name="planning_factor_metrics.topic_prefix" value="/planning/planning_factors/"/>
           <param name="planning_factor_metrics.stop_deviation.module_list" value="[blind_spot, crosswalk, detection_area, intersection, merge_from_private, no_drivable_lane, no_stopping_area, stop_line, traffic_light, virtual_traffic_light, walkway]"/>
           <param name="object_metrics.distance_filter_thr_m" value="30.0"/>
+          <param name="object_metrics.excluded_labels" value="[unknown]"/>
           <!-- end params from: {workspace}/src/universe/autoware_universe/evaluator/autoware_control_evaluator/config/control_evaluator.param.yaml -->
           <param name="use_sim_time" value="false"/>
           <param name="wheel_radius" value="0.383"/>

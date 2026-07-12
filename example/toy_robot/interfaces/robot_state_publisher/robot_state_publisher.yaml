@@ -1,6 +1,8 @@
 connections:
   /joint_states:
     type: subscription
+  /robot_description:
+    type: publisher
   /tf:
     type: publisher
   /tf_static:

@@ -1,0 +1,14 @@
+connections:
+  # Inherits from pointcloud_preprocessor::Filter base class
+  - topic: input
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: output
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: debug/ring_outlier_filter
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ring_outlier_filter/debug/visibility
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped

@@ -15,42 +15,56 @@ example/autoware/interfaces/
     ├── my_node.yaml         (standalone node executable)
     └── other_node.yaml
 
+When a node is available as both a standalone executable and a composable plugin
+(both are launched depending on configuration), the composable YAML should be a
+relative symlink pointing to the executable YAML so that only one file is maintained:
+
+    ln -sr interfaces/<pkg>/my_node.yaml interfaces/<pkg>/MyComponent.yaml
+
 Expected YAML format
 ---------------------
+connections is a list of entries.  Each entry must have a ``topic`` key plus a
+``type`` key.  Additional optional keys: ``msg_type``, ``qos``, ``when``.
+
 connections:
-  ~/input/points:
+  - topic: ~/input/points
     type: subscription
     qos:
       reliability: best_effort
       durability: volatile
-  ~/output/objects:
+  - topic: ~/output/objects
     type: publisher
     qos:
       reliability: reliable
       durability: volatile
-  /tf:
+  - topic: /tf
     type: subscription
-  ~/set_parameters:
+  - topic: ~/set_parameters
     type: service_server
 
 Conditional connections
 ------------------------
-A connection entry may carry an optional ``when`` key whose value is a Python
-expression evaluated against the node's resolved parameters.  The expression
-receives a single name ``params`` — the dict of parameter name → resolved value
-passed by roscope.  The connection is included only when the expression
-evaluates to a truthy value.
+An entry may carry an optional ``when`` key whose value is a Python expression
+evaluated against the node's resolved parameters.  The expression receives a
+single name ``params`` — the dict of parameter name → resolved value passed by
+roscope.  The entry is included only when the expression evaluates to a truthy
+value.
 
-  ~/output/predicted_objects:
+  - topic: ~/output/predicted_objects
     type: publisher
     when: "params.get('use_object_filter', False)"
 
-  ~/input/map_based_prediction:
+  - topic: ~/input/map_based_prediction
     type: subscription
     when: "params.get('prediction_time_horizon_rate_for_validate_lane_changing_path', 0.0) > 0"
 
-If the expression raises any exception (e.g. unexpected param type), the
-connection is included conservatively.
+If the expression raises any exception (e.g. unexpected param type), the entry
+is included conservatively.
+
+The same topic name may appear more than once with mutually-exclusive ``when``
+conditions (e.g. a topic that is a subscription in replay mode and a publisher
+in hardware mode).  Two entries resolving to the *same* topic name after
+``when`` filtering is an error — the plugin raises ``ValueError``.
 
 Recognized types: publisher, subscription, service_client, service_server,
                   action_client, action_server.
@@ -103,16 +117,23 @@ def get_connections(
     data = yaml.safe_load(interface_file.read_text())
     if not isinstance(data, dict):
         return {}
-    raw = data.get("connections") or {}
+    raw = data.get("connections") or []
+    if not isinstance(raw, list):
+        raise TypeError(
+            f"{interface_file}: 'connections' must be a list of entries, got {type(raw).__name__}"
+        )
 
     result = {}
-    for topic, meta in raw.items():
-        if not isinstance(meta, dict):
-            result[topic] = meta
+    for entry in raw:
+        if not isinstance(entry, dict):
             continue
-        when = meta.get("when")
+        topic = entry.get("topic")
+        if not topic:
+            continue
+        when = entry.get("when")
         if when is not None and not _evaluate_when(when, params):
             continue
-        # Strip `when` from the metadata returned to roscope — it's plugin-internal.
-        result[topic] = {k: v for k, v in meta.items() if k != "when"}
+        if topic in result:
+            raise ValueError(f"{interface_file}: duplicate resolved connection topic {topic!r}")
+        result[topic] = {k: v for k, v in entry.items() if k not in ("topic", "when")}
     return result

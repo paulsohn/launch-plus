@@ -1,0 +1,10 @@
+# Input subscriptions are dynamically determined by the 'input_topics' parameter
+# (a list of topic name strings set at launch time). They cannot be statically
+# enumerated here. See interfaces/todo.md for tracking.
+connections:
+  - topic: output
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: output_info
+    type: publisher
+    msg_type: autoware_sensing_msgs/msg/ConcatenatedPointCloudInfo

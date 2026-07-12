@@ -1,0 +1,7 @@
+connections:
+  - topic: velocity_status
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/VelocityReport
+  - topic: twist_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped

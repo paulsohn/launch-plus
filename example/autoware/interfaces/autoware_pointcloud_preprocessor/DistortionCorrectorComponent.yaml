@@ -1,0 +1,13 @@
+connections:
+  - topic: ~/input/pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/input/twist
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+  - topic: ~/input/imu
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - topic: ~/output/pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2

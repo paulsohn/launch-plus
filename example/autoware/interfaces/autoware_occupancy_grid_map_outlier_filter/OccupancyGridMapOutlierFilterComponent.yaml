@@ -1,0 +1,22 @@
+connections:
+  - topic: ~/input/pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/input/occupancy_grid_map
+    type: subscription
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - topic: ~/output/pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/output/debug/outlier/pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "params.get('enable_debugger', False)"
+  - topic: ~/output/debug/low_confidence/pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "params.get('enable_debugger', False)"
+  - topic: ~/output/debug/high_confidence/pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "params.get('enable_debugger', False)"

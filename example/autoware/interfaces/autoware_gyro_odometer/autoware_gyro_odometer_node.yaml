@@ -1,0 +1,19 @@
+connections:
+  - topic: vehicle/twist_with_covariance
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+  - topic: imu
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - topic: twist_raw
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistStamped
+  - topic: twist_with_covariance_raw
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+  - topic: twist
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistStamped
+  - topic: twist_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped

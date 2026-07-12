@@ -12,6 +12,8 @@
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>toy_robot_controller</exec_depend>
   <exec_depend>toy_robot_sensor</exec_depend>
+  <exec_depend>toy_robot_localizer</exec_depend>
+  <exec_depend>toy_robot_planner</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

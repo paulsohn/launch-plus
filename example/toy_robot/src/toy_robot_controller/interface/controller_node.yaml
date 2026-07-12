@@ -1,9 +1,9 @@
 connections:
-  /cmd_vel:
+  ~/cmd_vel:
     type: subscription
-  /joint_states:
+  ~/joint_states:
     type: publisher
-  /odom:
+  ~/odom:
     type: publisher
   /tf:
     type: publisher

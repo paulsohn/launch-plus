@@ -1,8 +1,8 @@
 """Goal-driven planner for toy_robot.
 
-Subscribes to /goal_pose, /odom, and /pose, then drives the robot toward
-the goal with a simple proportional heading + speed controller.
-Publishes /cmd_vel for the controller and /plan for visualization.
+Uses private topic names (~/goal_pose, ~/odom, ~/pose, ~/cmd_vel, ~/plan)
+so the node is reusable without namespace collision.  The bringup launch
+file remaps these to the system-wide topic names.
 """
 
 import math
@@ -24,14 +24,14 @@ class PlannerNode(Node):
         self._goal: PoseStamped | None = None
         self._pose: PoseWithCovarianceStamped | None = None
 
-        self._goal_sub = self.create_subscription(PoseStamped, "/goal_pose", self._goal_cb, 10)
-        self._odom_sub = self.create_subscription(Odometry, "/odom", self._odom_cb, 10)
+        self._goal_sub = self.create_subscription(PoseStamped, "~/goal_pose", self._goal_cb, 10)
+        self._odom_sub = self.create_subscription(Odometry, "~/odom", self._odom_cb, 10)
         self._pose_sub = self.create_subscription(
-            PoseWithCovarianceStamped, "/pose", self._pose_cb, 10
+            PoseWithCovarianceStamped, "~/pose", self._pose_cb, 10
         )
 
-        self._cmd_pub = self.create_publisher(Twist, "/cmd_vel", 10)
-        self._plan_pub = self.create_publisher(Path, "/plan", 10)
+        self._cmd_pub = self.create_publisher(Twist, "~/cmd_vel", 10)
+        self._plan_pub = self.create_publisher(Path, "~/plan", 10)
 
         self._timer = self.create_timer(0.05, self._update)
 
@@ -44,8 +44,6 @@ class PlannerNode(Node):
         )
 
     def _odom_cb(self, msg: Odometry) -> None:
-        # Odom is used as a fallback pose source when the localizer has not
-        # yet published a /pose estimate.
         if self._pose is None:
             p = PoseWithCovarianceStamped()
             p.header = msg.header

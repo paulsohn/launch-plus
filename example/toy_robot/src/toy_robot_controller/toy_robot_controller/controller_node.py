@@ -1,6 +1,11 @@
 """Differential drive controller for toy_robot.
 
-Subscribes to /cmd_vel and publishes /joint_states, /odom, and /tf.
+Uses private topic names (~/cmd_vel, ~/joint_states, ~/odom) so the node is
+reusable without namespace collision.  The bringup launch file remaps these to
+the system-wide /cmd_vel, /joint_states, and /odom topics.
+
+/tf (odom→base_link) is published with an absolute topic name because
+TransformBroadcaster always publishes to /tf regardless of remapping.
 """
 
 import math
@@ -23,9 +28,9 @@ class ControllerNode(Node):
         self._r = self.get_parameter("wheel_radius").get_parameter_value().double_value
         self._d = self.get_parameter("wheel_separation").get_parameter_value().double_value
 
-        self._cmd_sub = self.create_subscription(Twist, "/cmd_vel", self._cmd_vel_cb, 10)
-        self._js_pub = self.create_publisher(JointState, "/joint_states", 10)
-        self._odom_pub = self.create_publisher(Odometry, "/odom", 10)
+        self._cmd_sub = self.create_subscription(Twist, "~/cmd_vel", self._cmd_vel_cb, 10)
+        self._js_pub = self.create_publisher(JointState, "~/joint_states", 10)
+        self._odom_pub = self.create_publisher(Odometry, "~/odom", 10)
         self._tf_broadcaster = TransformBroadcaster(self)
 
         self._vx = 0.0

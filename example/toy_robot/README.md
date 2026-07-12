@@ -33,7 +33,7 @@ Run from this directory:
 
 ```bash
 roscope resolve -d toy_robot_bringup toy_robot.launch.xml \
-  --plugin toy_robot_plugin.py \
+  --plugin toy_robot_interface_plugin.py \
   --preview
 ```
 
@@ -109,5 +109,5 @@ After sourcing `install/setup.bash`, drop `--preview` so roscope resolves
 
 ```bash
 roscope resolve -d toy_robot_bringup toy_robot.launch.xml \
-  --plugin toy_robot_plugin.py
+  --plugin toy_robot_interface_plugin.py
 ```

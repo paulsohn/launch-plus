@@ -1,6 +1,7 @@
 """Simulated 2-D laser scanner for toy_robot.
 
-Publishes a synthetic LaserScan on /scan at 10 Hz.
+Uses ~/scan as the output topic so the node can be reused without
+namespace collision.  The bringup launch file remaps ~/scan to /scan.
 """
 
 import math
@@ -22,7 +23,7 @@ class SensorNode(Node):
         self._frame_id = self.get_parameter("frame_id").get_parameter_value().string_value
         self._range_max = self.get_parameter("range_max").get_parameter_value().double_value
 
-        self._pub = self.create_publisher(LaserScan, "/scan", 10)
+        self._pub = self.create_publisher(LaserScan, "~/scan", 10)
         self._timer = self.create_timer(0.1, self._publish_scan)
 
     def _publish_scan(self) -> None:

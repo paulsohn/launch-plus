@@ -1,8 +1,11 @@
 """Scan-based localizer for toy_robot.
 
-Subscribes to /scan and uses the TF tree to look up the current
-odom→base_link transform, then publishes it as a /pose estimate.
-In a real system this would run a particle filter or ICP against a map.
+Uses ~/scan and ~/pose as the subscription and publisher topics so the node
+is reusable without namespace collision.  The bringup launch file remaps
+~/scan to /scan and ~/pose to /pose.
+
+/tf and /tf_static are subscribed via tf2_ros.TransformListener, which
+always uses the absolute topic names regardless of remapping.
 """
 
 import rclpy
@@ -19,8 +22,8 @@ class LocalizerNode(Node):
         self._tf_buffer = Buffer()
         self._tf_listener = TransformListener(self._tf_buffer, self)
 
-        self._scan_sub = self.create_subscription(LaserScan, "/scan", self._scan_cb, 10)
-        self._pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/pose", 10)
+        self._scan_sub = self.create_subscription(LaserScan, "~/scan", self._scan_cb, 10)
+        self._pose_pub = self.create_publisher(PoseWithCovarianceStamped, "~/pose", 10)
 
     def _scan_cb(self, msg: LaserScan) -> None:
         try:

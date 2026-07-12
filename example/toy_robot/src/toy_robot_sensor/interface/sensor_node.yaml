@@ -1,3 +1,3 @@
 connections:
-  /scan:
+  ~/scan:
     type: publisher

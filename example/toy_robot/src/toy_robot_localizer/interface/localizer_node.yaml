@@ -1,9 +1,9 @@
 connections:
-  /scan:
+  ~/scan:
     type: subscription
   /tf:
     type: subscription
   /tf_static:
     type: subscription
-  /pose:
+  ~/pose:
     type: publisher

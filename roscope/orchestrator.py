@@ -175,6 +175,7 @@ def _resolve_python_file_recursive(
     result: ResolveResult,
     fetched_packages: set[str],
     failed_repos: set[str],
+    connection_plugin=None,
 ) -> None:
     """Resolve a launch file by calling py_resolver directly."""
     # Resolve file path based on mode
@@ -241,6 +242,7 @@ def _resolve_python_file_recursive(
             lockfile=lockfile,
             global_params=current_global_params,
             fetch_options=options,
+            connection_plugin=connection_plugin,
         )
     except Exception as e:
         logger.error("failed to resolve launch file %s: %s", file_path, e)
@@ -263,6 +265,7 @@ def resolve_launch_recursive(
     options: FetchOptions | None = None,
     initial_args: dict[str, str] | None = None,
     workflow_options: ResolveWorkflowOptions | None = None,
+    connection_plugin=None,
 ) -> ResolveResult:
     """Resolve a launch file recursively, fetching packages on demand.
 
@@ -302,6 +305,7 @@ def resolve_launch_recursive(
         result,
         fetched_packages,
         failed_repos,
+        connection_plugin=connection_plugin,
     )
 
     logger.info(

@@ -295,12 +295,12 @@ function packBounds(placements: ChildPlacement[]): LayoutRect {
 // ── Topic post-processing ─────────────────────────────────────────────
 
 function positionTopics(cy: cytoscape.Core): void {
-  const topics = cy.nodes('[type="topic"]');
+  const topics = cy.nodes('[type="connection"]');
   if (topics.length === 0) return;
 
   // Place each topic at the centroid of its connected non-topic nodes.
   topics.forEach((t: cytoscape.NodeSingular) => {
-    const neighbors = t.neighborhood().nodes().not('[type="topic"]');
+    const neighbors = t.neighborhood().nodes().not('[type="connection"]');
     if (neighbors.length === 0) return;
     let cx = 0, cy2 = 0;
     neighbors.forEach((n: cytoscape.NodeSingular) => {

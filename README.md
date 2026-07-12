@@ -92,7 +92,7 @@ knows exactly which packages are needed and can fetch and build only those.
 - **Python 3.10+** — used to evaluate Python launch files and `$(eval ...)` substitutions in XML
 - **Git** — for sparse-checkout operations
 - **ROS 2** — source your ROS 2 environment (`source /opt/ros/<distro>/setup.bash`)
-- **pnpm** — required to build the web visualizer ([install](https://pnpm.io/installation))
+- **pnpm v10** — required to build the web visualizer ([install](https://pnpm.io/installation)); pnpm v11 is not yet supported
 - **rosdep** — required for `--rosdep` (part of `ros-dev-tools`, not the base ROS 2 runtime)
 - **colcon** — required for `build` / `test` commands (part of `ros-dev-tools`)
 

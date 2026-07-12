@@ -47,7 +47,7 @@ jobs:
             > /etc/apt/sources.list.d/nodesource.list
           apt-get update
           apt-get install -y nodejs
-          npm install -g pnpm
+          npm install -g pnpm@10
 
       - name: Install CUDA 12.8
         run: |

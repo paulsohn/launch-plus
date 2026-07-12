@@ -62,6 +62,8 @@ class ResolverState:
         "root_source_key",
         "show_empty_includes",
         "show_args",
+        "connection_plugin",
+        "connection_registry",
     )
 
     def __init__(self) -> None:
@@ -86,6 +88,9 @@ class ResolverState:
         self.root_source_key: str = ""
         self.show_empty_includes: bool = False
         self.show_args: bool = False
+        self.connection_plugin = None
+        # resolved_to -> [(package, executable, connection_type), ...]
+        self.connection_registry: dict[str, list[tuple[str, str, str]]] = {}
 
     # ─── Package tracking and resolution ──────────────────────────────────
 
@@ -190,6 +195,87 @@ class ResolverState:
             return resolved
 
         raise LookupError(f"package '{package}' not found")
+
+    def apply_connection_plugin(
+        self,
+        pkg: str,
+        params: dict,
+        remaps: list,
+        *,
+        executable: str | None = None,
+        plugin_name: str | None = None,
+        node_ns: str | None = None,
+        node_name: str | None = None,
+    ) -> dict[str, dict]:
+        """Call the connection plugin, extend remaps in-place, register connections.
+
+        Exactly one of *executable* or *plugin_name* must be provided.
+        *node_ns* and *node_name* are used to expand ``~/`` and relative connection
+        names to their absolute form before conflict registration.
+
+        Returns the validated remap_metadata dict (keyed by 'from' / connection name).
+        Returns {} when no plugin is set, the package cannot be resolved, or the
+        plugin degrades gracefully.
+        """
+        if self.connection_plugin is None or not pkg:
+            return {}
+        pkg_share: str | None = None
+        try:
+            pkg_share = self.resolve_pkg_share(pkg)
+        except Exception:
+            return {}
+        from roscope.plugin import call_plugin
+
+        meta_by_connection = call_plugin(
+            self.connection_plugin,
+            pkg_share_path=pkg_share,
+            params=params,
+            pkg_name=pkg,
+            executable=executable,
+            plugin_name=plugin_name,
+        )
+        if not meta_by_connection:
+            return {}
+        identifier = executable or plugin_name or ""
+        remap_metadata: dict[str, dict] = {}
+        existing_froms = {r[0] for r in remaps if isinstance(r, (list, tuple)) and len(r) >= 2}
+        for conn, meta in meta_by_connection.items():
+            remap_metadata[conn] = meta
+            if conn not in existing_froms:
+                remaps.append([conn, conn])
+        from roscope.entities.helpers import _expand_connection_name
+
+        remap_to = {r[0]: r[1] for r in remaps if isinstance(r, (list, tuple)) and len(r) >= 2}
+        for conn, meta in remap_metadata.items():
+            conn_type = meta.get("type")
+            if conn_type:
+                resolved = remap_to.get(conn, conn)
+                self.register_connection(
+                    _expand_connection_name(resolved, node_ns, node_name),
+                    conn_type,
+                    pkg,
+                    identifier,
+                )
+        return remap_metadata
+
+    def register_connection(self, resolved_to: str, conn_type: str, pkg: str, exe: str) -> None:
+        """Record a typed connection and log an error if a protocol-family conflict arises."""
+        from roscope.plugin import PROTOCOL_FAMILY
+
+        family = PROTOCOL_FAMILY.get(conn_type)
+        if family is None:
+            return
+        entries = self.connection_registry.setdefault(resolved_to, [])
+        entries.append((pkg, exe, conn_type))
+        families = {PROTOCOL_FAMILY[t] for _, _, t in entries}
+        if len(families) > 1:
+            detail = ", ".join(f"{p}/{e}:{t}" for p, e, t in entries)
+            logger.error(
+                "connection type conflict on %r: mixed protocol families (%s) — %s",
+                resolved_to,
+                ", ".join(sorted(families)),
+                detail,
+            )
 
     def _build_lockfile(self):
         """Reconstruct a minimal Lockfile from lockfile_data for fetcher API."""

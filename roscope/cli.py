@@ -546,6 +546,12 @@ def fetch(
 @click.option("--shallow", is_flag=True)
 @click.option("--visualize", is_flag=True, help="Open graph visualizer in browser")
 @click.option("--viz-id", default="", help="Visualizer history label (default: 'default')")
+@click.option(
+    "--plugin",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Path to a connection metadata plugin script (Python file with get_connections())",
+)
 @click.pass_context
 def resolve(
     ctx: click.Context,
@@ -564,6 +570,7 @@ def resolve(
     shallow: bool,
     visualize: bool,
     viz_id: str,
+    plugin: str | None,
 ) -> None:
     """Resolve launch file (no build)."""
     from click.core import ParameterSource  # type: ignore[attr-defined]
@@ -607,6 +614,7 @@ def resolve(
         shallow=shallow,
         visualize=visualize,
         viz_id=viz_id,
+        plugin_path=plugin,
     )
 
 
@@ -974,12 +982,19 @@ def _cmd_resolve(
     shallow: bool,
     visualize: bool = False,
     viz_id: str = "",
+    plugin_path: str | None = None,
 ) -> None:
     """Shared resolve/check implementation."""
     from roscope.fetcher import FetchOptions
     from roscope.log import DiagnosticCollector
     from roscope.orchestrator import resolve_launch_recursive
     from roscope.renderer import render_resolved_xml
+
+    connection_plugin = None
+    if plugin_path is not None:
+        from roscope.plugin import load_plugin
+
+        connection_plugin = load_plugin(plugin_path)
 
     parsed_lockfile = _load_lockfile(lockfile_path, src_dir, workspace_state)
     fetch_path = Path(src_dir)
@@ -1000,6 +1015,7 @@ def _cmd_resolve(
             options=options,
             initial_args=initial_args,
             workflow_options=workflow_options,
+            connection_plugin=connection_plugin,
         )
     finally:
         logging.getLogger("roscope").removeHandler(collector)

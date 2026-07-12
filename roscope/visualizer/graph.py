@@ -1,7 +1,7 @@
 """Convert resolved action tree to a JSON-serializable graph structure.
 
 The graph IR bridges between Python Action objects and the Cytoscape.js
-frontend. It produces nodes (vertices), groups (compound nodes), topics,
+frontend. It produces nodes (vertices), groups (compound nodes), connections,
 and edges suitable for hierarchical graph layout.
 """
 
@@ -13,6 +13,11 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+# Connection types whose edge points FROM the node TO the connection vertex (data flows out).
+_OUT_CONN_TYPES: frozenset[str] = frozenset({"publisher", "service_client", "action_client"})
+# Connection types whose edge points FROM the connection vertex TO the node (data flows in).
+_IN_CONN_TYPES: frozenset[str] = frozenset({"subscription", "service_server", "action_server"})
+
 
 def actions_to_graph(
     actions: list,
@@ -21,7 +26,7 @@ def actions_to_graph(
 ) -> dict:
     """Convert a resolved action list to a graph dict.
 
-    Returns a dict with keys: metadata, nodes, groups, topics, edges.
+    Returns a dict with keys: metadata, nodes, groups, connections, edges.
     """
     builder = _GraphBuilder(package, launcher)
     builder.walk(actions, parent_id=None)
@@ -38,8 +43,8 @@ class _GraphBuilder:
 
         self._nodes: list[dict] = []
         self._groups: list[dict] = []
-        self._topics: dict[str, str] = {}  # expanded_topic_name -> topic_id
-        self._topic_meta: dict[str, dict] = {}  # topic_id -> {name}
+        self._connections: dict[str, str] = {}  # expanded_name -> connection_id
+        self._connection_meta: dict[str, dict] = {}  # connection_id -> {name, connType}
         self._edges: list[dict] = []
 
         # For resolving LoadComposableNodes targets
@@ -61,21 +66,27 @@ class _GraphBuilder:
         self._uid_counters[base] = count + 1
         return base if count == 0 else f"{base}#{count}"
 
-    def _get_or_create_topic(self, topic_name: str, node_fqn: str, node_ns: str) -> str:
-        # Resolve topic name to absolute form following ROS 2 name rules:
+    def _get_or_create_connection(
+        self, conn_name: str, node_fqn: str, node_ns: str, family: str | None = None
+    ) -> str:
+        # Resolve connection name to absolute form following ROS 2 name rules:
         #   ~/foo  → <node_fqn>/foo   (private, node-scoped, best-effort)
         #   foo    → <node_ns>/foo    (relative, namespace-scoped)
         #   /foo   → /foo             (absolute, used as-is)
-        if topic_name.startswith("~/"):
-            topic_name = f"{node_fqn.rstrip('/')}/{topic_name[2:]}"
-        elif not topic_name.startswith("/"):
-            topic_name = f"{node_ns.rstrip('/')}/{topic_name}"
-        if topic_name in self._topics:
-            return self._topics[topic_name]
-        tid = self._uid("topic", topic_name)
-        self._topics[topic_name] = tid
-        self._topic_meta[tid] = {"name": topic_name}
-        return tid
+        if conn_name.startswith("~/"):
+            conn_name = f"{node_fqn.rstrip('/')}/{conn_name[2:]}"
+        elif not conn_name.startswith("/"):
+            conn_name = f"{node_ns.rstrip('/')}/{conn_name}"
+        if conn_name in self._connections:
+            cid = self._connections[conn_name]
+            # First typed remap wins: if vertex is still "unknown", take new family.
+            if family and self._connection_meta[cid]["connType"] == "unknown":
+                self._connection_meta[cid]["connType"] = family
+            return cid
+        cid = self._uid("connection", conn_name)
+        self._connections[conn_name] = cid
+        self._connection_meta[cid] = {"name": conn_name, "connType": family or "unknown"}
+        return cid
 
     def _package_color(self, pkg: str) -> str:
         """Deterministic color from package name."""
@@ -170,7 +181,7 @@ class _GraphBuilder:
             "remaps": self._extract_remaps(action),
         }
         self._nodes.append(node_entry)
-        self._add_topic_edges(nid, fqn, ns, action)
+        self._add_connection_edges(nid, fqn, ns, action)
 
     def _handle_container(self, action, parent_id: str | None) -> None:
         if not action.package:
@@ -242,11 +253,33 @@ class _GraphBuilder:
         }
         self._nodes.append(node_entry)
 
-        # Topic edges from composable node remaps
+        # Connection edges from composable node remaps
+        from roscope.plugin import PROTOCOL_FAMILY
+
+        remap_metadata = data.get("remap_metadata", {})
         for remap in data.get("remappings", []):
             if len(remap) == 2 and remap[1]:
-                tid = self._get_or_create_topic(remap[1], cfqn, cns)
-                self._edges.append({"source": cnid, "target": tid, "type": "remap"})
+                from_ = remap[0]
+                to = remap[1]
+                meta = remap_metadata.get(from_) or {}
+                conn_type = meta.get("type") if meta else None
+                family = PROTOCOL_FAMILY.get(conn_type) if conn_type else None
+                cid = self._get_or_create_connection(to, cfqn, cns, family)
+                if conn_type in _OUT_CONN_TYPES:
+                    source, target, directed = cnid, cid, True
+                elif conn_type in _IN_CONN_TYPES:
+                    source, target, directed = cid, cnid, True
+                else:
+                    source, target, directed = cnid, cid, False
+                self._edges.append(
+                    {
+                        "source": source,
+                        "target": target,
+                        "type": "remap",
+                        "directed": directed,
+                        "connType": conn_type or "",
+                    }
+                )
 
     def _handle_load_composable(self, action, parent_id: str | None) -> None:
         if not action.composable_node_descriptions:
@@ -368,18 +401,41 @@ class _GraphBuilder:
         remaps = getattr(action, "remappings", [])
         return [{"from": r[0], "to": r[1]} for r in remaps if len(r) == 2]
 
-    def _add_topic_edges(self, node_id: str, node_fqn: str, node_ns: str, action) -> None:
+    def _add_connection_edges(self, node_id: str, node_fqn: str, node_ns: str, action) -> None:
+        from roscope.plugin import PROTOCOL_FAMILY
+
         remaps = getattr(action, "remappings", [])
+        remap_metadata = getattr(action, "remap_metadata", {})
         for remap in remaps:
             if len(remap) == 2 and remap[1]:
-                tid = self._get_or_create_topic(remap[1], node_fqn, node_ns)
-                self._edges.append({"source": node_id, "target": tid, "type": "remap"})
+                from_ = remap[0]
+                to = remap[1]
+                meta = remap_metadata.get(from_) or {}
+                conn_type = meta.get("type") if meta else None
+                family = PROTOCOL_FAMILY.get(conn_type) if conn_type else None
+                cid = self._get_or_create_connection(to, node_fqn, node_ns, family)
+                if conn_type in _OUT_CONN_TYPES:
+                    source, target, directed = node_id, cid, True
+                elif conn_type in _IN_CONN_TYPES:
+                    source, target, directed = cid, node_id, True
+                else:
+                    source, target, directed = node_id, cid, False
+                self._edges.append(
+                    {
+                        "source": source,
+                        "target": target,
+                        "type": "remap",
+                        "directed": directed,
+                        "connType": conn_type or "",
+                    }
+                )
 
     def to_dict(self) -> dict:
         from roscope import __version__
 
-        topic_list = [
-            {"id": tid, **self._topic_meta[tid]} for tid in sorted(set(self._topics.values()))
+        conn_list = [
+            {"id": cid, **self._connection_meta[cid]}
+            for cid in sorted(set(self._connections.values()))
         ]
         return {
             "metadata": {
@@ -390,6 +446,6 @@ class _GraphBuilder:
             },
             "nodes": self._nodes,
             "groups": self._groups,
-            "topics": topic_list,
+            "connections": conn_list,
             "edges": self._edges,
         }

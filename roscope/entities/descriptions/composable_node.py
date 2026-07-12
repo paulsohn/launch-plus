@@ -163,27 +163,14 @@ class ComposableNode:
         if ns:
             elem.set("namespace", ns)
 
-        for pf in data.get("param_files", []):
-            path = pf.get("path", "")
-            inlined = pf.get("params")
-            if inlined is not None:
-                elem.append(ET.Comment(f" params from: {path} "))
-                for k, v in inlined:
-                    p = ET.SubElement(elem, "param")
-                    p.set("name", k)
-                    p.set("value", str(v))
-                elem.append(ET.Comment(f" end params from: {path} "))
-            else:
-                p = ET.SubElement(elem, "param")
-                p.set("from", path)
+        from roscope.entities.helpers import _serialize_param_files, _serialize_remaps
+
+        _serialize_param_files(elem, data.get("param_files", []))
         for k, v in data.get("parameters", []):
             p = ET.SubElement(elem, "param")
             p.set("name", k)
             p.set("value", v)
-        for from_, to in data.get("remappings", []):
-            r = ET.SubElement(elem, "remap")
-            r.set("from", from_)
-            r.set("to", to)
+        _serialize_remaps(elem, data.get("remappings", []), data.get("remap_metadata", {}))
         for ea in data.get("extra_arguments", []):
             e = ET.SubElement(elem, "extra_arg")
             e.set("name", ea.get("name", ""))

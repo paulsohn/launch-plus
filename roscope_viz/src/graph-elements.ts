@@ -154,36 +154,37 @@ export function buildElements(graph: GraphData): ElementDefinition[] {
     });
   }
 
-  // Build topic -> connected node IDs map from edges
-  const topicConnections = new Map<string, string[]>();
-  const topicIds = new Set(graph.topics.map((t) => t.id));
+  // Build connection -> connected node IDs map from edges
+  const connectionConnections = new Map<string, string[]>();
+  const connectionIds = new Set(graph.connections.map((c) => c.id));
   for (const e of graph.edges) {
-    if (topicIds.has(e.target)) {
-      const list = topicConnections.get(e.target) ?? [];
+    if (connectionIds.has(e.target)) {
+      const list = connectionConnections.get(e.target) ?? [];
       list.push(e.source);
-      topicConnections.set(e.target, list);
+      connectionConnections.set(e.target, list);
     }
-    if (topicIds.has(e.source)) {
-      const list = topicConnections.get(e.source) ?? [];
+    if (connectionIds.has(e.source)) {
+      const list = connectionConnections.get(e.source) ?? [];
       list.push(e.target);
-      topicConnections.set(e.source, list);
+      connectionConnections.set(e.source, list);
     }
   }
 
-  // Topics — place each in the LCA of its connected nodes
-  for (const t of graph.topics) {
-    const connectedNodes = topicConnections.get(t.id) ?? [];
+  // Connections — place each in the LCA of its connected nodes
+  for (const c of graph.connections) {
+    const connectedNodes = connectionConnections.get(c.id) ?? [];
     const lcaParent = computeLCA(connectedNodes, parentMap, typeMap);
     if (lcaParent) {
-      parentMap.set(t.id, lcaParent);
+      parentMap.set(c.id, lcaParent);
     }
     elements.push({
       group: "nodes",
       data: {
-        id: t.id,
-        label: t.name,
-        fullName: t.name,
-        type: "topic",
+        id: c.id,
+        label: c.name,
+        fullName: c.name,
+        type: "connection",
+        connType: c.connType,
         parent: lcaParent,
       },
     });
@@ -197,6 +198,8 @@ export function buildElements(graph: GraphData): ElementDefinition[] {
         source: e.source,
         target: e.target,
         type: e.type,
+        directed: e.directed ?? false,
+        connType: e.connType ?? "",
       },
     });
   }

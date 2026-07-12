@@ -153,6 +153,7 @@ class Node(ExecuteProcess):
         self.remappings: list = list(kwargs.get("remappings") or [])
         self.env: dict = {}
         self.param_files: list = []
+        self.remap_metadata: dict[str, dict] = {}
         self.output = kwargs.get("output")
         self.args = kwargs.get("arguments")
         self.ros_args = kwargs.get("ros_arguments")
@@ -228,6 +229,16 @@ class Node(ExecuteProcess):
                 dst = context.perform_substitution(r[1])
                 remaps.append([src or str(r[0]), dst or str(r[1])])
 
+        effective_ns = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
+        remap_metadata = state.apply_connection_plugin(
+            pkg,
+            dict(active_params),
+            remaps,
+            executable=exe,
+            node_ns=effective_ns,
+            node_name=name,
+        )
+
         env = base.env if base else {}
 
         def _resolve_opt(attr):
@@ -244,6 +255,7 @@ class Node(ExecuteProcess):
         resolved.parameters = params
         resolved.param_files = pf_list
         resolved.remappings = remaps
+        resolved.remap_metadata = remap_metadata
         resolved.env = env
         resolved.output = _resolve_opt("output")
         resolved.args = _resolve_opt("args")
@@ -282,31 +294,26 @@ class Node(ExecuteProcess):
 
     def _add_children(self, parent: ET.Element) -> None:
         """Add param_files, parameters, remappings, env as XML children."""
-        for pf in self.param_files:
-            path = pf.get("path", "")
-            inlined = pf.get("params")
-            if inlined is not None:
-                parent.append(ET.Comment(f" params from: {path} "))
-                for k, v in inlined:
-                    p = ET.SubElement(parent, "param")
-                    p.set("name", k)
-                    p.set("value", str(v))
-                parent.append(ET.Comment(f" end params from: {path} "))
-            else:
-                p = ET.SubElement(parent, "param")
-                p.set("from", path)
+        from roscope.entities.helpers import _serialize_param_files, _serialize_remaps
+
+        _serialize_param_files(parent, self.param_files)
 
         for key, value in self.parameters:
             p = ET.SubElement(parent, "param")
             p.set("name", key)
             p.set("value", value)
 
-        for from_, to in self.remappings:
-            if to and self.namespace and not to.startswith("/") and not to.startswith("~/"):
-                to = f"{self.namespace.rstrip('/')}/{to}"
-            r = ET.SubElement(parent, "remap")
-            r.set("from", from_)
-            r.set("to", to)
+        ns = self.namespace
+        qualified_remaps = [
+            [
+                from_,
+                f"{ns.rstrip('/')}/{to}"
+                if to and ns and not to.startswith("/") and not to.startswith("~/")
+                else to,
+            ]
+            for from_, to in self.remappings
+        ]
+        _serialize_remaps(parent, qualified_remaps, self.remap_metadata)
 
         if isinstance(self.env, dict):
             for ename, value in sorted(self.env.items()):

@@ -11,11 +11,29 @@
 #   - packages: Package index for O(1) dependency lookup
 #
 repositories:
+  core/agnocast:
+    type: git
+    url: https://github.com/autowarefoundation/agnocast.git
+    version: 5164c224158b831269f7d6df89f864c037548a50
+    ref: 2.3.5
+    packages:
+    - agnocast
+    - agnocast_cie_config_msgs
+    - agnocast_cie_thread_configurator
+    - agnocast_components
+    - agnocast_e2e_test
+    - agnocast_ioctl_wrapper
+    - agnocast_sample_application
+    - agnocast_sample_interfaces
+    - agnocastlib
+    - ros2agnocast
+    - ros2agnocast_discovery_agent
+    - ros2agnocast_discovery_msgs
   core/autoware_adapi_msgs:
     type: git
     url: https://github.com/autowarefoundation/autoware_adapi_msgs.git
-    version: 34f89d088c2cf0ae7ca72f1a325ddb8308a0daeb
-    ref: main
+    version: 35a7aeb97dfbbbc363c49fc032ded0c8ba172e24
+    ref: 1.9.2
     packages:
     - autoware_adapi_v1_msgs
     - autoware_adapi_version_msgs
@@ -30,8 +48,8 @@ repositories:
   core/autoware_core:
     type: git
     url: https://github.com/autowarefoundation/autoware_core.git
-    version: ff7768e4d3983ce788e0163a7db18af591fbdada
-    ref: main
+    version: 16045061a9c10da468b60e190b8fab02110fa501
+    ref: 1.8.0
     packages:
     - autoware_adapi_adaptors
     - autoware_adapi_specs
@@ -106,8 +124,8 @@ repositories:
   core/autoware_internal_msgs:
     type: git
     url: https://github.com/autowarefoundation/autoware_internal_msgs.git
-    version: 094122d37e56c7bfd8f3385307d345cfdb2123e6
-    ref: main
+    version: ec3722332b6c9e158ddd43a8d7ba444bfe42ba01
+    ref: 1.13.0
     packages:
     - autoware_internal_debug_msgs
     - autoware_internal_localization_msgs
@@ -118,16 +136,16 @@ repositories:
   core/autoware_lanelet2_extension:
     type: git
     url: https://github.com/autowarefoundation/autoware_lanelet2_extension.git
-    version: 38b5af5ac8121989e018ef6e48a1d508119e0128
-    ref: 0.12.0
+    version: e00a6372d5395ad4cdeccaaa5fefa0a4b558272c
+    ref: 1.1.0
     packages:
     - autoware_lanelet2_extension
     - autoware_lanelet2_extension_python
   core/autoware_msgs:
     type: git
     url: https://github.com/autowarefoundation/autoware_msgs.git
-    version: 588f00df3acca009ea709a74acd6538897eef424
-    ref: 1.11.0
+    version: bb8e7bf5d97168663e0e7b357929e4fcdbd3a967
+    ref: 1.13.0
     packages:
     - autoware_common_msgs
     - autoware_control_msgs
@@ -137,14 +155,15 @@ repositories:
     - autoware_perception_msgs
     - autoware_planning_msgs
     - autoware_sensing_msgs
+    - autoware_simulation_msgs
     - autoware_system_msgs
     - autoware_v2x_msgs
     - autoware_vehicle_msgs
   core/autoware_rviz_plugins:
     type: git
     url: https://github.com/autowarefoundation/autoware_rviz_plugins.git
-    version: 584fd1be2b68c44a3c1f5da2d6e37663e0eab9ac
-    ref: main
+    version: b3d59795932ee08cad52de5f1981cb8ef9d6d37c
+    ref: 0.6.0
     packages:
     - autoware_localization_rviz_plugin
     - autoware_mission_details_overlay_rviz_plugin
@@ -152,11 +171,28 @@ repositories:
     - autoware_perception_rviz_plugin
     - autoware_planning_rviz_plugin
     - autoware_string_stamped_rviz_plugin
+    - autoware_topic_text_overlay_rviz_plugin
+  core/autoware_simple_planning_simulator:
+    type: git
+    url: https://github.com/autowarefoundation/autoware_simple_planning_simulator.git
+    version: d6e166fc1841e0b7c4d415255df760d0e97f5f3c
+    packages:
+    - autoware_dummy_perception_publisher
+    - autoware_learning_based_vehicle_model
+    - autoware_simple_planning_simulator
+  core/autoware_system_designer:
+    type: git
+    url: https://github.com/autowarefoundation/autoware_system_designer.git
+    version: 923037395a17ff99d11e67140f5bdff72b7ccc68
+    ref: v0.4.1
+    packages:
+    - autoware_system_design_examples
+    - autoware_system_designer
   core/autoware_utils:
     type: git
     url: https://github.com/autowarefoundation/autoware_utils.git
-    version: 2c663f0274f5370b507a3ee238f49bc570745abd
-    ref: main
+    version: 1a0ebbc8cb955e49ec28163a3a7953dc7fa4c312
+    ref: 1.9.0
     packages:
     - autoware_utils
     - autoware_utils_debug
@@ -170,11 +206,18 @@ repositories:
     - autoware_utils_tf
     - autoware_utils_uuid
     - autoware_utils_visualization
+  core/external/rviz_2d_overlay_plugins:
+    type: git
+    url: https://github.com/teamspatzenhirn/rviz_2d_overlay_plugins.git
+    version: 36b3c86d37afb916aef9585d3c8429bcbeec21b7
+    ref: 1.4.0
+    packages:
+    - rviz_2d_overlay_msgs
+    - rviz_2d_overlay_plugins
   launcher/autoware_launch:
     type: git
     url: https://github.com/autowarefoundation/autoware_launch.git
-    version: d17ac7033a95370c0516f206d77ebf165cb1df26
-    ref: main
+    version: 9e81f5fea10c11eb981f25e1c3be94b45ed65b4e
     packages:
     - autoware_launch
     - autoware_sample_designs
@@ -205,26 +248,11 @@ repositories:
     - tier4_simulator_launch
     - tier4_system_launch
     - tier4_vehicle_launch
-  middleware/external/agnocast:
-    type: git
-    url: https://github.com/tier4/agnocast.git
-    version: 06525c73ffaae9e31def4193db12a9454c64d53a
-    ref: 2.3.0
-    packages:
-    - agnocast_cie_config_msgs
-    - agnocast_cie_thread_configurator
-    - agnocast_components
-    - agnocast_e2e_test
-    - agnocast_ioctl_wrapper
-    - agnocast_sample_application
-    - agnocast_sample_interfaces
-    - agnocastlib
-    - ros2agnocast
   sensor_component/external/nebula:
     type: git
     url: https://github.com/tier4/nebula.git
-    version: c3845a943964d19821fe635bd0e365129203e5ff
-    ref: v0.3.2.2
+    version: 9cb61cc9658172ab8907d8967258d7b3e92cd476
+    ref: v1.1.0
     packages:
     - continental_msgs
     - continental_srvs
@@ -246,6 +274,10 @@ repositories:
     - nebula_robosense_common
     - nebula_robosense_decoders
     - nebula_robosense_hw_interfaces
+    - nebula_sample
+    - nebula_sample_common
+    - nebula_sample_decoders
+    - nebula_sample_hw_interfaces
     - nebula_velodyne
     - nebula_velodyne_common
     - nebula_velodyne_decoders
@@ -267,8 +299,8 @@ repositories:
   sensor_component/external/sync_tooling_msgs:
     type: git
     url: https://github.com/tier4/sync_tooling_msgs.git
-    version: 0b7c482b044a5f6d8eccf3e8686cc8f7afbc3363
-    ref: 0.2.6
+    version: 4c877f17e5e77c707a286811b3e4238b65e20e7e
+    ref: v0.2.10
     packages:
     - sync_tooling_msgs
   sensor_component/ros2_socketcan:
@@ -287,101 +319,10 @@ repositories:
     - boost_serial_driver
     - boost_tcp_driver
     - boost_udp_driver
-  simulator/scenario_simulator:
-    type: git
-    url: https://github.com/tier4/scenario_simulator_v2.git
-    version: f5e7105528e760bd454f85d29b27f4a0f7c778bf
-    ref: 22.0.0
-    packages:
-    - agnocast_wrapper
-    - arithmetic
-    - behavior_tree_plugin
-    - concealer
-    - context_gamma_planner
-    - cpp_mock_scenarios
-    - do_nothing_plugin
-    - embree_vendor
-    - geometry
-    - get_parameter
-    - kashiwanoha_map
-    - openscenario_experimental_catalog
-    - openscenario_interpreter
-    - openscenario_interpreter_example
-    - openscenario_interpreter_msgs
-    - openscenario_preprocessor
-    - openscenario_preprocessor_msgs
-    - openscenario_utility
-    - openscenario_validator
-    - openscenario_visualization
-    - random_test_runner
-    - real_time_factor_control_rviz_plugin
-    - scenario_simulator_exception
-    - scenario_simulator_v2
-    - scenario_test_runner
-    - simple_cross_map
-    - simple_junit
-    - simple_sensor_simulator
-    - simulation_interface
-    - status_monitor
-    - traffic_simulator
-    - traffic_simulator_msgs
-  tools:
-    type: git
-    url: https://github.com/autowarefoundation/autoware_tools.git
-    version: 0badafbc04f74a93e9d58bcdde10b78d3066a114
-    ref: 0.6.0
-    packages:
-    - autoware_debug_tools
-    - autoware_dependency_checker
-    - autoware_lanelet2_map_utils
-    - autoware_localization_evaluation_scripts
-    - autoware_planning_data_analyzer
-    - autoware_pointcloud_divider
-    - autoware_pointcloud_merger
-    - autoware_pointcloud_projection_converter
-    - autoware_pointcloud_saver_rviz_plugin
-    - autoware_position_error_evaluator
-    - autoware_route_client
-    - autoware_route_history
-    - autoware_rtc_replayer
-    - autoware_static_centerline_generator
-    - autoware_tp_manager
-    - bag2lanelet
-    - calibration_adapter
-    - control_data_collecting_tool
-    - control_debug_tools
-    - deviation_estimator
-    - deviation_evaluator
-    - driving_environment_analyzer
-    - estimator_utils
-    - learning_based_vehicle_calibration
-    - mission_planner_rviz_plugin
-    - parameter_estimator
-    - pitch_checker
-    - planning_debug_tools
-    - reaction_analyzer
-    - rqt_diagnostic_graph_monitor
-    - rtc_manager_rviz_plugin
-    - simulator_compatibility_test
-    - tier4_automatic_goal_rviz_plugin
-    - tier4_calibration_msgs
-    - tier4_calibration_rviz_plugin
-    - tier4_control_rviz_plugin
-    - tier4_debug_rviz_plugin
-    - tier4_debug_tools
-    - tier4_logging_level_configure_rviz_plugin
-    - tier4_metrics_rviz_plugin
-    - tier4_screen_capture_rviz_plugin
-    - tier4_simulated_clock_rviz_plugin
-    - tier4_string_viewer_rviz_plugin
-    - tier4_target_object_type_rviz_plugin
-    - time_delay_estimator
-    - vehicle_cmd_analyzer
   universe/autoware_universe:
     type: git
     url: https://github.com/autowarefoundation/autoware_universe.git
-    version: 4ac84877a715182ca1078650bfda10b945aa595c
-    ref: main
+    version: 8d9187fe94b917933e698dd769b05585546e8f50
     packages:
     - autoware_accel_brake_map_calibrator
     - autoware_adapi_visualizers
@@ -391,6 +332,7 @@ repositories:
     - autoware_bag_time_manager_rviz_plugin
     - autoware_behavior_path_avoidance_by_lane_change_module
     - autoware_behavior_path_bidirectional_traffic_module
+    - autoware_behavior_path_direction_change_module
     - autoware_behavior_path_dynamic_obstacle_avoidance_module
     - autoware_behavior_path_external_request_lane_change_module
     - autoware_behavior_path_goal_planner_module
@@ -418,6 +360,7 @@ repositories:
     - autoware_bevfusion
     - autoware_bezier_sampler
     - autoware_bluetooth_monitor
+    - autoware_boundary_departure_checker
     - autoware_bytetrack
     - autoware_calibration_status_classifier
     - autoware_camera_streampetr
@@ -455,7 +398,7 @@ repositories:
     - autoware_diffusion_planner
     - autoware_dummy_diag_publisher
     - autoware_dummy_infrastructure
-    - autoware_dummy_perception_publisher
+    - autoware_dummy_traffic_light_publisher
     - autoware_duplicated_node_checker
     - autoware_elevation_map_loader
     - autoware_euclidean_cluster
@@ -485,7 +428,6 @@ repositories:
     - autoware_kinematic_evaluator
     - autoware_landmark_manager
     - autoware_lane_departure_checker
-    - autoware_learning_based_vehicle_model
     - autoware_lidar_apollo_instance_segmentation
     - autoware_lidar_centerpoint
     - autoware_lidar_frnet
@@ -562,7 +504,6 @@ repositories:
     - autoware_shift_decider
     - autoware_simpl_prediction
     - autoware_simple_object_merger
-    - autoware_simple_planning_simulator
     - autoware_smart_mpc_trajectory_follower
     - autoware_spheric_collision_detector
     - autoware_steer_offset_estimator
@@ -583,6 +524,7 @@ repositories:
     - autoware_traffic_light_arbiter
     - autoware_traffic_light_category_merger
     - autoware_traffic_light_classifier
+    - autoware_traffic_light_compliance_checker
     - autoware_traffic_light_fine_detector
     - autoware_traffic_light_map_based_detector
     - autoware_traffic_light_multi_camera_fusion
@@ -599,6 +541,7 @@ repositories:
     - autoware_trajectory_modifier
     - autoware_trajectory_optimizer
     - autoware_trajectory_ranker
+    - autoware_trajectory_selector
     - autoware_trajectory_validator
     - autoware_universe_designs
     - autoware_universe_utils
@@ -633,8 +576,8 @@ repositories:
   universe/external/cuda_blackboard:
     type: git
     url: https://github.com/autowarefoundation/cuda_blackboard.git
-    version: e3f13d2ddb0c7e0f6a1fd76227301555e4262a19
-    ref: 0.3.0
+    version: d40f8d45f1a2e9c0fb271d13e3e178d7682fa682
+    ref: 0.4.0
     packages:
     - cuda_blackboard
   universe/external/eagleye:
@@ -668,7 +611,7 @@ repositories:
     type: git
     url: https://github.com/autowarefoundation/managed_transform_buffer.git
     version: b12c9c11bccdb0ea24ac3665c91f0933ba43752f
-    ref: main
+    ref: 0.2.0
     packages:
     - managed_transform_buffer
   universe/external/morai_msgs:
@@ -707,8 +650,8 @@ repositories:
   universe/external/tier4_autoware_msgs:
     type: git
     url: https://github.com/tier4/tier4_autoware_msgs.git
-    version: 16b60bb8a4673bf56c592cc23144a9336880354c
-    ref: tier4/universe
+    version: b9c385197baf1a2e77f088bea46e7287cd3ec367
+    ref: v0.58.0
     packages:
     - tier4_api_msgs
     - tier4_auto_msgs_converter
@@ -734,36 +677,33 @@ repositories:
     packages:
     - trt_batched_nms
 packages:
+  agnocast:
+    repo: core/agnocast
+    path: src/agnocast
   agnocast_cie_config_msgs:
-    repo: middleware/external/agnocast
+    repo: core/agnocast
     path: src/agnocast_cie_config_msgs
   agnocast_cie_thread_configurator:
-    repo: middleware/external/agnocast
+    repo: core/agnocast
     path: src/agnocast_cie_thread_configurator
   agnocast_components:
-    repo: middleware/external/agnocast
+    repo: core/agnocast
     path: src/agnocast_components
   agnocast_e2e_test:
-    repo: middleware/external/agnocast
+    repo: core/agnocast
     path: src/agnocast_e2e_test
   agnocast_ioctl_wrapper:
-    repo: middleware/external/agnocast
+    repo: core/agnocast
     path: src/agnocast_ioctl_wrapper
   agnocast_sample_application:
-    repo: middleware/external/agnocast
+    repo: core/agnocast
     path: src/agnocast_sample_application
   agnocast_sample_interfaces:
-    repo: middleware/external/agnocast
+    repo: core/agnocast
     path: src/agnocast_sample_interfaces
-  agnocast_wrapper:
-    repo: simulator/scenario_simulator
-    path: common/agnocast_wrapper
   agnocastlib:
-    repo: middleware/external/agnocast
+    repo: core/agnocast
     path: src/agnocastlib
-  arithmetic:
-    repo: simulator/scenario_simulator
-    path: common/math/arithmetic
   autoware_accel_brake_map_calibrator:
     repo: universe/autoware_universe
     path: vehicle/autoware_accel_brake_map_calibrator
@@ -806,6 +746,9 @@ packages:
   autoware_behavior_path_bidirectional_traffic_module:
     repo: universe/autoware_universe
     path: planning/behavior_path_planner/autoware_behavior_path_bidirectional_traffic_module
+  autoware_behavior_path_direction_change_module:
+    repo: universe/autoware_universe
+    path: planning/behavior_path_planner/autoware_behavior_path_direction_change_module
   autoware_behavior_path_dynamic_obstacle_avoidance_module:
     repo: universe/autoware_universe
     path: planning/behavior_path_planner/autoware_behavior_path_dynamic_obstacle_avoidance_module
@@ -896,6 +839,9 @@ packages:
   autoware_bluetooth_monitor:
     repo: universe/autoware_universe
     path: system/autoware_bluetooth_monitor
+  autoware_boundary_departure_checker:
+    repo: universe/autoware_universe
+    path: common/autoware_boundary_departure_checker
   autoware_bytetrack:
     repo: universe/autoware_universe
     path: perception/autoware_bytetrack
@@ -1016,18 +962,12 @@ packages:
   autoware_cuda_utils:
     repo: universe/autoware_universe
     path: sensing/autoware_cuda_utils
-  autoware_debug_tools:
-    repo: tools
-    path: common/autoware_debug_tools
   autoware_default_adapi:
     repo: core/autoware_core
     path: api/autoware_default_adapi
   autoware_default_adapi_universe:
     repo: universe/autoware_universe
     path: system/autoware_default_adapi_universe
-  autoware_dependency_checker:
-    repo: tools
-    path: autoware_dependency_checker
   autoware_deprecated_boundary_departure_checker:
     repo: universe/autoware_universe
     path: common/autoware_deprecated_boundary_departure_checker
@@ -1062,8 +1002,11 @@ packages:
     repo: universe/autoware_universe
     path: system/autoware_dummy_infrastructure
   autoware_dummy_perception_publisher:
+    repo: core/autoware_simple_planning_simulator
+    path: autoware_dummy_perception_publisher
+  autoware_dummy_traffic_light_publisher:
     repo: universe/autoware_universe
-    path: simulator/autoware_dummy_perception_publisher
+    path: simulator/autoware_dummy_traffic_light_publisher
   autoware_duplicated_node_checker:
     repo: universe/autoware_universe
     path: system/autoware_duplicated_node_checker
@@ -1202,9 +1145,6 @@ packages:
   autoware_lanelet2_extension_python:
     repo: core/autoware_lanelet2_extension
     path: autoware_lanelet2_extension_python
-  autoware_lanelet2_map_utils:
-    repo: tools
-    path: map/autoware_lanelet2_map_utils
   autoware_lanelet2_map_visualizer:
     repo: core/autoware_core
     path: map/autoware_lanelet2_map_visualizer
@@ -1215,8 +1155,8 @@ packages:
     repo: launcher/autoware_launch
     path: autoware_launch
   autoware_learning_based_vehicle_model:
-    repo: universe/autoware_universe
-    path: simulator/autoware_learning_based_vehicle_model
+    repo: core/autoware_simple_planning_simulator
+    path: autoware_learning_based_vehicle_model
   autoware_lidar_apollo_instance_segmentation:
     repo: universe/autoware_universe
     path: perception/autoware_lidar_apollo_instance_segmentation
@@ -1241,9 +1181,6 @@ packages:
   autoware_localization_error_monitor:
     repo: universe/autoware_universe
     path: localization/autoware_localization_error_monitor
-  autoware_localization_evaluation_scripts:
-    repo: tools
-    path: localization/autoware_localization_evaluation_scripts
   autoware_localization_evaluator:
     repo: universe/autoware_universe
     path: evaluator/autoware_localization_evaluator
@@ -1412,9 +1349,6 @@ packages:
   autoware_pipeline_latency_monitor:
     repo: universe/autoware_universe
     path: system/autoware_pipeline_latency_monitor
-  autoware_planning_data_analyzer:
-    repo: tools
-    path: planning/autoware_planning_data_analyzer
   autoware_planning_evaluator:
     repo: universe/autoware_universe
     path: evaluator/autoware_planning_evaluator
@@ -1454,21 +1388,9 @@ packages:
   autoware_point_types:
     repo: core/autoware_core
     path: common/autoware_point_types
-  autoware_pointcloud_divider:
-    repo: tools
-    path: map/autoware_pointcloud_divider
-  autoware_pointcloud_merger:
-    repo: tools
-    path: map/autoware_pointcloud_merger
   autoware_pointcloud_preprocessor:
     repo: universe/autoware_universe
     path: sensing/autoware_pointcloud_preprocessor
-  autoware_pointcloud_projection_converter:
-    repo: tools
-    path: map/autoware_pointcloud_projection_converter
-  autoware_pointcloud_saver_rviz_plugin:
-    repo: tools
-    path: map/autoware_pointcloud_saver_rviz_plugin
   autoware_polar_grid:
     repo: universe/autoware_universe
     path: common/autoware_polar_grid
@@ -1487,9 +1409,6 @@ packages:
   autoware_pose_instability_detector:
     repo: universe/autoware_universe
     path: localization/autoware_pose_instability_detector
-  autoware_position_error_evaluator:
-    repo: tools
-    path: localization/autoware_position_error_evaluator
   autoware_predicted_path_checker:
     repo: universe/autoware_universe
     path: control/autoware_predicted_path_checker
@@ -1550,21 +1469,12 @@ packages:
   autoware_remaining_distance_time_calculator:
     repo: universe/autoware_universe
     path: planning/autoware_remaining_distance_time_calculator
-  autoware_route_client:
-    repo: tools
-    path: planning/autoware_route_client
   autoware_route_handler:
     repo: core/autoware_core
     path: planning/autoware_route_handler
-  autoware_route_history:
-    repo: tools
-    path: planning/autoware_route_history
   autoware_rtc_interface:
     repo: universe/autoware_universe
     path: planning/autoware_rtc_interface
-  autoware_rtc_replayer:
-    repo: tools
-    path: planning/autoware_rtc_replayer
   autoware_sample_designs:
     repo: launcher/autoware_launch
     path: autoware_sample_designs
@@ -1602,20 +1512,20 @@ packages:
     repo: universe/autoware_universe
     path: perception/autoware_simple_object_merger
   autoware_simple_planning_simulator:
-    repo: universe/autoware_universe
-    path: simulator/autoware_simple_planning_simulator
+    repo: core/autoware_simple_planning_simulator
+    path: autoware_simple_planning_simulator
   autoware_simple_pure_pursuit:
     repo: core/autoware_core
     path: control/autoware_simple_pure_pursuit
+  autoware_simulation_msgs:
+    repo: core/autoware_msgs
+    path: autoware_simulation_msgs
   autoware_smart_mpc_trajectory_follower:
     repo: universe/autoware_universe
     path: control/autoware_smart_mpc_trajectory_follower
   autoware_spheric_collision_detector:
     repo: universe/autoware_universe
     path: control/autoware_spheric_collision_detector
-  autoware_static_centerline_generator:
-    repo: tools
-    path: planning/autoware_static_centerline_generator
   autoware_steer_offset_estimator:
     repo: universe/autoware_universe
     path: vehicle/autoware_steer_offset_estimator
@@ -1631,6 +1541,12 @@ packages:
   autoware_surround_obstacle_checker:
     repo: universe/autoware_universe
     path: planning/autoware_surround_obstacle_checker
+  autoware_system_design_examples:
+    repo: core/autoware_system_designer
+    path: autoware_system_design_examples
+  autoware_system_designer:
+    repo: core/autoware_system_designer
+    path: autoware_system_designer
   autoware_system_monitor:
     repo: universe/autoware_universe
     path: system/autoware_system_monitor
@@ -1676,9 +1592,9 @@ packages:
   autoware_topic_state_monitor:
     repo: universe/autoware_universe
     path: system/autoware_topic_state_monitor
-  autoware_tp_manager:
-    repo: tools
-    path: map/autoware_tp_manager
+  autoware_topic_text_overlay_rviz_plugin:
+    repo: core/autoware_rviz_plugins
+    path: autoware_overlay_rviz_plugin/autoware_topic_text_overlay_rviz_plugin
   autoware_tracking_object_merger:
     repo: universe/autoware_universe
     path: perception/autoware_tracking_object_merger
@@ -1691,6 +1607,9 @@ packages:
   autoware_traffic_light_classifier:
     repo: universe/autoware_universe
     path: perception/autoware_traffic_light_classifier
+  autoware_traffic_light_compliance_checker:
+    repo: universe/autoware_universe
+    path: common/autoware_traffic_light_compliance_checker
   autoware_traffic_light_fine_detector:
     repo: universe/autoware_universe
     path: perception/autoware_traffic_light_fine_detector
@@ -1742,6 +1661,9 @@ packages:
   autoware_trajectory_ranker:
     repo: universe/autoware_universe
     path: planning/autoware_trajectory_ranker
+  autoware_trajectory_selector:
+    repo: universe/autoware_universe
+    path: planning/autoware_trajectory_selector
   autoware_trajectory_validator:
     repo: universe/autoware_universe
     path: planning/autoware_trajectory_validator
@@ -1832,12 +1754,6 @@ packages:
   awsim_sensor_kit_launch:
     repo: launcher/autoware_launch
     path: sensor_kit/awsim_sensor_kit_launch/awsim_sensor_kit_launch
-  bag2lanelet:
-    repo: tools
-    path: bag2lanelet
-  behavior_tree_plugin:
-    repo: simulator/scenario_simulator
-    path: simulation/behavior_tree_plugin
   bevdet_vendor:
     repo: universe/external/bevdet_vendor
     path: .
@@ -1853,9 +1769,6 @@ packages:
   boost_udp_driver:
     repo: sensor_component/transport_drivers
     path: udp_driver
-  calibration_adapter:
-    repo: tools
-    path: vehicle/calibration_adapter
   camera_description:
     repo: sensor_component/external/sensor_component_description
     path: camera_description
@@ -1871,42 +1784,15 @@ packages:
   common_sensor_launch:
     repo: launcher/autoware_launch
     path: sensor_kit/sample_sensor_kit_launch/common_sensor_launch
-  concealer:
-    repo: simulator/scenario_simulator
-    path: external/concealer
-  context_gamma_planner:
-    repo: simulator/scenario_simulator
-    path: simulation/context_gamma_planner
   continental_msgs:
     repo: sensor_component/external/nebula
     path: src/nebula_continental/continental_msgs
   continental_srvs:
     repo: sensor_component/external/nebula
     path: src/nebula_continental/continental_srvs
-  control_data_collecting_tool:
-    repo: tools
-    path: control_data_collecting_tool
-  control_debug_tools:
-    repo: tools
-    path: control/control_debug_tools
-  cpp_mock_scenarios:
-    repo: simulator/scenario_simulator
-    path: mock/cpp_mock_scenarios
   cuda_blackboard:
     repo: universe/external/cuda_blackboard
     path: .
-  deviation_estimator:
-    repo: tools
-    path: localization/deviation_estimation_tools/deviation_estimator
-  deviation_evaluator:
-    repo: tools
-    path: localization/deviation_estimation_tools/deviation_evaluator
-  do_nothing_plugin:
-    repo: simulator/scenario_simulator
-    path: simulation/do_nothing_plugin
-  driving_environment_analyzer:
-    repo: tools
-    path: driving_environment_analyzer
   eagleye_can_velocity_converter:
     repo: universe/external/eagleye
     path: eagleye_util/can_velocity_converter
@@ -1937,30 +1823,12 @@ packages:
   eagleye_tf:
     repo: universe/external/eagleye
     path: eagleye_util/tf
-  embree_vendor:
-    repo: simulator/scenario_simulator
-    path: external/embree_vendor
-  estimator_utils:
-    repo: tools
-    path: vehicle/estimator_utils
-  geometry:
-    repo: simulator/scenario_simulator
-    path: common/math/geometry
-  get_parameter:
-    repo: simulator/scenario_simulator
-    path: common/get_parameter
   glog:
     repo: universe/external/glog
     path: .
   imu_description:
     repo: sensor_component/external/sensor_component_description
     path: imu_description
-  kashiwanoha_map:
-    repo: simulator/scenario_simulator
-    path: map/kashiwanoha_map
-  learning_based_vehicle_calibration:
-    repo: tools
-    path: vehicle/learning_based_vehicle_calibration
   livox_description:
     repo: sensor_component/external/sensor_component_description
     path: livox_description
@@ -1970,9 +1838,6 @@ packages:
   managed_transform_buffer:
     repo: universe/external/managed_transform_buffer
     path: managed_transform_buffer
-  mission_planner_rviz_plugin:
-    repo: tools
-    path: common/mission_planner_rviz_plugin
   morai_msgs:
     repo: universe/external/morai_msgs
     path: .
@@ -2033,6 +1898,18 @@ packages:
   nebula_robosense_hw_interfaces:
     repo: sensor_component/external/nebula
     path: src/nebula_robosense/nebula_robosense_hw_interfaces
+  nebula_sample:
+    repo: sensor_component/external/nebula
+    path: src/nebula_sample/nebula_sample
+  nebula_sample_common:
+    repo: sensor_component/external/nebula
+    path: src/nebula_sample/nebula_sample_common
+  nebula_sample_decoders:
+    repo: sensor_component/external/nebula
+    path: src/nebula_sample/nebula_sample_decoders
+  nebula_sample_hw_interfaces:
+    repo: sensor_component/external/nebula
+    path: src/nebula_sample/nebula_sample_hw_interfaces
   nebula_velodyne:
     repo: sensor_component/external/nebula
     path: src/nebula_velodyne/nebula_velodyne
@@ -2054,66 +1931,21 @@ packages:
   negotiated_interfaces:
     repo: universe/external/negotiated
     path: negotiated_interfaces
-  openscenario_experimental_catalog:
-    repo: simulator/scenario_simulator
-    path: openscenario/openscenario_experimental_catalog
-  openscenario_interpreter:
-    repo: simulator/scenario_simulator
-    path: openscenario/openscenario_interpreter
-  openscenario_interpreter_example:
-    repo: simulator/scenario_simulator
-    path: openscenario/openscenario_interpreter_example
-  openscenario_interpreter_msgs:
-    repo: simulator/scenario_simulator
-    path: openscenario/openscenario_interpreter_msgs
-  openscenario_preprocessor:
-    repo: simulator/scenario_simulator
-    path: openscenario/openscenario_preprocessor
-  openscenario_preprocessor_msgs:
-    repo: simulator/scenario_simulator
-    path: openscenario/openscenario_preprocessor_msgs
-  openscenario_utility:
-    repo: simulator/scenario_simulator
-    path: openscenario/openscenario_utility
-  openscenario_validator:
-    repo: simulator/scenario_simulator
-    path: openscenario/openscenario_validator
-  openscenario_visualization:
-    repo: simulator/scenario_simulator
-    path: rviz_plugins/openscenario_visualization
   pandar_description:
     repo: sensor_component/external/sensor_component_description
     path: pandar_description
   pandar_msgs:
     repo: sensor_component/external/nebula
     path: src/nebula_hesai/pandar_msgs
-  parameter_estimator:
-    repo: tools
-    path: vehicle/parameter_estimator
   perception_utils:
     repo: universe/autoware_universe
     path: perception/perception_utils
-  pitch_checker:
-    repo: tools
-    path: vehicle/pitch_checker
-  planning_debug_tools:
-    repo: tools
-    path: planning/planning_debug_tools
   pointcloud_to_laserscan:
     repo: universe/external/pointcloud_to_laserscan
     path: .
   radar_description:
     repo: sensor_component/external/sensor_component_description
     path: radar_description
-  random_test_runner:
-    repo: simulator/scenario_simulator
-    path: test_runner/random_test_runner
-  reaction_analyzer:
-    repo: tools
-    path: system/reaction_analyzer
-  real_time_factor_control_rviz_plugin:
-    repo: simulator/scenario_simulator
-    path: rviz_plugins/real_time_factor_control_rviz_plugin
   robosense_msgs:
     repo: sensor_component/external/nebula
     path: src/nebula_robosense/robosense_msgs
@@ -2124,20 +1956,26 @@ packages:
     repo: sensor_component/ros2_socketcan
     path: ros2_socketcan_msgs
   ros2agnocast:
-    repo: middleware/external/agnocast
+    repo: core/agnocast
     path: src/ros2agnocast
-  rqt_diagnostic_graph_monitor:
-    repo: tools
-    path: system/rqt_diagnostic_graph_monitor
-  rtc_manager_rviz_plugin:
-    repo: tools
-    path: common/rtc_manager_rviz_plugin
+  ros2agnocast_discovery_agent:
+    repo: core/agnocast
+    path: src/ros2agnocast_discovery_agent
+  ros2agnocast_discovery_msgs:
+    repo: core/agnocast
+    path: src/ros2agnocast_discovery_msgs
   rtklib_bridge:
     repo: universe/external/rtklib_ros_bridge
     path: rtklib_bridge
   rtklib_msgs:
     repo: universe/external/rtklib_ros_bridge
     path: rtklib_msgs
+  rviz_2d_overlay_msgs:
+    repo: core/external/rviz_2d_overlay_plugins
+    path: rviz_2d_overlay_msgs
+  rviz_2d_overlay_plugins:
+    repo: core/external/rviz_2d_overlay_plugins
+    path: rviz_2d_overlay_plugins
   sample_sensor_kit_description:
     repo: launcher/autoware_launch
     path: sensor_kit/sample_sensor_kit_launch/sample_sensor_kit_description
@@ -2150,30 +1988,6 @@ packages:
   sample_vehicle_launch:
     repo: launcher/autoware_launch
     path: vehicle/sample_vehicle_launch/sample_vehicle_launch
-  scenario_simulator_exception:
-    repo: simulator/scenario_simulator
-    path: common/scenario_simulator_exception
-  scenario_simulator_v2:
-    repo: simulator/scenario_simulator
-    path: scenario_simulator_v2
-  scenario_test_runner:
-    repo: simulator/scenario_simulator
-    path: test_runner/scenario_test_runner
-  simple_cross_map:
-    repo: simulator/scenario_simulator
-    path: map/simple_cross_map
-  simple_junit:
-    repo: simulator/scenario_simulator
-    path: common/simple_junit
-  simple_sensor_simulator:
-    repo: simulator/scenario_simulator
-    path: simulation/simple_sensor_simulator
-  simulation_interface:
-    repo: simulator/scenario_simulator
-    path: simulation/simulation_interface
-  simulator_compatibility_test:
-    repo: tools
-    path: simulator/simulator_compatibility_test
   single_lidar_common_launch:
     repo: launcher/autoware_launch
     path: sensor_kit/single_lidar_sensor_kit_launch/single_lidar_common_launch
@@ -2183,9 +1997,6 @@ packages:
   single_lidar_sensor_kit_launch:
     repo: launcher/autoware_launch
     path: sensor_kit/single_lidar_sensor_kit_launch/single_lidar_sensor_kit_launch
-  status_monitor:
-    repo: simulator/scenario_simulator
-    path: common/status_monitor
   sync_tooling_msgs:
     repo: sensor_component/external/sync_tooling_msgs
     path: .
@@ -2201,18 +2012,9 @@ packages:
   tier4_auto_msgs_converter:
     repo: universe/external/tier4_autoware_msgs
     path: tier4_auto_msgs_converter
-  tier4_automatic_goal_rviz_plugin:
-    repo: tools
-    path: common/tier4_automatic_goal_rviz_plugin
   tier4_autoware_api_launch:
     repo: launcher/autoware_launch
     path: tier4_universe_launch/tier4_autoware_api_launch
-  tier4_calibration_msgs:
-    repo: tools
-    path: common/tier4_calibration_msgs
-  tier4_calibration_rviz_plugin:
-    repo: tools
-    path: common/tier4_calibration_rviz_plugin
   tier4_camera_view_rviz_plugin:
     repo: universe/autoware_universe
     path: visualization/tier4_camera_view_rviz_plugin
@@ -2225,21 +2027,12 @@ packages:
   tier4_control_msgs:
     repo: universe/external/tier4_autoware_msgs
     path: tier4_control_msgs
-  tier4_control_rviz_plugin:
-    repo: tools
-    path: common/tier4_control_rviz_plugin
   tier4_datetime_rviz_plugin:
     repo: universe/autoware_universe
     path: visualization/tier4_datetime_rviz_plugin
   tier4_debug_msgs:
     repo: universe/external/tier4_autoware_msgs
     path: tier4_debug_msgs
-  tier4_debug_rviz_plugin:
-    repo: tools
-    path: common/tier4_debug_rviz_plugin
-  tier4_debug_tools:
-    repo: tools
-    path: common/tier4_debug_tools
   tier4_dummy_object_rviz_plugin:
     repo: universe/autoware_universe
     path: simulator/tier4_dummy_object_rviz_plugin
@@ -2255,9 +2048,6 @@ packages:
   tier4_localization_msgs:
     repo: universe/external/tier4_autoware_msgs
     path: tier4_localization_msgs
-  tier4_logging_level_configure_rviz_plugin:
-    repo: tools
-    path: common/tier4_logging_level_configure_rviz_plugin
   tier4_manual_lane_change_rviz_plugin:
     repo: universe/autoware_universe
     path: visualization/tier4_manual_lane_change_rviz_plugin
@@ -2270,9 +2060,6 @@ packages:
   tier4_metric_msgs:
     repo: universe/external/tier4_autoware_msgs
     path: tier4_metric_msgs
-  tier4_metrics_rviz_plugin:
-    repo: tools
-    path: evaluation/tier4_metrics_rviz_plugin
   tier4_perception_launch:
     repo: launcher/autoware_launch
     path: tier4_universe_launch/tier4_perception_launch
@@ -2294,15 +2081,9 @@ packages:
   tier4_rtc_msgs:
     repo: universe/external/tier4_autoware_msgs
     path: tier4_rtc_msgs
-  tier4_screen_capture_rviz_plugin:
-    repo: tools
-    path: common/tier4_screen_capture_rviz_plugin
   tier4_sensing_launch:
     repo: launcher/autoware_launch
     path: tier4_universe_launch/tier4_sensing_launch
-  tier4_simulated_clock_rviz_plugin:
-    repo: tools
-    path: common/tier4_simulated_clock_rviz_plugin
   tier4_simulation_msgs:
     repo: universe/external/tier4_autoware_msgs
     path: tier4_simulation_msgs
@@ -2312,18 +2093,12 @@ packages:
   tier4_state_rviz_plugin:
     repo: universe/autoware_universe
     path: visualization/tier4_state_rviz_plugin
-  tier4_string_viewer_rviz_plugin:
-    repo: tools
-    path: common/tier4_string_viewer_rviz_plugin
   tier4_system_launch:
     repo: launcher/autoware_launch
     path: tier4_universe_launch/tier4_system_launch
   tier4_system_msgs:
     repo: universe/external/tier4_autoware_msgs
     path: tier4_system_msgs
-  tier4_target_object_type_rviz_plugin:
-    repo: tools
-    path: common/tier4_target_object_type_rviz_plugin
   tier4_traffic_light_rviz_plugin:
     repo: universe/autoware_universe
     path: visualization/tier4_traffic_light_rviz_plugin
@@ -2339,21 +2114,9 @@ packages:
   tier4_vehicle_rviz_plugin:
     repo: universe/autoware_universe
     path: visualization/tier4_vehicle_rviz_plugin
-  time_delay_estimator:
-    repo: tools
-    path: vehicle/time_delay_estimator
-  traffic_simulator:
-    repo: simulator/scenario_simulator
-    path: simulation/traffic_simulator
-  traffic_simulator_msgs:
-    repo: simulator/scenario_simulator
-    path: simulation/traffic_simulator_msgs
   trt_batched_nms:
     repo: universe/external/trt_batched_nms
     path: .
-  vehicle_cmd_analyzer:
-    repo: tools
-    path: control/vehicle_cmd_analyzer
   velodyne_description:
     repo: sensor_component/external/sensor_component_description
     path: velodyne_description

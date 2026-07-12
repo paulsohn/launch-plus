@@ -1,0 +1,68 @@
+name: Toy Robot Integration Test
+
+on:
+  push:
+    branches: [devel]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Build + Resolve (${{ matrix.ros_distro }})
+    runs-on: ${{ matrix.os }}
+    container: ros:${{ matrix.ros_distro }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            ros_distro: jazzy
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install system dependencies
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends \
+            build-essential \
+            python3-pip \
+            python3-venv \
+            ros-dev-tools \
+            ros-${{ matrix.ros_distro }}-robot-state-publisher
+
+      - name: Install Node.js 22 LTS and pnpm
+        run: |
+          curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+            | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg
+          echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+            > /etc/apt/sources.list.d/nodesource.list
+          apt-get update
+          apt-get install -y nodejs
+          npm install -g pnpm@10
+
+      - name: Install roscope
+        run: |
+          python3 -m venv /opt/roscope-venv
+          /opt/roscope-venv/bin/pip install -e .
+          ln -s /opt/roscope-venv/bin/roscope /usr/local/bin/roscope
+
+      - name: Build toy_robot packages
+        working-directory: example/toy_robot
+        shell: bash
+        run: |
+          source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+          colcon build --symlink-install
+
+      - name: Resolve launch file
+        working-directory: example/toy_robot
+        shell: bash
+        run: |
+          source /opt/ros/${{ matrix.ros_distro }}/setup.bash
+          source install/setup.bash
+          roscope resolve -d toy_robot_bringup toy_robot.launch.xml \
+            --plugin toy_robot_interface_plugin.py \
+            --preview

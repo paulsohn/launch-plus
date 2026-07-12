@@ -1,0 +1,11 @@
+connections:
+  ~/goal_pose:
+    type: subscription
+  ~/odom:
+    type: subscription
+  ~/pose:
+    type: subscription
+  ~/cmd_vel:
+    type: publisher
+  ~/plan:
+    type: publisher

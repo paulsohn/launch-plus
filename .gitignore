@@ -51,9 +51,10 @@ roscope/visualizer/static/
 # Integration test outputs (keep only the committed resolved.launch.xml)
 example/**/*.xml
 !example/autoware/resolved.launch.xml
+!example/toy_robot/src/**/*.xml
 
 # Fetched packages from example runs
-example/**/src/
+example/autoware/src/
 
 # Colcon build outputs from example runs
 example/**/build/

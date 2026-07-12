@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="use_sim_time" default="false"
+       description="Use simulation clock (set to true when running in Gazebo)"/>
+
+  <!-- robot_state_publisher: standard ROS 2 node, interfaces defined in
+       example/toy_robot/interfaces/robot_state_publisher/
+       Subscribes /joint_states; publishes /tf and /tf_static -->
+  <node pkg="robot_state_publisher" exec="robot_state_publisher"
+        name="robot_state_publisher">
+    <param from="$(find-pkg-share toy_robot_bringup)/config/robot_description.yaml"/>
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+  </node>
+
+  <!-- NOTE: roscope's resolver primarily infers node interfaces from
+       <remap> elements.  /tf and /tf_static are used with absolute names
+       internally (TransformBroadcaster/TransformListener) and therefore
+       never appear as remaps, so roscope cannot see them from the launch
+       file alone.  Two options to make them visible in the topology:
+         1. Declare them in the node's interface YAML (preferred — see
+            toy_robot_interface_plugin.py and the per-node interface/ dirs).
+         2. Add a no-op remap such as <remap from="/tf" to="/tf"/> so that
+            roscope sees the topic at the launch-file level even without a plugin. -->
+
+  <!-- controller_node: differential drive controller
+       Internal: ~/cmd_vel (sub), ~/joint_states (pub), ~/odom (pub), /tf (pub) -->
+  <node pkg="toy_robot_controller" exec="controller_node" name="controller">
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <param name="wheel_radius" value="0.05"/>
+    <param name="wheel_separation" value="0.2"/>
+    <remap from="~/cmd_vel" to="/cmd_vel"/>
+    <remap from="~/joint_states" to="/joint_states"/>
+    <remap from="~/odom" to="/odom"/>
+  </node>
+
+  <!-- sensor_node: simulated 2-D laser scanner
+       Internal: ~/scan (pub) -->
+  <node pkg="toy_robot_sensor" exec="sensor_node" name="sensor">
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <param name="frame_id" value="laser_link"/>
+    <param name="range_max" value="10.0"/>
+    <remap from="~/scan" to="/scan"/>
+  </node>
+
+  <!-- localizer_node: scan-based pose estimator
+       Internal: ~/scan (sub), ~/pose (pub); /tf and /tf_static via tf2 listener -->
+  <node pkg="toy_robot_localizer" exec="localizer_node" name="localizer">
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <remap from="~/scan" to="/scan"/>
+    <remap from="~/pose" to="/pose"/>
+  </node>
+
+  <!-- planner_node: goal-driven velocity planner
+       Internal: ~/goal_pose (sub), ~/odom (sub), ~/pose (sub), ~/cmd_vel (pub), ~/plan (pub) -->
+  <node pkg="toy_robot_planner" exec="planner_node" name="planner">
+    <param name="use_sim_time" value="$(var use_sim_time)"/>
+    <remap from="~/goal_pose" to="/goal_pose"/>
+    <remap from="~/odom" to="/odom"/>
+    <remap from="~/pose" to="/pose"/>
+    <remap from="~/cmd_vel" to="/cmd_vel"/>
+    <remap from="~/plan" to="/plan"/>
+  </node>
+</launch>

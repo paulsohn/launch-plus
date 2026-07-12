@@ -1,0 +1,9 @@
+connections:
+  ~/cmd_vel:
+    type: subscription
+  ~/joint_states:
+    type: publisher
+  ~/odom:
+    type: publisher
+  /tf:
+    type: publisher

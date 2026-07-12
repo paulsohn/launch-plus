@@ -1,0 +1,9 @@
+connections:
+  ~/scan:
+    type: subscription
+  /tf:
+    type: subscription
+  /tf_static:
+    type: subscription
+  ~/pose:
+    type: publisher

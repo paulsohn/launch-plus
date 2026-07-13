@@ -50,9 +50,7 @@ name contains a runtime-determined segment:
   - name_expr: "'/api/manual/' + params.get('mode', 'joy') + '/velocity'"
     type: subscription
 
-On evaluation error, the entry is skipped (no conservative fallback — there
-is no default name to substitute).  Having both ``name`` and ``name_expr`` on
-the same entry is an error.
+Having both ``name`` and ``name_expr`` on the same entry is an error.
 
 Loop expansion
 --------------
@@ -67,18 +65,23 @@ is available in both ``name_expr`` and ``when``.  ``loop`` requires ``name_expr`
     msg_type: autoware_perception_msgs/msg/DetectedObjects
     when: "params.get('input/detection%02d/channel' % item, 'none') not in ('none', '')"
 
+  - loop: "to_list(params.get('input_topics', []))"
+    name_expr: "item"
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+
+``to_list`` converts a ROS 2 string-serialised list (``"[a,b,c]"``) or an
+actual Python list to ``list[str]``.  It is available in all expressions.
+
 Available names in all expressions: ``params`` (always), ``item`` (inside ``loop``).
 Available built-ins: format, len, str, int, float, bool, range, list, tuple,
-                     enumerate, zip.
+                     enumerate, zip, to_list.
 
-If ``loop`` evaluation fails the entry is skipped entirely.  If ``name_expr``
-fails for a particular item that item is skipped.
-
-Conditional connections
-------------------------
-An entry may carry an optional ``when`` key whose value is a Python expression.
-The entry (or loop item) is included only when the expression is truthy.
-If the expression raises any exception, the entry is included conservatively.
+Error policy
+------------
+Any evaluation failure (``loop``, ``name_expr``, ``when``) raises an exception
+rather than silently skipping.  The caller is expected to surface these as
+configuration errors.
 
 The same name may appear more than once with mutually-exclusive ``when``
 conditions.  Two entries resolving to the *same* name after ``when`` filtering
@@ -103,6 +106,19 @@ import yaml
 
 _INTERFACES_DIR = Path(__file__).parent / "interfaces"
 
+_SKIP_KEYS = {"name", "name_expr", "loop", "when"}
+
+
+def _to_list(v: object) -> list:
+    """Convert a ROS 2 string-serialised list ``"[a,b,c]"`` or a Python list to list[str]."""
+    if isinstance(v, list):
+        return v
+    s = str(v).strip()
+    if s.startswith("[") and s.endswith("]"):
+        s = s[1:-1]
+    return [item.strip() for item in s.split(",") if item.strip()]
+
+
 _SAFE_BUILTINS = {
     "format": format,
     "len": len,
@@ -115,21 +131,12 @@ _SAFE_BUILTINS = {
     "tuple": tuple,
     "enumerate": enumerate,
     "zip": zip,
+    "to_list": _to_list,
 }
-
-_SKIP_KEYS = {"name", "name_expr", "loop", "when"}
 
 
 def _eval(expr: str, local: dict):
     return eval(expr, {"__builtins__": _SAFE_BUILTINS}, local)
-
-
-def _evaluate_when(expr: str, local: dict) -> bool:
-    """Evaluate a ``when`` expression; returns True conservatively on any error."""
-    try:
-        return bool(_eval(expr, local))
-    except Exception:
-        return True
 
 
 def get_connections(
@@ -175,32 +182,20 @@ def get_connections(
         if has_loop and not has_expr:
             raise ValueError(f"{interface_file}: entry has 'loop' but no 'name_expr'")
 
-        if has_loop:
-            try:
-                items = list(_eval(entry["loop"], base_local))
-            except Exception:
-                continue
-        else:
-            items = [None]
-
+        items = list(_eval(entry["loop"], base_local)) if has_loop else [None]
         attrs = {k: v for k, v in entry.items() if k not in _SKIP_KEYS}
 
         for item in items:
             local = {**base_local, "item": item} if has_loop else base_local
 
-            if has_expr:
-                try:
-                    conn_name: str = str(_eval(entry["name_expr"], local))
-                except Exception:
-                    continue
-            else:
-                conn_name = entry.get("name") or ""
-
+            conn_name: str = (
+                str(_eval(entry["name_expr"], local)) if has_expr else (entry.get("name") or "")
+            )
             if not conn_name:
                 continue
 
             when = entry.get("when")
-            if when is not None and not _evaluate_when(when, local):
+            if when is not None and not bool(_eval(when, local)):
                 continue
 
             if conn_name in result:

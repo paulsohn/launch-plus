@@ -1,12 +1,9 @@
-# Dynamic detection inputs: up to 12 input channels (detection01..detection12).
-# Each channel's topic name is a parameter (input/detectionNN/objects).
-# A channel is only subscribed when input/detectionNN/channel != "none" and is not empty.
-# The static entries below use the conventional topic names; actual names are remapped at launch.
-# See todo.md for the dynamic subscription exception.
 connections:
-  - name: ~/input/detection01/objects
+  - loop: "range(1, 13)"
+    name_expr: "params.get('input/detection%02d/objects' % item, '~/input/detection%02d/objects' % item)"
     type: subscription
     msg_type: autoware_perception_msgs/msg/DetectedObjects
+    when: "params.get('input/detection%02d/channel' % item, 'none') not in ('none', '')"
   - name: ~/input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry

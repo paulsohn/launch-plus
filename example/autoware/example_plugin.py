@@ -25,8 +25,8 @@ Expected YAML format
 ---------------------
 connections is a list of entries.  Each entry must have exactly one of
 ``name`` or ``name_expr``, plus a ``type`` key.  Additional optional keys:
-``msg_type``, ``qos``, ``when``.  The name (however derived) identifies the
-topic, service, or action depending on ``type``.
+``msg_type``, ``qos``, ``when``, ``loop``.  The name (however derived) identifies
+the topic, service, or action depending on ``type``.
 
 ``name`` is a literal string:
 
@@ -54,29 +54,35 @@ On evaluation error, the entry is skipped (no conservative fallback — there
 is no default name to substitute).  Having both ``name`` and ``name_expr`` on
 the same entry is an error.
 
+Loop expansion
+--------------
+``loop`` is a Python expression that evaluates to an iterable.  When present,
+the entry is expanded once per item; the current item is bound to ``item`` and
+is available in both ``name_expr`` and ``when``.  ``loop`` requires ``name_expr``
+(``name`` is a literal and would produce duplicate-name errors).
+
+  - loop: "range(1, 13)"
+    name_expr: "'~/input/detection%02d/objects' % item"
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+    when: "params.get('input/detection%02d/channel' % item, 'none') not in ('none', '')"
+
+Available names in all expressions: ``params`` (always), ``item`` (inside ``loop``).
+Available built-ins: format, len, str, int, float, bool, range, list, tuple,
+                     enumerate, zip.
+
+If ``loop`` evaluation fails the entry is skipped entirely.  If ``name_expr``
+fails for a particular item that item is skipped.
+
 Conditional connections
 ------------------------
-An entry may carry an optional ``when`` key whose value is a Python expression
-evaluated against the node's resolved parameters.  The expression receives a
-single name ``params`` — the dict of parameter name → resolved value passed by
-roscope.  The entry is included only when the expression evaluates to a truthy
-value.
-
-  - name: ~/output/predicted_objects
-    type: publisher
-    when: "params.get('use_object_filter', False)"
-
-  - name_expr: "params.get('output_topic', '~/output/trajectory')"
-    type: publisher
-    when: "params.get('publish_output', True)"
-
-If the ``when`` expression raises any exception, the entry is included
-conservatively.
+An entry may carry an optional ``when`` key whose value is a Python expression.
+The entry (or loop item) is included only when the expression is truthy.
+If the expression raises any exception, the entry is included conservatively.
 
 The same name may appear more than once with mutually-exclusive ``when``
-conditions (e.g. a topic that is a subscription in replay mode and a publisher
-in hardware mode).  Two entries resolving to the *same* name after ``when``
-filtering is an error — the plugin raises ``ValueError``.
+conditions.  Two entries resolving to the *same* name after ``when`` filtering
+is an error — the plugin raises ``ValueError``.
 
 Recognized types: publisher, subscription, service_client, service_server,
                   action_client, action_server.
@@ -97,15 +103,31 @@ import yaml
 
 _INTERFACES_DIR = Path(__file__).parent / "interfaces"
 
+_SAFE_BUILTINS = {
+    "format": format,
+    "len": len,
+    "str": str,
+    "int": int,
+    "float": float,
+    "bool": bool,
+    "range": range,
+    "list": list,
+    "tuple": tuple,
+    "enumerate": enumerate,
+    "zip": zip,
+}
 
-def _evaluate_when(expr: str, params: dict) -> bool:
-    """Evaluate a ``when`` expression against resolved node parameters.
+_SKIP_KEYS = {"name", "name_expr", "loop", "when"}
 
-    Returns True (include the connection) on any evaluation error so that
-    missing or unexpected parameter values never silently drop connections.
-    """
+
+def _eval(expr: str, local: dict):
+    return eval(expr, {"__builtins__": _SAFE_BUILTINS}, local)
+
+
+def _evaluate_when(expr: str, local: dict) -> bool:
+    """Evaluate a ``when`` expression; returns True conservatively on any error."""
     try:
-        return bool(eval(expr, {"__builtins__": {}}, {"params": params}))
+        return bool(_eval(expr, local))
     except Exception:
         return True
 
@@ -120,10 +142,10 @@ def get_connections(
 ) -> dict:
     # For composable nodes the plugin class name (e.g. "my_pkg::MyComponent") is
     # provided.  Use only the final part after "::" as the file name.
-    name = executable or (plugin_name.split("::")[-1] if plugin_name else None)
-    if not name:
+    node_name = executable or (plugin_name.split("::")[-1] if plugin_name else None)
+    if not node_name:
         return {}
-    interface_file = _INTERFACES_DIR / pkg_name / f"{name}.yaml"
+    interface_file = _INTERFACES_DIR / pkg_name / f"{node_name}.yaml"
     if not interface_file.exists():
         return {}
     data = yaml.safe_load(interface_file.read_text())
@@ -135,30 +157,56 @@ def get_connections(
             f"{interface_file}: 'connections' must be a list of entries, got {type(raw).__name__}"
         )
 
-    result = {}
+    result: dict = {}
+    base_local: dict = {"params": params}
+
     for entry in raw:
         if not isinstance(entry, dict):
             continue
+
         has_name = "name" in entry
         has_expr = "name_expr" in entry
+        has_loop = "loop" in entry
+
         if has_name and has_expr:
             raise ValueError(f"{interface_file}: entry has both 'name' and 'name_expr'")
-        if has_expr:
+        if has_loop and has_name:
+            raise ValueError(f"{interface_file}: entry has both 'loop' and 'name'")
+        if has_loop and not has_expr:
+            raise ValueError(f"{interface_file}: entry has 'loop' but no 'name_expr'")
+
+        if has_loop:
             try:
-                conn_name: str = str(
-                    eval(entry["name_expr"], {"__builtins__": {}}, {"params": params})
-                )
+                items = list(_eval(entry["loop"], base_local))
             except Exception:
                 continue
         else:
-            conn_name = entry.get("name") or ""
-        if not conn_name:
-            continue
-        when = entry.get("when")
-        if when is not None and not _evaluate_when(when, params):
-            continue
-        if conn_name in result:
-            raise ValueError(f"{interface_file}: duplicate resolved connection name {conn_name!r}")
-        skip = {"name", "name_expr", "when"}
-        result[conn_name] = {k: v for k, v in entry.items() if k not in skip}
+            items = [None]
+
+        attrs = {k: v for k, v in entry.items() if k not in _SKIP_KEYS}
+
+        for item in items:
+            local = {**base_local, "item": item} if has_loop else base_local
+
+            if has_expr:
+                try:
+                    conn_name: str = str(_eval(entry["name_expr"], local))
+                except Exception:
+                    continue
+            else:
+                conn_name = entry.get("name") or ""
+
+            if not conn_name:
+                continue
+
+            when = entry.get("when")
+            if when is not None and not _evaluate_when(when, local):
+                continue
+
+            if conn_name in result:
+                raise ValueError(
+                    f"{interface_file}: duplicate resolved connection name {conn_name!r}"
+                )
+            result[conn_name] = attrs
+
     return result

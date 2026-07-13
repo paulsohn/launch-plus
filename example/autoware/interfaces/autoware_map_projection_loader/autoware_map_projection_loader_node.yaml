@@ -1,0 +1,5 @@
+connections:
+  # Resolved topic name via component_interface_specs::map::MapProjectorInfo::name = "/map/map_projector_info"
+  - topic: /map/map_projector_info
+    type: publisher
+    msg_type: autoware_map_msgs/msg/MapProjectorInfo

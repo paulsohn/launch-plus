@@ -1,0 +1,10 @@
+connections:
+  # Resolved topic name via component_interface_specs::map::MapProjectorInfo::name = "/map/map_projector_info"
+  - topic: /map/map_projector_info
+    type: subscription
+    msg_type: autoware_map_msgs/msg/MapProjectorInfo
+
+  # Resolved topic name via component_interface_specs::map::VectorMap::name = "/map/vector_map"
+  - topic: /map/vector_map
+    type: publisher
+    msg_type: autoware_map_msgs/msg/LaneletMapBin

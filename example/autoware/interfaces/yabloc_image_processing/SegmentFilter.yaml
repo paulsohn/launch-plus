@@ -1,0 +1,16 @@
+connections:
+  - topic: ~/input/line_segments_cloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/input/graph_segmented
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - topic: ~/output/projected_line_segments_cloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/debug/debug_line_segments
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/debug/projected_image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image

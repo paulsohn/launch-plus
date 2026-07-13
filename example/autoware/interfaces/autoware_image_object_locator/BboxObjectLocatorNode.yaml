@@ -1,0 +1,12 @@
+connections:
+  # Per-ROI subscriptions (index determined by rois_ids param — dynamic count)
+  # Topic names configurable via params; defaults shown below
+  - topic: ~/input/camera_info0
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - topic: ~/input/rois0
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
+  - topic: ~/rois0/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects

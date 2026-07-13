@@ -1,0 +1,25 @@
+connections:
+  - topic: imu/data_tf_converted
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - topic: velocity
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped
+  - topic: velocity_status
+    type: subscription
+    msg_type: eagleye_msgs/msg/StatusStamped
+  - topic: distance
+    type: subscription
+    msg_type: eagleye_msgs/msg/Distance
+  - topic: height
+    type: publisher
+    msg_type: eagleye_msgs/msg/Height
+  - topic: pitching
+    type: publisher
+    msg_type: eagleye_msgs/msg/Pitching
+  - topic: acc_x_offset
+    type: publisher
+    msg_type: eagleye_msgs/msg/AccXOffset
+  - topic: acc_x_scale_factor
+    type: publisher
+    msg_type: eagleye_msgs/msg/AccXScaleFactor

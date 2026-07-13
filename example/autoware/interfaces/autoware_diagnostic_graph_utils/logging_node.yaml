@@ -1,0 +1,12 @@
+# Subscribes to the diagnostic graph via DiagGraphSubscription (absolute topics).
+# Publishes a periodic text dump of the error graph subtree rooted at 'root_path'.
+connections:
+  - topic: /diagnostics_graph/struct
+    type: subscription
+    msg_type: tier4_system_msgs/msg/DiagGraphStruct
+  - topic: /diagnostics_graph/status
+    type: subscription
+    msg_type: tier4_system_msgs/msg/DiagGraphStatus
+  - topic: ~/debug/error_graph_text
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped

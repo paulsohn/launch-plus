@@ -1,0 +1,7 @@
+connections:
+  - topic: rtklib_nav
+    type: publisher
+    msg_type: rtklib_msgs/msg/RtklibNav
+  - topic: rtklib/fix
+    type: publisher
+    msg_type: sensor_msgs/msg/NavSatFix

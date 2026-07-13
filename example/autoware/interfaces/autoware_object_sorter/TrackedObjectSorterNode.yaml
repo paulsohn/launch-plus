@@ -1,0 +1,7 @@
+connections:
+  - topic: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  - topic: ~/output/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrackedObjects

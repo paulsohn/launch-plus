@@ -1,0 +1,3 @@
+# Input and output topic names come from positional CLI args, not ROS parameters.
+# Cannot be determined statically. See todo.md.
+connections: []

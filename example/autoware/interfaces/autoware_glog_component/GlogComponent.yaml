@@ -1,0 +1,4 @@
+# GlogComponent is an infrastructure-only component: it initializes Google Logging (glog)
+# and installs a failure signal handler. It has no ROS 2 publishers, subscriptions,
+# services, or actions.
+connections: []

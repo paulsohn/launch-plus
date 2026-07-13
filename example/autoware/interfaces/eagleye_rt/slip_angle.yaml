@@ -1,0 +1,16 @@
+connections:
+  - topic: imu/data_tf_converted
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - topic: velocity_scale_factor
+    type: subscription
+    msg_type: eagleye_msgs/msg/VelocityScaleFactor
+  - topic: yaw_rate_offset_stop
+    type: subscription
+    msg_type: eagleye_msgs/msg/YawrateOffset
+  - topic: yaw_rate_offset_2nd
+    type: subscription
+    msg_type: eagleye_msgs/msg/YawrateOffset
+  - topic: slip_angle
+    type: publisher
+    msg_type: eagleye_msgs/msg/SlipAngle

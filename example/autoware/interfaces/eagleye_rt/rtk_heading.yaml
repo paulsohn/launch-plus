@@ -1,0 +1,19 @@
+connections:
+  - topic: imu/data_tf_converted
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - topic: velocity
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped
+  - topic: velocity_status
+    type: subscription
+    msg_type: eagleye_msgs/msg/StatusStamped
+  - topic: yaw_rate_offset_stop
+    type: subscription
+    msg_type: eagleye_msgs/msg/YawrateOffset
+  - topic: slip_angle
+    type: subscription
+    msg_type: eagleye_msgs/msg/SlipAngle
+  - topic: distance
+    type: subscription
+    msg_type: eagleye_msgs/msg/Distance

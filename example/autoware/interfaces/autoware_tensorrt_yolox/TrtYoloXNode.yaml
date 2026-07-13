@@ -1,0 +1,16 @@
+connections:
+  - topic: ~/in/image
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - topic: ~/out/objects
+    type: publisher
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
+  - topic: ~/out/mask
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+  - topic: ~/out/color_mask
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+  - topic: ~/out/image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image

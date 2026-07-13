@@ -1,0 +1,19 @@
+connections:
+  - topic: ~/input/reference_trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - topic: ~/input/control_raw
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/Control
+  - topic: ~/input/measured_steering
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+  - topic: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - topic: ~/output/error_stamped
+    type: publisher
+    msg_type: autoware_control_msgs/msg/ErrorStamped
+  - topic: ~/output/driving_status_stamped
+    type: publisher
+    msg_type: autoware_control_msgs/msg/DrivingMonitorStamped

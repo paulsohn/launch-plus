@@ -1,0 +1,7 @@
+connections:
+  - topic: imu/data_tf_converted
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - topic: angular_velocity_offset_stop
+    type: publisher
+    msg_type: eagleye_msgs/msg/AngularVelocityOffset

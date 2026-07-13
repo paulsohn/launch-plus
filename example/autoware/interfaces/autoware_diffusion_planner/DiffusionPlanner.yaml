@@ -1,0 +1,73 @@
+connections:
+  # Subscriptions (via InterProcessPollingSubscriber)
+  - topic: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - topic: ~/input/acceleration
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - topic: ~/input/tracked_objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  - topic: ~/input/traffic_signals
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+  - topic: ~/input/turn_indicators
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsReport
+  - topic: ~/input/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - topic: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  # Publishers
+  - topic: ~/output/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - topic: ~/output/trajectories
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - topic: ~/output/predicted_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+  - topic: ~/output/turn_indicators
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+  - topic: ~/output/debug/traffic_signal
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroup
+  - topic: ~/debug/route_marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - topic: ~/debug/lane_marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - topic: ~/debug/linestring_marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - topic: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: autoware_utils/msg/ProcessingTimeDetail
+  - topic: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - topic: ~/debug/inference_time_ms
+    type: publisher
+    msg_type: std_msgs/msg/Float64
+  - topic: ~/debug/denoising_steps
+    type: publisher
+    msg_type: std_msgs/msg/Float32MultiArray
+  - topic: ~/debug/guidance_status
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped
+  # Services
+  - topic: ~/service/set_start_guidance_enabled
+    type: service_server
+    msg_type: std_srvs/srv/SetBool
+  - topic: ~/service/set_stop_guidance_enabled
+    type: service_server
+    msg_type: std_srvs/srv/SetBool
+  - topic: ~/service/set_centerline_guidance_enabled
+    type: service_server
+    msg_type: std_srvs/srv/SetBool

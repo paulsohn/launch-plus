@@ -1,0 +1,16 @@
+connections:
+  - topic: ~/input/pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/output/pointcloud/segmentation
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/output/pointcloud/visualization
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/output/pointcloud/filtered
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/output/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects

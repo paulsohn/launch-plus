@@ -1,0 +1,7 @@
+# Python node: multi_camera_combiner (multi_camera_combiner_node:main)
+# Subscriptions to individual camera image topics are created dynamically from a runtime list.
+connections:
+  - topic: /sensing/camera/all_cameras/image_raw
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+  # Dynamic: subscribes to N individual camera image topics from runtime parameter list

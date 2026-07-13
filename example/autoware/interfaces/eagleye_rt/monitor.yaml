@@ -1,0 +1,73 @@
+connections:
+  - topic: imu/data_tf_converted
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - topic: rtklib/fix
+    type: subscription
+    msg_type: sensor_msgs/msg/NavSatFix
+  - topic: velocity_scale_factor
+    type: subscription
+    msg_type: eagleye_msgs/msg/VelocityScaleFactor
+  - topic: distance
+    type: subscription
+    msg_type: eagleye_msgs/msg/Distance
+  - topic: heading_1st
+    type: subscription
+    msg_type: eagleye_msgs/msg/Heading
+  - topic: heading_interpolate_1st
+    type: subscription
+    msg_type: eagleye_msgs/msg/Heading
+  - topic: heading_2nd
+    type: subscription
+    msg_type: eagleye_msgs/msg/Heading
+  - topic: heading_interpolate_2nd
+    type: subscription
+    msg_type: eagleye_msgs/msg/Heading
+  - topic: heading_3rd
+    type: subscription
+    msg_type: eagleye_msgs/msg/Heading
+  - topic: heading_interpolate_3rd
+    type: subscription
+    msg_type: eagleye_msgs/msg/Heading
+  - topic: yaw_rate_offset_stop
+    type: subscription
+    msg_type: eagleye_msgs/msg/YawrateOffset
+  - topic: yaw_rate_offset_1st
+    type: subscription
+    msg_type: eagleye_msgs/msg/YawrateOffset
+  - topic: yaw_rate_offset_2nd
+    type: subscription
+    msg_type: eagleye_msgs/msg/YawrateOffset
+  - topic: slip_angle
+    type: subscription
+    msg_type: eagleye_msgs/msg/SlipAngle
+  - topic: enu_relative_pos
+    type: subscription
+    msg_type: eagleye_msgs/msg/Position
+  - topic: enu_vel
+    type: subscription
+    msg_type: geometry_msgs/msg/Vector3Stamped
+  - topic: height
+    type: subscription
+    msg_type: eagleye_msgs/msg/Height
+  - topic: pitching
+    type: subscription
+    msg_type: eagleye_msgs/msg/Pitching
+  - topic: enu_absolute_pos
+    type: subscription
+    msg_type: eagleye_msgs/msg/Position
+  - topic: enu_absolute_pos_interpolate
+    type: subscription
+    msg_type: eagleye_msgs/msg/Position
+  - topic: fix
+    type: subscription
+    msg_type: sensor_msgs/msg/NavSatFix
+  - topic: twist
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped
+  - topic: rolling
+    type: subscription
+    msg_type: eagleye_msgs/msg/Rolling
+  - topic: velocity
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped

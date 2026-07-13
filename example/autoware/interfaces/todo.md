@@ -121,6 +121,103 @@ cannot be fully represented.
 - **Workaround**: Only the static `~/output/total_latency_ms` publisher and `/diagnostics` are recorded.
 - **Possible fix**: Same `dynamic_subscriptions` extension.
 
+## Fully dynamic topic nodes (topic from CLI args, not params)
+
+### topic_tools/relay
+- **Package**: `topic_tools`
+- **File**: `topic_tools/relay.yaml`
+- **Issue**: Input and output topic names are positional CLI `args`, not ROS parameters.
+  They cannot be determined from params at all. Only a stub is recorded.
+- **Workaround**: Empty connections list; relay instances are identified via node name in the launch file.
+- **Possible fix**: Provide instance-level override in the plugin or parse `args` from the launch XML.
+
+## Skipped (visualization tools with no static roscope connections)
+
+- `rviz2` — subscribes to a user-configurable set of display topics; not covered.
+
+## Dynamic topics from parameter lists (extension packages)
+
+### BEVFusionNode
+- **Package**: `autoware_bevfusion`
+- **File**: `autoware_bevfusion/BEVFusionNode.yaml`
+- **Issue**: `~/input/image{i}` and `~/input/camera_info{i}` (i = 0..num_cameras-1); count from `num_cameras` TensorRT config. Only index 0 recorded.
+
+### StreamPetrNode
+- **Package**: `autoware_camera_streampetr`
+- **File**: `autoware_camera_streampetr/StreamPetrNode.yaml`
+- **Issue**: `~/input/camera{i}/camera_info` and `~/input/camera{i}/image` (i = 0..rois_number-1); count from `rois_number` param. Only index 0 recorded.
+
+### BboxObjectLocatorNode
+- **Package**: `autoware_image_object_locator`
+- **File**: `autoware_image_object_locator/BboxObjectLocatorNode.yaml`
+- **Issue**: Per-ROI camera_info, ROI subscribers, and output publishers created for each entry in `rois_ids` param. Topic names configurable per camera. Only index 0 recorded.
+
+### Image projection fusion nodes (all)
+- **Package**: `autoware_image_projection_based_fusion`
+- **Files**: `RoiClusterFusionNode.yaml`, `RoiDetectedObjectFusionNode.yaml`, `RoiPointCloudFusionNode.yaml`, `PointPaintingFusionNode.yaml`, `SegmentationPointCloudFusionNode.yaml`
+- **Issue**: `input/rois{i}` and `input/camera_info{i}` (i = 0..rois_number-1); count from `rois_number`. Only index 0 recorded.
+
+### SimpleDetectedObjectMergerNode / SimpleTrackedObjectMergerNode
+- **Package**: `autoware_simple_object_merger`
+- **Files**: `SimpleDetectedObjectMergerNode.yaml`, `SimpleTrackedObjectMergerNode.yaml`
+- **Issue**: Input topics entirely from `input_topics` string array param. No static topic names; YAML has placeholder comment only.
+
+### CudaPointCloudConcatenateDataSynchronizerComponent
+- **Package**: `autoware_cuda_pointcloud_preprocessor`
+- **File**: `autoware_cuda_pointcloud_preprocessor/CudaPointCloudConcatenateDataSynchronizerComponent.yaml`
+- **Issue**: Each entry in `input_topics` (vector<string>) becomes a CudaPointCloud2 subscription. Only fixed `output` and `output_info` publishers recorded.
+
+### CalibrationStatusClassifierNode
+- **Package**: `autoware_calibration_status_classifier`
+- **File**: `autoware_calibration_status_classifier/CalibrationStatusClassifierNode.yaml`
+- **Issue**: `input.cloud_topics` (vector<string>) → PointCloud2 subs; `input.image_topics` (vector<string>) → Image subs; msg types for velocity/angular velocity/objects subs vary by source parameter. Array subs omitted.
+
+### VadNode
+- **Package**: `autoware_tensorrt_vad`
+- **File**: `autoware_tensorrt_vad/VadNode.yaml`
+- **Issue**: `~/input/image<i>` and `~/input/camera_info<i>` (i = 0..num_cameras-1) from `node_params.num_cameras`. Only static entries recorded.
+
+## Dynamic topics from runtime config or CLI args (extension packages)
+
+### autoware_carla_interface (main node)
+- **Package**: `autoware_carla_interface`
+- **File**: `autoware_carla_interface/autoware_carla_interface.yaml`
+- **Issue**: Sensor publishers (Image, CameraInfo, PointCloud2, Imu, etc.) created from a runtime sensor kit config file. Only vehicle interface topics recorded.
+
+### multi_camera_combiner
+- **Package**: `autoware_carla_interface`
+- **File**: `autoware_carla_interface/multi_camera_combiner.yaml`
+- **Issue**: Camera subscriptions from a runtime list parameter. Only combined output publisher recorded.
+
+### TopicRelayController (generic mode)
+- **Package**: `autoware_topic_relay_controller`
+- **File**: `autoware_topic_relay_controller/TopicRelayController.yaml`
+- **Issue**: In non-TF mode, topic name and msg type (`topic_type` param) fully runtime-determined via `create_generic_publisher/subscription`. TF-mode and service-server entries are recorded.
+
+### ConverterNode
+- **Package**: `autoware_scenario_simulator_v2_adapter`
+- **File**: `autoware_scenario_simulator_v2_adapter/ConverterNode.yaml`
+- **Issue**: Metric topic subscriptions from a runtime parameter list; `UserDefinedValue` publishers with runtime-derived names from metric fields. Only `/diagnostics` subscription recorded.
+
+### ControlCmdGate
+- **Package**: `autoware_control_command_gate`
+- **File**: `autoware_control_command_gate/ControlCmdGate.yaml`
+- **Issue**: Per-source input topics `~/inputs/<name>/control`, `~/inputs/<name>/gear`, etc., where names come from `inputs_names.<id>` parameters. Only static outputs and vehicle status subscriptions recorded.
+
+### PathToTrajectory
+- **Package**: `autoware_planning_topic_converter`
+- **File**: `autoware_planning_topic_converter/PathToTrajectory.yaml`
+- **Issue**: `input_topic` and `output_topic` are runtime params; types are statically known (Path → Trajectory) but topic strings are not.
+
+## eagleye_rt — argument-driven topic selection
+
+Many eagleye_rt executables select topic names via argv[1] ("1st"/"2nd"/"3rd") or parameters:
+- `heading`, `heading_interpolate`, `yaw_rate_offset`: argv[1] selects which order's pub/sub topics
+- `rtk_heading`, `rtk_dead_reckoning`, `height`, `smoothing`, `tf_converted_imu`, `twist_relay`, `monitor`, `velocity_estimator`, `slip_coefficient`, `velocity_scale_factor`: topic names from parameters
+- `slip_coefficient`: no ROS publishers (results written to file)
+
+YAML files record default/best-effort topic names where identifiable from source. See `todo_batch_b.md` for full per-executable breakdown.
+
 ## Unverified interfaces (source not in workspace)
 
 ### ublox_gps_node

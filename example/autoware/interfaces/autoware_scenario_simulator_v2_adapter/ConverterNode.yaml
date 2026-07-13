@@ -1,0 +1,11 @@
+# Subscriptions to metric topics are dynamic (configured at runtime via parameter list).
+# Only the diagnostics subscription is statically known.
+# Publishers are created per-metric-field at runtime (UserDefinedValue on dynamic topic names).
+connections:
+  # Static diagnostic subscription
+  - topic: /diagnostics
+    type: subscription
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+  # Dynamic: subscribes to N metric topics from parameter list (tier4_metric_msgs/msg/MetricArray)
+  # Dynamic: publishes UserDefinedValue on per-field topic names derived from metric fields
+  # See todo_batch_a.md for details

@@ -1,0 +1,19 @@
+connections:
+  - topic: enu_vel
+    type: subscription
+    msg_type: geometry_msgs/msg/Vector3Stamped
+  - topic: enu_absolute_pos
+    type: subscription
+    msg_type: eagleye_msgs/msg/Position
+  - topic: gnss_smooth_pos_enu
+    type: subscription
+    msg_type: eagleye_msgs/msg/Position
+  - topic: height
+    type: subscription
+    msg_type: eagleye_msgs/msg/Height
+  - topic: enu_absolute_pos_interpolate
+    type: publisher
+    msg_type: eagleye_msgs/msg/Position
+  - topic: fix
+    type: publisher
+    msg_type: sensor_msgs/msg/NavSatFix

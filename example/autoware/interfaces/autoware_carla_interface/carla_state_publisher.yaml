@@ -1,0 +1,10 @@
+connections:
+  - topic: ~/input/pose_with_covariance
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - topic: ~/input/twist_with_covariance
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+  - topic: ~/output/odometry
+    type: publisher
+    msg_type: nav_msgs/msg/Odometry

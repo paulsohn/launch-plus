@@ -1,0 +1,18 @@
+connections:
+  # Self pose from TF (via SelfPoseListener - not a regular subscription)
+  - topic: /planning/mission_planning/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  # Debug outputs via DebugPublisher (prefix: goal_distance_calculator)
+  - topic: ~/deviation/lateral
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - topic: ~/deviation/longitudinal
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - topic: ~/deviation/yaw
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - topic: ~/deviation/yaw_deg
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

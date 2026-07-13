@@ -1,0 +1,12 @@
+connections:
+  # Per-camera subscriptions (index 0..rois_number-1)
+  # Dynamic count — only static pattern recorded here
+  - topic: ~/input/camera0/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - topic: ~/input/camera0/image
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - topic: ~/output/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects

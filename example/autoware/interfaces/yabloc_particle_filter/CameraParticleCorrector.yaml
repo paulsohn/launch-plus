@@ -1,0 +1,34 @@
+connections:
+  - topic: ~/input/line_segments_cloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/input/ll2_road_marking
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/input/ll2_bounding_box
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/input/pose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseStamped
+  - topic: ~/debug/match_image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+  - topic: ~/debug/cost_map_image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+  - topic: ~/debug/cost_map_range
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - topic: ~/debug/state_string
+    type: publisher
+    msg_type: std_msgs/msg/String
+  - topic: ~/debug/scored_cloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/debug/scored_post_cloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/switch_srv
+    type: service_server
+    msg_type: std_srvs/srv/SetBool

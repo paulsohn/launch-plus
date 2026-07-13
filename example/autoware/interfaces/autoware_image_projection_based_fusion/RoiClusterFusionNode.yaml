@@ -1,0 +1,15 @@
+connections:
+  # Base FusionNode: 3D input (pointcloud/cluster) and per-camera 2D ROI + camera_info
+  # rois_number is a runtime param; pattern shown for index 0
+  - topic: input
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
+  - topic: input/rois0
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
+  - topic: input/camera_info0
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - topic: output
+    type: publisher
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature

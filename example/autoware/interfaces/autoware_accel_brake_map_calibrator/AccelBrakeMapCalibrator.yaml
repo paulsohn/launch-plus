@@ -1,0 +1,64 @@
+connections:
+  - topic: ~/input/steer
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+  - topic: ~/input/actuation_status
+    type: subscription
+    msg_type: tier4_vehicle_msgs/msg/ActuationStatusStamped
+  - topic: ~/input/actuation_cmd
+    type: subscription
+    msg_type: tier4_vehicle_msgs/msg/ActuationCommandStamped
+  - topic: ~/input/velocity
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/VelocityReport
+  - topic: ~/output/update_suggest
+    type: publisher
+    msg_type: std_msgs/msg/Bool
+  - topic: ~/output/update_raw_map
+    type: publisher
+    msg_type: std_msgs/msg/Float32MultiArray
+  - topic: ~/output/debug_values
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
+  - topic: ~/output/current_map_error
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: ~/output/updated_map_error
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: ~/output/map_error_ratio
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: /accel_brake_map_calibrator/output/calibration_status
+    type: publisher
+    msg_type: tier4_external_api_msgs/msg/CalibrationStatus
+  - topic: ~/debug/original_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - topic: ~/debug/update_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - topic: ~/debug/data_average_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - topic: ~/debug/data_std_dev_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - topic: ~/debug/data_count_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - topic: ~/debug/data_count_self_pose_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - topic: ~/debug/occ_index
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - topic: ~/debug/original_raw_map
+    type: publisher
+    msg_type: std_msgs/msg/Float32MultiArray
+  - topic: ~/debug/offset_covariance
+    type: publisher
+    msg_type: std_msgs/msg/Float32MultiArray
+  - topic: ~/input/update_map_dir
+    type: service_server
+    msg_type: tier4_vehicle_msgs/srv/UpdateAccelBrakeMap

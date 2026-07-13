@@ -1,0 +1,13 @@
+connections:
+  - topic: pose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseStamped
+  - topic: twist
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistStamped
+  - topic: linear_x
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: angular_z
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped

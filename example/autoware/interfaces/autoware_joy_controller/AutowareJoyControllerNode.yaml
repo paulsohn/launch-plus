@@ -1,0 +1,34 @@
+connections:
+  - topic: input/joy
+    type: subscription
+    msg_type: sensor_msgs/msg/Joy
+  - topic: input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - topic: output/control_command
+    type: publisher
+    msg_type: autoware_control_msgs/msg/Control
+  - topic: output/control
+    type: publisher
+    msg_type: tier4_external_api_msgs/msg/ControlCommandStamped
+  - topic: output/shift
+    type: publisher
+    msg_type: tier4_external_api_msgs/msg/GearShiftStamped
+  - topic: output/turn_signal
+    type: publisher
+    msg_type: tier4_external_api_msgs/msg/TurnSignalStamped
+  - topic: output/gate_mode
+    type: publisher
+    msg_type: tier4_control_msgs/msg/GateMode
+  - topic: output/heartbeat
+    type: publisher
+    msg_type: tier4_external_api_msgs/msg/Heartbeat
+  - topic: output/vehicle_engage
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/Engage
+  - topic: service/emergency_stop
+    type: service_client
+    msg_type: tier4_external_api_msgs/srv/SetEmergency
+  - topic: service/autoware_engage
+    type: service_client
+    msg_type: tier4_external_api_msgs/srv/Engage

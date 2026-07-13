@@ -1,0 +1,10 @@
+connections:
+  - topic: /api/autoware/set/velocity_limit
+    type: service_server
+    msg_type: tier4_external_api_msgs/srv/SetVelocityLimit
+  - topic: /planning/scenario_planning/max_velocity_default
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+  - topic: /planning/scenario_planning/current_max_velocity
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit

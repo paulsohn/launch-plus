@@ -1,0 +1,22 @@
+connections:
+  - topic: ~/input/pose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseStamped
+  - topic: ~/input/steer
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+  - topic: ~/output/steering_offset
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: ~/output/steering_offset_covariance
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: ~/output/debug_info
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped
+  - topic: ~/output/steering_offset_update
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: ~/trigger_steer_offset_calibration
+    type: service_server
+    msg_type: std_srvs/srv/Trigger

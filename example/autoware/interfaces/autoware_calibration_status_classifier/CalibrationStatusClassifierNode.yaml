@@ -1,0 +1,13 @@
+connections:
+  - topic: ~/input/linear_velocity
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped
+  - topic: ~/input/angular_velocity
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped
+  - topic: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - topic: ~/input/validate_calibration_srv
+    type: service
+    msg_type: std_srvs/srv/Trigger

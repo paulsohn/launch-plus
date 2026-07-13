@@ -1,0 +1,13 @@
+connections:
+  - topic: ~/input/command_array
+    type: subscription
+    msg_type: tier4_v2x_msgs/msg/InfrastructureCommandArray
+  - topic: ~/input/planning_factors
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+  - topic: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - topic: ~/output/state_array
+    type: publisher
+    msg_type: tier4_v2x_msgs/msg/VirtualTrafficLightStateArray

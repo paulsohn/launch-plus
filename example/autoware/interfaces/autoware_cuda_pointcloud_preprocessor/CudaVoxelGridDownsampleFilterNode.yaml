@@ -1,0 +1,7 @@
+connections:
+  - topic: ~/input/pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/output/pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2

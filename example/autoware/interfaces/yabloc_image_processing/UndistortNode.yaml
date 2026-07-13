@@ -1,0 +1,16 @@
+connections:
+  - topic: ~/input/image_raw
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - topic: ~/input/image_raw/compressed
+    type: subscription
+    msg_type: sensor_msgs/msg/CompressedImage
+  - topic: ~/input/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - topic: ~/output/resized_info
+    type: publisher
+    msg_type: sensor_msgs/msg/CameraInfo
+  - topic: ~/output/resized_image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image

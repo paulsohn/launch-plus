@@ -1,0 +1,13 @@
+connections:
+  - topic: ~/input/objects
+    type: subscription
+    msg_type: autoware_sensing_msgs/msg/RadarObjects
+  - topic: ~/input/radar_info
+    type: subscription
+    msg_type: autoware_sensing_msgs/msg/RadarInfo
+  - topic: ~/output/detections
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - topic: ~/output/tracks
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrackedObjects

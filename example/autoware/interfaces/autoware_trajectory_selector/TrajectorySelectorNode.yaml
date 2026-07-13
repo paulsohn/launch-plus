@@ -1,0 +1,28 @@
+connections:
+  - topic: ~/input/lanelet2_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - topic: ~/input/trajectories_generative
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - topic: ~/input/trajectories_backup
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - topic: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - topic: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+  - topic: ~/input/acceleration
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - topic: ~/input/traffic_signals
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+  - topic: ~/output/trajectories
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - topic: ~/debug/processing_time_detail_ms/trajectory_selector
+    type: publisher
+    msg_type: autoware_utils_debug/msg/ProcessingTimeDetail

@@ -1,0 +1,7 @@
+connections:
+  - topic: input_geo_pose
+    type: subscription
+    msg_type: geographic_msgs/msg/GeoPoseWithCovariance
+  - topic: output_pose
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped

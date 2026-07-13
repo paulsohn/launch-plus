@@ -1,0 +1,13 @@
+connections:
+  - topic: input/main_object
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  - topic: input/sub_object
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  - topic: output/object
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  - topic: debug/interpolated_sub_object
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrackedObjects

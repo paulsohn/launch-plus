@@ -1,0 +1,16 @@
+connections:
+  - topic: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - topic: ~/output/ll2_road_marking
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/output/ll2_sign_board
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/output/ll2_bounding_box
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: ~/debug/sign_board_marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray

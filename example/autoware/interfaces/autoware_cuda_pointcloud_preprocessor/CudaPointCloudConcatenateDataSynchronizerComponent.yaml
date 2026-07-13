@@ -1,0 +1,7 @@
+connections:
+  - topic: output
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - topic: output_info
+    type: publisher
+    msg_type: autoware_sensing_msgs/msg/ConcatenatedPointCloudInfo

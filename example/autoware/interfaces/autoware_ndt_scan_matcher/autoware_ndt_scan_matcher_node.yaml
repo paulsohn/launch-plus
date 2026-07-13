@@ -1,0 +1,117 @@
+connections:
+  # Subscriptions
+  - topic: ekf_pose_with_covariance
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+
+  - topic: points_raw
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+
+  # Regularization pose subscription — only active when ndt_regularization_enable is true
+  - topic: regularization_pose_with_covariance
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+    when: "params.get('ndt_regularization_enable', False)"
+
+  # Publishers — primary outputs
+  - topic: ndt_pose
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseStamped
+
+  - topic: ndt_pose_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+
+  # Publishers — debug outputs
+  - topic: points_aligned
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+
+  - topic: points_aligned_no_ground
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+
+  - topic: initial_pose_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+
+  - topic: multi_ndt_pose
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseArray
+
+  - topic: multi_initial_pose
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseArray
+
+  - topic: exe_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+
+  - topic: transform_probability
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+
+  - topic: nearest_voxel_transformation_likelihood
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+
+  - topic: no_ground_transform_probability
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+
+  - topic: no_ground_nearest_voxel_transformation_likelihood
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+
+  - topic: voxel_score_points
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+
+  - topic: iteration_num
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Int32Stamped
+
+  - topic: initial_to_result_relative_pose
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseStamped
+
+  - topic: initial_to_result_distance
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+
+  - topic: initial_to_result_distance_old
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+
+  - topic: initial_to_result_distance_new
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+
+  - topic: ndt_marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  - topic: monte_carlo_initial_pose_marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  - topic: debug/loaded_pointcloud_map
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+
+  # Diagnostics published via DiagnosticsInterface
+  - topic: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+
+  # Service servers
+  - topic: ndt_align_srv
+    type: service_server
+
+  - topic: trigger_node_srv
+    type: service_server
+
+  # Service client — dynamic map loading (MapUpdateModule)
+  - topic: pcd_loader_service
+    type: service_client

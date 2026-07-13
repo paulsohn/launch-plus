@@ -1,0 +1,18 @@
+connections:
+  # Subscriptions
+  - topic: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+
+  - topic: ~/input/twist
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+
+  # Publishers
+  - topic: ~/debug/diff_pose
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseStamped
+
+  - topic: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray

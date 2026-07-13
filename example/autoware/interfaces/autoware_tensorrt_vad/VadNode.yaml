@@ -1,6 +1,12 @@
-# Dynamic topics: ~/input/image<i> and ~/input/camera_info<i> are created per camera
-# where i in range(num_cameras); only static entries are listed here.
 connections:
+  - loop: "range(params.get('node_params.num_cameras', 6))"
+    name_expr: "'~/input/image%d' % item"
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - loop: "range(params.get('node_params.num_cameras', 6))"
+    name_expr: "'~/input/camera_info%d' % item"
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
   - name: ~/input/kinematic_state
     type: subscription
     msg_type: nav_msgs/msg/Odometry

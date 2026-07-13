@@ -1,12 +1,15 @@
 connections:
-  # Per-ROI subscriptions (index determined by rois_ids param — dynamic count)
-  # Topic names configurable via params; defaults shown below
-  - name: ~/input/camera_info0
+  # rois_ids is a list[int] — topic names use the ID value as a string suffix.
+  # The actual topic for each ID is declared as a parameter with a sensible default.
+  - loop: "to_list(params.get('rois_ids', []))"
+    name_expr: "params.get('input/camera_info' + item, '/sensing/camera/camera' + item + '/camera_info')"
     type: subscription
     msg_type: sensor_msgs/msg/CameraInfo
-  - name: ~/input/rois0
+  - loop: "to_list(params.get('rois_ids', []))"
+    name_expr: "params.get('input/rois' + item, '/perception/object_recognition/detection/rois' + item)"
     type: subscription
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
-  - name: ~/rois0/objects
+  - loop: "to_list(params.get('rois_ids', []))"
+    name_expr: "params.get('output/rois' + item + '/objects', '~/rois' + item + '/objects')"
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects

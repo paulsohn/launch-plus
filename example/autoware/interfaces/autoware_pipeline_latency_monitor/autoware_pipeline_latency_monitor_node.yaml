@@ -1,7 +1,9 @@
-# EXCEPTION: Subscriptions are created from runtime params (processing_steps.sequence list).
-# Each step subscribes to the topic name and type declared in params.
-# Only the static output is listed here.
 connections:
+  - loop: "to_list(params.get('processing_steps.sequence', []))"
+    name_expr: "params.get('processing_steps.' + item + '.topic', '')"
+    type: subscription
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+    when: "params.get('processing_steps.' + item + '.topic', '') != ''"
   - name: ~/output/total_latency_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

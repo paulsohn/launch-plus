@@ -29,9 +29,10 @@ connections:
   - name: ~/input/turn_indicators_status
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsReport
-  # Dynamic subscriptions: one per module in stop_decision.module_list param,
-  # topic = stop_decision.topic_prefix + module_name. Not statically expressible.
-  # See todo.md for details.
+  - loop: "to_list(params.get('stop_decision.module_list', []))"
+    name_expr: "params.get('stop_decision.topic_prefix', '/planning/planning_factors/') + item"
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/PlanningFactorArray
   - name: ~/metrics
     type: publisher
     msg_type: tier4_metric_msgs/msg/MetricArray

@@ -1,10 +1,10 @@
 connections:
-  # Per-camera subscriptions (index 0..rois_number-1)
-  # Dynamic count — only static pattern recorded here
-  - name: ~/input/camera0/camera_info
+  - loop: "range(params.get('rois_number', 6))"
+    name_expr: "'~/input/camera%d/camera_info' % item"
     type: subscription
     msg_type: sensor_msgs/msg/CameraInfo
-  - name: ~/input/camera0/image
+  - loop: "range(params.get('rois_number', 6))"
+    name_expr: "'~/input/camera%d/image' % item"
     type: subscription
     msg_type: sensor_msgs/msg/Image
   - name: ~/output/objects

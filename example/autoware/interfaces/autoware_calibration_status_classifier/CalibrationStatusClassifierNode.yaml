@@ -8,6 +8,14 @@ connections:
   - name: ~/input/objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - loop: "to_list(params.get('input.cloud_topics', []))"
+    name_expr: "item"
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - loop: "to_list(params.get('input.image_topics', []))"
+    name_expr: "item"
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
   - name: ~/input/validate_calibration_srv
     type: service
     msg_type: std_srvs/srv/Trigger

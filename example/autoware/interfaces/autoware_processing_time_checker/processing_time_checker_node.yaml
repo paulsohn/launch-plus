@@ -1,7 +1,8 @@
-# EXCEPTION: Subscriptions are created from runtime param processing_time_topic_name_list.
-# Each entry in that list becomes a subscription to Float64Stamped.
-# Only the static output is listed here.
 connections:
+  - loop: "to_list(params.get('processing_time_topic_name_list', []))"
+    name_expr: "item"
+    type: subscription
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
   - name: ~/metrics
     type: publisher
     msg_type: tier4_metric_msgs/msg/MetricArray

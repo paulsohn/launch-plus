@@ -32,14 +32,10 @@ connections:
     type: subscription
     msg_type: autoware_perception_msgs/msg/PredictedObjects
 
-  # Dynamic planning_factor subscriptions — topic names are
-  #   params["planning_factor_metrics.topic_prefix"] + module_name
-  # Default prefix: /planning/planning_factors/
-  # Default modules: blind_spot, crosswalk, detection_area, intersection,
-  #   merge_from_private, no_drivable_lane, no_stopping_area, stop_line,
-  #   traffic_light, virtual_traffic_light, walkway
-  # EXCEPTION: runtime-configured list; static entries omitted.
-  # See todo.md for tracking.
+  - loop: "to_list(params.get('planning_factor_metrics.stop_deviation.module_list', []))"
+    name_expr: "params.get('planning_factor_metrics.topic_prefix', '/planning/planning_factors/') + item"
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/PlanningFactorArray
 
   # Outputs
   - name: ~/metrics

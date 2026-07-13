@@ -1,6 +1,9 @@
 # Dynamic topics: ~/inputs/<name>/control, ~/inputs/<name>/gear,
 # ~/inputs/<name>/turn_indicators, ~/inputs/<name>/hazard_lights are created per
-# source named in params["inputs_names.<id>"]. Only static entries listed here.
+# source. The `inputs` param is a list[int] of source IDs; the name for each ID
+# comes from `inputs_names.<id>` (a separate param per integer ID).
+# This two-level indirection (int ID → name string → topic path) cannot be expressed
+# with the loop: format. See todo.md for tracking.
 connections:
   - name: /localization/kinematic_state
     type: subscription

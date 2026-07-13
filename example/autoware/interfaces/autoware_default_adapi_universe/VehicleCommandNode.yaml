@@ -1,0 +1,19 @@
+connections:
+  - topic: /control/command/control_cmd
+    type: subscription
+    msg_type: autoware_control_msgs/msg/Control
+  - topic: /control/command/actuation_cmd
+    type: subscription
+    msg_type: tier4_vehicle_msgs/msg/ActuationCommandStamped
+  - topic: /api/control/command/pedals
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
+  - topic: /api/control/command/acceleration
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/AccelerationCommand
+  - topic: /api/control/command/velocity
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/VelocityCommand
+  - topic: /api/control/command/steering
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand

@@ -1,0 +1,7 @@
+connections:
+  - topic: ~/initialpose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - topic: /api/localization/initialize
+    type: service_client
+    msg_type: autoware_adapi_v1_msgs/srv/InitializeLocalization

@@ -1,0 +1,15 @@
+connections:
+  # DiagGraphSubscription subscribes to the aggregator's struct and status topics
+  - topic: /diagnostics_graph/struct
+    type: subscription
+    msg_type: tier4_system_msgs/msg/DiagGraphStruct
+  - topic: /diagnostics_graph/status
+    type: subscription
+    msg_type: tier4_system_msgs/msg/DiagGraphStatus
+  - topic: ~/input/emergency_holding
+    type: subscription
+    msg_type: tier4_system_msgs/msg/EmergencyHoldingState
+    when: "params.get('use_external_emergency_holding', False)"
+  - topic: ~/hazard_status
+    type: publisher
+    msg_type: autoware_system_msgs/msg/HazardStatusStamped

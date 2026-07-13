@@ -1,0 +1,7 @@
+connections:
+  - topic: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+  - topic: ~/memory_usage
+    type: publisher
+    msg_type: tier4_external_api_msgs/msg/MemoryStatus

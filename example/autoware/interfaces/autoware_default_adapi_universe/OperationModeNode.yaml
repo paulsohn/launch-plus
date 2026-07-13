@@ -1,0 +1,34 @@
+connections:
+  - topic: /system/operation_mode/state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  - topic: /system/operation_mode/availability
+    type: subscription
+    msg_type: tier4_system_msgs/msg/OperationModeAvailability
+  - topic: /api/operation_mode/state
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  - topic: /api/operation_mode/change_to_stop
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/ChangeOperationMode
+  - topic: /api/operation_mode/change_to_autonomous
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/ChangeOperationMode
+  - topic: /api/operation_mode/change_to_local
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/ChangeOperationMode
+  - topic: /api/operation_mode/change_to_remote
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/ChangeOperationMode
+  - topic: /api/operation_mode/enable_autoware_control
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/ChangeOperationMode
+  - topic: /api/operation_mode/disable_autoware_control
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/ChangeOperationMode
+  - topic: /system/operation_mode/change_operation_mode
+    type: service_client
+    msg_type: autoware_system_msgs/srv/ChangeOperationMode
+  - topic: /system/operation_mode/change_autoware_control
+    type: service_client
+    msg_type: autoware_system_msgs/srv/ChangeAutowareControl

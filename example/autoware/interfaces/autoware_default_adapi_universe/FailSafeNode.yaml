@@ -1,0 +1,10 @@
+connections:
+  - topic: /system/fail_safe/mrm_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/MrmState
+  - topic: /api/fail_safe/mrm_state
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/MrmState
+  - topic: /api/fail_safe/list_mrm_description
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/ListMrmDescription

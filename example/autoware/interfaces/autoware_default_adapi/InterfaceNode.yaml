@@ -1,0 +1,4 @@
+connections:
+  - topic: /api/interface/version
+    type: service_server
+    msg_type: autoware_adapi_version_msgs/srv/InterfaceVersion

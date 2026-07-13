@@ -1,0 +1,7 @@
+# EXCEPTION: Subscriptions are created from runtime param processing_time_topic_name_list.
+# Each entry in that list becomes a subscription to Float64Stamped.
+# Only the static output is listed here.
+connections:
+  - topic: ~/metrics
+    type: publisher
+    msg_type: tier4_metric_msgs/msg/MetricArray

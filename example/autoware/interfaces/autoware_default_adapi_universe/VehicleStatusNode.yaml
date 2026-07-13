@@ -1,0 +1,31 @@
+connections:
+  - topic: /localization/kinematic_state
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - topic: /localization/acceleration
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - topic: /vehicle/status/steering_status
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+  - topic: /vehicle/status/gear_status
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/GearReport
+  - topic: /vehicle/status/turn_indicators_status
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsReport
+  - topic: /vehicle/status/hazard_lights_status
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsReport
+  - topic: /vehicle/status/battery_charge
+    type: subscription
+    msg_type: tier4_vehicle_msgs/msg/BatteryStatus
+  - topic: /map/map_projector_info
+    type: subscription
+    msg_type: autoware_map_msgs/msg/MapProjectorInfo
+  - topic: /api/vehicle/kinematics
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/VehicleKinematics
+  - topic: /api/vehicle/status
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/VehicleStatus

@@ -91,6 +91,36 @@ cannot be fully represented.
 - **Action needed**: Verify exact message type (`autoware_internal_debug_msgs/msg/Float64Stamped`
   or similar) and decide whether to add a `dynamic_publishers` key for these per-module topics.
 
+## Runtime-configurable topic monitors
+
+### TopicStateMonitorNode
+- **Package**: `autoware_topic_state_monitor`
+- **File**: `autoware_topic_state_monitor/TopicStateMonitorNode.yaml`
+- **Issue**: The monitored topic name comes entirely from the `topic` runtime parameter and
+  the type from `topic_type`. Only the `/diagnostics` output is statically knowable.
+- **Workaround**: Only `/diagnostics` publisher recorded.
+- **Possible fix**: Extend with a `dynamic_subscriptions` key or an instance-level override.
+
+### processing_time_checker_node
+- **Package**: `autoware_processing_time_checker`
+- **File**: `autoware_processing_time_checker/processing_time_checker_node.yaml`
+- **Issue**: Subscriptions are created in a loop over the `processing_time_topic_name_list`
+  parameter (a `list[str]`). Each entry becomes a subscription to
+  `autoware_internal_debug_msgs/msg/Float64Stamped`.
+- **Workaround**: Only the static `~/metrics` publisher is recorded.
+- **Possible fix**: Same `dynamic_subscriptions` extension.
+
+### autoware_pipeline_latency_monitor_node
+- **Package**: `autoware_pipeline_latency_monitor`
+- **File**: `autoware_pipeline_latency_monitor/autoware_pipeline_latency_monitor_node.yaml`
+- **Issue**: Subscriptions are created from the `processing_steps.sequence` parameter (a
+  `list[str]`). For each step, the topic name and type are declared in sub-parameters
+  `processing_steps.<step>.topic` and `processing_steps.<step>.topic_type`.
+  Supported types are `autoware_internal_debug_msgs/msg/Float64Stamped` and
+  `autoware_planning_validator/msg/PlanningValidatorStatus`.
+- **Workaround**: Only the static `~/output/total_latency_ms` publisher and `/diagnostics` are recorded.
+- **Possible fix**: Same `dynamic_subscriptions` extension.
+
 ## Unverified interfaces (source not in workspace)
 
 ### ublox_gps_node

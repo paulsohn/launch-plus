@@ -1,0 +1,12 @@
+# EXCEPTION: Subscriptions are created from runtime params (processing_steps.sequence list).
+# Each step subscribes to the topic name and type declared in params.
+# Only the static output is listed here.
+connections:
+  - topic: ~/output/total_latency_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - topic: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+  # Debug topics published via DebugPublisher under "pipeline_latency_monitor" namespace
+  # (e.g. ~/debug/<step>_latency_ms, ~/debug/pipeline_total_latency_ms) — omitted as runtime-driven

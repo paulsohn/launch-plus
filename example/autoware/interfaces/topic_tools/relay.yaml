@@ -1,3 +1,7 @@
-# Input and output topic names come from positional CLI args, not ROS parameters.
-# Cannot be determined statically. See todo.md.
-connections: []
+connections:
+  - name_expr: "args[1]"
+    type: subscription
+    when: "len(args) > 1 and args[1]"
+  - name_expr: "args[2]"
+    type: publisher
+    when: "len(args) > 2 and args[2]"

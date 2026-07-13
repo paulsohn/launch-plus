@@ -31,16 +31,6 @@ Cases that cannot be fully expressed in the current YAML convention and need rev
 - **Possible fix**: Add static entries per known module (analogous to the existing per-module
   MarkerArray publishers), or introduce a class-name → short-name mapping mechanism.
 
-## Fully dynamic topic nodes (topic from CLI args, not params)
-
-### topic_tools/relay
-- **Package**: `topic_tools`
-- **File**: `topic_tools/relay.yaml`
-- **Issue**: Input and output topic names are positional CLI `args`, not ROS parameters.
-  They cannot be determined from params at all. Only a stub is recorded.
-- **Workaround**: Empty connections list; relay instances are identified via node name in the launch file.
-- **Possible fix**: Provide instance-level override in the plugin or parse `args` from the launch XML.
-
 ## Skipped (visualization tools with no static roscope connections)
 
 - `rviz2` — subscribes to a user-configurable set of display topics; not covered.

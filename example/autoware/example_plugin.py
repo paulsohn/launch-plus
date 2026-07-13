@@ -73,7 +73,13 @@ is available in both ``name_expr`` and ``when``.  ``loop`` requires ``name_expr`
 ``to_list`` converts a ROS 2 string-serialised list (``"[a,b,c]"``) or an
 actual Python list to ``list[str]``.  It is available in all expressions.
 
-Available names in all expressions: ``params`` (always), ``item`` (inside ``loop``).
+``args`` follows the ``argv`` convention: ``args[0]`` is the executable name,
+``args[1]`` is the first user-supplied argument (same index as ``argv[1]``).
+``args`` is always a list; it is empty for composable nodes (which have no
+standalone process argv).
+
+Available names in all expressions: ``params`` (always), ``args`` (always),
+``item`` (inside ``loop``).
 Available built-ins: format, len, str, int, float, bool, range, list, tuple,
                      enumerate, zip, to_list.
 
@@ -146,6 +152,7 @@ def get_connections(
     pkg_name: str,
     executable: str | None = None,
     plugin_name: str | None = None,
+    args: list[str] | None = None,
 ) -> dict:
     # For composable nodes the plugin class name (e.g. "my_pkg::MyComponent") is
     # provided.  Use only the final part after "::" as the file name.
@@ -165,7 +172,7 @@ def get_connections(
         )
 
     result: dict = {}
-    base_local: dict = {"params": params}
+    base_local: dict = {"params": params, "args": args or []}
 
     for entry in raw:
         if not isinstance(entry, dict):

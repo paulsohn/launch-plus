@@ -32,6 +32,7 @@ from roscope.entities.expose import expose_action
 from roscope.entities.helpers import _current_file, _ros2_namespace_join
 from roscope.entities.parameter_descriptions import Parameter, ParameterFile
 from roscope.entities.parsing import Parser
+from roscope.entities.utilities import perform_substitutions
 from roscope.parsers.entity import Entity
 
 logger = logging.getLogger("roscope")
@@ -124,7 +125,8 @@ class Node(ExecuteProcess):
         kwargs["remappings"] = cls.parse_remaps(entity, parser)
         kwargs["kind"] = "lifecycle_node" if entity.type_name == "lifecycle_node" else "node"
         kwargs["output"] = _parse_optional(parser, entity.get_attr("output", optional=True))
-        kwargs["arguments"] = _parse_optional(parser, entity.get_attr("args", optional=True))
+        args_raw = entity.get_attr("args", optional=True)
+        kwargs["arguments"] = cls._parse_cmdline(args_raw, parser) if args_raw else None
         kwargs["ros_arguments"] = _parse_optional(
             parser, entity.get_attr("ros_args", optional=True)
         )
@@ -230,6 +232,30 @@ class Node(ExecuteProcess):
                 remaps.append([src or str(r[0]), dst or str(r[1])])
 
         effective_ns = _ros2_namespace_join(ros_ns, ns) if ns else ros_ns
+
+        def _resolve_args() -> list[str] | None:
+            raw = self.args
+            if raw is None:
+                return None
+            if not isinstance(raw, list):
+                return [context.perform_substitution(raw)]
+            result: list[str] = []
+            for item in raw:
+                if isinstance(item, str):
+                    result.append(item)
+                elif isinstance(item, list):
+                    # Per-arg substitution group from _parse_cmdline.
+                    result.append(perform_substitutions(context, item))
+                else:
+                    result.append(context.perform_substitution(item))
+            return result or None
+
+        resolved_args = _resolve_args()
+
+        # Build argv-style list: args[0] = executable name, args[1..] = arguments.
+        # Composable nodes have no standalone argv, so args is empty for them.
+        plugin_args = [exe] + (resolved_args or []) if exe else []
+
         remap_metadata = state.apply_connection_plugin(
             pkg,
             dict(active_params),
@@ -237,6 +263,7 @@ class Node(ExecuteProcess):
             executable=exe,
             node_ns=effective_ns,
             node_name=name,
+            args=plugin_args,
         )
 
         env = base.env if base else {}
@@ -258,7 +285,7 @@ class Node(ExecuteProcess):
         resolved.remap_metadata = remap_metadata
         resolved.env = env
         resolved.output = _resolve_opt("output")
-        resolved.args = _resolve_opt("args")
+        resolved.args = resolved_args
         resolved.ros_args = _resolve_opt("ros_args")
         resolved.respawn = _resolve_opt("respawn")
         resolved.respawn_delay = _resolve_opt("respawn_delay")
@@ -281,7 +308,8 @@ class Node(ExecuteProcess):
         if self.output:
             elem.set("output", self.output)
         if self.args:
-            elem.set("args", self.args)
+            args_str = " ".join(self.args) if isinstance(self.args, list) else self.args
+            elem.set("args", args_str)
         if self.ros_args:
             elem.set("ros_args", self.ros_args)
         if self.respawn:

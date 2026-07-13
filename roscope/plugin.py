@@ -58,6 +58,7 @@ def call_plugin(
     pkg_name: str,
     executable: str | None = None,
     plugin_name: str | None = None,
+    args: list[str] | None = None,
 ) -> dict[str, dict]:
     """Invoke the plugin and return validated connection metadata.
 
@@ -87,6 +88,7 @@ def call_plugin(
             pkg_name=pkg_name,
             executable=executable,
             plugin_name=plugin_name,
+            args=args or [],
         )
     except Exception as e:
         logger.error("--plugin: raised for %s/%s: %s", pkg_share_path, identifier, e)

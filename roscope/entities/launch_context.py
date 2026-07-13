@@ -206,6 +206,7 @@ class ResolverState:
         plugin_name: str | None = None,
         node_ns: str | None = None,
         node_name: str | None = None,
+        args: list[str] | None = None,
     ) -> dict[str, dict]:
         """Call the connection plugin, extend remaps in-place, register connections.
 
@@ -233,6 +234,7 @@ class ResolverState:
             pkg_name=pkg,
             executable=executable,
             plugin_name=plugin_name,
+            args=args,
         )
         if not meta_by_connection:
             return {}

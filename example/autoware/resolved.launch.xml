@@ -3849,7 +3849,7 @@
         <group>
           <!-- source: {workspace}/src/launcher/autoware_launch/tier4_universe_launch/tier4_perception_launch/launch/traffic_light_recognition/traffic_light_camera_info_relay.launch.py -->
           <!-- arg name="camera_namespaces" value="[camera6, camera7]" -->
-          <node pkg="topic_tools" exec="relay" name="traffic_light_camera_info_relay" namespace="/perception/traffic_light_recognition/camera6" args="/sensing/camera/camera6/camera_infocamera_info">
+          <node pkg="topic_tools" exec="relay" name="traffic_light_camera_info_relay" namespace="/perception/traffic_light_recognition/camera6" args="/sensing/camera/camera6/camera_info camera_info">
             <param name="use_sim_time" value="false"/>
             <param name="wheel_radius" value="0.383"/>
             <param name="wheel_width" value="0.235"/>
@@ -3862,7 +3862,7 @@
             <param name="vehicle_height" value="2.5"/>
             <param name="max_steer_angle" value="0.7"/>
           </node>
-          <node pkg="topic_tools" exec="relay" name="traffic_light_camera_info_relay" namespace="/perception/traffic_light_recognition/camera7" args="/sensing/camera/camera7/camera_infocamera_info">
+          <node pkg="topic_tools" exec="relay" name="traffic_light_camera_info_relay" namespace="/perception/traffic_light_recognition/camera7" args="/sensing/camera/camera7/camera_info camera_info">
             <param name="use_sim_time" value="false"/>
             <param name="wheel_radius" value="0.383"/>
             <param name="wheel_width" value="0.235"/>

@@ -13,7 +13,15 @@ from roscope.plugin import call_plugin
 def _make_plugin_fn(connections: dict):
     """Return a get_connections() callable that always returns *connections*."""
 
-    def get_connections(*, pkg_share_path, params, pkg_name, executable=None, plugin_name=None):
+    def get_connections(
+        *,
+        pkg_share_path,
+        params,
+        pkg_name,
+        executable=None,
+        plugin_name=None,
+        args=None,
+    ):
         return connections
 
     return get_connections
@@ -180,6 +188,31 @@ class TestApplyConnectionPluginNode:
         assert meta == {}
         assert remaps == []
 
+    def test_args_passed_to_plugin(self):
+        received = {}
+
+        def capturing_fn(
+            *,
+            pkg_share_path,
+            params,
+            pkg_name,
+            executable=None,
+            plugin_name=None,
+            args=None,
+        ):
+            received["args"] = args
+            return {}
+
+        ctx = _make_context(capturing_fn, _PKG_SHARES)
+        ctx._state.apply_connection_plugin(
+            "my_pkg",
+            {},
+            [],
+            executable="my_node",
+            args=["/in", "/out"],
+        )
+        assert received["args"] == ["/in", "/out"]
+
 
 # ─── apply_connection_plugin: composable node ─────────────────────────────────
 
@@ -188,7 +221,9 @@ class TestApplyConnectionPluginComposable:
     def test_composable_plugin_name_passed_through(self):
         received = {}
 
-        def capturing_fn(*, pkg_share_path, params, pkg_name, executable=None, plugin_name=None):
+        def capturing_fn(
+            *, pkg_share_path, params, pkg_name, executable=None, plugin_name=None, args=None
+        ):
             received["plugin_name"] = plugin_name
             return {}
 

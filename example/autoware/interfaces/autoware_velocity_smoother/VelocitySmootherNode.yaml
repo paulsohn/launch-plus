@@ -1,0 +1,84 @@
+connections:
+  # subscriptions
+  - topic: ~/input/trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - topic: /localization/kinematic_state
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - topic: ~/input/acceleration
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - topic: ~/input/external_velocity_limit_mps
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+  - topic: ~/input/operation_mode_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+
+  # publishers
+  - topic: ~/output/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - topic: ~/output/current_velocity_limit_mps
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+  - topic: ~/virtual_wall
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - topic: ~/distance_to_stopline
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+
+  # debug publishers
+  - topic: ~/closest_velocity
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: ~/closest_acceleration
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: ~/closest_jerk
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: ~/closest_max_velocity
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - topic: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - topic: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: autoware_utils_debug/msg/ProcessingTimeDetail  # UNVERIFIED: type inferred from autoware_utils_debug::ProcessingTimeDetail
+  - topic: ~/debug/trajectory_raw
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - topic: ~/debug/trajectory_external_velocity_limited
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - topic: ~/debug/trajectory_lateral_acc_filtered
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - topic: ~/debug/trajectory_steering_rate_limited
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - topic: ~/debug/trajectory_time_resampled
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+
+  # debug publishers for JerkFiltered algorithm only
+  - topic: ~/debug/forward_filtered_trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "params.get('algorithm_type', '') == 'JerkFiltered'"
+  - topic: ~/debug/backward_filtered_trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "params.get('algorithm_type', '') == 'JerkFiltered'"
+  - topic: ~/debug/merged_filtered_trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "params.get('algorithm_type', '') == 'JerkFiltered'"
+  - topic: ~/closest_merged_velocity
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+    when: "params.get('algorithm_type', '') == 'JerkFiltered'"

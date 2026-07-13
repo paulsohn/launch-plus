@@ -1,0 +1,40 @@
+connections:
+  - topic: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - topic: ~/input/operation_mode_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  - topic: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - topic: ~/input/modified_goal
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/PoseWithUuidStamped
+  - topic: ~/input/reroute_availability
+    type: subscription
+    msg_type: tier4_planning_msgs/msg/RerouteAvailability
+  - topic: ~/route
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - topic: ~/state
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/RouteState
+  - topic: ~/debug/route_marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - topic: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - topic: ~/clear_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/ClearRoute
+  - topic: ~/set_lanelet_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/SetLaneletRoute
+  - topic: ~/set_preferred_primitive
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/SetPreferredPrimitive
+  - topic: ~/set_waypoint_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/SetWaypointRoute

@@ -1,0 +1,22 @@
+connections:
+  - topic: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - topic: ~/input/map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - topic: ~/input/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - topic: /planning/scenario_planning/current_max_velocity
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+  - topic: ~/input/scenario
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/Scenario
+  - topic: ~/output/mission_remaining_distance_time
+    type: publisher
+    msg_type: autoware_internal_msgs/msg/MissionRemainingDistanceTime
+  - topic: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree

@@ -40,6 +40,45 @@ cannot be fully represented.
   publisher are recorded; all per-camera subscriptions are absent.
 - **Possible fix**: Same `dynamic_subscriptions` extension.
 
+### PlanningEvaluatorNode (planning_evaluator)
+- **Package**: `autoware_planning_evaluator`
+- **File**: `autoware_planning_evaluator/planning_evaluator.yaml`
+- **Issue**: PlanningFactor subscriptions are created in a loop over the
+  `stop_decision.module_list` parameter (a `list[str]`). Each subscription topic
+  is `stop_decision.topic_prefix + module_name`. The number and names of topics
+  are not known statically.
+- **Workaround**: Only static connections are recorded; dynamic PlanningFactorArray
+  subscriptions are absent (noted as a comment in the YAML).
+- **Possible fix**: Same `dynamic_subscriptions` extension as PointCloudConcatenateDataSynchronizerComponent.
+
+## Absolute topic subscriptions injected by loaded modules
+
+### MotionVelocityPlannerNode — ObstacleCruiseModule (optimization_based_planner)
+- **Package**: `autoware_motion_velocity_planner`
+- **File**: `autoware_motion_velocity_planner/MotionVelocityPlannerNode.yaml`
+- **Issue**: When `ObstacleCruiseModule` is loaded, its `OptimizationBasedPlanner` subscribes to
+  the hardcoded absolute topic `/planning/trajectory` (not a node-relative `~/` topic). This topic
+  name is fixed in source and is not a parameter. It is recorded in the YAML with a `when:` guard,
+  but the absolute topic path cannot be remapped via the node's topic remapping and may conflict
+  with other nodes publishing on that topic.
+- **Action needed**: Verify whether `/planning/trajectory` is intentional (debug-only) or should
+  be remapped to a node-private topic; check if the optimization-based planner is still the active
+  backend for `ObstacleCruiseModule`.
+
+## Dynamic publishers injected by loaded modules (topic names contain module name at runtime)
+
+### BehaviorPathPlannerNode — per-module processing-time debug publishers
+- **Package**: `autoware_behavior_path_planner`
+- **File**: `autoware_behavior_path_planner/BehaviorPathPlannerNode.yaml`
+- **Issue**: `PlannerManager` creates a `DebugPublisher` with namespace `~/debug` and publishes
+  `~/debug/<module_name>` (Float64Stamped or similar) for each loaded module's per-iteration
+  processing time. The module names are determined at runtime from the `launch_modules` parameter.
+  There is also one entry per module (total_time) plus "total_time" itself. These are not recorded
+  as static entries because there are too many permutations and the exact message type requires
+  further verification.
+- **Action needed**: Verify exact message type (`autoware_internal_debug_msgs/msg/Float64Stamped`
+  or similar) and decide whether to add a `dynamic_publishers` key for these per-module topics.
+
 ## Unverified interfaces (source not in workspace)
 
 ### ublox_gps_node

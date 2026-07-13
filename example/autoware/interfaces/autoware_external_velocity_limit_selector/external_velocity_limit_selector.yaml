@@ -1,0 +1,16 @@
+connections:
+  - topic: input/velocity_limit_from_api
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+  - topic: input/velocity_limit_from_internal
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+  - topic: input/velocity_limit_clear_command_from_internal
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimitClearCommand
+  - topic: output/external_velocity_limit
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+  - topic: output/debug
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped

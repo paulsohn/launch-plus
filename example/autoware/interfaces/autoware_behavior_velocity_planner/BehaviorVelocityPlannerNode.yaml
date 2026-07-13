@@ -1,0 +1,430 @@
+connections:
+  # ---- Core node subscriptions ----
+  - topic: ~/input/path_with_lane_id
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/PathWithLaneId
+
+  - topic: ~/input/dynamic_objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+
+  - topic: ~/input/no_ground_pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+
+  - topic: ~/input/vehicle_odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+
+  - topic: ~/input/accel
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+
+  - topic: ~/input/traffic_signals
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+
+  - topic: ~/input/occupancy_grid
+    type: subscription
+    msg_type: nav_msgs/msg/OccupancyGrid
+
+  - topic: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+
+  - topic: ~/input/external_velocity_limit_mps
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+
+  # ---- Core node publishers ----
+  - topic: ~/output/path
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+
+  - topic: ~/debug/path
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  - topic: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  # ---- Core node service servers ----
+  - topic: ~/service/load_plugin
+    type: service_server
+    msg_type: autoware_internal_planning_msgs/srv/LoadPlugin
+
+  - topic: ~/service/unload_plugin
+    type: service_server
+    msg_type: autoware_internal_planning_msgs/srv/UnloadPlugin
+
+  # ---- Module-injected: VirtualTrafficLightModulePlugin ----
+  # Subscription added by VirtualTrafficLightModuleManager constructor
+  - topic: ~/input/virtual_traffic_light_states
+    type: subscription
+    msg_type: tier4_v2x_msgs/msg/VirtualTrafficLightStateArray
+    when: "'autoware::behavior_velocity_planner::experimental::VirtualTrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/output/infrastructure_commands
+    type: publisher
+    msg_type: tier4_v2x_msgs/msg/InfrastructureCommandArray
+    when: "'autoware::behavior_velocity_planner::experimental::VirtualTrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  # ---- Module-injected: TrafficLightModulePlugin ----
+  - topic: ~/output/traffic_signal
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroup
+    when: "'autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  # ---- Module-injected: IntersectionModulePlugin (manager-level) ----
+  - topic: ~/debug/intersection/decision_state
+    type: publisher
+    msg_type: std_msgs/msg/String
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/intersection_traffic_signal
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroup
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  # ---- Module-injected: IntersectionModulePlugin (scene-level, per module instance) ----
+  - topic: ~/debug/intersection/ego_ttc
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64MultiArrayStamped
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/intersection/object_ttc
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64MultiArrayStamped
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  # ---- Module-injected: BlindSpotModulePlugin ----
+  - topic: ~/debug/blind_spot/decision_state
+    type: publisher
+    msg_type: std_msgs/msg/String
+    when: "'autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin' in params.get('launch_modules', [])"
+
+  # ---- Module-injected: CrosswalkModulePlugin (scene-level) ----
+  - topic: ~/debug/collision_info
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped
+    when: "'autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin' in params.get('launch_modules', [])"
+
+  # ---- Per-module debug publishers from SceneModuleManagerInterface base ----
+  # Pattern: ~/debug/<module_name>, ~/virtual_wall/<module_name>,
+  #          ~/debug/processing_time_detail_ms/<module_name>
+  # The optional ~/debug/path_with_lane_id/<module_name> is controlled by the
+  # is_publish_debug_path parameter and is omitted here.
+
+  - topic: ~/debug/crosswalk
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/virtual_wall/crosswalk
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/processing_time_detail_ms/crosswalk
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/walkway
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::WalkwayModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/virtual_wall/walkway
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::WalkwayModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/processing_time_detail_ms/walkway
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::behavior_velocity_planner::experimental::WalkwayModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/traffic_light
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/virtual_wall/traffic_light
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/processing_time_detail_ms/traffic_light
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/intersection
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/virtual_wall/intersection
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/processing_time_detail_ms/intersection
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/blind_spot
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/virtual_wall/blind_spot
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/processing_time_detail_ms/blind_spot
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/detection_area
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/virtual_wall/detection_area
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/processing_time_detail_ms/detection_area
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/virtual_traffic_light
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::VirtualTrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/virtual_wall/virtual_traffic_light
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::VirtualTrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/processing_time_detail_ms/virtual_traffic_light
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::behavior_velocity_planner::experimental::VirtualTrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/no_stopping_area
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/virtual_wall/no_stopping_area
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/processing_time_detail_ms/no_stopping_area
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/stop_line
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::StopLineModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/virtual_wall/stop_line
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::StopLineModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: ~/debug/processing_time_detail_ms/stop_line
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::behavior_velocity_planner::experimental::StopLineModulePlugin' in params.get('launch_modules', [])"
+
+  # ---- RTC topics (absolute paths) from SceneModuleManagerInterfaceWithRTC ----
+  # RTCInterface creates absolute topics for cooperative status, auto-mode status,
+  # cooperate commands service, and enable_auto_mode service.
+  # Applies to: crosswalk, traffic_light, intersection, blind_spot, detection_area, no_stopping_area.
+  # intersection also creates a second RTCInterface named "intersection_occlusion".
+  # ObjectsOfInterestMarkerInterface adds /planning/debug/objects_of_interest/<module_name>.
+
+  - topic: /planning/cooperate_status/crosswalk
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/auto_mode_status/crosswalk
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/AutoModeStatus
+    when: "'autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_commands/crosswalk
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/enable_auto_mode/crosswalk
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/debug/objects_of_interest/crosswalk
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::CrosswalkModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_status/traffic_light
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/auto_mode_status/traffic_light
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/AutoModeStatus
+    when: "'autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_commands/traffic_light
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/enable_auto_mode/traffic_light
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/debug/objects_of_interest/traffic_light
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::TrafficLightModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_status/intersection
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/auto_mode_status/intersection
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/AutoModeStatus
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_commands/intersection
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/enable_auto_mode/intersection
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/debug/objects_of_interest/intersection
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  # IntersectionModuleManager creates a second RTCInterface for occlusion detection
+  - topic: /planning/cooperate_status/intersection_occlusion
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/auto_mode_status/intersection_occlusion
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/AutoModeStatus
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_commands/intersection_occlusion
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/enable_auto_mode/intersection_occlusion
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_velocity_planner::experimental::IntersectionModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_status/blind_spot
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/auto_mode_status/blind_spot
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/AutoModeStatus
+    when: "'autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_commands/blind_spot
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/enable_auto_mode/blind_spot
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/debug/objects_of_interest/blind_spot
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::BlindSpotModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_status/detection_area
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/auto_mode_status/detection_area
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/AutoModeStatus
+    when: "'autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_commands/detection_area
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/enable_auto_mode/detection_area
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/debug/objects_of_interest/detection_area
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::DetectionAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_status/no_stopping_area
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/auto_mode_status/no_stopping_area
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/AutoModeStatus
+    when: "'autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/cooperate_commands/no_stopping_area
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/enable_auto_mode/no_stopping_area
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin' in params.get('launch_modules', [])"
+
+  - topic: /planning/debug/objects_of_interest/no_stopping_area
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_velocity_planner::experimental::NoStoppingAreaModulePlugin' in params.get('launch_modules', [])"

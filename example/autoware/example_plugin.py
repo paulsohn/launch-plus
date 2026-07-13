@@ -23,10 +23,12 @@ relative symlink pointing to the executable YAML so that only one file is mainta
 
 Expected YAML format
 ---------------------
-connections is a list of entries.  Each entry must have a ``name`` key plus a
-``type`` key.  Additional optional keys: ``msg_type``, ``qos``, ``when``.
-The ``name`` field holds a topic name, service name, or action name depending
-on the ``type``.
+connections is a list of entries.  Each entry must have exactly one of
+``name`` or ``name_expr``, plus a ``type`` key.  Additional optional keys:
+``msg_type``, ``qos``, ``when``.  The name (however derived) identifies the
+topic, service, or action depending on ``type``.
+
+``name`` is a literal string:
 
 connections:
   - name: ~/input/points
@@ -36,13 +38,21 @@ connections:
       durability: volatile
   - name: ~/output/objects
     type: publisher
-    qos:
-      reliability: reliable
-      durability: volatile
   - name: /tf
     type: subscription
   - name: ~/set_parameters
     type: service_server
+
+``name_expr`` is a Python expression evaluated against the node's resolved
+parameters (same ``params`` dict as ``when``).  Use it when the connection
+name contains a runtime-determined segment:
+
+  - name_expr: "'/api/manual/' + params.get('mode', 'joy') + '/velocity'"
+    type: subscription
+
+On evaluation error, the entry is skipped (no conservative fallback — there
+is no default name to substitute).  Having both ``name`` and ``name_expr`` on
+the same entry is an error.
 
 Conditional connections
 ------------------------
@@ -56,12 +66,12 @@ value.
     type: publisher
     when: "params.get('use_object_filter', False)"
 
-  - name: ~/input/map_based_prediction
-    type: subscription
-    when: "params.get('prediction_time_horizon_rate_for_validate_lane_changing_path', 0.0) > 0"
+  - name_expr: "params.get('output_topic', '~/output/trajectory')"
+    type: publisher
+    when: "params.get('publish_output', True)"
 
-If the expression raises any exception (e.g. unexpected param type), the entry
-is included conservatively.
+If the ``when`` expression raises any exception, the entry is included
+conservatively.
 
 The same name may appear more than once with mutually-exclusive ``when``
 conditions (e.g. a topic that is a subscription in replay mode and a publisher
@@ -129,7 +139,19 @@ def get_connections(
     for entry in raw:
         if not isinstance(entry, dict):
             continue
-        conn_name = entry.get("name")
+        has_name = "name" in entry
+        has_expr = "name_expr" in entry
+        if has_name and has_expr:
+            raise ValueError(f"{interface_file}: entry has both 'name' and 'name_expr'")
+        if has_expr:
+            try:
+                conn_name: str = str(
+                    eval(entry["name_expr"], {"__builtins__": {}}, {"params": params})
+                )
+            except Exception:
+                continue
+        else:
+            conn_name = entry.get("name") or ""
         if not conn_name:
             continue
         when = entry.get("when")
@@ -137,5 +159,6 @@ def get_connections(
             continue
         if conn_name in result:
             raise ValueError(f"{interface_file}: duplicate resolved connection name {conn_name!r}")
-        result[conn_name] = {k: v for k, v in entry.items() if k not in ("name", "when")}
+        skip = {"name", "name_expr", "when"}
+        result[conn_name] = {k: v for k, v in entry.items() if k not in skip}
     return result

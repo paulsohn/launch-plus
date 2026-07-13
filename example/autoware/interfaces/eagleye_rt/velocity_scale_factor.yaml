@@ -1,10 +1,10 @@
 connections:
-  - topic: imu/data_tf_converted
+  - name: imu/data_tf_converted
     type: subscription
     msg_type: sensor_msgs/msg/Imu
-  - topic: velocity
+  - name: velocity
     type: publisher
     msg_type: geometry_msgs/msg/TwistStamped
-  - topic: velocity_scale_factor
+  - name: velocity_scale_factor
     type: publisher
     msg_type: eagleye_msgs/msg/VelocityScaleFactor

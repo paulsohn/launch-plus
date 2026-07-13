@@ -1,27 +1,27 @@
 connections:
-  - topic: /api/autoware/get/map/info/hash
+  - name: /api/autoware/get/map/info/hash
     type: subscription
     msg_type: tier4_external_api_msgs/msg/MapHash
-  - topic: input/vector_map
+  - name: input/vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
   # One of the two below is active depending on use_sequential_load param
-  - topic: input/pointcloud_map_metadata
+  - name: input/pointcloud_map_metadata
     type: subscription
     msg_type: autoware_map_msgs/msg/PointCloudMapMetaData
     when: "params.get('use_sequential_load', False)"
-  - topic: input/pointcloud_map
+  - name: input/pointcloud_map
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
     when: "not params.get('use_sequential_load', True)"
-  - topic: service/get_selected_pointcloud_map
+  - name: service/get_selected_pointcloud_map
     type: service_client
     msg_type: autoware_map_msgs/srv/GetSelectedPointCloudMap
     when: "params.get('use_sequential_load', False)"
-  - topic: output/elevation_map
+  - name: output/elevation_map
     type: publisher
     msg_type: grid_map_msgs/msg/GridMap
-  - topic: output/elevation_map_cloud
+  - name: output/elevation_map_cloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
     when: "params.get('use_elevation_map_cloud_publisher', False)"

@@ -1,49 +1,49 @@
 connections:
-  - topic: ~/planner/state
+  - name: ~/planner/state
     type: subscription
     msg_type: autoware_planning_msgs/msg/RouteState
-  - topic: ~/planner/route
+  - name: ~/planner/route
     type: subscription
     msg_type: autoware_planning_msgs/msg/LaneletRoute
-  - topic: ~/main/state
+  - name: ~/main/state
     type: publisher
     msg_type: autoware_planning_msgs/msg/RouteState
-  - topic: ~/main/route
+  - name: ~/main/route
     type: publisher
     msg_type: autoware_planning_msgs/msg/LaneletRoute
-  - topic: ~/mrm/state
+  - name: ~/mrm/state
     type: publisher
     msg_type: autoware_planning_msgs/msg/RouteState
-  - topic: ~/mrm/route
+  - name: ~/mrm/route
     type: publisher
     msg_type: autoware_planning_msgs/msg/LaneletRoute
-  - topic: ~/debug/processing_time_ms
+  - name: ~/debug/processing_time_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
-  - topic: ~/main/clear_route
+  - name: ~/main/clear_route
     type: service_server
     msg_type: autoware_planning_msgs/srv/ClearRoute
-  - topic: ~/main/set_waypoint_route
+  - name: ~/main/set_waypoint_route
     type: service_server
     msg_type: autoware_planning_msgs/srv/SetWaypointRoute
-  - topic: ~/main/set_lanelet_route
+  - name: ~/main/set_lanelet_route
     type: service_server
     msg_type: autoware_planning_msgs/srv/SetLaneletRoute
-  - topic: ~/mrm/clear_route
+  - name: ~/mrm/clear_route
     type: service_server
     msg_type: autoware_planning_msgs/srv/ClearRoute
-  - topic: ~/mrm/set_waypoint_route
+  - name: ~/mrm/set_waypoint_route
     type: service_server
     msg_type: autoware_planning_msgs/srv/SetWaypointRoute
-  - topic: ~/mrm/set_lanelet_route
+  - name: ~/mrm/set_lanelet_route
     type: service_server
     msg_type: autoware_planning_msgs/srv/SetLaneletRoute
-  - topic: ~/planner/clear_route
+  - name: ~/planner/clear_route
     type: service_client
     msg_type: autoware_planning_msgs/srv/ClearRoute
-  - topic: ~/planner/set_lanelet_route
+  - name: ~/planner/set_lanelet_route
     type: service_client
     msg_type: autoware_planning_msgs/srv/SetLaneletRoute
-  - topic: ~/planner/set_waypoint_route
+  - name: ~/planner/set_waypoint_route
     type: service_client
     msg_type: autoware_planning_msgs/srv/SetWaypointRoute

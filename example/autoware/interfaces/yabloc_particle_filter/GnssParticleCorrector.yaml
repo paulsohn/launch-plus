@@ -1,10 +1,10 @@
 connections:
-  - topic: ~/input/pose_with_covariance
+  - name: ~/input/pose_with_covariance
     type: subscription
     msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
-  - topic: ~/input/height
+  - name: ~/input/height
     type: subscription
     msg_type: std_msgs/msg/Float32
-  - topic: ~/debug/gnss_range_marker
+  - name: ~/debug/gnss_range_marker
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray

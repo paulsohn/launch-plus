@@ -1,10 +1,10 @@
 connections:
-  - topic: ~/input/tracks
+  - name: ~/input/tracks
     type: subscription
     msg_type: radar_msgs/msg/RadarTracks
-  - topic: ~/output/noise_tracks
+  - name: ~/output/noise_tracks
     type: publisher
     msg_type: radar_msgs/msg/RadarTracks
-  - topic: ~/output/filtered_tracks
+  - name: ~/output/filtered_tracks
     type: publisher
     msg_type: radar_msgs/msg/RadarTracks

@@ -1,12 +1,12 @@
 connections:
-  - topic: input/odom
+  - name: input/odom
     type: subscription
     msg_type: nav_msgs/msg/Odometry
     when: "params.get('use_odom', False)"
-  - topic: input/twist
+  - name: input/twist
     type: subscription
     msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
     when: "not params.get('use_odom', False)"
-  - topic: output/accel
+  - name: output/accel
     type: publisher
     msg_type: geometry_msgs/msg/AccelWithCovarianceStamped

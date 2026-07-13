@@ -2,20 +2,20 @@
 # (launch_hw=false) and as a publisher in hardware capture mode (launch_hw=true).
 # The two entries are mutually exclusive via their when: conditions.
 connections:
-  - topic: velodyne_packets
+  - name: velodyne_packets
     type: subscription
     msg_type: velodyne_msgs/msg/VelodyneScan
     when: "not params.get('launch_hw', True)"
-  - topic: velodyne_packets
+  - name: velodyne_packets
     type: publisher
     msg_type: velodyne_msgs/msg/VelodyneScan
     when: "params.get('launch_hw', True)"
-  - topic: velodyne_points
+  - name: velodyne_points
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: aw_points
+  - name: aw_points
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: aw_points_ex
+  - name: aw_points_ex
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2

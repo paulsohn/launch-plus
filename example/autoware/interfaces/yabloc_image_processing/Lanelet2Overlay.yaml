@@ -1,28 +1,28 @@
 connections:
-  - topic: ~/input/ground
+  - name: ~/input/ground
     type: subscription
     msg_type: std_msgs/msg/Float32MultiArray
-  - topic: ~/input/image_raw
+  - name: ~/input/image_raw
     type: subscription
     msg_type: sensor_msgs/msg/Image
-  - topic: ~/input/pose
+  - name: ~/input/pose
     type: subscription
     msg_type: geometry_msgs/msg/PoseStamped
-  - topic: ~/input/projected_line_segments_cloud
+  - name: ~/input/projected_line_segments_cloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/input/camera_info
+  - name: ~/input/camera_info
     type: subscription
     msg_type: sensor_msgs/msg/CameraInfo
-  - topic: ~/input/ll2_sign_board
+  - name: ~/input/ll2_sign_board
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/input/ll2_road_marking
+  - name: ~/input/ll2_road_marking
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/debug/projected_marker
+  - name: ~/debug/projected_marker
     type: publisher
     msg_type: visualization_msgs/msg/Marker
-  - topic: ~/debug/lanelet2_overlay_image
+  - name: ~/debug/lanelet2_overlay_image
     type: publisher
     msg_type: sensor_msgs/msg/Image

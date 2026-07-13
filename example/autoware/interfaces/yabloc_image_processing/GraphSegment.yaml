@@ -1,10 +1,10 @@
 connections:
-  - topic: ~/input/image_raw
+  - name: ~/input/image_raw
     type: subscription
     msg_type: sensor_msgs/msg/Image
-  - topic: ~/output/mask_image
+  - name: ~/output/mask_image
     type: publisher
     msg_type: sensor_msgs/msg/Image
-  - topic: ~/debug/segmented_image
+  - name: ~/debug/segmented_image
     type: publisher
     msg_type: sensor_msgs/msg/Image

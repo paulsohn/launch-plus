@@ -1,7 +1,7 @@
 connections:
-  - topic: /particle_array
+  - name: /particle_array
     type: subscription
     msg_type: yabloc_particle_filter/msg/ParticleArray
-  - topic: /marker_array
+  - name: /marker_array
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray

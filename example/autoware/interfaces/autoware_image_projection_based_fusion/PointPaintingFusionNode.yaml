@@ -1,16 +1,16 @@
 connections:
-  - topic: input
+  - name: input
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: input/rois0
+  - name: input/rois0
     type: subscription
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
-  - topic: input/camera_info0
+  - name: input/camera_info0
     type: subscription
     msg_type: sensor_msgs/msg/CameraInfo
-  - topic: ~/output/objects
+  - name: ~/output/objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: ~/debug/painted_pointcloud
+  - name: ~/debug/painted_pointcloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2

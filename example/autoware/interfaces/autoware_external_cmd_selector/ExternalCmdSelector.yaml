@@ -1,84 +1,84 @@
 connections:
   # Inputs — local source
-  - topic: ~/input/local/pedals_cmd
+  - name: ~/input/local/pedals_cmd
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
 
-  - topic: ~/input/local/steering_cmd
+  - name: ~/input/local/steering_cmd
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
 
-  - topic: ~/input/local/heartbeat
+  - name: ~/input/local/heartbeat
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
 
-  - topic: ~/input/local/gear_cmd
+  - name: ~/input/local/gear_cmd
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/GearCommand
 
-  - topic: ~/input/local/turn_indicators_cmd
+  - name: ~/input/local/turn_indicators_cmd
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
 
-  - topic: ~/input/local/hazard_lights_cmd
+  - name: ~/input/local/hazard_lights_cmd
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
 
   # Inputs — remote source
-  - topic: ~/input/remote/pedals_cmd
+  - name: ~/input/remote/pedals_cmd
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
 
-  - topic: ~/input/remote/steering_cmd
+  - name: ~/input/remote/steering_cmd
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
 
-  - topic: ~/input/remote/heartbeat
+  - name: ~/input/remote/heartbeat
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
 
-  - topic: ~/input/remote/gear_cmd
+  - name: ~/input/remote/gear_cmd
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/GearCommand
 
-  - topic: ~/input/remote/turn_indicators_cmd
+  - name: ~/input/remote/turn_indicators_cmd
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
 
-  - topic: ~/input/remote/hazard_lights_cmd
+  - name: ~/input/remote/hazard_lights_cmd
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
 
   # Outputs
-  - topic: ~/output/current_selector_mode
+  - name: ~/output/current_selector_mode
     type: publisher
     msg_type: tier4_control_msgs/msg/ExternalCommandSelectorMode
 
-  - topic: ~/output/pedals_cmd
+  - name: ~/output/pedals_cmd
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
 
-  - topic: ~/output/steering_cmd
+  - name: ~/output/steering_cmd
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
 
-  - topic: ~/output/heartbeat
+  - name: ~/output/heartbeat
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
 
-  - topic: ~/output/gear_cmd
+  - name: ~/output/gear_cmd
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/GearCommand
 
-  - topic: ~/output/turn_indicators_cmd
+  - name: ~/output/turn_indicators_cmd
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
 
-  - topic: ~/output/hazard_lights_cmd
+  - name: ~/output/hazard_lights_cmd
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
 
   # Service
-  - topic: ~/service/select_external_command
+  - name: ~/service/select_external_command
     type: service_server
     msg_type: tier4_control_msgs/srv/ExternalCommandSelect

@@ -1,34 +1,34 @@
 connections:
   # Published unconditionally when enable_whole_load is true
-  - topic: output/pointcloud_map
+  - name: output/pointcloud_map
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
     when: "params.get('enable_whole_load', False)"
 
   # Published when enable_downsampled_whole_load is true
-  - topic: output/debug/downsampled_pointcloud_map
+  - name: output/debug/downsampled_pointcloud_map
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
     when: "params.get('enable_downsampled_whole_load', False)"
 
   # Published by SelectedMapLoaderModule (always instantiated when enable_selected_load is true,
   # but metadata is also published by the selected loader module unconditionally when enabled)
-  - topic: output/pointcloud_map_metadata
+  - name: output/pointcloud_map_metadata
     type: publisher
     msg_type: autoware_map_msgs/msg/PointCloudMapMetaData
     when: "params.get('enable_selected_load', False)"
 
   # Always instantiated (DifferentialMapLoaderModule is created unconditionally)
-  - topic: service/get_differential_pcd_map
+  - name: service/get_differential_pcd_map
     type: service_server
     msg_type: autoware_map_msgs/srv/GetDifferentialPointCloudMap
 
-  - topic: service/get_partial_pcd_map
+  - name: service/get_partial_pcd_map
     type: service_server
     msg_type: autoware_map_msgs/srv/GetPartialPointCloudMap
     when: "params.get('enable_partial_load', False)"
 
-  - topic: service/get_selected_pcd_map
+  - name: service/get_selected_pcd_map
     type: service_server
     msg_type: autoware_map_msgs/srv/GetSelectedPointCloudMap
     when: "params.get('enable_selected_load', False)"

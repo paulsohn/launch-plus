@@ -2,6 +2,6 @@
 # (params "topic" and "topic_type"). No static subscription topic can be listed.
 # Only the diagnostic output is statically knowable.
 connections:
-  - topic: /diagnostics
+  - name: /diagnostics
     type: publisher
     msg_type: diagnostic_msgs/msg/DiagnosticArray

@@ -1,28 +1,28 @@
 connections:
-  - topic: ~/input/route
+  - name: ~/input/route
     type: subscription
     msg_type: autoware_planning_msgs/msg/LaneletRoute
-  - topic: ~/input/occupancy_grid
+  - name: ~/input/occupancy_grid
     type: subscription
     msg_type: nav_msgs/msg/OccupancyGrid
-  - topic: ~/input/odometry
+  - name: ~/input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: ~/input/scenario
+  - name: ~/input/scenario
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/Scenario
-  - topic: ~/output/trajectory
+  - name: ~/output/trajectory
     type: publisher
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: ~/debug/pose_array
+  - name: ~/debug/pose_array
     type: publisher
     msg_type: geometry_msgs/msg/PoseArray
-  - topic: ~/debug/partial_pose_array
+  - name: ~/debug/partial_pose_array
     type: publisher
     msg_type: geometry_msgs/msg/PoseArray
-  - topic: is_completed
+  - name: is_completed
     type: publisher
     msg_type: std_msgs/msg/Bool
-  - topic: ~/debug/processing_time_ms
+  - name: ~/debug/processing_time_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

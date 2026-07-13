@@ -1,23 +1,23 @@
 connections:
   # Absolute topic — no remap; latched MapProjectorInfo from map loader
-  - topic: /map/map_projector_info
+  - name: /map/map_projector_info
     type: subscription
     msg_type: autoware_map_msgs/msg/MapProjectorInfo
-  - topic: fix
+  - name: fix
     type: subscription
     msg_type: sensor_msgs/msg/NavSatFix
   # Always subscribed; use_gnss_ins_orientation controls whether the data is used in the callback
-  - topic: autoware_orientation
+  - name: autoware_orientation
     type: subscription
     msg_type: autoware_sensing_msgs/msg/GnssInsOrientationStamped
-  - topic: gnss_pose
+  - name: gnss_pose
     type: publisher
     msg_type: geometry_msgs/msg/PoseStamped
-  - topic: gnss_pose_cov
+  - name: gnss_pose_cov
     type: publisher
     msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
-  - topic: gnss_fixed
+  - name: gnss_fixed
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/BoolStamped
-  - topic: /tf
+  - name: /tf
     type: publisher

@@ -1,101 +1,101 @@
 connections:
-  - topic: /localization/kinematic_state
+  - name: /localization/kinematic_state
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: /planning/trajectory
+  - name: /planning/trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
   # Fixed list of planning factor topics (all PlanningFactorArray)
-  - topic: /planning/planning_factors/behavior_path_planner
+  - name: /planning/planning_factors/behavior_path_planner
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/blind_spot
+  - name: /planning/planning_factors/blind_spot
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/crosswalk
+  - name: /planning/planning_factors/crosswalk
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/detection_area
+  - name: /planning/planning_factors/detection_area
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/dynamic_obstacle_stop
+  - name: /planning/planning_factors/dynamic_obstacle_stop
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/intersection
+  - name: /planning/planning_factors/intersection
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/merge_from_private
+  - name: /planning/planning_factors/merge_from_private
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/no_stopping_area
+  - name: /planning/planning_factors/no_stopping_area
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/obstacle_cruise_planner
+  - name: /planning/planning_factors/obstacle_cruise_planner
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/obstacle_stop_planner
+  - name: /planning/planning_factors/obstacle_stop_planner
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/obstacle_stop
+  - name: /planning/planning_factors/obstacle_stop
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/obstacle_cruise
+  - name: /planning/planning_factors/obstacle_cruise
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/obstacle_slow_down
+  - name: /planning/planning_factors/obstacle_slow_down
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/occlusion_spot
+  - name: /planning/planning_factors/occlusion_spot
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/run_out
+  - name: /planning/planning_factors/run_out
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/stop_line
+  - name: /planning/planning_factors/stop_line
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/surround_obstacle_checker
+  - name: /planning/planning_factors/surround_obstacle_checker
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/traffic_light
+  - name: /planning/planning_factors/traffic_light
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/virtual_traffic_light
+  - name: /planning/planning_factors/virtual_traffic_light
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/walkway
+  - name: /planning/planning_factors/walkway
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/motion_velocity_planner
+  - name: /planning/planning_factors/motion_velocity_planner
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/static_obstacle_avoidance
+  - name: /planning/planning_factors/static_obstacle_avoidance
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/dynamic_obstacle_avoidance
+  - name: /planning/planning_factors/dynamic_obstacle_avoidance
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/avoidance_by_lane_change
+  - name: /planning/planning_factors/avoidance_by_lane_change
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/lane_change_left
+  - name: /planning/planning_factors/lane_change_left
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/lane_change_right
+  - name: /planning/planning_factors/lane_change_right
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/start_planner
+  - name: /planning/planning_factors/start_planner
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/goal_planner
+  - name: /planning/planning_factors/goal_planner
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /planning/planning_factors/roundabout
+  - name: /planning/planning_factors/roundabout
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
-  - topic: /api/planning/velocity_factors
+  - name: /api/planning/velocity_factors
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/VelocityFactorArray
-  - topic: /api/planning/steering_factors
+  - name: /api/planning/steering_factors
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/SteeringFactorArray

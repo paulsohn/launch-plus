@@ -1,22 +1,22 @@
 connections:
-  - topic: ~/input/tracked_objects
+  - name: ~/input/tracked_objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/TrackedObjects
-  - topic: ~/input/initial_objects
+  - name: ~/input/initial_objects
     type: subscription
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
-  - topic: ~/output
+  - name: ~/output
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: ~/debug/initial_objects
+  - name: ~/debug/initial_objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: ~/debug/tracked_objects
+  - name: ~/debug/tracked_objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: ~/debug/merged_objects
+  - name: ~/debug/merged_objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: ~/debug/divided_objects
+  - name: ~/debug/divided_objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects

@@ -1,10 +1,10 @@
 connections:
-  - topic: input/cluster0
+  - name: input/cluster0
     type: subscription
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
-  - topic: input/cluster1
+  - name: input/cluster1
     type: subscription
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
-  - topic: output/clusters
+  - name: output/clusters
     type: publisher
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature

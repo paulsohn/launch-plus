@@ -5,9 +5,9 @@
 # the single output publisher are recorded here.
 # See todo.md for the dynamic subscription exception.
 connections:
-  - topic: ~/input/vector_map
+  - name: ~/input/vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
-  - topic: ~/output/traffic_signals
+  - name: ~/output/traffic_signals
     type: publisher
     msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray

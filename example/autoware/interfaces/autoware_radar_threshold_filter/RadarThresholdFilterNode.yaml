@@ -1,7 +1,7 @@
 connections:
-  - topic: ~/input/radar
+  - name: ~/input/radar
     type: subscription
     msg_type: radar_msgs/msg/RadarScan
-  - topic: ~/output/radar
+  - name: ~/output/radar
     type: publisher
     msg_type: radar_msgs/msg/RadarScan

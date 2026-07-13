@@ -1,10 +1,10 @@
 connections:
-  - topic: input/pointcloud
+  - name: input/pointcloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: output/labeled_clusters
+  - name: output/labeled_clusters
     type: publisher
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
-  - topic: debug/instance_pointcloud
+  - name: debug/instance_pointcloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2

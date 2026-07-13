@@ -1,16 +1,16 @@
 connections:
-  - topic: /control/vehicle_cmd_gate/is_paused
+  - name: /control/vehicle_cmd_gate/is_paused
     type: subscription
     msg_type: tier4_control_msgs/msg/IsPaused
-  - topic: /control/vehicle_cmd_gate/is_start_requested
+  - name: /control/vehicle_cmd_gate/is_start_requested
     type: subscription
     msg_type: tier4_control_msgs/msg/IsStartRequested
-  - topic: /api/motion/state
+  - name: /api/motion/state
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/MotionState
-  - topic: /api/motion/accept_start
+  - name: /api/motion/accept_start
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/AcceptStart
-  - topic: /control/vehicle_cmd_gate/set_pause
+  - name: /control/vehicle_cmd_gate/set_pause
     type: service_client
     msg_type: tier4_control_msgs/srv/SetPause

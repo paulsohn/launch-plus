@@ -1,13 +1,13 @@
 connections:
-  - topic: input/object_recognition
+  - name: input/object_recognition
     type: subscription
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: input/predicted_trajectory
+  - name: input/predicted_trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: input/odometry
+  - name: input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: debug/marker
+  - name: debug/marker
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray

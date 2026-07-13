@@ -1,10 +1,10 @@
 connections:
-  - topic: input
+  - name: input
     type: subscription
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: /vector_map
+  - name: /vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
-  - topic: output
+  - name: output
     type: publisher
     msg_type: autoware_perception_msgs/msg/TrackedObjects

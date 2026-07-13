@@ -1,10 +1,10 @@
 connections:
-  - topic: ~/input/lanelet2_map
+  - name: ~/input/lanelet2_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
-  - topic: ~/input/traffic_signals
+  - name: ~/input/traffic_signals
     type: subscription
     msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
-  - topic: ~/output/marker
+  - name: ~/output/marker
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray

@@ -1,8 +1,8 @@
 connections:
   # Inherits from pointcloud_preprocessor::Filter base class
-  - topic: input
+  - name: input
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: output
+  - name: output
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2

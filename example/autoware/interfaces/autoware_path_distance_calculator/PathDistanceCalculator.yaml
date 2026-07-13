@@ -1,7 +1,7 @@
 connections:
-  - topic: ~/input/path
+  - name: ~/input/path
     type: subscription
     msg_type: autoware_planning_msgs/msg/Path
-  - topic: ~/output/distance
+  - name: ~/output/distance
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

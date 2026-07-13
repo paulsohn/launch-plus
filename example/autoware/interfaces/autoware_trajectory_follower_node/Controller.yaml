@@ -1,49 +1,49 @@
 connections:
   # Inputs (InterProcessPollingSubscriber)
-  - topic: ~/input/reference_trajectory
+  - name: ~/input/reference_trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
 
-  - topic: ~/input/current_odometry
+  - name: ~/input/current_odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
 
-  - topic: ~/input/current_steering
+  - name: ~/input/current_steering
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/SteeringReport
 
-  - topic: ~/input/current_accel
+  - name: ~/input/current_accel
     type: subscription
     msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
 
-  - topic: ~/input/current_operation_mode
+  - name: ~/input/current_operation_mode
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
 
   # MPC lateral controller steering offset update (transient_local)
-  - topic: ~/input/steering_offset_update
+  - name: ~/input/steering_offset_update
     type: subscription
     msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
 
   # Outputs
-  - topic: ~/output/control_cmd
+  - name: ~/output/control_cmd
     type: publisher
     msg_type: autoware_control_msgs/msg/Control
 
-  - topic: ~/output/debug_marker
+  - name: ~/output/debug_marker
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray
 
-  - topic: ~/lateral/debug/processing_time_ms
+  - name: ~/lateral/debug/processing_time_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
 
-  - topic: ~/longitudinal/debug/processing_time_ms
+  - name: ~/longitudinal/debug/processing_time_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
 
   # Optional: published only when enable_control_cmd_horizon_pub is true
-  - topic: ~/debug/control_cmd_horizon
+  - name: ~/debug/control_cmd_horizon
     type: publisher
     msg_type: autoware_control_msgs/msg/ControlHorizon
     when: "params.get('enable_control_cmd_horizon_pub', False)"

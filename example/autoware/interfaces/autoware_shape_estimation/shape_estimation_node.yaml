@@ -1,7 +1,7 @@
 connections:
-  - topic: input
+  - name: input
     type: subscription
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
-  - topic: objects
+  - name: objects
     type: publisher
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature

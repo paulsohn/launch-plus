@@ -1,10 +1,10 @@
 connections:
-  - topic: /api/fail_safe/mrm_request/list
+  - name: /api/fail_safe/mrm_request/list
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/MrmRequestList
-  - topic: /api/fail_safe/mrm_request/send
+  - name: /api/fail_safe/mrm_request/send
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/SendMrmRequest
-  - topic: /diagnostics
+  - name: /diagnostics
     type: publisher
     msg_type: diagnostic_msgs/msg/DiagnosticArray

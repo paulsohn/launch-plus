@@ -3,16 +3,16 @@
 # Only the service and the TF-mode connections are statically known.
 connections:
   # Service name comes from runtime parameter 'srv_name'; recorded as representative placeholder
-  - topic: ~/change_relay_control
+  - name: ~/change_relay_control
     type: service_server
     msg_type: tier4_system_msgs/srv/ChangeTopicRelayControl
     when: "params.get('enable_relay_control', False)"
   # TF relay mode (when topic == '/tf' or '/tf_static')
-  - topic: "params.get('topic', '')"
+  - name: "params.get('topic', '')"
     type: subscription
     msg_type: tf2_msgs/msg/TFMessage
     when: "params.get('topic', '') in ('/tf', '/tf_static')"
-  - topic: "params.get('remap_topic', '')"
+  - name: "params.get('remap_topic', '')"
     type: publisher
     msg_type: tf2_msgs/msg/TFMessage
     when: "params.get('topic', '') in ('/tf', '/tf_static')"

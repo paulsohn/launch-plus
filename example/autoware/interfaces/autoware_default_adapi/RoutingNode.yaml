@@ -1,46 +1,46 @@
 connections:
-  - topic: /api/routing/state
+  - name: /api/routing/state
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/RouteState
-  - topic: /api/routing/route
+  - name: /api/routing/route
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/Route
-  - topic: /api/routing/set_route_points
+  - name: /api/routing/set_route_points
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/SetRoutePoints
-  - topic: /api/routing/set_route
+  - name: /api/routing/set_route
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/SetRoute
-  - topic: /api/routing/change_route_points
+  - name: /api/routing/change_route_points
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/SetRoutePoints
-  - topic: /api/routing/change_route
+  - name: /api/routing/change_route
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/SetRoute
-  - topic: /api/routing/clear_route
+  - name: /api/routing/clear_route
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/ClearRoute
-  - topic: /planning/route_state
+  - name: /planning/route_state
     type: subscription
     msg_type: autoware_planning_msgs/msg/RouteState
-  - topic: /planning/route
+  - name: /planning/route
     type: subscription
     msg_type: autoware_planning_msgs/msg/LaneletRoute
-  - topic: /system/operation_mode/state
+  - name: /system/operation_mode/state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
-  - topic: /planning/set_waypoint_route
+  - name: /planning/set_waypoint_route
     type: service_client
     msg_type: autoware_planning_msgs/srv/SetWaypointRoute
-  - topic: /planning/set_lanelet_route
+  - name: /planning/set_lanelet_route
     type: service_client
     msg_type: autoware_planning_msgs/srv/SetLaneletRoute
-  - topic: /planning/clear_route
+  - name: /planning/clear_route
     type: service_client
     msg_type: autoware_planning_msgs/srv/ClearRoute
-  - topic: /system/operation_mode/change_operation_mode
+  - name: /system/operation_mode/change_operation_mode
     type: service_client
     msg_type: autoware_system_msgs/srv/ChangeOperationMode
-  - topic: /diagnostics
+  - name: /diagnostics
     type: publisher
     msg_type: diagnostic_msgs/msg/DiagnosticArray

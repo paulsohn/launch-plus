@@ -1,7 +1,7 @@
 connections:
-  - topic: ~/command_mode/availability
+  - name: ~/command_mode/availability
     type: subscription
     msg_type: tier4_system_msgs/msg/CommandModeAvailability
-  - topic: ~/operation_mode/availability
+  - name: ~/operation_mode/availability
     type: publisher
     msg_type: tier4_system_msgs/msg/OperationModeAvailability

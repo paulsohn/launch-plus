@@ -3,15 +3,15 @@
 #   prediction_latency_topic_name (default: .../debug/processing_time_ms)
 # Defaults match the resolved.launch.xml values; override at launch time changes these topics.
 connections:
-  - topic: ~/input/objects
+  - name: ~/input/objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/PredictedObjects
-  - topic: /perception/object_recognition/tracking/multi_object_tracker/debug/meas_to_tracked_object_ms
+  - name: /perception/object_recognition/tracking/multi_object_tracker/debug/meas_to_tracked_object_ms
     type: subscription
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
-  - topic: /perception/object_recognition/prediction/map_based_prediction/debug/processing_time_ms
+  - name: /perception/object_recognition/prediction/map_based_prediction/debug/processing_time_ms
     type: subscription
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
-  - topic: ~/perception_analytics
+  - name: ~/perception_analytics
     type: publisher
     msg_type: tier4_metric_msgs/msg/MetricArray

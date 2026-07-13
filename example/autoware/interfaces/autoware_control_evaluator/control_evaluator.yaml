@@ -1,34 +1,34 @@
 connections:
   # Inputs (InterProcessPollingSubscriber)
-  - topic: ~/input/odometry
+  - name: ~/input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
 
-  - topic: ~/input/acceleration
+  - name: ~/input/acceleration
     type: subscription
     msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
 
-  - topic: ~/input/trajectory
+  - name: ~/input/trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
 
-  - topic: ~/input/route
+  - name: ~/input/route
     type: subscription
     msg_type: autoware_planning_msgs/msg/LaneletRoute
 
-  - topic: ~/input/vector_map
+  - name: ~/input/vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
 
-  - topic: ~/input/behavior_path
+  - name: ~/input/behavior_path
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/PathWithLaneId
 
-  - topic: ~/input/steering_status
+  - name: ~/input/steering_status
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/SteeringReport
 
-  - topic: ~/input/objects
+  - name: ~/input/objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/PredictedObjects
 
@@ -42,10 +42,10 @@ connections:
   # See todo.md for tracking.
 
   # Outputs
-  - topic: ~/metrics
+  - name: ~/metrics
     type: publisher
     msg_type: tier4_metric_msgs/msg/MetricArray
 
-  - topic: ~/debug/processing_time_ms
+  - name: ~/debug/processing_time_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

@@ -1,7 +1,7 @@
 connections:
-  - topic: ~/input/twist
+  - name: ~/input/twist
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: ~/metrics
+  - name: ~/metrics
     type: publisher
     msg_type: diagnostic_msgs/msg/DiagnosticArray

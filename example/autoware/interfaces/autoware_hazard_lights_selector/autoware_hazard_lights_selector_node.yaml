@@ -1,10 +1,10 @@
 connections:
-  - topic: input/planning/hazard_lights_command
+  - name: input/planning/hazard_lights_command
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
-  - topic: input/system/hazard_lights_command
+  - name: input/system/hazard_lights_command
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
-  - topic: output/hazard_lights_command
+  - name: output/hazard_lights_command
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand

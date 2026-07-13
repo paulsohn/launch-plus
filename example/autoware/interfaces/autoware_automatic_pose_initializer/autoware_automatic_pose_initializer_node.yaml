@@ -1,9 +1,9 @@
 connections:
   # Subscribes to the localization initialization state via the AD API
-  - topic: /api/localization/initialization_state
+  - name: /api/localization/initialization_state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/LocalizationInitializationState
 
   # Calls the localization initialize API when state is UNINITIALIZED
-  - topic: /api/localization/initialize
+  - name: /api/localization/initialize
     type: service_client

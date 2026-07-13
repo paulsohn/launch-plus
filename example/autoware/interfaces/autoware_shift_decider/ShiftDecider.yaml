@@ -1,18 +1,18 @@
 connections:
   # Inputs (InterProcessPollingSubscriber — no ~/ prefix)
-  - topic: input/control_cmd
+  - name: input/control_cmd
     type: subscription
     msg_type: autoware_control_msgs/msg/Control
 
-  - topic: input/state
+  - name: input/state
     type: subscription
     msg_type: autoware_system_msgs/msg/AutowareState
 
-  - topic: input/current_gear
+  - name: input/current_gear
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/GearReport
 
   # Outputs
-  - topic: output/gear_cmd
+  - name: output/gear_cmd
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/GearCommand

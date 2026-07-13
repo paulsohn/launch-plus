@@ -1,22 +1,22 @@
 connections:
-  - topic: ~/input/candidate_trajectories
+  - name: ~/input/candidate_trajectories
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
-  - topic: ~/input/odometry
+  - name: ~/input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: ~/input/acceleration
+  - name: ~/input/acceleration
     type: subscription
     msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
-  - topic: ~/input/objects
+  - name: ~/input/objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/PredictedObjects
-  - topic: ~/input/pointcloud
+  - name: ~/input/pointcloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/output/candidate_trajectories
+  - name: ~/output/candidate_trajectories
     type: publisher
     msg_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
-  - topic: ~/debug/processing_time_detail
+  - name: ~/debug/processing_time_detail
     type: publisher
     msg_type: autoware_utils_debug/msg/ProcessingTimeDetail

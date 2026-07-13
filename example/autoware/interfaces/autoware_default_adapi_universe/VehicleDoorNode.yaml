@@ -1,25 +1,25 @@
 connections:
-  - topic: /system/operation_mode/state
+  - name: /system/operation_mode/state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
-  - topic: /vehicle/doors/status
+  - name: /vehicle/doors/status
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/DoorStatusArray
-  - topic: /api/vehicle/doors/status
+  - name: /api/vehicle/doors/status
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/DoorStatusArray
-  - topic: /api/vehicle/doors/command
+  - name: /api/vehicle/doors/command
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/SetDoorCommand
-  - topic: /api/vehicle/doors/layout
+  - name: /api/vehicle/doors/layout
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/GetDoorLayout
-  - topic: /vehicle/doors/command
+  - name: /vehicle/doors/command
     type: service_client
     msg_type: autoware_adapi_v1_msgs/srv/SetDoorCommand
-  - topic: /vehicle/doors/layout
+  - name: /vehicle/doors/layout
     type: service_client
     msg_type: autoware_adapi_v1_msgs/srv/GetDoorLayout
-  - topic: /diagnostics
+  - name: /diagnostics
     type: publisher
     msg_type: diagnostic_msgs/msg/DiagnosticArray

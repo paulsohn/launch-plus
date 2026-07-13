@@ -1,22 +1,22 @@
 connections:
-  - topic: /vehicle/status/steering_status
+  - name: /vehicle/status/steering_status
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/SteeringReport
-  - topic: /vehicle/status/velocity_status
+  - name: /vehicle/status/velocity_status
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/VelocityReport
-  - topic: /planning/route_state
+  - name: /planning/route_state
     type: subscription
     msg_type: autoware_planning_msgs/msg/RouteState
-  - topic: ~/control
+  - name: ~/control
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/Control
-  - topic: ~/gear
+  - name: ~/gear
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/GearCommand
-  - topic: ~/turn_indicators
+  - name: ~/turn_indicators
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
-  - topic: ~/hazard_lights
+  - name: ~/hazard_lights
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand

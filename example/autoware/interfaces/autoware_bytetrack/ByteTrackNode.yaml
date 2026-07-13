@@ -1,10 +1,10 @@
 connections:
-  - topic: ~/in/rect
+  - name: ~/in/rect
     type: subscription
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
-  - topic: ~/out/objects
+  - name: ~/out/objects
     type: publisher
     msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
-  - topic: ~/out/objects/debug/uuid
+  - name: ~/out/objects/debug/uuid
     type: publisher
     msg_type: tier4_perception_msgs/msg/DynamicObjectArray

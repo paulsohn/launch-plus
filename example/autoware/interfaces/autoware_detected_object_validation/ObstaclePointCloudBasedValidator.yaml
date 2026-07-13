@@ -1,19 +1,19 @@
 connections:
-  - topic: ~/input/detected_objects
+  - name: ~/input/detected_objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: ~/input/obstacle_pointcloud
+  - name: ~/input/obstacle_pointcloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/output/objects
+  - name: ~/output/objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: ~/debug/removed_objects
+  - name: ~/debug/removed_objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: ~/debug/neighbor_pointcloud
+  - name: ~/debug/neighbor_pointcloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/debug/pointcloud_within_polygon
+  - name: ~/debug/pointcloud_within_polygon
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2

@@ -1,28 +1,28 @@
 connections:
-  - topic: ~/input/path
+  - name: ~/input/path
     type: subscription
     msg_type: autoware_planning_msgs/msg/Path
-  - topic: ~/input/odometry
+  - name: ~/input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: ~/output/path
+  - name: ~/output/path
     type: publisher
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: ~/virtual_wall
+  - name: ~/virtual_wall
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray
-  - topic: ~/debug/extended_traj
+  - name: ~/debug/extended_traj
     type: publisher
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: ~/debug/marker
+  - name: ~/debug/marker
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray
-  - topic: ~/debug/calculation_time
+  - name: ~/debug/calculation_time
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/StringStamped
-  - topic: ~/debug/processing_time_ms
+  - name: ~/debug/processing_time_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
-  - topic: ~/debug/processing_time_detail_ms
+  - name: ~/debug/processing_time_detail_ms
     type: publisher
     msg_type: autoware_utils/ProcessingTimeDetail

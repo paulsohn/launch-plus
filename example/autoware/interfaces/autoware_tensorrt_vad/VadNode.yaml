@@ -1,24 +1,24 @@
 # Dynamic topics: ~/input/image<i> and ~/input/camera_info<i> are created per camera
 # where i in range(num_cameras); only static entries are listed here.
 connections:
-  - topic: ~/input/kinematic_state
+  - name: ~/input/kinematic_state
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: ~/input/acceleration
+  - name: ~/input/acceleration
     type: subscription
     msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
-  - topic: /tf_static
+  - name: /tf_static
     type: subscription
     msg_type: tf2_msgs/msg/TFMessage
-  - topic: ~/output/trajectory
+  - name: ~/output/trajectory
     type: publisher
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: ~/output/trajectories
+  - name: ~/output/trajectories
     type: publisher
     msg_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
-  - topic: ~/output/objects
+  - name: ~/output/objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/PredictedObjects
-  - topic: ~/output/map
+  - name: ~/output/map
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray

@@ -1,13 +1,13 @@
 connections:
-  - topic: /api/external/set/engage
+  - name: /api/external/set/engage
     type: service_server
     msg_type: tier4_external_api_msgs/srv/Engage
-  - topic: /api/operation_mode/state
+  - name: /api/operation_mode/state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
-  - topic: /api/operation_mode/change_to_stop
+  - name: /api/operation_mode/change_to_stop
     type: service_client
     msg_type: autoware_adapi_v1_msgs/srv/ChangeOperationMode
-  - topic: /api/operation_mode/change_to_autonomous
+  - name: /api/operation_mode/change_to_autonomous
     type: service_client
     msg_type: autoware_adapi_v1_msgs/srv/ChangeOperationMode

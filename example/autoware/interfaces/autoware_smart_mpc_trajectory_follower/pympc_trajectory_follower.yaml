@@ -1,91 +1,91 @@
 connections:
-  - topic: /planning/trajectory
+  - name: /planning/trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: /localization/kinematic_state
+  - name: /localization/kinematic_state
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: /localization/acceleration
+  - name: /localization/acceleration
     type: subscription
     msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
-  - topic: /vehicle/status/steering_status
+  - name: /vehicle/status/steering_status
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/SteeringReport
-  - topic: /system/operation_mode/state
+  - name: /system/operation_mode/state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
-  - topic: /pympc_stop_mode_reset_request
+  - name: /pympc_stop_mode_reset_request
     type: subscription
     msg_type: std_msgs/msg/String
-  - topic: /planning/mission_planning/echo_back_goal_pose
+  - name: /planning/mission_planning/echo_back_goal_pose
     type: subscription
     msg_type: geometry_msgs/msg/PoseStamped
-  - topic: /pympc_reload_mpc_param_trigger
+  - name: /pympc_reload_mpc_param_trigger
     type: subscription
     msg_type: std_msgs/msg/String
-  - topic: /control/command/control_cmd
+  - name: /control/command/control_cmd
     type: subscription
     msg_type: autoware_control_msgs/msg/Control
-  - topic: /control/trajectory_follower/control_cmd
+  - name: /control/trajectory_follower/control_cmd
     type: publisher
     msg_type: autoware_control_msgs/msg/Control
-  - topic: /control/trajectory_follower/lateral/predicted_trajectory
+  - name: /control/trajectory_follower/lateral/predicted_trajectory
     type: publisher
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: /debug_mpc_x_current
+  - name: /debug_mpc_x_current
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_x_des
+  - name: /debug_mpc_x_des
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_y_des
+  - name: /debug_mpc_y_des
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_v_des
+  - name: /debug_mpc_v_des
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_yaw_des
+  - name: /debug_mpc_yaw_des
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_acc_des
+  - name: /debug_mpc_acc_des
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_steer_des
+  - name: /debug_mpc_steer_des
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_X_des_converted
+  - name: /debug_mpc_X_des_converted
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_nominal_traj
+  - name: /debug_mpc_nominal_traj
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_nominal_inputs
+  - name: /debug_mpc_nominal_inputs
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_X_input_list
+  - name: /debug_mpc_X_input_list
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_Y_output_list
+  - name: /debug_mpc_Y_output_list
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_error_prediction
+  - name: /debug_mpc_error_prediction
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /debug_mpc_emergency_stop_mode
+  - name: /debug_mpc_emergency_stop_mode
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/BoolStamped
-  - topic: /debug_mpc_goal_stop_mode
+  - name: /debug_mpc_goal_stop_mode
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/BoolStamped
-  - topic: /debug_mpc_max_trajectory_err
+  - name: /debug_mpc_max_trajectory_err
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
-  - topic: /debug_mpc_calc_u_opt_time
+  - name: /debug_mpc_calc_u_opt_time
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
-  - topic: /debug_mpc_total_ctrl_time
+  - name: /debug_mpc_total_ctrl_time
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
-  - topic: /debug_mpc_sampling_paths_marker_array
+  - name: /debug_mpc_sampling_paths_marker_array
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray

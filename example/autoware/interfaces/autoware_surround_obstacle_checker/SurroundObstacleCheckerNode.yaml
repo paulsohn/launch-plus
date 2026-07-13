@@ -1,31 +1,31 @@
 connections:
-  - topic: ~/input/odometry
+  - name: ~/input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: ~/input/pointcloud
+  - name: ~/input/pointcloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/input/objects
+  - name: ~/input/objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/PredictedObjects
-  - topic: ~/output/velocity_limit_clear_command
+  - name: ~/output/velocity_limit_clear_command
     type: publisher
     msg_type: autoware_internal_planning_msgs/msg/VelocityLimitClearCommand
-  - topic: ~/output/max_velocity
+  - name: ~/output/max_velocity
     type: publisher
     msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
-  - topic: ~/debug/processing_time_ms
+  - name: ~/debug/processing_time_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
-  - topic: ~/debug/marker
+  - name: ~/debug/marker
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray
-  - topic: ~/debug/footprint
+  - name: ~/debug/footprint
     type: publisher
     msg_type: geometry_msgs/msg/PolygonStamped
-  - topic: ~/debug/footprint_offset
+  - name: ~/debug/footprint_offset
     type: publisher
     msg_type: geometry_msgs/msg/PolygonStamped
-  - topic: ~/debug/footprint_recover_offset
+  - name: ~/debug/footprint_recover_offset
     type: publisher
     msg_type: geometry_msgs/msg/PolygonStamped

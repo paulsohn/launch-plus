@@ -1,9 +1,9 @@
 connections:
   # Python node — topic names are hardcoded absolute paths (not remappable ~/ prefixes)
-  - topic: /api/autoware/get/map/info/hash
+  - name: /api/autoware/get/map/info/hash
     type: publisher
     msg_type: tier4_external_api_msgs/msg/MapHash
 
-  - topic: /api/autoware/get/map/lanelet/xml
+  - name: /api/autoware/get/map/lanelet/xml
     type: service_server
     msg_type: tier4_external_api_msgs/srv/GetTextFile

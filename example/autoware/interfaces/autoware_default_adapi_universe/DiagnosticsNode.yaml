@@ -1,22 +1,22 @@
 connections:
-  - topic: /diagnostics_graph/struct
+  - name: /diagnostics_graph/struct
     type: subscription
     msg_type: tier4_system_msgs/msg/DiagGraphStruct
-  - topic: /diagnostics_graph/status
+  - name: /diagnostics_graph/status
     type: subscription
     msg_type: tier4_system_msgs/msg/DiagGraphStatus
-  - topic: /api/fail_safe/mrm_state
+  - name: /api/fail_safe/mrm_state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/MrmState
-  - topic: /api/system/diagnostics/struct
+  - name: /api/system/diagnostics/struct
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/DiagGraphStruct
-  - topic: /api/system/diagnostics/status
+  - name: /api/system/diagnostics/status
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/DiagGraphStatus
-  - topic: /api/system/diagnostics/reset
+  - name: /api/system/diagnostics/reset
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/ResetDiagGraph
-  - topic: /diagnostics_graph/reset
+  - name: /diagnostics_graph/reset
     type: service_client
     msg_type: tier4_system_msgs/srv/ResetDiagGraph

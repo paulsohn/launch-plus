@@ -2,19 +2,19 @@
 # ~/input/rough/rois is only subscribed when use_high_accuracy_detection is true.
 # ~/output/image is always published but via image_transport when use_image_transport=true.
 connections:
-  - topic: ~/input/image
+  - name: ~/input/image
     type: subscription
     msg_type: sensor_msgs/msg/Image
-  - topic: ~/input/rois
+  - name: ~/input/rois
     type: subscription
     msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
-  - topic: ~/input/traffic_signals
+  - name: ~/input/traffic_signals
     type: subscription
     msg_type: tier4_perception_msgs/msg/TrafficLightArray
-  - topic: ~/input/rough/rois
+  - name: ~/input/rough/rois
     type: subscription
     msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
     when: "params.get('use_high_accuracy_detection', False)"
-  - topic: ~/output/image
+  - name: ~/output/image
     type: publisher
     msg_type: sensor_msgs/msg/Image

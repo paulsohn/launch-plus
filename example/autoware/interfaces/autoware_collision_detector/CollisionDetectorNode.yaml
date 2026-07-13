@@ -1,23 +1,23 @@
 connections:
   # Inputs (InterProcessPollingSubscriber)
-  - topic: ~/input/odometry
+  - name: ~/input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
 
-  - topic: ~/input/pointcloud
+  - name: ~/input/pointcloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
 
-  - topic: ~/input/objects
+  - name: ~/input/objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/PredictedObjects
 
   # Fixed absolute topic (transient_local QoS)
-  - topic: /api/operation_mode/state
+  - name: /api/operation_mode/state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
 
   # Outputs
-  - topic: ~/debug_markers
+  - name: ~/debug_markers
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray

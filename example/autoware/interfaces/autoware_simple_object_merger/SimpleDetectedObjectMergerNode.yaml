@@ -1,10 +1,10 @@
 connections:
   # input_topics is a runtime list param — dynamic number of subscriptions
   # Only static pattern recorded here
-  - topic: "~"
+  - name: "~"
     type: subscription
     msg_type: autoware_perception_msgs/msg/DetectedObjects
     # Note: actual topic names come from input_topics parameter (string array)
-  - topic: ~/output/objects
+  - name: ~/output/objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects

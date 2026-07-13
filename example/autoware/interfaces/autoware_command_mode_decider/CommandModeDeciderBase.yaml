@@ -1,33 +1,33 @@
 connections:
   # Interface with switcher nodes
-  - topic: ~/command_mode/request
+  - name: ~/command_mode/request
     type: publisher
     msg_type: tier4_system_msgs/msg/CommandModeRequest
-  - topic: ~/command_mode/status
+  - name: ~/command_mode/status
     type: subscription
     msg_type: tier4_system_msgs/msg/CommandModeStatus
-  - topic: ~/command_mode/availability
+  - name: ~/command_mode/availability
     type: subscription
     msg_type: tier4_system_msgs/msg/CommandModeAvailability
-  - topic: ~/command_mode/transition/available
+  - name: ~/command_mode/transition/available
     type: subscription
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/control_mode/report
+  - name: ~/control_mode/report
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/ControlModeReport
   # Interface for API
-  - topic: ~/operation_mode/state
+  - name: ~/operation_mode/state
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
-  - topic: ~/operation_mode/change_operation_mode
+  - name: ~/operation_mode/change_operation_mode
     type: service_server
     msg_type: autoware_system_msgs/srv/ChangeOperationMode
-  - topic: ~/operation_mode/change_autoware_control
+  - name: ~/operation_mode/change_autoware_control
     type: service_server
     msg_type: autoware_system_msgs/srv/ChangeAutowareControl
-  - topic: ~/mrm/state
+  - name: ~/mrm/state
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/MrmState
-  - topic: ~/debug
+  - name: ~/debug
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Int32MultiArrayStamped

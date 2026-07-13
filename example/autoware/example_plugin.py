@@ -23,23 +23,25 @@ relative symlink pointing to the executable YAML so that only one file is mainta
 
 Expected YAML format
 ---------------------
-connections is a list of entries.  Each entry must have a ``topic`` key plus a
+connections is a list of entries.  Each entry must have a ``name`` key plus a
 ``type`` key.  Additional optional keys: ``msg_type``, ``qos``, ``when``.
+The ``name`` field holds a topic name, service name, or action name depending
+on the ``type``.
 
 connections:
-  - topic: ~/input/points
+  - name: ~/input/points
     type: subscription
     qos:
       reliability: best_effort
       durability: volatile
-  - topic: ~/output/objects
+  - name: ~/output/objects
     type: publisher
     qos:
       reliability: reliable
       durability: volatile
-  - topic: /tf
+  - name: /tf
     type: subscription
-  - topic: ~/set_parameters
+  - name: ~/set_parameters
     type: service_server
 
 Conditional connections
@@ -50,21 +52,21 @@ single name ``params`` — the dict of parameter name → resolved value passed 
 roscope.  The entry is included only when the expression evaluates to a truthy
 value.
 
-  - topic: ~/output/predicted_objects
+  - name: ~/output/predicted_objects
     type: publisher
     when: "params.get('use_object_filter', False)"
 
-  - topic: ~/input/map_based_prediction
+  - name: ~/input/map_based_prediction
     type: subscription
     when: "params.get('prediction_time_horizon_rate_for_validate_lane_changing_path', 0.0) > 0"
 
 If the expression raises any exception (e.g. unexpected param type), the entry
 is included conservatively.
 
-The same topic name may appear more than once with mutually-exclusive ``when``
+The same name may appear more than once with mutually-exclusive ``when``
 conditions (e.g. a topic that is a subscription in replay mode and a publisher
-in hardware mode).  Two entries resolving to the *same* topic name after
-``when`` filtering is an error — the plugin raises ``ValueError``.
+in hardware mode).  Two entries resolving to the *same* name after ``when``
+filtering is an error — the plugin raises ``ValueError``.
 
 Recognized types: publisher, subscription, service_client, service_server,
                   action_client, action_server.
@@ -127,13 +129,13 @@ def get_connections(
     for entry in raw:
         if not isinstance(entry, dict):
             continue
-        topic = entry.get("topic")
-        if not topic:
+        conn_name = entry.get("name")
+        if not conn_name:
             continue
         when = entry.get("when")
         if when is not None and not _evaluate_when(when, params):
             continue
-        if topic in result:
-            raise ValueError(f"{interface_file}: duplicate resolved connection topic {topic!r}")
-        result[topic] = {k: v for k, v in entry.items() if k not in ("topic", "when")}
+        if conn_name in result:
+            raise ValueError(f"{interface_file}: duplicate resolved connection name {conn_name!r}")
+        result[conn_name] = {k: v for k, v in entry.items() if k not in ("name", "when")}
     return result

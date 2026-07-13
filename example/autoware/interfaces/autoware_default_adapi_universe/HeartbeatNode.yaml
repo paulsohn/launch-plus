@@ -1,4 +1,4 @@
 connections:
-  - topic: /api/system/heartbeat
+  - name: /api/system/heartbeat
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/Heartbeat

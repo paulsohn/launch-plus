@@ -1,10 +1,10 @@
 connections:
-  - topic: input
+  - name: input
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: output
+  - name: output
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/crop_box_polygon
+  - name: ~/crop_box_polygon
     type: publisher
     msg_type: geometry_msgs/msg/PolygonStamped

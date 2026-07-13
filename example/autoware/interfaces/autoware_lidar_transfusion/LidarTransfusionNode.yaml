@@ -1,7 +1,7 @@
 connections:
-  - topic: ~/input/pointcloud
+  - name: ~/input/pointcloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/output/objects
+  - name: ~/output/objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects

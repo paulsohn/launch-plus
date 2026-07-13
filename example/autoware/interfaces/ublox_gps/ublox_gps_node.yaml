@@ -2,15 +2,15 @@
 # ublox_gps source not found under src/sensor_component/; interface derived from
 # known ublox_gps ROS 2 conventions. See interfaces/todo.md for tracking.
 connections:
-  - topic: /fix
+  - name: /fix
     type: publisher
     msg_type: sensor_msgs/msg/NavSatFix
-  - topic: /vel
+  - name: /vel
     type: publisher
     msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
-  - topic: /imu
+  - name: /imu
     type: publisher
     msg_type: sensor_msgs/msg/Imu
-  - topic: /time_reference
+  - name: /time_reference
     type: publisher
     msg_type: sensor_msgs/msg/TimeReference

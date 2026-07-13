@@ -1,10 +1,10 @@
 connections:
-  - topic: /diagnostics
+  - name: /diagnostics
     type: publisher
     msg_type: diagnostic_msgs/msg/DiagnosticArray
-  - topic: ~/cpu_usage
+  - name: ~/cpu_usage
     type: publisher
     msg_type: tier4_external_api_msgs/msg/CpuUsage
-  - topic: ~/cpu_temperature
+  - name: ~/cpu_temperature
     type: publisher
     msg_type: tier4_external_api_msgs/msg/CpuTemperature

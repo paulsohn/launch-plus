@@ -1,17 +1,17 @@
 connections:
   # Pointcloud subscription via CudaBlackboardSubscriber (not create_subscription)
-  - topic: ~/input/pointcloud
+  - name: ~/input/pointcloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
   # Per-camera image and camera_info subscribers (index 0..N-1, count from num_cameras param)
   # Topic names: ~/input/image{i} and ~/input/camera_info{i}
   # Dynamic count — only static pattern recorded here
-  - topic: ~/input/image0
+  - name: ~/input/image0
     type: subscription
     msg_type: sensor_msgs/msg/Image
-  - topic: ~/input/camera_info0
+  - name: ~/input/camera_info0
     type: subscription
     msg_type: sensor_msgs/msg/CameraInfo
-  - topic: ~/output/objects
+  - name: ~/output/objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects

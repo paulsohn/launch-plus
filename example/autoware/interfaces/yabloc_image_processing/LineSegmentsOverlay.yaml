@@ -1,10 +1,10 @@
 connections:
-  - topic: ~/input/image_raw
+  - name: ~/input/image_raw
     type: subscription
     msg_type: sensor_msgs/msg/Image
-  - topic: ~/input/line_segments
+  - name: ~/input/line_segments
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/debug/image_with_colored_line_segments
+  - name: ~/debug/image_with_colored_line_segments
     type: publisher
     msg_type: sensor_msgs/msg/Image

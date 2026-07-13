@@ -1,4 +1,4 @@
 connections:
-  - topic: ~/component_system_usage
+  - name: ~/component_system_usage
     type: publisher
     msg_type: autoware_internal_msgs/msg/ResourceUsageReport

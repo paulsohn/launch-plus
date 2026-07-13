@@ -1,54 +1,54 @@
 connections:
-  - topic: /diagnostics
+  - name: /diagnostics
     type: subscription
     msg_type: diagnostic_msgs/msg/DiagnosticArray
   # Publishers: ~/launch/<module> and ~/autonomous/<module> for each module in
   # {sensing, perception, map, localization, planning, control, vehicle, system}
-  - topic: ~/launch/sensing
+  - name: ~/launch/sensing
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/launch/perception
+  - name: ~/launch/perception
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/launch/map
+  - name: ~/launch/map
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/launch/localization
+  - name: ~/launch/localization
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/launch/planning
+  - name: ~/launch/planning
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/launch/control
+  - name: ~/launch/control
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/launch/vehicle
+  - name: ~/launch/vehicle
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/launch/system
+  - name: ~/launch/system
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/autonomous/sensing
+  - name: ~/autonomous/sensing
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/autonomous/perception
+  - name: ~/autonomous/perception
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/autonomous/map
+  - name: ~/autonomous/map
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/autonomous/localization
+  - name: ~/autonomous/localization
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/autonomous/planning
+  - name: ~/autonomous/planning
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/autonomous/control
+  - name: ~/autonomous/control
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/autonomous/vehicle
+  - name: ~/autonomous/vehicle
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable
-  - topic: ~/autonomous/system
+  - name: ~/autonomous/system
     type: publisher
     msg_type: tier4_system_msgs/msg/ModeChangeAvailable

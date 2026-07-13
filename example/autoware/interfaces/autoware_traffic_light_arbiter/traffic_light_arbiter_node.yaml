@@ -1,13 +1,13 @@
 connections:
-  - topic: ~/sub/vector_map
+  - name: ~/sub/vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
-  - topic: ~/sub/perception_traffic_signals
+  - name: ~/sub/perception_traffic_signals
     type: subscription
     msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
-  - topic: ~/sub/external_traffic_signals
+  - name: ~/sub/external_traffic_signals
     type: subscription
     msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
-  - topic: ~/pub/traffic_signals
+  - name: ~/pub/traffic_signals
     type: publisher
     msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray

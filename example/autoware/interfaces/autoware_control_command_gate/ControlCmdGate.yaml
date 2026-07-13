@@ -2,42 +2,42 @@
 # ~/inputs/<name>/turn_indicators, ~/inputs/<name>/hazard_lights are created per
 # source named in params["inputs_names.<id>"]. Only static entries listed here.
 connections:
-  - topic: /localization/kinematic_state
+  - name: /localization/kinematic_state
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: /localization/acceleration
+  - name: /localization/acceleration
     type: subscription
     msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
-  - topic: /vehicle/status/steering_status
+  - name: /vehicle/status/steering_status
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/SteeringReport
-  - topic: /vehicle/status/control_mode
+  - name: /vehicle/status/control_mode
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/ControlModeReport
-  - topic: ~/output/control
+  - name: ~/output/control
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/Control
-  - topic: ~/output/gear
+  - name: ~/output/gear
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/GearCommand
-  - topic: ~/output/turn_indicators
+  - name: ~/output/turn_indicators
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
-  - topic: ~/output/hazard_lights
+  - name: ~/output/hazard_lights
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
-  - topic: ~/source/status
+  - name: ~/source/status
     type: publisher
     msg_type: autoware_control_command_gate/msg/CommandSourceStatus
-  - topic: ~/filter/status
+  - name: ~/filter/status
     type: publisher
     msg_type: autoware_control_command_gate/msg/CommandFilterStatus
-  - topic: ~/source/change
+  - name: ~/source/change
     type: service_server
     msg_type: autoware_control_command_gate/srv/ChangeCommandSource
-  - topic: ~/filter/change
+  - name: ~/filter/change
     type: service_server
     msg_type: autoware_control_command_gate/srv/ChangeCommandFilter
-  - topic: ~/source/select
+  - name: ~/source/select
     type: service_server
     msg_type: autoware_control_command_gate/srv/SelectCommandSource

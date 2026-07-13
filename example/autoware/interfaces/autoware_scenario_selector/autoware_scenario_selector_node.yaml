@@ -1,31 +1,31 @@
 connections:
-  - topic: input/lane_driving/trajectory
+  - name: input/lane_driving/trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: input/parking/trajectory
+  - name: input/parking/trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: input/lanelet_map
+  - name: input/lanelet_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
-  - topic: input/route
+  - name: input/route
     type: subscription
     msg_type: autoware_planning_msgs/msg/LaneletRoute
-  - topic: input/odometry
+  - name: input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: is_parking_completed
+  - name: is_parking_completed
     type: subscription
     msg_type: std_msgs/msg/Bool
-  - topic: input/operation_mode_state
+  - name: input/operation_mode_state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
-  - topic: output/scenario
+  - name: output/scenario
     type: publisher
     msg_type: autoware_internal_planning_msgs/msg/Scenario
-  - topic: output/trajectory
+  - name: output/trajectory
     type: publisher
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: ~/debug/processing_time_ms
+  - name: ~/debug/processing_time_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

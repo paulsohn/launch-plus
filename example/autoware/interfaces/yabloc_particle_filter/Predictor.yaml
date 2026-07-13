@@ -1,31 +1,31 @@
 connections:
-  - topic: ~/input/initialpose
+  - name: ~/input/initialpose
     type: subscription
     msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
-  - topic: ~/input/weighted_particles
+  - name: ~/input/weighted_particles
     type: subscription
     msg_type: yabloc_particle_filter/msg/ParticleArray
-  - topic: ~/input/height
+  - name: ~/input/height
     type: subscription
     msg_type: std_msgs/msg/Float32
-  - topic: ~/input/twist_with_covariance
+  - name: ~/input/twist_with_covariance
     type: subscription
     msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
-  - topic: ~/input/ekf_pose
+  - name: ~/input/ekf_pose
     type: subscription
     msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
-  - topic: ~/output/predicted_particles
+  - name: ~/output/predicted_particles
     type: publisher
     msg_type: yabloc_particle_filter/msg/ParticleArray
-  - topic: ~/output/pose
+  - name: ~/output/pose
     type: publisher
     msg_type: geometry_msgs/msg/PoseStamped
-  - topic: ~/output/pose_with_covariance
+  - name: ~/output/pose_with_covariance
     type: publisher
     msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
-  - topic: ~/debug/init_marker
+  - name: ~/debug/init_marker
     type: publisher
     msg_type: visualization_msgs/msg/Marker
-  - topic: ~/yabloc_trigger_srv
+  - name: ~/yabloc_trigger_srv
     type: service_server
     msg_type: std_srvs/srv/SetBool

@@ -1,7 +1,7 @@
 connections:
-  - topic: /perception/object_recognition/objects
+  - name: /perception/object_recognition/objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/PredictedObjects
-  - topic: /api/perception/objects
+  - name: /api/perception/objects
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/DynamicObjectArray

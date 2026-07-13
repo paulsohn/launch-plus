@@ -1,7 +1,7 @@
 connections:
-  - topic: input/object
+  - name: input/object
     type: subscription
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: output/object
+  - name: output/object
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects

@@ -1,22 +1,22 @@
 connections:
-  - topic: ~/input/mrm/comfortable_stop/operate
+  - name: ~/input/mrm/comfortable_stop/operate
     type: service_server
     msg_type: tier4_system_msgs/srv/OperateMrm
-  - topic: ~/input/driving_mode_request
+  - name: ~/input/driving_mode_request
     type: subscription
     msg_type: tier4_system_msgs/msg/DrivingModeRequest
-  - topic: ~/input/driving_mode_info
+  - name: ~/input/driving_mode_info
     type: subscription
     msg_type: tier4_system_msgs/msg/DrivingModeInfo
-  - topic: ~/output/mrm/comfortable_stop/status
+  - name: ~/output/mrm/comfortable_stop/status
     type: publisher
     msg_type: tier4_system_msgs/msg/MrmBehaviorStatus
-  - topic: ~/output/velocity_limit
+  - name: ~/output/velocity_limit
     type: publisher
     msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
-  - topic: ~/output/velocity_limit/clear
+  - name: ~/output/velocity_limit/clear
     type: publisher
     msg_type: autoware_internal_planning_msgs/msg/VelocityLimitClearCommand
-  - topic: ~/output/mrm_state
+  - name: ~/output/mrm_state
     type: publisher
     msg_type: tier4_system_msgs/msg/DrivingModeMrmState

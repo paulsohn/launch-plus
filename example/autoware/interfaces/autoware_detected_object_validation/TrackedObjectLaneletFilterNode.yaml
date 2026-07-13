@@ -1,13 +1,13 @@
 connections:
-  - topic: input/vector_map
+  - name: input/vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
-  - topic: input/object
+  - name: input/object
     type: subscription
     msg_type: autoware_perception_msgs/msg/TrackedObjects
-  - topic: output/object
+  - name: output/object
     type: publisher
     msg_type: autoware_perception_msgs/msg/TrackedObjects
-  - topic: ~/debug/marker
+  - name: ~/debug/marker
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray

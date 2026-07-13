@@ -1,16 +1,16 @@
 connections:
-  - topic: ~/input/image
+  - name: ~/input/image
     type: subscription
     msg_type: sensor_msgs/msg/Image
-  - topic: ~/input/rois
+  - name: ~/input/rois
     type: subscription
     msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
-  - topic: ~/expect/rois
+  - name: ~/expect/rois
     type: subscription
     msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
-  - topic: ~/output/rois
+  - name: ~/output/rois
     type: publisher
     msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
-  - topic: ~/debug/exe_time_ms
+  - name: ~/debug/exe_time_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32Stamped

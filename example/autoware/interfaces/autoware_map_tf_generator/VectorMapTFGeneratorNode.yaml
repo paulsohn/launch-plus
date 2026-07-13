@@ -1,11 +1,11 @@
 connections:
   # Topic name is "vector_map" (relative), resolves to ~/vector_map under node namespace
   # README documents this as /map/vector_map — matches component_interface_specs::map::VectorMap::name
-  - topic: vector_map
+  - name: vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
 
   # TF is broadcast via tf2_ros::StaticTransformBroadcaster (not a standard create_publisher call)
-  - topic: /tf_static
+  - name: /tf_static
     type: publisher
     msg_type: tf2_msgs/msg/TFMessage

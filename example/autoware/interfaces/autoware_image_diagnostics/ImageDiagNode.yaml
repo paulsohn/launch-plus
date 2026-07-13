@@ -1,4 +1,4 @@
 connections:
-  - topic: input/raw_image
+  - name: input/raw_image
     type: subscription
     msg_type: sensor_msgs/msg/Image

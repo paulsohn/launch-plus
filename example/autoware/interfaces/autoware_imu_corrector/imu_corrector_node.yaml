@@ -1,13 +1,13 @@
 connections:
-  - topic: input
+  - name: input
     type: subscription
     msg_type: sensor_msgs/msg/Imu
-  - topic: gyro_bias_input
+  - name: gyro_bias_input
     type: subscription
     msg_type: geometry_msgs/msg/Vector3Stamped
-  - topic: gyro_scale_input
+  - name: gyro_scale_input
     type: subscription
     msg_type: geometry_msgs/msg/Vector3Stamped
-  - topic: output
+  - name: output
     type: publisher
     msg_type: sensor_msgs/msg/Imu

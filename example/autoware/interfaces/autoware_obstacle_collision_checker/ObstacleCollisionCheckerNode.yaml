@@ -1,16 +1,16 @@
 connections:
-  - topic: input/obstacle_pointcloud
+  - name: input/obstacle_pointcloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: input/reference_trajectory
+  - name: input/reference_trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: input/predicted_trajectory
+  - name: input/predicted_trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: input/odometry
+  - name: input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: debug/marker
+  - name: debug/marker
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray

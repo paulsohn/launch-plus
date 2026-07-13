@@ -1,7 +1,7 @@
 connections:
-  - topic: ~/input/compressed_image
+  - name: ~/input/compressed_image
     type: subscription
     msg_type: sensor_msgs/msg/CompressedImage
-  - topic: ~/output/raw_image
+  - name: ~/output/raw_image
     type: publisher
     msg_type: sensor_msgs/msg/Image

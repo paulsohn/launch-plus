@@ -1,25 +1,25 @@
 connections:
-  - topic: velocity_scale_factor
+  - name: velocity_scale_factor
     type: subscription
     msg_type: eagleye_msgs/msg/VelocityScaleFactor
-  - topic: yaw_rate_offset_2nd
+  - name: yaw_rate_offset_2nd
     type: subscription
     msg_type: eagleye_msgs/msg/YawrateOffset
-  - topic: yaw_rate_offset_stop
+  - name: yaw_rate_offset_stop
     type: subscription
     msg_type: eagleye_msgs/msg/YawrateOffset
-  - topic: distance
+  - name: distance
     type: subscription
     msg_type: eagleye_msgs/msg/Distance
-  - topic: angular_velocity_offset_stop
+  - name: angular_velocity_offset_stop
     type: subscription
     msg_type: eagleye_msgs/msg/AngularVelocityOffset
-  - topic: imu/data_tf_converted
+  - name: imu/data_tf_converted
     type: subscription
     msg_type: sensor_msgs/msg/Imu
-  - topic: acc_y_offset_additional_rolling
+  - name: acc_y_offset_additional_rolling
     type: publisher
     msg_type: eagleye_msgs/msg/AccYOffset
-  - topic: enable_additional_rolling
+  - name: enable_additional_rolling
     type: publisher
     msg_type: eagleye_msgs/msg/Rolling

@@ -1,22 +1,22 @@
 connections:
-  - topic: ~/input/vector_map
+  - name: ~/input/vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
-  - topic: ~/input/pose
+  - name: ~/input/pose
     type: subscription
     msg_type: geometry_msgs/msg/PoseStamped
-  - topic: ~/output/height
+  - name: ~/output/height
     type: publisher
     msg_type: std_msgs/msg/Float32
-  - topic: ~/output/ground
+  - name: ~/output/ground
     type: publisher
     msg_type: std_msgs/msg/Float32MultiArray
-  - topic: ~/debug/ground_markers
+  - name: ~/debug/ground_markers
     type: publisher
     msg_type: visualization_msgs/msg/Marker
-  - topic: ~/debug/ground_status
+  - name: ~/debug/ground_status
     type: publisher
     msg_type: std_msgs/msg/String
-  - topic: ~/debug/near_cloud
+  - name: ~/debug/near_cloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2

@@ -1,10 +1,10 @@
 connections:
-  - topic: ~/input/detected_objects
+  - name: ~/input/detected_objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-  - topic: ~/input/occupancy_grid_map
+  - name: ~/input/occupancy_grid_map
     type: subscription
     msg_type: nav_msgs/msg/OccupancyGrid
-  - topic: ~/output/objects
+  - name: ~/output/objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects

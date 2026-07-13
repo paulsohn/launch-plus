@@ -1,16 +1,16 @@
 connections:
   # Subscription
-  - topic: input/odom
+  - name: input/odom
     type: subscription
     msg_type: nav_msgs/msg/Odometry
 
   # Publishers
-  - topic: debug/ellipse_marker
+  - name: debug/ellipse_marker
     type: publisher
     msg_type: visualization_msgs/msg/Marker
 
   # Diagnostics published via DiagnosticsInterface (autoware_utils_diagnostics)
   # which uses /diagnostics topic internally
-  - topic: /diagnostics
+  - name: /diagnostics
     type: publisher
     msg_type: diagnostic_msgs/msg/DiagnosticArray

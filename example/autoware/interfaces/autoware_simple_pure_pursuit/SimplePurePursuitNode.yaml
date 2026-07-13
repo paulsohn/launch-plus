@@ -1,10 +1,10 @@
 connections:
-  - topic: ~/input/odometry
+  - name: ~/input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: ~/input/trajectory
+  - name: ~/input/trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
-  - topic: ~/output/control_command
+  - name: ~/output/control_command
     type: publisher
     msg_type: autoware_control_msgs/msg/Control

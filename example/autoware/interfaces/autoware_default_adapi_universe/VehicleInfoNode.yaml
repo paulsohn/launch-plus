@@ -1,4 +1,4 @@
 connections:
-  - topic: /api/vehicle/dimensions
+  - name: /api/vehicle/dimensions
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/GetVehicleDimensions

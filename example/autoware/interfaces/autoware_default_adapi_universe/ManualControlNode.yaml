@@ -2,57 +2,57 @@
 # which sets the namespace ns_ = "/api/manual/<mode>" and target "/external/<mode>/...".
 # Topics below use <mode> as a placeholder for the runtime value.
 connections:
-  - topic: /api/operation_mode/state
+  - name: /api/operation_mode/state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
   # AD API service servers
-  - topic: /api/manual/<mode>/control_mode/list
+  - name: /api/manual/<mode>/control_mode/list
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/ListManualControlMode
-  - topic: /api/manual/<mode>/control_mode/select
+  - name: /api/manual/<mode>/control_mode/select
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/SelectManualControlMode
-  - topic: /api/manual/<mode>/control_mode/status
+  - name: /api/manual/<mode>/control_mode/status
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/ManualControlModeStatus
   # External operator input subscriptions (created dynamically on mode select)
-  - topic: /api/manual/<mode>/operator/heartbeat
+  - name: /api/manual/<mode>/operator/heartbeat
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
-  - topic: /api/manual/<mode>/command/pedals
+  - name: /api/manual/<mode>/command/pedals
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
-  - topic: /api/manual/<mode>/command/steering
+  - name: /api/manual/<mode>/command/steering
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
-  - topic: /api/manual/<mode>/command/gear
+  - name: /api/manual/<mode>/command/gear
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/GearCommand
-  - topic: /api/manual/<mode>/command/turn_indicators
+  - name: /api/manual/<mode>/command/turn_indicators
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/TurnIndicatorsCommand
-  - topic: /api/manual/<mode>/command/hazard_lights
+  - name: /api/manual/<mode>/command/hazard_lights
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/HazardLightsCommand
   # Internal output publishers
-  - topic: /external/<mode>/heartbeat
+  - name: /external/<mode>/heartbeat
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
-  - topic: /external/<mode>/pedals_cmd
+  - name: /external/<mode>/pedals_cmd
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
-  - topic: /external/<mode>/steering_cmd
+  - name: /external/<mode>/steering_cmd
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
-  - topic: /external/<mode>/gear_cmd
+  - name: /external/<mode>/gear_cmd
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/GearCommand
-  - topic: /external/<mode>/turn_indicators_cmd
+  - name: /external/<mode>/turn_indicators_cmd
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
-  - topic: /external/<mode>/hazard_lights_cmd
+  - name: /external/<mode>/hazard_lights_cmd
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
-  - topic: /diagnostics
+  - name: /diagnostics
     type: publisher
     msg_type: diagnostic_msgs/msg/DiagnosticArray

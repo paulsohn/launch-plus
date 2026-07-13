@@ -1,22 +1,22 @@
 connections:
-  - topic: ~/input/vector_map
+  - name: ~/input/vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
-  - topic: ~/input/car/traffic_signals
+  - name: ~/input/car/traffic_signals
     type: subscription
     msg_type: tier4_perception_msgs/msg/TrafficLightArray
-  - topic: ~/input/pedestrian/traffic_signals
+  - name: ~/input/pedestrian/traffic_signals
     type: subscription
     msg_type: tier4_perception_msgs/msg/TrafficLightArray
-  - topic: ~/input/rois
+  - name: ~/input/rois
     type: subscription
     msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
-  - topic: ~/input/camera_info
+  - name: ~/input/camera_info
     type: subscription
     msg_type: sensor_msgs/msg/CameraInfo
-  - topic: ~/input/cloud
+  - name: ~/input/cloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/output/traffic_signals
+  - name: ~/output/traffic_signals
     type: publisher
     msg_type: tier4_perception_msgs/msg/TrafficLightArray

@@ -1,7 +1,7 @@
 connections:
-  - topic: /diagnostics
+  - name: /diagnostics
     type: publisher
     msg_type: diagnostic_msgs/msg/DiagnosticArray
-  - topic: ~/network_status
+  - name: ~/network_status
     type: publisher
     msg_type: tier4_external_api_msgs/msg/NetworkStatus

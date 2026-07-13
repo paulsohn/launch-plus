@@ -1,10 +1,10 @@
 connections:
-  - topic: ~/input/vector_map
+  - name: ~/input/vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
-  - topic: ~/input/traffic_signals
+  - name: ~/input/traffic_signals
     type: subscription
     msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
-  - topic: ~/output/traffic_signals
+  - name: ~/output/traffic_signals
     type: publisher
     msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray

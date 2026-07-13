@@ -1,37 +1,37 @@
 connections:
-  - topic: imu/data_tf_converted
+  - name: imu/data_tf_converted
     type: subscription
     msg_type: sensor_msgs/msg/Imu
-  - topic: velocity
+  - name: velocity
     type: subscription
     msg_type: geometry_msgs/msg/TwistStamped
-  - topic: velocity_status
+  - name: velocity_status
     type: subscription
     msg_type: eagleye_msgs/msg/StatusStamped
-  - topic: velocity_scale_factor
+  - name: velocity_scale_factor
     type: subscription
     msg_type: eagleye_msgs/msg/VelocityScaleFactor
-  - topic: heading_interpolate_3rd
+  - name: heading_interpolate_3rd
     type: subscription
     msg_type: eagleye_msgs/msg/Heading
-  - topic: yaw_rate_offset_stop
+  - name: yaw_rate_offset_stop
     type: subscription
     msg_type: eagleye_msgs/msg/YawrateOffset
-  - topic: yaw_rate_offset_2nd
+  - name: yaw_rate_offset_2nd
     type: subscription
     msg_type: eagleye_msgs/msg/YawrateOffset
-  - topic: pitching
+  - name: pitching
     type: subscription
     msg_type: eagleye_msgs/msg/Pitching
-  - topic: enu_vel
+  - name: enu_vel
     type: publisher
     msg_type: geometry_msgs/msg/Vector3Stamped
-  - topic: enu_relative_pos
+  - name: enu_relative_pos
     type: publisher
     msg_type: eagleye_msgs/msg/Position
-  - topic: twist
+  - name: twist
     type: publisher
     msg_type: geometry_msgs/msg/TwistStamped
-  - topic: twist_with_covariance
+  - name: twist_with_covariance
     type: publisher
     msg_type: geometry_msgs/msg/TwistWithCovarianceStamped

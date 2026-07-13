@@ -1,10 +1,10 @@
 connections:
-  - topic: /joint_states
+  - name: /joint_states
     type: subscription
     msg_type: sensor_msgs/msg/JointState
-  - topic: /tf
+  - name: /tf
     type: publisher
     msg_type: tf2_msgs/msg/TFMessage
-  - topic: /tf_static
+  - name: /tf_static
     type: publisher
     msg_type: tf2_msgs/msg/TFMessage

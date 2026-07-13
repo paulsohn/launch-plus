@@ -1,41 +1,41 @@
 connections:
-  - topic: ~/input/control_cmd
+  - name: ~/input/control_cmd
     type: subscription
     msg_type: autoware_control_msgs/msg/Control
-  - topic: ~/input/odometry
+  - name: ~/input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: ~/input/accel
+  - name: ~/input/accel
     type: subscription
     msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
-  - topic: ~/input/operation_mode_state
+  - name: ~/input/operation_mode_state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
-  - topic: ~/input/control_horizon
+  - name: ~/input/control_horizon
     type: subscription
     msg_type: autoware_control_msgs/msg/ControlHorizon
-  - topic: ~/input/steering
+  - name: ~/input/steering
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/SteeringReport
     when: "params.get('convert_actuation_to_steering_status', False) == False"
-  - topic: ~/input/actuation_status
+  - name: ~/input/actuation_status
     type: subscription
     msg_type: tier4_vehicle_msgs/msg/ActuationStatusStamped
     when: "params.get('need_to_subscribe_actuation_status', False)"
-  - topic: ~/output/actuation_cmd
+  - name: ~/output/actuation_cmd
     type: publisher
     msg_type: tier4_vehicle_msgs/msg/ActuationCommandStamped
-  - topic: ~/output/steering_status
+  - name: ~/output/steering_status
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/SteeringReport
     when: "params.get('convert_actuation_to_steering_status', False)"
-  - topic: ~/output/control_component_latency
+  - name: ~/output/control_component_latency
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
-  - topic: /vehicle/raw_vehicle_cmd_converter/debug/steer_pid
+  - name: /vehicle/raw_vehicle_cmd_converter/debug/steer_pid
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
-  - topic: /vehicle/raw_vehicle_cmd_converter/debug/compensated_control_cmd
+  - name: /vehicle/raw_vehicle_cmd_converter/debug/compensated_control_cmd
     type: publisher
     msg_type: autoware_control_msgs/msg/Control
     when: "params.get('use_vehicle_adaptor', False)"

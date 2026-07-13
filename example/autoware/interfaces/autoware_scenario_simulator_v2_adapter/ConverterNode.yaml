@@ -3,7 +3,7 @@
 # Publishers are created per-metric-field at runtime (UserDefinedValue on dynamic topic names).
 connections:
   # Static diagnostic subscription
-  - topic: /diagnostics
+  - name: /diagnostics
     type: subscription
     msg_type: diagnostic_msgs/msg/DiagnosticArray
   # Dynamic: subscribes to N metric topics from parameter list (tier4_metric_msgs/msg/MetricArray)

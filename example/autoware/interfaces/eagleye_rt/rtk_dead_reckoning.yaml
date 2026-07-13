@@ -1,13 +1,13 @@
 connections:
-  - topic: enu_vel
+  - name: enu_vel
     type: subscription
     msg_type: geometry_msgs/msg/Vector3Stamped
-  - topic: heading_interpolate_3rd
+  - name: heading_interpolate_3rd
     type: subscription
     msg_type: eagleye_msgs/msg/Heading
-  - topic: enu_absolute_pos_interpolate
+  - name: enu_absolute_pos_interpolate
     type: publisher
     msg_type: eagleye_msgs/msg/Position
-  - topic: fix
+  - name: fix
     type: publisher
     msg_type: sensor_msgs/msg/NavSatFix

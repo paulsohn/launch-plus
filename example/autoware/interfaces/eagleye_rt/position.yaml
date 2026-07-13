@@ -1,22 +1,22 @@
 connections:
-  - topic: enu_vel
+  - name: enu_vel
     type: subscription
     msg_type: geometry_msgs/msg/Vector3Stamped
-  - topic: velocity
+  - name: velocity
     type: subscription
     msg_type: geometry_msgs/msg/TwistStamped
-  - topic: velocity_status
+  - name: velocity_status
     type: subscription
     msg_type: eagleye_msgs/msg/StatusStamped
-  - topic: velocity_scale_factor
+  - name: velocity_scale_factor
     type: subscription
     msg_type: eagleye_msgs/msg/VelocityScaleFactor
-  - topic: distance
+  - name: distance
     type: subscription
     msg_type: eagleye_msgs/msg/Distance
-  - topic: heading_interpolate_3rd
+  - name: heading_interpolate_3rd
     type: subscription
     msg_type: eagleye_msgs/msg/Heading
-  - topic: enu_absolute_pos
+  - name: enu_absolute_pos
     type: publisher
     msg_type: eagleye_msgs/msg/Position

@@ -1,10 +1,10 @@
 connections:
-  - topic: ~/input/pointcloud
+  - name: ~/input/pointcloud
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/output/pointcloud
+  - name: ~/output/pointcloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/debug/pointcloud_noise
+  - name: ~/debug/pointcloud_noise
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2

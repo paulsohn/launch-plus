@@ -1,25 +1,25 @@
 connections:
-  - topic: ~/input/vector_map
+  - name: ~/input/vector_map
     type: subscription
     msg_type: autoware_map_msgs/msg/LaneletMapBin
-  - topic: ~/input/points_no_ground
+  - name: ~/input/points_no_ground
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-  - topic: ~/input/objects
+  - name: ~/input/objects
     type: subscription
     msg_type: autoware_perception_msgs/msg/PredictedObjects
-  - topic: ~/input/scenario
+  - name: ~/input/scenario
     type: subscription
     msg_type: autoware_internal_planning_msgs/msg/Scenario
-  - topic: ~/output/grid_map
+  - name: ~/output/grid_map
     type: publisher
     msg_type: grid_map_msgs/msg/GridMap
-  - topic: ~/output/occupancy_grid
+  - name: ~/output/occupancy_grid
     type: publisher
     msg_type: nav_msgs/msg/OccupancyGrid
-  - topic: ~/debug/processing_time_ms
+  - name: ~/debug/processing_time_ms
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
-  - topic: processing_time
+  - name: processing_time
     type: publisher
     msg_type: autoware_utils/ProcessingTimeDetail

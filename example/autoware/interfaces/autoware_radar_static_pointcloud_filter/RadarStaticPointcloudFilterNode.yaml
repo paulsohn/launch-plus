@@ -1,13 +1,13 @@
 connections:
-  - topic: ~/input/radar
+  - name: ~/input/radar
     type: subscription
     msg_type: radar_msgs/msg/RadarScan
-  - topic: ~/input/odometry
+  - name: ~/input/odometry
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-  - topic: ~/output/static_radar_scan
+  - name: ~/output/static_radar_scan
     type: publisher
     msg_type: radar_msgs/msg/RadarScan
-  - topic: ~/output/dynamic_radar_scan
+  - name: ~/output/dynamic_radar_scan
     type: publisher
     msg_type: radar_msgs/msg/RadarScan

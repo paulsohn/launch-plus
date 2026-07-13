@@ -51,6 +51,18 @@ cannot be fully represented.
   subscriptions are absent (noted as a comment in the YAML).
 - **Possible fix**: Same `dynamic_subscriptions` extension as PointCloudConcatenateDataSynchronizerComponent.
 
+### ControlEvaluatorNode (control_evaluator)
+- **Package**: `autoware_control_evaluator`
+- **File**: `autoware_control_evaluator/control_evaluator.yaml`
+- **Issue**: PlanningFactor subscriptions are created in a loop over
+  `planning_factor_metrics.stop_deviation.module_list` (a `list[str]`). Each subscription
+  topic is `planning_factor_metrics.topic_prefix + module_name`. The default prefix is
+  `/planning/planning_factors/` and the default modules are: blind_spot, crosswalk,
+  detection_area, intersection, merge_from_private, no_drivable_lane, no_stopping_area,
+  stop_line, traffic_light, virtual_traffic_light, walkway. The exact set is a runtime param.
+- **Workaround**: Static entries omitted; noted as comment in the YAML.
+- **Possible fix**: Same `dynamic_subscriptions` extension.
+
 ## Absolute topic subscriptions injected by loaded modules
 
 ### MotionVelocityPlannerNode — ObstacleCruiseModule (optimization_based_planner)

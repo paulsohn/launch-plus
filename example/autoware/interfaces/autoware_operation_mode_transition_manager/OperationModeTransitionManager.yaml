@@ -1,0 +1,75 @@
+connections:
+  # Inputs (InterProcessPollingSubscriber — no ~/ prefix; relative topics)
+  - topic: kinematics
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+
+  - topic: trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+
+  - topic: trajectory_follower_control_cmd
+    type: subscription
+    msg_type: autoware_control_msgs/msg/Control
+
+  - topic: control_cmd
+    type: subscription
+    msg_type: autoware_control_msgs/msg/Control
+
+  - topic: gate_operation_mode
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+
+  - topic: control_mode_report
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/ControlModeReport
+
+  # Compatibility shim inputs (absolute topics)
+  - topic: /api/autoware/get/engage
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/Engage
+
+  - topic: /control/current_gate_mode
+    type: subscription
+    msg_type: tier4_control_msgs/msg/GateMode
+
+  - topic: /control/external_cmd_selector/current_selector_mode
+    type: subscription
+    msg_type: tier4_control_msgs/msg/ExternalCommandSelectorMode
+
+  # Outputs
+  # component_interface_utils Publisher for /system/operation_mode/state
+  - topic: /system/operation_mode/state
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+
+  - topic: ~/debug_info
+    type: publisher
+    msg_type: autoware_operation_mode_transition_manager/msg/OperationModeTransitionManagerDebug
+
+  # Compatibility shim outputs (absolute topics)
+  - topic: /autoware/engage
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/Engage
+
+  - topic: /control/gate_mode_cmd
+    type: publisher
+    msg_type: tier4_control_msgs/msg/GateMode
+
+  # Service servers
+  - topic: /system/operation_mode/change_autoware_control
+    type: service_server
+    msg_type: autoware_system_msgs/srv/ChangeAutowareControl
+
+  - topic: /system/operation_mode/change_operation_mode
+    type: service_server
+    msg_type: autoware_system_msgs/srv/ChangeOperationMode
+
+  # Service clients
+  - topic: control_mode_request
+    type: service_client
+    msg_type: autoware_vehicle_msgs/srv/ControlModeCommand
+
+  - topic: /control/external_cmd_selector/select_external_command
+    type: service_client
+    msg_type: tier4_control_msgs/srv/ExternalCommandSelect

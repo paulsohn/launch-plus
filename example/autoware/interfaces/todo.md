@@ -80,13 +80,3 @@ Many eagleye_rt executables select topic names via argv[1] ("1st"/"2nd"/"3rd") o
 - `rtk_heading`, `rtk_dead_reckoning`, `height`, `smoothing`, `velocity_estimator`, `slip_coefficient`,
   `velocity_scale_factor`: topic names are C++ local variables loaded from a YAML config file, not
   declared as ROS parameters — cannot be expressed via `name_expr:`. YAML files retain static defaults.
-
-## Unverified interfaces (source not in workspace)
-
-### ublox_gps_node
-- **Package**: `ublox_gps`
-- **File**: `ublox_gps/ublox_gps_node.yaml`
-- **Issue**: Source was not present under `src/sensor_component/` at time of writing.
-  Interface was derived from known `ublox_gps` ROS 2 conventions — not verified against C++ source.
-- **Action needed**: Locate source (e.g. from upstream `ublox_ros` repo) and verify or correct
-  topic names and types.

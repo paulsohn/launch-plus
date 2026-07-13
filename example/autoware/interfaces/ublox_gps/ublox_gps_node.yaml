@@ -1,16 +1,10 @@
-# DRAFT - needs C++ verification
-# ublox_gps source not found under src/sensor_component/; interface derived from
-# known ublox_gps ROS 2 conventions. See interfaces/todo.md for tracking.
 connections:
-  - name: /fix
+  - name: ~/fix
     type: publisher
     msg_type: sensor_msgs/msg/NavSatFix
-  - name: /vel
+  - name: ~/fix_velocity
     type: publisher
     msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
-  - name: /imu
+  - name: ~/navpvt
     type: publisher
-    msg_type: sensor_msgs/msg/Imu
-  - name: /time_reference
-    type: publisher
-    msg_type: sensor_msgs/msg/TimeReference
+    msg_type: ublox_msgs/msg/NavPVT

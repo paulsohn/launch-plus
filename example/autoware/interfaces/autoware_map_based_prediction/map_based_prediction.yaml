@@ -14,8 +14,12 @@ connections:
   - name: maneuver
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray
-    when: "params.get('publish_debug_markers', False)"
+    when: "to_bool(params.get('publish_debug_markers', False))"
   - name: ~/debug/processing_time_detail_ms
     type: publisher
     msg_type: tier4_debug_msgs/msg/Float64Stamped
-    when: "params.get('publish_processing_time_detail', False)"
+    when: "to_bool(params.get('publish_processing_time_detail', False))"
+  # NOTE: Some launch configurations add a remap from the relative topic "objects" to an
+  # absolute path. This is a cascade remap artifact (the package launch remaps ~/output/objects
+  # → objects, then an outer launch remaps objects → absolute topic). It is not a separate
+  # subscription or publisher — the actual publisher is ~/output/objects above.

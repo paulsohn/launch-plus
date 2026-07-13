@@ -5,12 +5,12 @@ connections:
   - name_expr: "'image_diag/debug/' + params['hardware_id'] + '/diag_block_image'"
     type: publisher
     msg_type: sensor_msgs/msg/Image
-    when: "params.get('debug', False)"
+    when: "to_bool(params.get('debug', False))"
   - name_expr: "'image_diag/debug/' + params['hardware_id'] + '/dft_image'"
     type: publisher
     msg_type: sensor_msgs/msg/Image
-    when: "params.get('debug', False)"
+    when: "to_bool(params.get('debug', False))"
   - name_expr: "'image_diag/debug/' + params['hardware_id'] + '/gray_image'"
     type: publisher
     msg_type: sensor_msgs/msg/Image
-    when: "params.get('debug', False)"
+    when: "to_bool(params.get('debug', False))"

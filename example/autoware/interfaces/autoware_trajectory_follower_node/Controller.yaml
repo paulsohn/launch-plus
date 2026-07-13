@@ -46,7 +46,27 @@ connections:
   - name: ~/debug/control_cmd_horizon
     type: publisher
     msg_type: autoware_control_msgs/msg/ControlHorizon
-    when: "params.get('enable_control_cmd_horizon_pub', False)"
+    when: "to_bool(params.get('enable_control_cmd_horizon_pub', False))"
+
+  # Lateral controller outputs (published by MPC or pure_pursuit plugin)
+  - name: ~/output/predicted_trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - name: ~/output/lateral_diagnostic
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
+
+  # Longitudinal controller outputs (published by PID plugin)
+  - name: ~/output/slope_angle
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
+  - name: ~/output/longitudinal_diagnostic
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
+
+  # NOTE: ~/output/stop_reason appears as a remap in some launch files but
+  # does not correspond to any publisher in the current source code.
+  # This may be a legacy remap from an older interface.
 
   # Note: lateral_controller_mode (mpc | pure_pursuit) and
   # longitudinal_controller_mode (pid) select the algorithm but do NOT

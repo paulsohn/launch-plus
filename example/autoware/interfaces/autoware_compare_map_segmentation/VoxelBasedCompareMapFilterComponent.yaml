@@ -10,13 +10,13 @@ connections:
   - name: map
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-    when: "not params.get('use_dynamic_map_loading', False)"
+    when: "not to_bool(params.get('use_dynamic_map_loading', False))"
   # Dynamic map loading (use_dynamic_map_loading == true)
   - name: kinematic_state
     type: subscription
     msg_type: nav_msgs/msg/Odometry
-    when: "params.get('use_dynamic_map_loading', False)"
+    when: "to_bool(params.get('use_dynamic_map_loading', False))"
   - name: map_loader_service
     type: service_client
     # msg_type: autoware_map_msgs/srv/GetDifferentialPointCloudMap
-    when: "params.get('use_dynamic_map_loading', False)"
+    when: "to_bool(params.get('use_dynamic_map_loading', False))"

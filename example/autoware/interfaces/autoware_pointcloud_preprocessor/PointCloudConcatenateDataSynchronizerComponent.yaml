@@ -3,6 +3,12 @@ connections:
     name_expr: "item"
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
+  # Twist subscription for motion compensation — only when is_motion_compensated=true
+  # and input_twist_topic_type="twist" (as opposed to "odom").
+  - name: ~/input/twist
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+    when: "to_bool(params.get('is_motion_compensated', False)) and params.get('input_twist_topic_type', 'twist') == 'twist'"
   - name: output
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2

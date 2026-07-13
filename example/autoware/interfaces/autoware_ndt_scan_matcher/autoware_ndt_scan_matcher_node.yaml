@@ -8,11 +8,11 @@ connections:
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
 
-  # Regularization pose subscription — only active when ndt_regularization_enable is true
+  # Regularization pose subscription — only active when ndt.regularization.enable is true
   - name: regularization_pose_with_covariance
     type: subscription
     msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
-    when: "params.get('ndt_regularization_enable', False)"
+    when: "to_bool(params.get('ndt.regularization.enable', False))"
 
   # Publishers — primary outputs
   - name: ndt_pose

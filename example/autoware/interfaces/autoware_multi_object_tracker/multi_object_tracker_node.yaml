@@ -14,16 +14,16 @@ connections:
   - name: ~/output/merged_objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/DetectedObjects
-    when: "params.get('publish_merged_objects', False)"
+    when: "to_bool(params.get('publish_merged_objects', False))"
   - name: ~/debug/tentative_objects
     type: publisher
     msg_type: autoware_perception_msgs/msg/TrackedObjects
-    when: "params.get('publish_tentative_objects', False)"
+    when: "to_bool(params.get('publish_tentative_objects', False))"
   - name: ~/debug/objects_markers
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray
-    when: "params.get('publish_debug_markers', False)"
+    when: "to_bool(params.get('publish_debug_markers', False))"
   - name: ~/debug/processing_time_detail_ms
     type: publisher
     msg_type: tier4_debug_msgs/msg/Float64Stamped
-    when: "params.get('publish_processing_time_detail', False)"
+    when: "to_bool(params.get('publish_processing_time_detail', False))"

@@ -17,18 +17,18 @@ connections:
   - name: ~/input/steering
     type: subscription
     msg_type: autoware_vehicle_msgs/msg/SteeringReport
-    when: "params.get('convert_actuation_to_steering_status', False) == False"
+    when: "to_bool(params.get('convert_actuation_to_steering_status', False)) == False"
   - name: ~/input/actuation_status
     type: subscription
     msg_type: tier4_vehicle_msgs/msg/ActuationStatusStamped
-    when: "params.get('need_to_subscribe_actuation_status', False)"
+    when: "to_bool(params.get('need_to_subscribe_actuation_status', False))"
   - name: ~/output/actuation_cmd
     type: publisher
     msg_type: tier4_vehicle_msgs/msg/ActuationCommandStamped
   - name: ~/output/steering_status
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/SteeringReport
-    when: "params.get('convert_actuation_to_steering_status', False)"
+    when: "to_bool(params.get('convert_actuation_to_steering_status', False))"
   - name: ~/output/control_component_latency
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
@@ -38,4 +38,4 @@ connections:
   - name: /vehicle/raw_vehicle_cmd_converter/debug/compensated_control_cmd
     type: publisher
     msg_type: autoware_control_msgs/msg/Control
-    when: "params.get('use_vehicle_adaptor', False)"
+    when: "to_bool(params.get('use_vehicle_adaptor', False))"

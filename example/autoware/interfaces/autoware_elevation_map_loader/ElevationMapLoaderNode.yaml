@@ -9,19 +9,19 @@ connections:
   - name: input/pointcloud_map_metadata
     type: subscription
     msg_type: autoware_map_msgs/msg/PointCloudMapMetaData
-    when: "params.get('use_sequential_load', False)"
+    when: "to_bool(params.get('use_sequential_load', False))"
   - name: input/pointcloud_map
     type: subscription
     msg_type: sensor_msgs/msg/PointCloud2
-    when: "not params.get('use_sequential_load', True)"
+    when: "not to_bool(params.get('use_sequential_load', True))"
   - name: service/get_selected_pointcloud_map
     type: service_client
     msg_type: autoware_map_msgs/srv/GetSelectedPointCloudMap
-    when: "params.get('use_sequential_load', False)"
+    when: "to_bool(params.get('use_sequential_load', False))"
   - name: output/elevation_map
     type: publisher
     msg_type: grid_map_msgs/msg/GridMap
   - name: output/elevation_map_cloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
-    when: "params.get('use_elevation_map_cloud_publisher', False)"
+    when: "to_bool(params.get('use_elevation_map_cloud_publisher', False))"

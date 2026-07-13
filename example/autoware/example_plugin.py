@@ -81,7 +81,11 @@ standalone process argv).
 Available names in all expressions: ``params`` (always), ``args`` (always),
 ``item`` (inside ``loop``).
 Available built-ins: format, len, str, int, float, bool, range, list, tuple,
-                     enumerate, zip, to_list.
+                     enumerate, zip, to_list, to_bool.
+``to_bool`` converts a ROS 2 param value to bool robustly: Python booleans
+pass through; strings are matched case-insensitively against ``"true"``
+(necessary because YAML-loaded params may arrive as ``"false"`` rather than
+``False``, and Python's built-in ``bool("false")`` incorrectly returns ``True``).
 
 Error policy
 ------------
@@ -125,6 +129,18 @@ def _to_list(v: object) -> list:
     return [item.strip() for item in s.split(",") if item.strip()]
 
 
+def _to_bool(v: object) -> bool:
+    """Convert a ROS 2 param value to bool.
+
+    ROS 2 params loaded from YAML may arrive as strings (``"true"``/``"false"``)
+    rather than Python booleans.  ``bool("false")`` is ``True`` in Python, so
+    use this helper instead of the built-in ``bool`` when testing param flags.
+    """
+    if isinstance(v, bool):
+        return v
+    return str(v).strip().lower() == "true"
+
+
 _SAFE_BUILTINS = {
     "format": format,
     "len": len,
@@ -138,6 +154,7 @@ _SAFE_BUILTINS = {
     "enumerate": enumerate,
     "zip": zip,
     "to_list": _to_list,
+    "to_bool": _to_bool,
 }
 
 

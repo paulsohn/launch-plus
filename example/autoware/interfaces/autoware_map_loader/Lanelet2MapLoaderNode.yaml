@@ -8,3 +8,6 @@ connections:
   - name: /map/vector_map
     type: publisher
     msg_type: autoware_map_msgs/msg/LaneletMapBin
+  # NOTE: output/lanelet2_map, output/lanelet2_map_metadata, service/get_selected_lanelet2_map
+  # appear as remaps in some launch files but do not correspond to current source publishers
+  # (which use absolute topics via component_interface_specs). May be legacy remaps.

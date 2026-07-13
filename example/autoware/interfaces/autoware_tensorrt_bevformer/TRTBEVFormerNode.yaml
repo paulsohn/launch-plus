@@ -44,4 +44,4 @@ connections:
   - name: ~/output_bboxes
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray
-    when: "params.get('debug_mode', False)"
+    when: "to_bool(params.get('debug_mode', False))"

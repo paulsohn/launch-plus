@@ -73,3 +73,5 @@ connections:
   - name: /control/external_cmd_selector/select_external_command
     type: service_client
     msg_type: tier4_control_msgs/srv/ExternalCommandSelect
+  # NOTE: "steering" (subscription) and "is_autonomous_available" (publisher) appear as remaps
+  # in some launch files but are absent from the current node.hpp/node.cpp. May be legacy remaps.

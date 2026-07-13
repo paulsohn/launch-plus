@@ -36,12 +36,12 @@ connections:
   - name: ~/debug/obstacle_pointcloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
-    when: "params.get('publish_debug_pointcloud', False)"
+    when: "to_bool(params.get('publish_debug_pointcloud', False))"
 
   - name: ~/debug/markers
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray
-    when: "params.get('publish_debug_markers', False)"
+    when: "to_bool(params.get('publish_debug_markers', False))"
 
   - name: ~/debug/rss_distance
     type: publisher

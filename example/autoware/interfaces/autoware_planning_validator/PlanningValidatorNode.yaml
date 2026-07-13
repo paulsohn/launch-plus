@@ -91,3 +91,6 @@ connections:
 
   # LatencyChecker — no additional publishers/subscriptions beyond shared context
   # TrajectoryChecker — no additional publishers/subscriptions beyond shared context
+  # NOTE: ~/input/objects appears as a remap in some launch files but is absent from the current
+  # node.cpp (only ~/input/trajectory is subscribed). May be a legacy remap from an older version
+  # where objects were directly subscribed (e.g. for IntersectionCollisionChecker).

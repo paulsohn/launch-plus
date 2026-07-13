@@ -11,4 +11,4 @@ connections:
   - name: ~/debug/processing_time_detail_ms
     type: publisher
     msg_type: tier4_debug_msgs/msg/Float64Stamped
-    when: "params.get('publish_processing_time_detail', False)"
+    when: "to_bool(params.get('publish_processing_time_detail', False))"

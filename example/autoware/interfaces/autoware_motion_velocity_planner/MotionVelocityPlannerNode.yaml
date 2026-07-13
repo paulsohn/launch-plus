@@ -316,3 +316,9 @@ connections:
     type: publisher
     msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
     when: "'autoware::motion_velocity_planner::RoadUserStopModule' in params.get('launch_modules', [])"
+  # NOTE: The following remaps appear in autoware_core_planning.launch.xml but are absent from the
+  # MVP node source code:
+  #   ~/input/virtual_traffic_light_states — tier4_v2x_msgs/msg/VirtualTrafficLightStateArray
+  #   ~/output/stop_reasons — tier4_planning_msgs/msg/StopReasonArray
+  #   ~/output/velocity_factors — autoware_planning_msgs/msg/VelocityFactorArray (or similar)
+  # These may be legacy remaps from an older universe-based MVP interface.

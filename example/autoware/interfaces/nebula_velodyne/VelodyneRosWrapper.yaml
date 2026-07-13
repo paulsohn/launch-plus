@@ -5,11 +5,11 @@ connections:
   - name: velodyne_packets
     type: subscription
     msg_type: velodyne_msgs/msg/VelodyneScan
-    when: "not params.get('launch_hw', True)"
+    when: "not to_bool(params.get('launch_hw', True))"
   - name: velodyne_packets
     type: publisher
     msg_type: velodyne_msgs/msg/VelodyneScan
-    when: "params.get('launch_hw', True)"
+    when: "to_bool(params.get('launch_hw', True))"
   - name: velodyne_points
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2

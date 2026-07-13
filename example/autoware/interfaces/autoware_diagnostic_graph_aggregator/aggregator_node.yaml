@@ -24,13 +24,13 @@ connections:
   - name: ~/availability
     type: publisher
     msg_type: tier4_system_msgs/msg/CommandModeAvailability
-    when: "params.get('use_command_mode_mappings', False)"
+    when: "to_bool(params.get('use_command_mode_mappings', False))"
   # Published when use_driving_mode_mappings=true
   - name: /system/driving_mode/available
     type: publisher
     msg_type: tier4_system_msgs/msg/DrivingModeFlag
-    when: "params.get('use_driving_mode_mappings', False)"
+    when: "to_bool(params.get('use_driving_mode_mappings', False))"
   - name: /system/driving_mode/continuable
     type: publisher
     msg_type: tier4_system_msgs/msg/DrivingModeFlag
-    when: "params.get('use_driving_mode_mappings', False)"
+    when: "to_bool(params.get('use_driving_mode_mappings', False))"

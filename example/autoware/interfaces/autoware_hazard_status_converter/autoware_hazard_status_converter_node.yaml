@@ -9,7 +9,9 @@ connections:
   - name: ~/input/emergency_holding
     type: subscription
     msg_type: tier4_system_msgs/msg/EmergencyHoldingState
-    when: "params.get('use_external_emergency_holding', False)"
+    when: "to_bool(params.get('use_external_emergency_holding', False))"
   - name: ~/hazard_status
     type: publisher
     msg_type: autoware_system_msgs/msg/HazardStatusStamped
+  # NOTE: ~/diagnostics_graph appears as a remap in some launch files but does not
+  # correspond to any subscription in the current source code. May be a legacy remap.

@@ -14,8 +14,8 @@ connections:
   - name: ~/debug/ndt_position_stddev
     type: publisher
     msg_type: std_msgs/msg/Float64
-    when: "params.get('enable_debug_topics', False)"
+    when: "to_bool(params.get('enable_debug_topics', False))"
   - name: ~/debug/gnss_position_stddev
     type: publisher
     msg_type: std_msgs/msg/Float64
-    when: "params.get('enable_debug_topics', False)"
+    when: "to_bool(params.get('enable_debug_topics', False))"

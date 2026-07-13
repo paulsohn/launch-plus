@@ -11,12 +11,12 @@ connections:
   - name: ~/output/debug/outlier/pointcloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
-    when: "params.get('enable_debugger', False)"
+    when: "to_bool(params.get('enable_debugger', False))"
   - name: ~/output/debug/low_confidence/pointcloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
-    when: "params.get('enable_debugger', False)"
+    when: "to_bool(params.get('enable_debugger', False))"
   - name: ~/output/debug/high_confidence/pointcloud
     type: publisher
     msg_type: sensor_msgs/msg/PointCloud2
-    when: "params.get('enable_debugger', False)"
+    when: "to_bool(params.get('enable_debugger', False))"

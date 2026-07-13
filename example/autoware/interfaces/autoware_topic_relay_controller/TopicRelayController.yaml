@@ -3,7 +3,7 @@ connections:
   - name: ~/change_relay_control
     type: service_server
     msg_type: tier4_system_msgs/srv/ChangeTopicRelayControl
-    when: "params.get('enable_relay_control', False)"
+    when: "to_bool(params.get('enable_relay_control', False))"
   # TF relay mode (when topic == '/tf' or '/tf_static')
   - name_expr: "params.get('topic', '')"
     type: subscription

@@ -14,7 +14,11 @@ connections:
   - name: ~/input/rough/rois
     type: subscription
     msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
-    when: "params.get('use_high_accuracy_detection', False)"
+    when: "to_bool(params.get('use_high_accuracy_detection', False))"
   - name: ~/output/image
     type: publisher
     msg_type: sensor_msgs/msg/Image
+  # NOTE: image_transport automatically creates sub-topics ~/output/image/compressed,
+  # ~/output/image/compressedDepth, ~/output/image/theora when use_image_transport=true.
+  # These appear as uncovered remaps in launch files but are not expressible as static
+  # connections — they are implicit image_transport codec topics.

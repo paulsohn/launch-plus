@@ -1,7 +1,7 @@
 connections:
-  - name: /imu/data_raw
+  - name_expr: "params.get('imu_topic', '/imu/data_raw')"
     type: subscription
     msg_type: sensor_msgs/msg/Imu
-  - name: imu/data_tf_converted
+  - name_expr: "params.get('publish_imu_topic', 'imu/data_tf_converted')"
     type: publisher
     msg_type: sensor_msgs/msg/Imu

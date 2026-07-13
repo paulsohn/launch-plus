@@ -1,56 +1,53 @@
-# Node behavior depends on runtime param "mode" (either "remote" or "local"),
-# which sets the namespace ns_ = "/api/manual/<mode>" and target "/external/<mode>/...".
-# Topics below use <mode> as a placeholder for the runtime value.
 connections:
   - name: /api/operation_mode/state
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
   # AD API service servers
-  - name: /api/manual/<mode>/control_mode/list
+  - name_expr: "'/api/manual/' + params['mode'] + '/control_mode/list'"
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/ListManualControlMode
-  - name: /api/manual/<mode>/control_mode/select
+  - name_expr: "'/api/manual/' + params['mode'] + '/control_mode/select'"
     type: service_server
     msg_type: autoware_adapi_v1_msgs/srv/SelectManualControlMode
-  - name: /api/manual/<mode>/control_mode/status
+  - name_expr: "'/api/manual/' + params['mode'] + '/control_mode/status'"
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/ManualControlModeStatus
   # External operator input subscriptions (created dynamically on mode select)
-  - name: /api/manual/<mode>/operator/heartbeat
+  - name_expr: "'/api/manual/' + params['mode'] + '/operator/heartbeat'"
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
-  - name: /api/manual/<mode>/command/pedals
+  - name_expr: "'/api/manual/' + params['mode'] + '/command/pedals'"
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
-  - name: /api/manual/<mode>/command/steering
+  - name_expr: "'/api/manual/' + params['mode'] + '/command/steering'"
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
-  - name: /api/manual/<mode>/command/gear
+  - name_expr: "'/api/manual/' + params['mode'] + '/command/gear'"
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/GearCommand
-  - name: /api/manual/<mode>/command/turn_indicators
+  - name_expr: "'/api/manual/' + params['mode'] + '/command/turn_indicators'"
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/TurnIndicatorsCommand
-  - name: /api/manual/<mode>/command/hazard_lights
+  - name_expr: "'/api/manual/' + params['mode'] + '/command/hazard_lights'"
     type: subscription
     msg_type: autoware_adapi_v1_msgs/msg/HazardLightsCommand
   # Internal output publishers
-  - name: /external/<mode>/heartbeat
+  - name_expr: "'/external/' + params['mode'] + '/heartbeat'"
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
-  - name: /external/<mode>/pedals_cmd
+  - name_expr: "'/external/' + params['mode'] + '/pedals_cmd'"
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
-  - name: /external/<mode>/steering_cmd
+  - name_expr: "'/external/' + params['mode'] + '/steering_cmd'"
     type: publisher
     msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
-  - name: /external/<mode>/gear_cmd
+  - name_expr: "'/external/' + params['mode'] + '/gear_cmd'"
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/GearCommand
-  - name: /external/<mode>/turn_indicators_cmd
+  - name_expr: "'/external/' + params['mode'] + '/turn_indicators_cmd'"
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
-  - name: /external/<mode>/hazard_lights_cmd
+  - name_expr: "'/external/' + params['mode'] + '/hazard_lights_cmd'"
     type: publisher
     msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
   - name: /diagnostics

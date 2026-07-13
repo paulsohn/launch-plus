@@ -96,10 +96,9 @@ cannot be fully represented.
 ### TopicStateMonitorNode
 - **Package**: `autoware_topic_state_monitor`
 - **File**: `autoware_topic_state_monitor/TopicStateMonitorNode.yaml`
-- **Issue**: The monitored topic name comes entirely from the `topic` runtime parameter and
-  the type from `topic_type`. Only the `/diagnostics` output is statically knowable.
-- **Workaround**: Only `/diagnostics` publisher recorded.
-- **Possible fix**: Extend with a `dynamic_subscriptions` key or an instance-level override.
+- **Resolved**: Subscription topic name is expressed via `name_expr: "params['topic']"`. The
+  message type (`topic_type` param) is still dynamic and cannot be expressed in the current
+  `msg_type` field; the entry omits `msg_type`.
 
 ### processing_time_checker_node
 - **Package**: `autoware_processing_time_checker`
@@ -192,7 +191,9 @@ cannot be fully represented.
 ### TopicRelayController (generic mode)
 - **Package**: `autoware_topic_relay_controller`
 - **File**: `autoware_topic_relay_controller/TopicRelayController.yaml`
-- **Issue**: In non-TF mode, topic name and msg type (`topic_type` param) fully runtime-determined via `create_generic_publisher/subscription`. TF-mode and service-server entries are recorded.
+- **Partially resolved**: Generic-mode topic and remap_topic names are now expressed via
+  `name_expr:` with `when:` guards. The message type (`topic_type` param) cannot be expressed
+  in the current `msg_type` field; generic-mode entries omit `msg_type`.
 
 ### ConverterNode
 - **Package**: `autoware_scenario_simulator_v2_adapter`
@@ -207,16 +208,21 @@ cannot be fully represented.
 ### PathToTrajectory
 - **Package**: `autoware_planning_topic_converter`
 - **File**: `autoware_planning_topic_converter/PathToTrajectory.yaml`
-- **Issue**: `input_topic` and `output_topic` are runtime params; types are statically known (Path → Trajectory) but topic strings are not.
+- **Resolved**: Both `input_topic` and `output_topic` are now expressed via `name_expr:`.
 
 ## eagleye_rt — argument-driven topic selection
 
 Many eagleye_rt executables select topic names via argv[1] ("1st"/"2nd"/"3rd") or parameters:
-- `heading`, `heading_interpolate`, `yaw_rate_offset`: argv[1] selects which order's pub/sub topics
-- `rtk_heading`, `rtk_dead_reckoning`, `height`, `smoothing`, `tf_converted_imu`, `twist_relay`, `monitor`, `velocity_estimator`, `slip_coefficient`, `velocity_scale_factor`: topic names from parameters
+- `heading`, `heading_interpolate`, `yaw_rate_offset`: argv[1] selects which order's pub/sub topics — SKIP
+- `rtk_heading`, `rtk_dead_reckoning`, `height`, `smoothing`, `velocity_estimator`, `slip_coefficient`,
+  `velocity_scale_factor`: topic names are C++ local variables loaded from a YAML config file, not
+  declared as ROS parameters — cannot be expressed via `name_expr:`. YAML files retain static defaults.
+- `tf_converted_imu`: `imu_topic` and `publish_imu_topic` params expressed via `name_expr:` — **resolved**
+- `twist_relay`: `twist.twist_topic` param expressed via `name_expr:` for subscription;
+  publisher `vehicle/twist` is hardcoded — **partially resolved**
+- `monitor`: `rtklib_nav_topic`, `gga_topic`, `monitor.comparison_twist_topic` params expressed
+  via `name_expr:` — **resolved**
 - `slip_coefficient`: no ROS publishers (results written to file)
-
-YAML files record default/best-effort topic names where identifiable from source. See `todo_batch_b.md` for full per-executable breakdown.
 
 ## Unverified interfaces (source not in workspace)
 

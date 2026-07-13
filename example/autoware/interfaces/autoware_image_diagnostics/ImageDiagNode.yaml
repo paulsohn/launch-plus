@@ -2,3 +2,15 @@ connections:
   - name: input/raw_image
     type: subscription
     msg_type: sensor_msgs/msg/Image
+  - name_expr: "'image_diag/debug/' + params['hardware_id'] + '/diag_block_image'"
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+    when: "params.get('debug', False)"
+  - name_expr: "'image_diag/debug/' + params['hardware_id'] + '/dft_image'"
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+    when: "params.get('debug', False)"
+  - name_expr: "'image_diag/debug/' + params['hardware_id'] + '/gray_image'"
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+    when: "params.get('debug', False)"

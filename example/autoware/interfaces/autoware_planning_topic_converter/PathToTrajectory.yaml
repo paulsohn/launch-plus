@@ -1,9 +1,7 @@
-# Topics resolved from runtime parameters: input_topic, output_topic
-# Static types known from template: Path -> Trajectory
 connections:
-  - name: "params['input_topic']"
+  - name_expr: "params['input_topic']"
     type: subscription
     msg_type: autoware_planning_msgs/msg/Path
-  - name: "params['output_topic']"
+  - name_expr: "params['output_topic']"
     type: publisher
     msg_type: autoware_planning_msgs/msg/Trajectory

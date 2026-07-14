@@ -152,32 +152,32 @@ connections:
     msg_type: autoware_planning_msgs/msg/Trajectory
     when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
 
-  # ObstacleCruiseModule / optimization_based_planner: subscribes absolute topic (not node-relative)
+  # ObstacleCruiseModule / optimization_based_planner: all connections below are only present when
+  # planning_algorithm == "optimization_base" (obstacle_cruise_module.cpp:91-92,183-184).
   - name: /planning/trajectory
     type: subscription
     msg_type: autoware_planning_msgs/msg/Trajectory
-    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
-    # UNVERIFIED: absolute topic used by optimization_based_planner; may be internal debug-only
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', []) and params.get('obstacle_cruise.option.planning_algorithm', '') == 'optimization_base'"
 
   - name: ~/optimized_sv_trajectory
     type: publisher
     msg_type: autoware_planning_msgs/msg/Trajectory
-    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', []) and params.get('obstacle_cruise.option.planning_algorithm', '') == 'optimization_base'"
 
   - name: ~/optimized_st_graph
     type: publisher
     msg_type: autoware_planning_msgs/msg/Trajectory
-    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', []) and params.get('obstacle_cruise.option.planning_algorithm', '') == 'optimization_base'"
 
   - name: ~/boundary
     type: publisher
     msg_type: autoware_planning_msgs/msg/Trajectory
-    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', []) and params.get('obstacle_cruise.option.planning_algorithm', '') == 'optimization_base'"
 
   - name: ~/debug/wall_marker
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray
-    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', []) and params.get('obstacle_cruise.option.planning_algorithm', '') == 'optimization_base'"
 
   # --- OutOfLaneModule publishers (autoware::motion_velocity_planner::OutOfLaneModule, ns_="out_of_lane") ---
   - name: ~/out_of_lane/debug_markers

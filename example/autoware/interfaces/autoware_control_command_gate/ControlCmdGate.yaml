@@ -1,9 +1,10 @@
-# Dynamic topics: ~/inputs/<name>/control, ~/inputs/<name>/gear,
+# Per-source input subscriptions: ~/inputs/<name>/control, ~/inputs/<name>/gear,
 # ~/inputs/<name>/turn_indicators, ~/inputs/<name>/hazard_lights are created per
 # source. The `inputs` param is a list[int] of source IDs; the name for each ID
 # comes from `inputs_names.<id>` (a separate param per integer ID).
-# This two-level indirection (int ID → name string → topic path) cannot be expressed
-# with the loop: format. See todo.md for tracking.
+# (subscription.cpp:28: const auto prefix = "~/inputs/" + name + "/";)
+# '$INVALID$' sentinel is used as default — contains '$' which is forbidden in ROS 2
+# parameter key names, so it can never be a real source name.
 connections:
   - name: /localization/kinematic_state
     type: subscription
@@ -44,3 +45,24 @@ connections:
   - name: ~/source/select
     type: service_server
     msg_type: autoware_control_command_gate/srv/SelectCommandSource
+
+  # ── Per-source input subscriptions ──────────────────────────────────────────────────────────────
+  - loop: "[params.get('inputs_names.' + str(i), '$INVALID$') for i in to_list(params.get('inputs', []))]"
+    name_expr: "'~/inputs/' + item + '/control'"
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/Control
+
+  - loop: "[params.get('inputs_names.' + str(i), '$INVALID$') for i in to_list(params.get('inputs', []))]"
+    name_expr: "'~/inputs/' + item + '/gear'"
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+
+  - loop: "[params.get('inputs_names.' + str(i), '$INVALID$') for i in to_list(params.get('inputs', []))]"
+    name_expr: "'~/inputs/' + item + '/turn_indicators'"
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+
+  - loop: "[params.get('inputs_names.' + str(i), '$INVALID$') for i in to_list(params.get('inputs', []))]"
+    name_expr: "'~/inputs/' + item + '/hazard_lights'"
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand

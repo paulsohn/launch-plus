@@ -9229,21 +9229,6 @@
                 <remap from="~/debug/obstacle_cruise/trajectory" to="~/debug/obstacle_cruise/trajectory">
                   <!-- type: publisher -->
                 </remap>
-                <remap from="/planning/trajectory" to="/planning/trajectory">
-                  <!-- type: subscription -->
-                </remap>
-                <remap from="~/optimized_sv_trajectory" to="~/optimized_sv_trajectory">
-                  <!-- type: publisher -->
-                </remap>
-                <remap from="~/optimized_st_graph" to="~/optimized_st_graph">
-                  <!-- type: publisher -->
-                </remap>
-                <remap from="~/boundary" to="~/boundary">
-                  <!-- type: publisher -->
-                </remap>
-                <remap from="~/debug/wall_marker" to="~/debug/wall_marker">
-                  <!-- type: publisher -->
-                </remap>
                 <remap from="~/out_of_lane/debug_markers" to="~/out_of_lane/debug_markers">
                   <!-- type: publisher -->
                 </remap>

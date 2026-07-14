@@ -2,20 +2,6 @@
 
 Cases that cannot be fully expressed in the current YAML convention and need revisiting.
 
-## Absolute topic subscriptions injected by loaded modules
-
-### MotionVelocityPlannerNode — ObstacleCruiseModule (optimization_based_planner)
-- **Package**: `autoware_motion_velocity_planner`
-- **File**: `autoware_motion_velocity_planner/MotionVelocityPlannerNode.yaml`
-- **Issue**: When `ObstacleCruiseModule` is loaded, its `OptimizationBasedPlanner` subscribes to
-  the hardcoded absolute topic `/planning/trajectory` (not a node-relative `~/` topic). This topic
-  name is fixed in source and is not a parameter. It is recorded in the YAML with a `when:` guard,
-  but the absolute topic path cannot be remapped via the node's topic remapping and may conflict
-  with other nodes publishing on that topic.
-- **Action needed**: Verify whether `/planning/trajectory` is intentional (debug-only) or should
-  be remapped to a node-private topic; check if the optimization-based planner is still the active
-  backend for `ObstacleCruiseModule`. (Source not in workspace — cannot verify locally.)
-
 ## Launch file remaps that are stale or conditional
 
 See [legacy.md](legacy.md) for remaps that appear in launch files but have no matching
@@ -44,14 +30,6 @@ source connection in the current codebase.
 - **File**: `autoware_scenario_simulator_v2_adapter/ConverterNode.yaml`
 - **Issue**: Per-metric-field topic names (UserDefinedValue publishers) are not expressible.
   The `loop:` entry covers `metric_topic_list` subscriptions only.
-
-### ControlCmdGate — **Not expressible** (two-level param indirection)
-- **Package**: `autoware_control_command_gate`
-- **File**: `autoware_control_command_gate/ControlCmdGate.yaml`
-- **Issue**: Per-source input topics `~/inputs/<name>/control`, `~/inputs/<name>/gear`, etc.
-  The source names come from `inputs_names.<id>` parameters where `<id>` is an integer from the
-  `inputs` list. This requires resolving an integer ID to a string name, then using that name in
-  the topic path — a two-level indirection not expressible with the current `loop:` format.
 
 ## eagleye_rt — argument-driven topic selection
 

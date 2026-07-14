@@ -8290,6 +8290,63 @@
                 <remap from="/planning/debug/objects_of_interest/lane_change_left" to="/planning/debug/objects_of_interest/lane_change_left">
                   <!-- type: publisher -->
                 </remap>
+                <remap from="~/debug/total_time/processing_time_ms" to="~/debug/total_time/processing_time_ms">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/static_obstacle_avoidance/processing_time_ms" to="~/debug/static_obstacle_avoidance/processing_time_ms">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/side_shift/processing_time_ms" to="~/debug/side_shift/processing_time_ms">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/bidirectional_traffic/processing_time_ms" to="~/debug/bidirectional_traffic/processing_time_ms">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/start_planner/processing_time_ms" to="~/debug/start_planner/processing_time_ms">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/goal_planner/processing_time_ms" to="~/debug/goal_planner/processing_time_ms">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/lane_change_right/processing_time_ms" to="~/debug/lane_change_right/processing_time_ms">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/lane_change_left/processing_time_ms" to="~/debug/lane_change_left/processing_time_ms">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/avoidance_by_lane_change/processing_time_ms" to="~/debug/avoidance_by_lane_change/processing_time_ms">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/&quot;&quot;/processing_time_ms" to="~/debug/&quot;&quot;/processing_time_ms">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/processing_time_detail_ms/static_obstacle_avoidance" to="~/debug/processing_time_detail_ms/static_obstacle_avoidance">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/processing_time_detail_ms/side_shift" to="~/debug/processing_time_detail_ms/side_shift">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/processing_time_detail_ms/bidirectional_traffic" to="~/debug/processing_time_detail_ms/bidirectional_traffic">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/processing_time_detail_ms/start_planner" to="~/debug/processing_time_detail_ms/start_planner">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/processing_time_detail_ms/goal_planner" to="~/debug/processing_time_detail_ms/goal_planner">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/processing_time_detail_ms/lane_change_right" to="~/debug/processing_time_detail_ms/lane_change_right">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/processing_time_detail_ms/lane_change_left" to="~/debug/processing_time_detail_ms/lane_change_left">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/processing_time_detail_ms/avoidance_by_lane_change" to="~/debug/processing_time_detail_ms/avoidance_by_lane_change">
+                  <!-- type: publisher -->
+                </remap>
+                <remap from="~/debug/processing_time_detail_ms/&quot;&quot;" to="~/debug/processing_time_detail_ms/&quot;&quot;">
+                  <!-- type: publisher -->
+                </remap>
                 <extra_arg name="use_intra_process_comms" value="false"/>
               </composable_node>
             </load_composable_node>

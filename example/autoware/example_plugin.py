@@ -81,11 +81,15 @@ standalone process argv).
 Available names in all expressions: ``params`` (always), ``args`` (always),
 ``item`` (inside ``loop``).
 Available built-ins: format, len, str, int, float, bool, range, list, tuple,
-                     enumerate, zip, to_list, to_bool.
+                     enumerate, zip, to_list, to_bool, to_snake_case.
 ``to_bool`` converts a ROS 2 param value to bool robustly: Python booleans
 pass through; strings are matched case-insensitively against ``"true"``
 (necessary because YAML-loaded params may arrive as ``"false"`` rather than
 ``False``, and Python's built-in ``bool("false")`` incorrectly returns ``True``).
+``to_snake_case`` converts a CamelCase string to snake_case.  Useful with
+``str.split`` and ``str.removesuffix`` for deriving per-module topic names from
+plugin class strings, e.g.:
+``to_snake_case(cls.split("::")[-1].removesuffix("ModuleManager"))``.
 
 Error policy
 ------------
@@ -110,6 +114,7 @@ Exactly one of *executable* (standalone node) or *plugin_name* (composable node)
 is provided.  *pkg_name* is always provided and is the ROS package name.
 """
 
+import re
 from pathlib import Path
 
 import yaml
@@ -141,6 +146,11 @@ def _to_bool(v: object) -> bool:
     return str(v).strip().lower() == "true"
 
 
+def _to_snake_case(s: str) -> str:
+    """Convert a CamelCase string to snake_case."""
+    return re.sub(r"(?<=[a-z\d])([A-Z])", r"_\1", s).lower()
+
+
 _SAFE_BUILTINS = {
     "format": format,
     "len": len,
@@ -155,6 +165,7 @@ _SAFE_BUILTINS = {
     "zip": zip,
     "to_list": _to_list,
     "to_bool": _to_bool,
+    "to_snake_case": _to_snake_case,
 }
 
 

@@ -597,5 +597,31 @@ connections:
     type: publisher
     msg_type: visualization_msgs/msg/MarkerArray
     when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+  # ── Per-module processing-time publishers ─────────────────────────────────────────────────
+  # PlannerManager::publishProcessingTime() (planner_manager.cpp:467) publishes Float64Stamped
+  # to ~/debug/<name>/processing_time_ms for "total_time" (always) and each loaded module's
+  # short name.  SceneModuleManagerInterface::initInterface() (scene_module_manager_interface.cpp:62)
+  # also publishes ProcessingTimeTree to ~/debug/processing_time_detail_ms/<name> per module.
+  #
+  # Each manager class sets its short name as the SceneModuleManagerInterface constructor
+  # argument (e.g. StaticObstacleAvoidanceModuleManager → "static_obstacle_avoidance",
+  # GoalPlannerModuleManager → "goal_planner").  In this codebase every BPP manager class
+  # is named <Name>ModuleManager and the short name equals to_snake_case(<Name>), so the
+  # loop expression below produces correct results.  Verify in each module's manager.hpp
+  # if modules are added or renamed.
+  - name: ~/debug/total_time/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  - loop: "[to_snake_case(cls.split('::')[-1].removesuffix('ModuleManager')) for cls in to_list(params.get('launch_modules', []))]"
+    name_expr: "'~/debug/' + item + '/processing_time_ms'"
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  - loop: "[to_snake_case(cls.split('::')[-1].removesuffix('ModuleManager')) for cls in to_list(params.get('launch_modules', []))]"
+    name_expr: "'~/debug/processing_time_detail_ms/' + item"
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+
   # NOTE: ~/output/stop_reasons appears as a remap in the BPP launch file but is absent from the
   # current node source code (tier4_planning_msgs/msg/StopReasonArray). May be a legacy remap.

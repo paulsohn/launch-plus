@@ -284,14 +284,20 @@ def _serialize_remaps(
     remaps: list,
     remap_metadata: dict | None = None,
 ) -> None:
-    """Append ``<remap>`` sub-elements to *parent*, annotating with type/qos comments."""
-    if remap_metadata is None:
-        remap_metadata = {}
+    """Append ``<remap>`` sub-elements to *parent*, annotating with type/qos comments.
+
+    *remap_metadata* semantics mirror ``call_plugin``:
+    - None  → no plugin coverage; all remaps are serialized (uncovered remaps included).
+    - {}    → plugin covers this node but has no connections; uncovered remaps suppressed.
+    - {...} → plugin covers this node; only remaps in *remap_metadata* are serialized.
+    """
     for from_, to in remaps:
+        meta = remap_metadata.get(from_) if remap_metadata is not None else None
+        if remap_metadata is not None and not meta:
+            continue  # plugin covers this node; omit launch-file remaps with no interface entry
         r = ET.SubElement(parent, "remap")
         r.set("from", from_)
         r.set("to", to)
-        meta = remap_metadata.get(from_)
         if meta:
             conn_type = meta.get("type")
             if conn_type:

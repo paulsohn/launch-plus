@@ -155,7 +155,7 @@ class Node(ExecuteProcess):
         self.remappings: list = list(kwargs.get("remappings") or [])
         self.env: dict = {}
         self.param_files: list = []
-        self.remap_metadata: dict[str, dict] = {}
+        self.remap_metadata: dict[str, dict] | None = None
         self.output = kwargs.get("output")
         self.args = kwargs.get("arguments")
         self.ros_args = kwargs.get("ros_arguments")

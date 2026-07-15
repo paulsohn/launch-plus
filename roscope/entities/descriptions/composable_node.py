@@ -170,7 +170,7 @@ class ComposableNode:
             p = ET.SubElement(elem, "param")
             p.set("name", k)
             p.set("value", v)
-        _serialize_remaps(elem, data.get("remappings", []), data.get("remap_metadata", {}))
+        _serialize_remaps(elem, data.get("remappings", []), data.get("remap_metadata"))
         for ea in data.get("extra_arguments", []):
             e = ET.SubElement(elem, "extra_arg")
             e.set("name", ea.get("name", ""))

@@ -207,24 +207,27 @@ class ResolverState:
         node_ns: str | None = None,
         node_name: str | None = None,
         args: list[str] | None = None,
-    ) -> dict[str, dict]:
+    ) -> dict[str, dict] | None:
         """Call the connection plugin, extend remaps in-place, register connections.
 
         Exactly one of *executable* or *plugin_name* must be provided.
         *node_ns* and *node_name* are used to expand ``~/`` and relative connection
         names to their absolute form before conflict registration.
 
-        Returns the validated remap_metadata dict (keyed by 'from' / connection name).
-        Returns {} when no plugin is set, the package cannot be resolved, or the
-        plugin degrades gracefully.
+        Returns:
+        - None  → no plugin, or plugin does not cover this node; caller should
+                  fall back to launch-file remaps.
+        - {}    → plugin covers this node with no connections; caller should
+                  suppress launch-file remaps (likely stale).
+        - {...} → plugin covers this node; only these connections should be shown.
         """
         if self.connection_plugin is None or not pkg:
-            return {}
+            return None
         pkg_share: str | None = None
         try:
             pkg_share = self.resolve_pkg_share(pkg)
         except Exception:
-            return {}
+            return None
         from roscope.plugin import call_plugin
 
         meta_by_connection = call_plugin(
@@ -236,6 +239,8 @@ class ResolverState:
             plugin_name=plugin_name,
             args=args,
         )
+        if meta_by_connection is None:
+            return None
         if not meta_by_connection:
             return {}
         identifier = executable or plugin_name or ""

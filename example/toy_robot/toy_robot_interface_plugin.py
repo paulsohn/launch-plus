@@ -40,10 +40,10 @@ def get_connections(
     pkg_name: str,
     executable: str | None = None,
     plugin_name: str | None = None,
-) -> dict:
+) -> dict | None:
     name = executable or (plugin_name.split("::")[-1] if plugin_name else None)
     if not name:
-        return {}
+        return None
 
     # Primary: interface definitions shipped inside the package
     primary = Path(pkg_share_path) / "interface" / f"{name}.yaml"
@@ -59,4 +59,4 @@ def get_connections(
         if isinstance(data, dict):
             return data.get("connections") or {}
 
-    return {}
+    return None

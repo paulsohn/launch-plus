@@ -104,7 +104,15 @@ is an error — the plugin raises ``ValueError``.
 Recognized types: publisher, subscription, service_client, service_server,
                   action_client, action_server.
 Any other type string is warned and ignored by the resolver.
-If the interface file does not exist, the node is silently skipped.
+
+Return value convention
+-----------------------
+- Return ``None`` when no interface file exists for this node.  The resolver
+  then falls back to launch-file remaps (uncovered remaps are shown as-is).
+- Return ``{}`` or a non-empty dict when the interface file exists.  The
+  resolver suppresses all launch-file remaps that have no matching interface
+  entry, treating them as stale.  This keeps the output clean for covered
+  nodes without requiring every legacy remap to be explicitly listed.
 
 Plugin function signature
 --------------------------
@@ -181,7 +189,7 @@ def get_connections(
     executable: str | None = None,
     plugin_name: str | None = None,
     args: list[str] | None = None,
-) -> dict:
+) -> dict | None:
     # For composable nodes the plugin class name (e.g. "my_pkg::MyComponent") is
     # provided.  Use only the final part after "::" as the file name.
     node_name = executable or (plugin_name.split("::")[-1] if plugin_name else None)
@@ -189,7 +197,7 @@ def get_connections(
         return {}
     interface_file = _INTERFACES_DIR / pkg_name / f"{node_name}.yaml"
     if not interface_file.exists():
-        return {}
+        return None
     data = yaml.safe_load(interface_file.read_text())
     if not isinstance(data, dict):
         return {}

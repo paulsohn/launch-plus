@@ -40,9 +40,14 @@ def _make_context(plugin_fn=None, pkg_shares=None):
 
 
 class TestCallPlugin:
-    def test_returns_empty_when_plugin_fn_none(self):
+    def test_returns_none_when_plugin_fn_none(self):
         result = call_plugin(None, pkg_share_path="/p", params={}, pkg_name="pkg", executable="n")
-        assert result == {}
+        assert result is None
+
+    def test_plugin_returns_none_propagates(self):
+        fn = lambda **kw: None  # noqa: E731
+        result = call_plugin(fn, pkg_share_path="/p", params={}, pkg_name="pkg", executable="n")
+        assert result is None
 
     def test_exactly_one_required_both_given(self):
         fn = _make_plugin_fn({})
@@ -168,10 +173,10 @@ class TestApplyConnectionPluginNode:
         assert remaps.count(["~/input", "~/input"]) == 0
         assert len([r for r in remaps if r[0] == "~/input"]) == 1
 
-    def test_no_plugin_returns_empty(self):
+    def test_no_plugin_returns_none(self):
         ctx = _make_context(None)
         result = ctx._state.apply_connection_plugin("my_pkg", {}, [], executable="my_node")
-        assert result == {}
+        assert result is None
 
     def test_invalid_plugin_output_ignored(self):
         fn = _make_plugin_fn({42: {"type": "publisher"}})

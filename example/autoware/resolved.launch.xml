@@ -1310,11 +1310,9 @@
           <param name="right_overhang" value="0.128"/>
           <param name="vehicle_height" value="2.5"/>
           <param name="max_steer_angle" value="0.7"/>
-          <remap from="~/diagnostics_graph" to="/diagnostics_graph"/>
           <remap from="~/hazard_status" to="/system/emergency/hazard_status">
             <!-- type: publisher -->
           </remap>
-          <remap from="~/input/emergency_holding" to="/system/emergency_holding"/>
           <remap from="/diagnostics_graph/struct" to="/diagnostics_graph/struct">
             <!-- type: subscription -->
           </remap>
@@ -1492,14 +1490,12 @@
           <remap from="output/pointcloud_map" to="/map/pointcloud_map">
             <!-- type: publisher -->
           </remap>
-          <remap from="output/pointcloud_map_metadata" to="/map/pointcloud_map_metadata"/>
           <remap from="service/get_partial_pcd_map" to="/map/get_partial_pointcloud_map">
             <!-- type: service_server -->
           </remap>
           <remap from="service/get_differential_pcd_map" to="/map/get_differential_pointcloud_map">
             <!-- type: service_server -->
           </remap>
-          <remap from="service/get_selected_pcd_map" to="/map/get_selected_pointcloud_map"/>
         </composable_node>
         <composable_node pkg="autoware_map_loader" plugin="autoware::map_loader::Lanelet2MapLoaderNode" name="lanelet2_map_loader" namespace="/map">
           <!-- params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/map/lanelet2_map_loader.param.yaml -->
@@ -1510,9 +1506,6 @@
           <param name="enable_selected_map_loading" value="false"/>
           <param name="lanelet2_map_metadata_path" value="{map_path}/lanelet2_map_metadata.yaml"/>
           <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/map/lanelet2_map_loader.param.yaml -->
-          <remap from="output/lanelet2_map" to="/map/vector_map"/>
-          <remap from="output/lanelet2_map_metadata" to="/map/vector_map_metadata"/>
-          <remap from="service/get_selected_lanelet2_map" to="/map/get_selected_vector_map"/>
           <remap from="/map/map_projector_info" to="/map/map_projector_info">
             <!-- type: subscription -->
           </remap>
@@ -2994,7 +2987,6 @@
               <remap from="ekf_pose_with_covariance" to="/localization/pose_twist_fusion_filter/biased_pose_with_covariance">
                 <!-- type: subscription -->
               </remap>
-              <remap from="regularization_pose_with_covariance" to="/sensing/gnss/pose_with_covariance"/>
               <remap from="trigger_node_srv" to="/localization/pose_estimator/trigger_node">
                 <!-- type: service_server -->
               </remap>
@@ -3162,7 +3154,6 @@
             <param name="max_steer_angle" value="0.7"/>
             <param name="map_height_fitter.map_loader_name" value="/map/pointcloud_map_loader"/>
             <param name="map_height_fitter.target" value="pointcloud_map"/>
-            <remap from="yabloc_align" to="/localization/pose_estimator/yabloc/initializer/yabloc_align_srv"/>
             <remap from="ndt_align" to="/localization/pose_estimator/ndt_align_srv">
               <!-- type: service_client -->
             </remap>
@@ -3187,7 +3178,6 @@
             <remap from="~/partial_map_load" to="/map/get_partial_pointcloud_map">
               <!-- type: service_client -->
             </remap>
-            <remap from="~/vector_map" to="/map/vector_map"/>
             <remap from="/localization/initialize" to="/localization/initialize">
               <!-- type: service_server -->
             </remap>
@@ -3448,7 +3438,6 @@
             <remap from="input/odom" to="/localization/kinematic_state">
               <!-- type: subscription -->
             </remap>
-            <remap from="input/twist" to="/localization/twist_estimator/twist_with_covariance"/>
             <remap from="output/accel" to="/localization/acceleration">
               <!-- type: publisher -->
             </remap>
@@ -4261,7 +4250,6 @@
               <remap from="input" to="/perception/obstacle_segmentation/pointcloud_map_filtered/downsampled/pointcloud">
                 <!-- type: subscription -->
               </remap>
-              <remap from="map" to="/map/pointcloud_map"/>
               <remap from="output" to="/perception/object_recognition/detection/pointcloud_map_filtered/pointcloud">
                 <!-- type: publisher -->
               </remap>
@@ -4710,24 +4698,12 @@
             <remap from="~/input/detection01/objects" to="/perception/object_recognition/detection/centerpoint/objects">
               <!-- type: subscription -->
             </remap>
-            <remap from="~/input/detection02/objects" to="/perception/object_recognition/detection/centerpoint_short_range/objects"/>
-            <remap from="~/input/detection03/objects" to="/perception/object_recognition/detection/clustering/camera_lidar_fusion/objects"/>
-            <remap from="~/input/detection04/objects" to="/perception/object_recognition/detection/clustering/label_based_euclidean_cluster/objects"/>
-            <remap from="~/input/detection05/objects" to="/perception/object_recognition/detection/irregular_object/objects"/>
-            <remap from="~/input/detection06/objects" to="/perception/object_recognition/detection/detection_by_tracker/objects"/>
-            <remap from="~/input/detection07/objects" to="/perception/object_recognition/detection/radar/far_objects"/>
-            <remap from="~/input/detection08/objects" to="/perception/object_recognition/detection/camera_vru/objects"/>
             <remap from="~/input/detection09/objects" to="/perception/object_recognition/detection/camera_only/objects">
               <!-- type: subscription -->
             </remap>
-            <remap from="~/input/detection10/objects" to="/perception/object_recognition/tracking/input/objects10"/>
-            <remap from="~/input/detection11/objects" to="/perception/object_recognition/tracking/input/objects11"/>
-            <remap from="~/input/detection12/objects" to="/perception/object_recognition/tracking/input/objects12"/>
-            <remap from="~/input/odometry" to="/localization/kinematic_state"/>
             <remap from="~/output/objects" to="/perception/object_recognition/tracking/objects">
               <!-- type: publisher -->
             </remap>
-            <remap from="~/output/merged_objects" to="/perception/object_recognition/detection/objects"/>
             <env name="LD_PRELOAD" value="/opt/ros/humble/lib/libagnocast_heaphook.so:"/>
           </node>
         </group>
@@ -4804,7 +4780,6 @@
             <param name="right_overhang" value="0.128"/>
             <param name="vehicle_height" value="2.5"/>
             <param name="max_steer_angle" value="0.7"/>
-            <remap from="objects" to="/perception/object_recognition/objects"/>
             <remap from="/vector_map" to="/map/vector_map">
               <!-- type: subscription -->
             </remap>
@@ -5164,9 +5139,6 @@
               <remap from="~/output/image" to="/perception/traffic_light_recognition/camera6/debug/rois">
                 <!-- type: publisher -->
               </remap>
-              <remap from="~/output/image/compressed" to="/perception/traffic_light_recognition/camera6/debug/rois/compressed"/>
-              <remap from="~/output/image/compressedDepth" to="/perception/traffic_light_recognition/camera6/debug/rois/compressedDepth"/>
-              <remap from="~/output/image/theora" to="/perception/traffic_light_recognition/camera6/debug/rois/theora"/>
               <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
           </node_container>
@@ -5304,9 +5276,6 @@
               <remap from="~/output/image" to="/perception/traffic_light_recognition/camera7/debug/rois">
                 <!-- type: publisher -->
               </remap>
-              <remap from="~/output/image/compressed" to="/perception/traffic_light_recognition/camera7/debug/rois/compressed"/>
-              <remap from="~/output/image/compressedDepth" to="/perception/traffic_light_recognition/camera7/debug/rois/compressedDepth"/>
-              <remap from="~/output/image/theora" to="/perception/traffic_light_recognition/camera7/debug/rois/theora"/>
               <extra_arg name="use_intra_process_comms" value="true"/>
             </composable_node>
           </node_container>
@@ -6779,8 +6748,6 @@
                 <remap from="~/input/no_ground_pointcloud" to="/perception/obstacle_segmentation/pointcloud">
                   <!-- type: subscription -->
                 </remap>
-                <remap from="~/input/compare_map_filtered_pointcloud" to="/planning/scenario_planning/lane_driving/behavior_planning/compare_map_filtered/pointcloud"/>
-                <remap from="~/input/vector_map_inside_area_filtered_pointcloud" to="/planning/scenario_planning/lane_driving/behavior_planning/vector_map_inside_area_filtered/pointcloud"/>
                 <remap from="~/input/external_velocity_limit_mps" to="/planning/scenario_planning/max_velocity_default">
                   <!-- type: subscription -->
                 </remap>
@@ -6796,7 +6763,6 @@
                 <remap from="~/output/path" to="/planning/scenario_planning/lane_driving/behavior_planning/path">
                   <!-- type: publisher -->
                 </remap>
-                <remap from="~/output/stop_reasons" to="/planning/scenario_planning/status/stop_reasons"/>
                 <remap from="~/output/infrastructure_commands" to="/planning/scenario_planning/status/infrastructure_commands">
                   <!-- type: publisher -->
                 </remap>
@@ -7989,7 +7955,6 @@
                 <remap from="~/output/modified_goal" to="/planning/scenario_planning/modified_goal">
                   <!-- type: publisher -->
                 </remap>
-                <remap from="~/output/stop_reasons" to="/planning/scenario_planning/status/stop_reasons"/>
                 <remap from="~/input/lateral_offset" to="~/input/lateral_offset">
                   <!-- type: subscription -->
                 </remap>
@@ -9148,7 +9113,6 @@
                 <remap from="~/input/traffic_signals" to="/perception/traffic_light_recognition/traffic_signals">
                   <!-- type: subscription -->
                 </remap>
-                <remap from="~/input/virtual_traffic_light_states" to="/perception/virtual_traffic_light_states"/>
                 <remap from="~/input/occupancy_grid" to="/perception/occupancy_grid_map/map">
                   <!-- type: subscription -->
                 </remap>
@@ -9161,8 +9125,6 @@
                 <remap from="~/output/clear_velocity_limit" to="/planning/scenario_planning/clear_velocity_limit">
                   <!-- type: publisher -->
                 </remap>
-                <remap from="~/output/stop_reasons" to="/planning/scenario_planning/status/stop_reasons"/>
-                <remap from="~/output/velocity_factors" to="/planning/velocity_factors/motion_velocity_planner"/>
                 <remap from="~/debug/markers" to="~/debug/markers">
                   <!-- type: publisher -->
                 </remap>
@@ -9653,7 +9615,6 @@
             <param name="common.adjacent_lane.participants.max_deceleration" value="-2.0"/>
             <!-- end params from: {workspace}/src/launcher/autoware_launch/autoware_launch/config/planning/scenario_planning/common/planning_validator/rear_collision_checker.param.yaml -->
             <param name="launch_modules" value="[autoware::planning_validator::LatencyChecker, autoware::planning_validator::TrajectoryChecker, autoware::planning_validator::IntersectionCollisionChecker, autoware::planning_validator::RearCollisionChecker, &quot;&quot;]"/>
-            <remap from="~/input/objects" to="/perception/object_recognition/objects"/>
             <remap from="~/input/pointcloud" to="/perception/obstacle_segmentation/pointcloud">
               <!-- type: subscription -->
             </remap>
@@ -10249,7 +10210,6 @@
           <remap from="kinematics" to="/localization/kinematic_state">
             <!-- type: subscription -->
           </remap>
-          <remap from="steering" to="/vehicle/status/steering_status"/>
           <remap from="trajectory" to="/planning/trajectory">
             <!-- type: subscription -->
           </remap>
@@ -10265,7 +10225,6 @@
           <remap from="gate_operation_mode" to="/control/vehicle_cmd_gate/operation_mode">
             <!-- type: subscription -->
           </remap>
-          <remap from="is_autonomous_available" to="/control/is_autonomous_available"/>
           <remap from="control_mode_request" to="/control/control_mode_request">
             <!-- type: service_client -->
           </remap>
@@ -10475,7 +10434,6 @@
           <remap from="~/output/longitudinal_diagnostic" to="/control/trajectory_follower/longitudinal/diagnostic">
             <!-- type: publisher -->
           </remap>
-          <remap from="~/output/stop_reason" to="/control/trajectory_follower/longitudinal/stop_reason"/>
           <remap from="~/output/control_cmd" to="/control/trajectory_follower/control_cmd">
             <!-- type: publisher -->
           </remap>
@@ -11959,7 +11917,6 @@
           <remap from="~/partial_map_load" to="/map/get_partial_pointcloud_map">
             <!-- type: service_client -->
           </remap>
-          <remap from="~/vector_map" to="/map/vector_map"/>
           <remap from="/api/localization/initialize" to="/api/localization/initialize">
             <!-- type: service_client -->
           </remap>

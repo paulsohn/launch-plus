@@ -1,0 +1,41 @@
+connections:
+  - name: ~/input/control_cmd
+    type: subscription
+    msg_type: autoware_control_msgs/msg/Control
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/accel
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - name: ~/input/operation_mode_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  - name: ~/input/control_horizon
+    type: subscription
+    msg_type: autoware_control_msgs/msg/ControlHorizon
+  - name: ~/input/steering
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+    when: "to_bool(params.get('convert_actuation_to_steering_status', False)) == False"
+  - name: ~/input/actuation_status
+    type: subscription
+    msg_type: tier4_vehicle_msgs/msg/ActuationStatusStamped
+    when: "to_bool(params.get('need_to_subscribe_actuation_status', False))"
+  - name: ~/output/actuation_cmd
+    type: publisher
+    msg_type: tier4_vehicle_msgs/msg/ActuationCommandStamped
+  - name: ~/output/steering_status
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+    when: "to_bool(params.get('convert_actuation_to_steering_status', False))"
+  - name: ~/output/control_component_latency
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - name: /vehicle/raw_vehicle_cmd_converter/debug/steer_pid
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
+  - name: /vehicle/raw_vehicle_cmd_converter/debug/compensated_control_cmd
+    type: publisher
+    msg_type: autoware_control_msgs/msg/Control
+    when: "to_bool(params.get('use_vehicle_adaptor', False))"

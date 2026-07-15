@@ -1,0 +1,31 @@
+connections:
+  - name: ~/input/initialpose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/input/weighted_particles
+    type: subscription
+    msg_type: yabloc_particle_filter/msg/ParticleArray
+  - name: ~/input/height
+    type: subscription
+    msg_type: std_msgs/msg/Float32
+  - name: ~/input/twist_with_covariance
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+  - name: ~/input/ekf_pose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/output/predicted_particles
+    type: publisher
+    msg_type: yabloc_particle_filter/msg/ParticleArray
+  - name: ~/output/pose
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseStamped
+  - name: ~/output/pose_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/debug/init_marker
+    type: publisher
+    msg_type: visualization_msgs/msg/Marker
+  - name: ~/yabloc_trigger_srv
+    type: service_server
+    msg_type: std_srvs/srv/SetBool

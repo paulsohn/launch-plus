@@ -1,0 +1,41 @@
+connections:
+  - name: /api/localization/initialization_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/LocalizationInitializationState
+  - name: /api/routing/state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/RouteState
+  - name: /api/operation_mode/state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  # Component state subscriptions (one per module: sensing, perception, map, localization, planning, control, vehicle, system)
+  - name: /system/component_state_monitor/component/launch/sensing
+    type: subscription
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: /system/component_state_monitor/component/launch/perception
+    type: subscription
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: /system/component_state_monitor/component/launch/map
+    type: subscription
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: /system/component_state_monitor/component/launch/localization
+    type: subscription
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: /system/component_state_monitor/component/launch/planning
+    type: subscription
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: /system/component_state_monitor/component/launch/control
+    type: subscription
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: /system/component_state_monitor/component/launch/vehicle
+    type: subscription
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: /system/component_state_monitor/component/launch/system
+    type: subscription
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: /autoware/state
+    type: publisher
+    msg_type: autoware_system_msgs/msg/AutowareState
+  - name: /autoware/shutdown
+    type: service_server
+    msg_type: std_srvs/srv/Trigger

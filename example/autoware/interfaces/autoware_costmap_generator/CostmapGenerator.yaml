@@ -1,0 +1,25 @@
+connections:
+  - name: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: ~/input/points_no_ground
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: ~/input/scenario
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/Scenario
+  - name: ~/output/grid_map
+    type: publisher
+    msg_type: grid_map_msgs/msg/GridMap
+  - name: ~/output/occupancy_grid
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - name: processing_time
+    type: publisher
+    msg_type: autoware_utils/ProcessingTimeDetail

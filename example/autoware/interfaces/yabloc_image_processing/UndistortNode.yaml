@@ -1,0 +1,16 @@
+connections:
+  - name: ~/input/image_raw
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/input/image_raw/compressed
+    type: subscription
+    msg_type: sensor_msgs/msg/CompressedImage
+  - name: ~/input/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: ~/output/resized_info
+    type: publisher
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: ~/output/resized_image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image

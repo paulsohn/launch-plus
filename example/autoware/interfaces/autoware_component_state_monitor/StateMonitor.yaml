@@ -1,0 +1,54 @@
+connections:
+  - name: /diagnostics
+    type: subscription
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+  # Publishers: ~/launch/<module> and ~/autonomous/<module> for each module in
+  # {sensing, perception, map, localization, planning, control, vehicle, system}
+  - name: ~/launch/sensing
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/launch/perception
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/launch/map
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/launch/localization
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/launch/planning
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/launch/control
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/launch/vehicle
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/launch/system
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/autonomous/sensing
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/autonomous/perception
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/autonomous/map
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/autonomous/localization
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/autonomous/planning
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/autonomous/control
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/autonomous/vehicle
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/autonomous/system
+    type: publisher
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable

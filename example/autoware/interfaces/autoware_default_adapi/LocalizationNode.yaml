@@ -1,0 +1,16 @@
+connections:
+  - name: /api/localization/initialization_state
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/LocalizationInitializationState
+  - name: /api/localization/initialize
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/InitializeLocalization
+  - name: /localization/initialization_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/LocalizationInitializationState
+  - name: /localization/initialize
+    type: service_client
+    msg_type: autoware_localization_msgs/srv/InitializeLocalization
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray

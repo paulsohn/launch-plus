@@ -1,0 +1,19 @@
+connections:
+  - name: ~/input/detected_objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: ~/input/obstacle_pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/output/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: ~/debug/removed_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: ~/debug/neighbor_pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/debug/pointcloud_within_polygon
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2

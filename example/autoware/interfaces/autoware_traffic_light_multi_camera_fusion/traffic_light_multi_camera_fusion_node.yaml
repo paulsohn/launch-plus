@@ -1,0 +1,19 @@
+connections:
+  - name: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - loop: "to_list(params.get('camera_namespaces', []))"
+    name_expr: "item + '/camera_info'"
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - loop: "to_list(params.get('camera_namespaces', []))"
+    name_expr: "item + '/detection/rois'"
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
+  - loop: "to_list(params.get('camera_namespaces', []))"
+    name_expr: "item + '/classification/traffic_signals'"
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/TrafficLightArray
+  - name: ~/output/traffic_signals
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray

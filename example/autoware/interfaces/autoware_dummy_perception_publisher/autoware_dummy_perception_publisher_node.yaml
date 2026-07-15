@@ -1,0 +1,17 @@
+connections:
+  - name: input/object
+    type: subscription
+    msg_type: autoware_simulation_msgs/msg/SimulatedObject
+  - name: output/dynamic_object
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: output/points_raw
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/output/debug/ground_truth_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  # PredictedObjectMovementPlugin subscription (plugin loaded at runtime)
+  - name: input/predicted_objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects

@@ -1,0 +1,22 @@
+connections:
+  - name: ~/input/control/control_cmd
+    type: subscription
+    msg_type: autoware_control_msgs/msg/Control
+  - name: ~/input/mrm/emergency_stop/operate
+    type: service_server
+    msg_type: tier4_system_msgs/srv/OperateMrm
+  - name: ~/input/driving_mode_request
+    type: subscription
+    msg_type: tier4_system_msgs/msg/DrivingModeRequest
+  - name: ~/input/driving_mode_info
+    type: subscription
+    msg_type: tier4_system_msgs/msg/DrivingModeInfo
+  - name: ~/output/mrm/emergency_stop/status
+    type: publisher
+    msg_type: tier4_system_msgs/msg/MrmBehaviorStatus
+  - name: ~/output/mrm/emergency_stop/control_cmd
+    type: publisher
+    msg_type: autoware_control_msgs/msg/Control
+  - name: ~/output/mrm_state
+    type: publisher
+    msg_type: tier4_system_msgs/msg/DrivingModeMrmState

@@ -1,0 +1,43 @@
+connections:
+  - name: ~/input/pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/input/ekf_pose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/input/lanelet2_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: ~/output/pose_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/debug/marker_mapped
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/marker_detected
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseArray
+  - name: ~/debug/pose_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/debug/marker_pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/debug/center_intensity_grid
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/positive_grid
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/negative_grid
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/matched_grid
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/vote_grid
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/service/trigger_node_srv
+    type: service_server
+    msg_type: std_srvs/srv/SetBool

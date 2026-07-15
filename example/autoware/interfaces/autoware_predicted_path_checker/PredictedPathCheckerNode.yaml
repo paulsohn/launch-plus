@@ -1,0 +1,28 @@
+connections:
+  - name: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: ~/input/reference_trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - name: ~/input/predicted_trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/current_accel
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - name: /control/vehicle_cmd_gate/is_stopped
+    type: subscription
+    msg_type: tier4_control_msgs/msg/IsStopped
+  - name: ~/debug/virtual_wall
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: /control/vehicle_cmd_gate/set_stop
+    type: service_client
+    msg_type: tier4_control_msgs/srv/SetStop

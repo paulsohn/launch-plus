@@ -1,0 +1,47 @@
+connections:
+  - name: ~/input/topic_img_fl
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/input/topic_img_f
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/input/topic_img_fr
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/input/topic_img_bl
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/input/topic_img_b
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/input/topic_img_br
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/input/can_bus
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/topic_img_f/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: ~/input/topic_img_fr/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: ~/input/topic_img_fl/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: ~/input/topic_img_b/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: ~/input/topic_img_bl/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: ~/input/topic_img_br/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: ~/output_boxes
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: ~/output_bboxes
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "to_bool(params.get('debug_mode', False))"

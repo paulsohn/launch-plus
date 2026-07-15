@@ -1,0 +1,7 @@
+connections:
+  - name: /vehicle/status/battery_charge
+    type: subscription
+    msg_type: tier4_vehicle_msgs/msg/BatteryStatus
+  - name: /api/vehicle/metrics
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/VehicleMetrics

@@ -1,0 +1,11 @@
+connections:
+  - loop: "to_list(params.get('input_topics', []))"
+    name_expr: "item"
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: output
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: output_info
+    type: publisher
+    msg_type: autoware_sensing_msgs/msg/ConcatenatedPointCloudInfo

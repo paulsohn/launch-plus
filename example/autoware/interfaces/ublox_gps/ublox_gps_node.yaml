@@ -1,0 +1,10 @@
+connections:
+  - name: ~/fix
+    type: publisher
+    msg_type: sensor_msgs/msg/NavSatFix
+  - name: ~/fix_velocity
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+  - name: ~/navpvt
+    type: publisher
+    msg_type: ublox_msgs/msg/NavPVT

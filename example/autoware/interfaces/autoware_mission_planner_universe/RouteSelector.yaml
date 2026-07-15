@@ -1,0 +1,49 @@
+connections:
+  - name: ~/planner/state
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/RouteState
+  - name: ~/planner/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - name: ~/main/state
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/RouteState
+  - name: ~/main/route
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - name: ~/mrm/state
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/RouteState
+  - name: ~/mrm/route
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - name: ~/main/clear_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/ClearRoute
+  - name: ~/main/set_waypoint_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/SetWaypointRoute
+  - name: ~/main/set_lanelet_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/SetLaneletRoute
+  - name: ~/mrm/clear_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/ClearRoute
+  - name: ~/mrm/set_waypoint_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/SetWaypointRoute
+  - name: ~/mrm/set_lanelet_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/SetLaneletRoute
+  - name: ~/planner/clear_route
+    type: service_client
+    msg_type: autoware_planning_msgs/srv/ClearRoute
+  - name: ~/planner/set_lanelet_route
+    type: service_client
+    msg_type: autoware_planning_msgs/srv/SetLaneletRoute
+  - name: ~/planner/set_waypoint_route
+    type: service_client
+    msg_type: autoware_planning_msgs/srv/SetWaypointRoute

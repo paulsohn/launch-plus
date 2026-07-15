@@ -1,0 +1,22 @@
+connections:
+  - name: ~/initialpose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: /api/localization/initialize
+    type: service_client
+    msg_type: autoware_adapi_v1_msgs/srv/InitializeLocalization
+
+  # MapHeightFitter topics (map_height_fitter.cpp) — target selects which map source to use.
+  # NOTE: launch files may contain all three remaps regardless of the active target.
+  - name: ~/pointcloud_map
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "params.get('map_height_fitter.target', '') == 'pointcloud_map'"
+  - name: ~/partial_map_load
+    type: service_client
+    msg_type: autoware_map_msgs/srv/GetPartialPointCloudMap
+    when: "params.get('map_height_fitter.target', '') == 'pointcloud_map'"
+  - name: ~/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+    when: "params.get('map_height_fitter.target', '') == 'vector_map'"

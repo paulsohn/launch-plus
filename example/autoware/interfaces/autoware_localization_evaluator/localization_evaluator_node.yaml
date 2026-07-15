@@ -1,0 +1,10 @@
+connections:
+  - name: ~/input/localization
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/localization/ref
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/metrics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray

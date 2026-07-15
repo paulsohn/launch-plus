@@ -1,0 +1,22 @@
+connections:
+  - name: ~/input/path
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Path
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: ~/output/path
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - name: ~/virtual_wall
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/calculation_time
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped

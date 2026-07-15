@@ -1,0 +1,627 @@
+connections:
+  # ── Core subscriptions ──────────────────────────────────────────────────────
+  - name: ~/input/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+
+  - name: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+
+  - name: ~/input/accel
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+
+  - name: ~/input/scenario
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/Scenario
+
+  - name: ~/input/perception
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+
+  - name: ~/input/occupancy_grid_map
+    type: subscription
+    msg_type: nav_msgs/msg/OccupancyGrid
+
+  - name: ~/input/costmap
+    type: subscription
+    msg_type: nav_msgs/msg/OccupancyGrid
+
+  - name: ~/input/traffic_signals
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+
+  - name: ~/input/lateral_offset
+    type: subscription
+    msg_type: tier4_planning_msgs/msg/LateralOffset
+
+  # Absolute topic (not ~/…): operation_mode state from system API
+  - name: /system/operation_mode/state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+
+  # Absolute topic: external velocity limit from scenario planning
+  - name: /planning/scenario_planning/max_velocity
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+
+  # ── Core publishers ──────────────────────────────────────────────────────────
+  - name: ~/output/path
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PathWithLaneId
+
+  - name: ~/output/turn_indicators_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+
+  - name: ~/output/hazard_lights_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+
+  - name: ~/output/modified_goal
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/PoseWithUuidStamped
+
+  - name: ~/output/is_reroute_available
+    type: publisher
+    msg_type: tier4_planning_msgs/msg/RerouteAvailability
+
+  # ── Static debug publishers (always present) ─────────────────────────────────
+  - name: ~/debug/avoidance_debug_message_array
+    type: publisher
+    msg_type: tier4_planning_msgs/msg/AvoidanceDebugMsgArray
+
+  - name: ~/debug/turn_signal_info
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  - name: ~/debug/bound
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  # PlannerManager DebugPublisher("~/debug") publishes lazily at runtime:
+  # ~/debug/root_reference_path (MarkerArray), ~/debug/internal_state (StringStamped),
+  # and ~/debug/<module_name> (Float64Stamped) for each module's processing time.
+  - name: ~/debug/root_reference_path
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  - name: ~/debug/internal_state
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped
+
+  # PublishedTimePublisher: appends "/debug/published_time" to the output/path topic.
+  - name: ~/output/path/debug/published_time
+    type: publisher
+    msg_type: autoware_internal_msgs/msg/PublishedTime
+
+  # PlanningFactorInterface for the core node (registered as "behavior_path_planner")
+  - name: /planning/planning_factors/behavior_path_planner
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+
+  # ── Per-module path_candidate / path_reference publishers ───────────────────
+  # Created in BehaviorPathPlannerNode constructor for every loaded module manager.
+  # Topic name pattern: /planning/path_candidate/<module_name>
+  #                     /planning/path_reference/<module_name>
+  # Module name strings are the snake_case names set in each manager's constructor.
+
+  - name: /planning/path_candidate/static_obstacle_avoidance
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_reference/static_obstacle_avoidance
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_candidate/side_shift
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::SideShiftModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_reference/side_shift
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::SideShiftModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_candidate/bidirectional_traffic
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::BidirectionalTrafficModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_reference/bidirectional_traffic
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::BidirectionalTrafficModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_candidate/start_planner
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_reference/start_planner
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_candidate/goal_planner
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_reference/goal_planner
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_candidate/lane_change_right
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_reference/lane_change_right
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_candidate/lane_change_left
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_reference/lane_change_left
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_candidate/avoidance_by_lane_change
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/path_reference/avoidance_by_lane_change
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  # ── Per-module debug/info/virtual_wall/drivable_lanes publishers ─────────────
+  # SceneModuleManagerInterface::initInterface() creates four MarkerArray publishers
+  # per loaded module: ~/info/<name>, ~/debug/<name>, ~/virtual_wall/<name>,
+  # ~/drivable_lanes/<name>.
+
+  # static_obstacle_avoidance
+  - name: ~/info/static_obstacle_avoidance
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/debug/static_obstacle_avoidance
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/virtual_wall/static_obstacle_avoidance
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/drivable_lanes/static_obstacle_avoidance
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  # side_shift
+  - name: ~/info/side_shift
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::SideShiftModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/debug/side_shift
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::SideShiftModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/virtual_wall/side_shift
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::SideShiftModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/drivable_lanes/side_shift
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::SideShiftModuleManager' in params.get('launch_modules', [])"
+
+  # bidirectional_traffic
+  - name: ~/info/bidirectional_traffic
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::BidirectionalTrafficModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/debug/bidirectional_traffic
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::BidirectionalTrafficModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/virtual_wall/bidirectional_traffic
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::BidirectionalTrafficModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/drivable_lanes/bidirectional_traffic
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::BidirectionalTrafficModuleManager' in params.get('launch_modules', [])"
+
+  # start_planner
+  - name: ~/info/start_planner
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/debug/start_planner
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/virtual_wall/start_planner
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/drivable_lanes/start_planner
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  # DebugPublisher(this, "~/debug/start_planner_evaluation_table") publishes lazily
+  # to ~/debug/start_planner_evaluation_table/start_planner_evaluation_table.
+  - name: ~/debug/start_planner_evaluation_table/start_planner_evaluation_table
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  # goal_planner
+  - name: ~/info/goal_planner
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/debug/goal_planner
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/virtual_wall/goal_planner
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/drivable_lanes/goal_planner
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  # lane_change_right
+  - name: ~/info/lane_change_right
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/debug/lane_change_right
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/virtual_wall/lane_change_right
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/drivable_lanes/lane_change_right
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  # lane_change_left
+  - name: ~/info/lane_change_left
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/debug/lane_change_left
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/virtual_wall/lane_change_left
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/drivable_lanes/lane_change_left
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+
+  # avoidance_by_lane_change
+  - name: ~/info/avoidance_by_lane_change
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/debug/avoidance_by_lane_change
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/virtual_wall/avoidance_by_lane_change
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: ~/drivable_lanes/avoidance_by_lane_change
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  # ── Per-module planning_factors publishers ───────────────────────────────────
+  # PlanningFactorInterface for each module manager registers under its module name.
+
+  - name: /planning/planning_factors/static_obstacle_avoidance
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/planning_factors/side_shift
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    when: "'autoware::behavior_path_planner::SideShiftModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/planning_factors/bidirectional_traffic
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    when: "'autoware::behavior_path_planner::BidirectionalTrafficModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/planning_factors/start_planner
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/planning_factors/goal_planner
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/planning_factors/lane_change_right
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/planning_factors/lane_change_left
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/planning_factors/avoidance_by_lane_change
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  # ── RTC (cooperate status / commands / auto-mode) per module ─────────────────
+  # RTCInterface publishes /planning/cooperate_status/<rtc_name>
+  # and /planning/auto_mode_status/<rtc_name>, and serves services
+  # /planning/cooperate_commands/<rtc_name> and /planning/enable_auto_mode/<rtc_name>.
+  #
+  # rtc_name = convertToSnakeCase(module_name) + optional "_left"/"_right" suffix.
+  # Modules with initInterface(node, {""}) → one channel named after the module.
+  # Modules with initInterface(node, {"left","right"}) → two channels: <name>_left, <name>_right.
+  # Modules with initInterface(node, {}) → no RTC channel (side_shift, bidirectional_traffic).
+
+  # static_obstacle_avoidance: {"left", "right"}
+  - name: /planning/cooperate_status/static_obstacle_avoidance_left
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/cooperate_status/static_obstacle_avoidance_right
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/cooperate_commands/static_obstacle_avoidance_left
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/cooperate_commands/static_obstacle_avoidance_right
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/enable_auto_mode/static_obstacle_avoidance_left
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/enable_auto_mode/static_obstacle_avoidance_right
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  # avoidance_by_lane_change: {"left", "right"}
+  - name: /planning/cooperate_status/avoidance_by_lane_change_left
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/cooperate_status/avoidance_by_lane_change_right
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/cooperate_commands/avoidance_by_lane_change_left
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/cooperate_commands/avoidance_by_lane_change_right
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/enable_auto_mode/avoidance_by_lane_change_left
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/enable_auto_mode/avoidance_by_lane_change_right
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  # start_planner: {""}
+  - name: /planning/cooperate_status/start_planner
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/cooperate_commands/start_planner
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/enable_auto_mode/start_planner
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  # goal_planner: {""}
+  - name: /planning/cooperate_status/goal_planner
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/cooperate_commands/goal_planner
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/enable_auto_mode/goal_planner
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  # lane_change_right: {""}
+  - name: /planning/cooperate_status/lane_change_right
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/cooperate_commands/lane_change_right
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/enable_auto_mode/lane_change_right
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  # lane_change_left: {""}
+  - name: /planning/cooperate_status/lane_change_left
+    type: publisher
+    msg_type: tier4_rtc_msgs/msg/CooperateStatusArray
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/cooperate_commands/lane_change_left
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/CooperateCommands
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/enable_auto_mode/lane_change_left
+    type: service_server
+    msg_type: tier4_rtc_msgs/srv/AutoMode
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+
+  # side_shift: initInterface(node, {}) → no RTC channel
+  # bidirectional_traffic: initInterface(node, {}) → no RTC channel
+
+  # ── Objects-of-interest marker publishers ────────────────────────────────────
+  # ObjectsOfInterestMarkerInterface publishes to
+  # /planning/debug/objects_of_interest/<rtc_name>.
+  # One instance is created per RTC channel (same naming as above).
+
+  - name: /planning/debug/objects_of_interest/static_obstacle_avoidance_left
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/debug/objects_of_interest/static_obstacle_avoidance_right
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StaticObstacleAvoidanceModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/debug/objects_of_interest/avoidance_by_lane_change_left
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/debug/objects_of_interest/avoidance_by_lane_change_right
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::AvoidanceByLaneChangeModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/debug/objects_of_interest/start_planner
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::StartPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/debug/objects_of_interest/goal_planner
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::GoalPlannerModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/debug/objects_of_interest/lane_change_right
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::LaneChangeRightModuleManager' in params.get('launch_modules', [])"
+
+  - name: /planning/debug/objects_of_interest/lane_change_left
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::behavior_path_planner::LaneChangeLeftModuleManager' in params.get('launch_modules', [])"
+  # ── Per-module processing-time publishers ─────────────────────────────────────────────────
+  # PlannerManager::publishProcessingTime() (planner_manager.cpp:467) publishes Float64Stamped
+  # to ~/debug/<name>/processing_time_ms for "total_time" (always) and each loaded module's
+  # short name.  SceneModuleManagerInterface::initInterface() (scene_module_manager_interface.cpp:62)
+  # also publishes ProcessingTimeTree to ~/debug/processing_time_detail_ms/<name> per module.
+  #
+  # Each manager class sets its short name as the SceneModuleManagerInterface constructor
+  # argument (e.g. StaticObstacleAvoidanceModuleManager → "static_obstacle_avoidance",
+  # GoalPlannerModuleManager → "goal_planner").  In this codebase every BPP manager class
+  # is named <Name>ModuleManager and the short name equals to_snake_case(<Name>), so the
+  # loop expression below produces correct results.  Verify in each module's manager.hpp
+  # if modules are added or renamed.
+  - name: ~/debug/total_time/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  - loop: "[to_snake_case(cls.split('::')[-1].removesuffix('ModuleManager')) for cls in to_list(params.get('launch_modules', []))]"
+    name_expr: "'~/debug/' + item + '/processing_time_ms'"
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  - loop: "[to_snake_case(cls.split('::')[-1].removesuffix('ModuleManager')) for cls in to_list(params.get('launch_modules', []))]"
+    name_expr: "'~/debug/processing_time_detail_ms/' + item"
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+
+  # NOTE: ~/output/stop_reasons appears as a remap in the BPP launch file but is absent from the
+  # current node source code (tier4_planning_msgs/msg/StopReasonArray). May be a legacy remap.

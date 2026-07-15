@@ -1,0 +1,7 @@
+connections:
+  - name: ~/command_mode/availability
+    type: subscription
+    msg_type: tier4_system_msgs/msg/CommandModeAvailability
+  - name: ~/operation_mode/availability
+    type: publisher
+    msg_type: tier4_system_msgs/msg/OperationModeAvailability

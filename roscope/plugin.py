@@ -58,7 +58,8 @@ def call_plugin(
     pkg_name: str,
     executable: str | None = None,
     plugin_name: str | None = None,
-) -> dict[str, dict]:
+    args: list[str] | None = None,
+) -> dict[str, dict] | None:
     """Invoke the plugin and return validated connection metadata.
 
     Exactly one of *executable* or *plugin_name* must be provided.
@@ -70,13 +71,22 @@ def call_plugin(
     third-party package's share directory can use the package name to look up
     interface definitions from a local registry instead.
 
-    - Plugin raises → logged as an error; returns {} (unexpected execution failure).
-    - Plugin returns non-dict (including None) → logged as a warning; returns {}
-      (return {} to indicate no metadata).
+    Return values:
+    - None → plugin has no interface definition for this node; caller should
+      fall back to launch-file remaps.
+    - {} → plugin covers this node but it has no connections; caller should
+      suppress launch-file remaps (they are likely stale).
+    - {...} → plugin covers this node with explicit connections.
+
+    - plugin_fn is None → returns None (no plugin loaded).
+    - Plugin raises → logged as an error; returns {} (unexpected failure,
+      treat as covered-but-broken to avoid silently showing stale remaps).
+    - Plugin returns None → returns None (intentional "not covered" signal).
+    - Plugin returns non-dict other than None → logged as a warning; returns {}.
     Entries whose 'type' is an unrecognized string are warned and dropped.
     """
     if plugin_fn is None:
-        return {}
+        return None
     if bool(executable) == bool(plugin_name):
         raise ValueError("exactly one of executable or plugin_name must be provided")
     identifier = executable or plugin_name or "<unknown>"
@@ -87,10 +97,14 @@ def call_plugin(
             pkg_name=pkg_name,
             executable=executable,
             plugin_name=plugin_name,
+            args=args or [],
         )
     except Exception as e:
         logger.error("--plugin: raised for %s/%s: %s", pkg_share_path, identifier, e)
         return {}
+
+    if result is None:
+        return None
 
     if not isinstance(result, dict):
         logger.warning(

@@ -1,0 +1,13 @@
+connections:
+  - name: ~/in/image
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/in/rect
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
+  - name: ~/in/uuid
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/DynamicObjectArray
+  - name: ~/out/image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image

@@ -1,0 +1,36 @@
+connections:
+  - name: ~/diagnostics
+    type: subscription
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+  - name: ~/struct
+    type: publisher
+    msg_type: tier4_system_msgs/msg/DiagGraphStruct
+  - name: ~/status
+    type: publisher
+    msg_type: tier4_system_msgs/msg/DiagGraphStatus
+  - name: ~/unknowns
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+  - name: ~/reset
+    type: service_server
+    msg_type: tier4_system_msgs/srv/ResetDiagGraph
+  - name: ~/set_initializing
+    type: service_server
+    msg_type: std_srvs/srv/SetBool
+  - name: ~/set_override
+    type: service_server
+    msg_type: tier4_system_msgs/srv/SetDiagGraphOverride
+  # Published when use_command_mode_mappings=true
+  - name: ~/availability
+    type: publisher
+    msg_type: tier4_system_msgs/msg/CommandModeAvailability
+    when: "to_bool(params.get('use_command_mode_mappings', False))"
+  # Published when use_driving_mode_mappings=true
+  - name: /system/driving_mode/available
+    type: publisher
+    msg_type: tier4_system_msgs/msg/DrivingModeFlag
+    when: "to_bool(params.get('use_driving_mode_mappings', False))"
+  - name: /system/driving_mode/continuable
+    type: publisher
+    msg_type: tier4_system_msgs/msg/DrivingModeFlag
+    when: "to_bool(params.get('use_driving_mode_mappings', False))"

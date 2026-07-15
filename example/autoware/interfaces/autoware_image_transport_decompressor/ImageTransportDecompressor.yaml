@@ -1,0 +1,7 @@
+connections:
+  - name: ~/input/compressed_image
+    type: subscription
+    msg_type: sensor_msgs/msg/CompressedImage
+  - name: ~/output/raw_image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image

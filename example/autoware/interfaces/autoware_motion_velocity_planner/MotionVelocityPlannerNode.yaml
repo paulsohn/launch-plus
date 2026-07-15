@@ -1,0 +1,324 @@
+connections:
+  # --- Core node subscriptions ---
+  - name: ~/input/trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+
+  - name: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+
+  - name: ~/input/dynamic_objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+
+  - name: ~/input/no_ground_pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+
+  - name: ~/input/vehicle_odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+
+  - name: ~/input/accel
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+
+  - name: ~/input/occupancy_grid
+    type: subscription
+    msg_type: nav_msgs/msg/OccupancyGrid
+
+  - name: ~/input/traffic_signals
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+
+  # --- Core node publishers ---
+  - name: ~/output/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+
+  - name: ~/output/velocity_limit
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+
+  - name: ~/output/clear_velocity_limit
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimitClearCommand
+
+  - name: ~/debug/markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  - name: ~/debug/processed_pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+
+  - name: ~/debug/processing_time_ms_diag
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree  # UNVERIFIED: ProcessingDiagnosticArray or similar
+
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  - name: ~/debug/mvp_common/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  # --- Core node services ---
+  - name: ~/service/load_plugin
+    type: service_server
+    msg_type: autoware_internal_planning_msgs/srv/LoadPlugin
+
+  - name: ~/service/unload_plugin
+    type: service_server
+    msg_type: autoware_internal_planning_msgs/srv/UnloadPlugin
+
+  # --- ObstacleStopModule publishers (autoware::motion_velocity_planner::ObstacleStopModule) ---
+  - name: ~/obstacle_stop/virtual_walls
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::ObstacleStopModule' in params.get('launch_modules', [])"
+
+  - name: ~/obstacle_stop/debug_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::ObstacleStopModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/obstacle_stop/planning_info
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
+    when: "'autoware::motion_velocity_planner::ObstacleStopModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/processing_time_detail_ms/obstacle_stop
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::motion_velocity_planner::ObstacleStopModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/obstacle_stop/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::ObstacleStopModule' in params.get('launch_modules', [])"
+
+  # --- ObstacleSlowDownModule publishers (autoware::motion_velocity_planner::ObstacleSlowDownModule) ---
+  - name: ~/obstacle_slow_down/virtual_walls
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::ObstacleSlowDownModule' in params.get('launch_modules', [])"
+
+  - name: ~/obstacle_slow_down/debug_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::ObstacleSlowDownModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/obstacle_slow_down/planning_info
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
+    when: "'autoware::motion_velocity_planner::ObstacleSlowDownModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/processing_time_detail_ms/obstacle_slow_down
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::motion_velocity_planner::ObstacleSlowDownModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/obstacle_slow_down/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::ObstacleSlowDownModule' in params.get('launch_modules', [])"
+
+  # --- ObstacleCruiseModule publishers (autoware::motion_velocity_planner::ObstacleCruiseModule) ---
+  - name: ~/obstacle_cruise/virtual_walls
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
+
+  - name: ~/obstacle_cruise/debug_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/obstacle_cruise/planning_info
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/processing_time_detail_ms/obstacle_cruise
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/obstacle_cruise/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', [])"
+
+  # ObstacleCruiseModule / optimization_based_planner: all connections below are only present when
+  # planning_algorithm == "optimization_base" (obstacle_cruise_module.cpp:91-92,183-184).
+  - name: /planning/trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', []) and params.get('obstacle_cruise.option.planning_algorithm', '') == 'optimization_base'"
+
+  - name: ~/optimized_sv_trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', []) and params.get('obstacle_cruise.option.planning_algorithm', '') == 'optimization_base'"
+
+  - name: ~/optimized_st_graph
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', []) and params.get('obstacle_cruise.option.planning_algorithm', '') == 'optimization_base'"
+
+  - name: ~/boundary
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', []) and params.get('obstacle_cruise.option.planning_algorithm', '') == 'optimization_base'"
+
+  - name: ~/debug/wall_marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::ObstacleCruiseModule' in params.get('launch_modules', []) and params.get('obstacle_cruise.option.planning_algorithm', '') == 'optimization_base'"
+
+  # --- OutOfLaneModule publishers (autoware::motion_velocity_planner::OutOfLaneModule, ns_="out_of_lane") ---
+  - name: ~/out_of_lane/debug_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::OutOfLaneModule' in params.get('launch_modules', [])"
+
+  - name: ~/out_of_lane/virtual_walls
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::OutOfLaneModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/out_of_lane/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::OutOfLaneModule' in params.get('launch_modules', [])"
+
+  # --- ObstacleVelocityLimiterModule publishers (autoware::motion_velocity_planner::ObstacleVelocityLimiterModule, ns_="obstacle_velocity_limiter") ---
+  - name: ~/obstacle_velocity_limiter/debug_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::ObstacleVelocityLimiterModule' in params.get('launch_modules', [])"
+
+  - name: ~/obstacle_velocity_limiter/virtual_walls
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::ObstacleVelocityLimiterModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/obstacle_velocity_limiter/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::ObstacleVelocityLimiterModule' in params.get('launch_modules', [])"
+
+  # --- DynamicObstacleStopModule publishers (autoware::motion_velocity_planner::DynamicObstacleStopModule, ns_="dynamic_obstacle_stop") ---
+  - name: ~/dynamic_obstacle_stop/debug_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::DynamicObstacleStopModule' in params.get('launch_modules', [])"
+
+  - name: ~/dynamic_obstacle_stop/virtual_walls
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::DynamicObstacleStopModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/dynamic_obstacle_stop/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::DynamicObstacleStopModule' in params.get('launch_modules', [])"
+
+  # --- RunOutModule publishers (autoware::motion_velocity_planner::RunOutModule, ns_="run_out") ---
+  - name: ~/run_out/debug_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::RunOutModule' in params.get('launch_modules', [])"
+
+  - name: ~/run_out/virtual_walls
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::RunOutModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/run_out/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::RunOutModule' in params.get('launch_modules', [])"
+
+  - name: ~/run_out/processing_time_detail_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::motion_velocity_planner::RunOutModule' in params.get('launch_modules', [])"
+
+  # --- BoundaryDeparturePreventionModule publishers and subscriptions
+  #     (autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule, ns="boundary_departure_prevention") ---
+  - name: ~/boundary_departure_prevention/debug_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule' in params.get('launch_modules', [])"
+
+  - name: ~/boundary_departure_prevention/virtual_walls
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/boundary_departure_prevention/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/processing_time_detail_ms/boundary_departure_prevention
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule' in params.get('launch_modules', [])"
+
+  # BoundaryDeparturePreventionModule additional subscriptions (absolute topics)
+  - name: /control/trajectory_follower/lateral/predicted_trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule' in params.get('launch_modules', [])"
+
+  - name: /control/command/control_cmd
+    type: subscription
+    msg_type: autoware_control_msgs/msg/Control
+    when: "'autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule' in params.get('launch_modules', [])"
+
+  - name: /vehicle/status/steering_status
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+    when: "'autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule' in params.get('launch_modules', [])"
+
+  - name: /api/operation_mode/state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+    when: "'autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule' in params.get('launch_modules', [])"
+
+  - name: /planning/mission_planning/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+    when: "'autoware::motion_velocity_planner::experimental::BoundaryDeparturePreventionModule' in params.get('launch_modules', [])"
+
+  # --- RoadUserStopModule publishers (autoware::motion_velocity_planner::RoadUserStopModule) ---
+  - name: ~/road_user_stop/virtual_walls
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::RoadUserStopModule' in params.get('launch_modules', [])"
+
+  - name: ~/road_user_stop/debug_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "'autoware::motion_velocity_planner::RoadUserStopModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/road_user_stop/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+    when: "'autoware::motion_velocity_planner::RoadUserStopModule' in params.get('launch_modules', [])"
+
+  - name: ~/debug/processing_time_detail_ms/road_user_stop
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::motion_velocity_planner::RoadUserStopModule' in params.get('launch_modules', [])"
+  # NOTE: The following remaps appear in autoware_core_planning.launch.xml but are absent from the
+  # MVP node source code:
+  #   ~/input/virtual_traffic_light_states — tier4_v2x_msgs/msg/VirtualTrafficLightStateArray
+  #   ~/output/stop_reasons — tier4_planning_msgs/msg/StopReasonArray
+  #   ~/output/velocity_factors — autoware_planning_msgs/msg/VelocityFactorArray (or similar)
+  # These may be legacy remaps from an older universe-based MVP interface.

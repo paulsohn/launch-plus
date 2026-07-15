@@ -1,0 +1,29 @@
+connections:
+  # Interface with decider node
+  - name: ~/command_mode/status
+    type: publisher
+    msg_type: tier4_system_msgs/msg/CommandModeStatus
+  - name: ~/command_mode/request
+    type: subscription
+    msg_type: tier4_system_msgs/msg/CommandModeRequest
+  # Control gate interface (ControlGateInterface)
+  - name: ~/source/select
+    type: service_client
+    msg_type: tier4_system_msgs/srv/SelectCommandSource
+  - name: ~/source/status
+    type: subscription
+    msg_type: tier4_system_msgs/msg/CommandSourceStatus
+  - name: ~/filter/status
+    type: subscription
+    msg_type: tier4_system_msgs/msg/CommandFilterStatus
+  # Vehicle gate interface (VehicleGateInterface)
+  - name: ~/control_mode/request
+    type: service_client
+    msg_type: autoware_vehicle_msgs/srv/ControlModeCommand
+  - name: ~/control_mode/report
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/ControlModeReport
+  # Network gate interface (NetworkGateInterface)
+  - name: ~/election/status
+    type: subscription
+    msg_type: tier4_external_api_msgs/msg/ElectionStatus

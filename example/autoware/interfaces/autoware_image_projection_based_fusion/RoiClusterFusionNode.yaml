@@ -1,0 +1,15 @@
+connections:
+  - name: input
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
+  - loop: "range(params.get('rois_number', 1))"
+    name_expr: "'input/rois%d' % item"
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
+  - loop: "range(params.get('rois_number', 1))"
+    name_expr: "'input/camera_info%d' % item"
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: output
+    type: publisher
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature

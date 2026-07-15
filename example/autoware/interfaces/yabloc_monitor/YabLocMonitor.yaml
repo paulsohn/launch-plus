@@ -1,0 +1,4 @@
+connections:
+  - name: ~/input/yabloc_pose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseStamped

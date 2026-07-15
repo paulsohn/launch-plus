@@ -1,0 +1,31 @@
+connections:
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: ~/output/velocity_limit_clear_command
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimitClearCommand
+  - name: ~/output/max_velocity
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - name: ~/debug/marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/footprint
+    type: publisher
+    msg_type: geometry_msgs/msg/PolygonStamped
+  - name: ~/debug/footprint_offset
+    type: publisher
+    msg_type: geometry_msgs/msg/PolygonStamped
+  - name: ~/debug/footprint_recover_offset
+    type: publisher
+    msg_type: geometry_msgs/msg/PolygonStamped

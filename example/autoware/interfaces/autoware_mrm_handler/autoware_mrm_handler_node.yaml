@@ -1,0 +1,49 @@
+connections:
+  - name: ~/input/operation_mode_availability
+    type: subscription
+    msg_type: tier4_system_msgs/msg/OperationModeAvailability
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/control_mode
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/ControlModeReport
+  - name: ~/input/mrm/pull_over/status
+    type: subscription
+    msg_type: tier4_system_msgs/msg/MrmBehaviorStatus
+  - name: ~/input/mrm/comfortable_stop/status
+    type: subscription
+    msg_type: tier4_system_msgs/msg/MrmBehaviorStatus
+  - name: ~/input/mrm/emergency_stop/status
+    type: subscription
+    msg_type: tier4_system_msgs/msg/MrmBehaviorStatus
+  - name: ~/input/api/operation_mode/state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  - name: ~/input/gear
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+  - name: ~/output/turn_indicators
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+  - name: ~/output/hazard
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+  - name: ~/output/gear
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+  - name: ~/output/mrm/state
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/MrmState
+  - name: ~/output/emergency_holding
+    type: publisher
+    msg_type: tier4_system_msgs/msg/EmergencyHoldingState
+  - name: ~/output/mrm/pull_over/operate
+    type: service_client
+    msg_type: tier4_system_msgs/srv/OperateMrm
+  - name: ~/output/mrm/comfortable_stop/operate
+    type: service_client
+    msg_type: tier4_system_msgs/srv/OperateMrm
+  - name: ~/output/mrm/emergency_stop/operate
+    type: service_client
+    msg_type: tier4_system_msgs/srv/OperateMrm

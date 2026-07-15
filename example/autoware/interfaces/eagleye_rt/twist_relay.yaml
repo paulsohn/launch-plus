@@ -1,0 +1,7 @@
+connections:
+  - name_expr: "params.get('twist.twist_topic', '/can_twist')"
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped
+  - name: vehicle/twist
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistStamped

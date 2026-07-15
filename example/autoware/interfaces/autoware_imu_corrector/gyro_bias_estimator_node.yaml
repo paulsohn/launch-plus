@@ -1,0 +1,19 @@
+connections:
+  - name: ~/input/imu_raw
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - name: ~/input/odom
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/pose_ndt
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/output/gyro_bias
+    type: publisher
+    msg_type: geometry_msgs/msg/Vector3Stamped
+  - name: ~/output/gyro_scale
+    type: publisher
+    msg_type: geometry_msgs/msg/Vector3Stamped
+  - name: ~/output/imu_scaled
+    type: publisher
+    msg_type: sensor_msgs/msg/Imu

@@ -1,0 +1,31 @@
+connections:
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/operation_mode_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  - name: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: ~/route
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - name: ~/state
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/RouteState
+  - name: ~/debug/route_marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - name: ~/clear_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/ClearRoute
+  - name: ~/set_lanelet_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/SetLaneletRoute
+  - name: ~/set_waypoint_route
+    type: service_server
+    msg_type: autoware_planning_msgs/srv/SetWaypointRoute

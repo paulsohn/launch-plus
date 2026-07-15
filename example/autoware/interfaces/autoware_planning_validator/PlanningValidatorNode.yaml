@@ -1,0 +1,96 @@
+connections:
+  # Core node subscriptions (node.cpp / node.hpp)
+  - name: ~/input/trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - name: ~/input/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - name: ~/input/lanelet_map_bin
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: ~/input/pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/input/kinematics
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/acceleration
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - name: ~/input/operational_mode_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  - name: ~/input/traffic_signals
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+
+  # Core node publishers (node.cpp)
+  - name: ~/output/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - name: ~/output/validation_status
+    type: publisher
+    msg_type: autoware_planning_validator/msg/PlanningValidatorStatus
+  - name: ~/output/markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  # Core node debug publishers (debug_marker.cpp — always loaded with the node)
+  - name: ~/debug/marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/virtual_wall
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  # IntersectionCollisionChecker module publishers (intersection_collision_checker.cpp)
+  - name: ~/intersection_collision_checker/debug/cluster_points
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "'autoware::planning_validator::IntersectionCollisionChecker' in params.get('launch_modules', [])"
+  - name: ~/intersection_collision_checker/debug/voxel_points
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "'autoware::planning_validator::IntersectionCollisionChecker' in params.get('launch_modules', [])"
+  - name: ~/intersection_collision_checker/debug/state
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped
+    when: "'autoware::planning_validator::IntersectionCollisionChecker' in params.get('launch_modules', [])"
+  # PlanningFactorInterface publishes to /planning/planning_factors/intersection_collision_checker
+  - name: /planning/planning_factors/intersection_collision_checker
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    when: "'autoware::planning_validator::IntersectionCollisionChecker' in params.get('launch_modules', [])"
+
+  # RearCollisionChecker module publishers (rear_collision_checker.cpp)
+  - name: ~/rear_collision_checker/debug/cluster_points
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "'autoware::planning_validator::RearCollisionChecker' in params.get('launch_modules', [])"
+  - name: ~/rear_collision_checker/debug/voxel_points
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "'autoware::planning_validator::RearCollisionChecker' in params.get('launch_modules', [])"
+  - name: ~/rear_collision_checker/debug/state
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped
+    when: "'autoware::planning_validator::RearCollisionChecker' in params.get('launch_modules', [])"
+  - name: ~/rear_collision_checker/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/ProcessingTimeTree
+    when: "'autoware::planning_validator::RearCollisionChecker' in params.get('launch_modules', [])"
+  # PlanningFactorInterface publishes to /planning/planning_factors/rear_collision_checker
+  - name: /planning/planning_factors/rear_collision_checker
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PlanningFactorArray
+    when: "'autoware::planning_validator::RearCollisionChecker' in params.get('launch_modules', [])"
+
+  # LatencyChecker — no additional publishers/subscriptions beyond shared context
+  # TrajectoryChecker — no additional publishers/subscriptions beyond shared context
+  # NOTE: ~/input/objects appears as a remap in some launch files but is absent from the current
+  # node.cpp (only ~/input/trajectory is subscribed). May be a legacy remap from an older version
+  # where objects were directly subscribed (e.g. for IntersectionCollisionChecker).

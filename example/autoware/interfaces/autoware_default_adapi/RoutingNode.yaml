@@ -1,0 +1,46 @@
+connections:
+  - name: /api/routing/state
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/RouteState
+  - name: /api/routing/route
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/Route
+  - name: /api/routing/set_route_points
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/SetRoutePoints
+  - name: /api/routing/set_route
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/SetRoute
+  - name: /api/routing/change_route_points
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/SetRoutePoints
+  - name: /api/routing/change_route
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/SetRoute
+  - name: /api/routing/clear_route
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/ClearRoute
+  - name: /planning/route_state
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/RouteState
+  - name: /planning/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - name: /system/operation_mode/state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  - name: /planning/set_waypoint_route
+    type: service_client
+    msg_type: autoware_planning_msgs/srv/SetWaypointRoute
+  - name: /planning/set_lanelet_route
+    type: service_client
+    msg_type: autoware_planning_msgs/srv/SetLaneletRoute
+  - name: /planning/clear_route
+    type: service_client
+    msg_type: autoware_planning_msgs/srv/ClearRoute
+  - name: /system/operation_mode/change_operation_mode
+    type: service_client
+    msg_type: autoware_system_msgs/srv/ChangeOperationMode
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray

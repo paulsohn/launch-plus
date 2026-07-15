@@ -1,0 +1,19 @@
+connections:
+  - name: imu/data_tf_converted
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - name: yaw_rate_offset_2nd
+    type: subscription
+    msg_type: eagleye_msgs/msg/YawrateOffset
+  - name: angular_velocity_offset_stop
+    type: subscription
+    msg_type: eagleye_msgs/msg/AngularVelocityOffset
+  - name: acc_x_offset
+    type: subscription
+    msg_type: eagleye_msgs/msg/AccXOffset
+  - name: acc_x_scale_factor
+    type: subscription
+    msg_type: eagleye_msgs/msg/AccXScaleFactor
+  - name: imu/data_corrected
+    type: publisher
+    msg_type: sensor_msgs/msg/Imu

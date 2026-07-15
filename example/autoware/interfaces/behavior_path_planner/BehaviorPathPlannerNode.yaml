@@ -1,0 +1,62 @@
+# Package: autoware_behavior_path_planner (found under behavior_path_planner directory)
+connections:
+  - name: ~/input/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - name: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/accel
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - name: ~/input/scenario
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/Scenario
+  - name: ~/input/perception
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: ~/input/occupancy_grid_map
+    type: subscription
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/input/costmap
+    type: subscription
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/input/traffic_signals
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+  - name: ~/input/lateral_offset
+    type: subscription
+    msg_type: tier4_planning_msgs/msg/LateralOffset
+  - name: /system/operation_mode/state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  - name: /planning/scenario_planning/max_velocity
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+  - name: ~/output/path
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PathWithLaneId
+  - name: ~/output/turn_indicators_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+  - name: ~/output/hazard_lights_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+  - name: ~/output/modified_goal
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/PoseWithUuidStamped
+  - name: ~/output/is_reroute_available
+    type: publisher
+    msg_type: tier4_planning_msgs/msg/RerouteAvailability
+  - name: ~/debug/avoidance_debug_message_array
+    type: publisher
+    msg_type: tier4_planning_msgs/msg/AvoidanceDebugMsgArray
+  - name: ~/debug/turn_signal_info
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/bound
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray

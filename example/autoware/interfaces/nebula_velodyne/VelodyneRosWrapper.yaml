@@ -1,0 +1,21 @@
+# velodyne_packets is the same topic name used as a subscription in replay mode
+# (launch_hw=false) and as a publisher in hardware capture mode (launch_hw=true).
+# The two entries are mutually exclusive via their when: conditions.
+connections:
+  - name: velodyne_packets
+    type: subscription
+    msg_type: velodyne_msgs/msg/VelodyneScan
+    when: "not to_bool(params.get('launch_hw', True))"
+  - name: velodyne_packets
+    type: publisher
+    msg_type: velodyne_msgs/msg/VelodyneScan
+    when: "to_bool(params.get('launch_hw', True))"
+  - name: velodyne_points
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: aw_points
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: aw_points_ex
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2

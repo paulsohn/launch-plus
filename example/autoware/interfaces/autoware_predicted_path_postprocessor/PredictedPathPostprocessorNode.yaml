@@ -1,0 +1,10 @@
+connections:
+  - name: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: ~/input/lanelet_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: ~/output/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/PredictedObjects

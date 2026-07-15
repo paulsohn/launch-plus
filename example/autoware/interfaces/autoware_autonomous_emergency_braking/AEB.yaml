@@ -1,0 +1,52 @@
+connections:
+  # Inputs (InterProcessPollingSubscriber)
+  - name: ~/input/pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+
+  - name: ~/input/velocity
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/VelocityReport
+
+  - name: ~/input/imu
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+
+  - name: ~/input/predicted_trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+
+  - name: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+
+  - name: /autoware/state
+    type: subscription
+    msg_type: autoware_system_msgs/msg/AutowareState
+
+  # Outputs
+  - name: ~/metrics
+    type: publisher
+    msg_type: tier4_metric_msgs/msg/MetricArray
+
+  - name: ~/virtual_wall
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  - name: ~/debug/obstacle_pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "to_bool(params.get('publish_debug_pointcloud', False))"
+
+  - name: ~/debug/markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "to_bool(params.get('publish_debug_markers', False))"
+
+  - name: ~/debug/rss_distance
+    type: publisher
+    msg_type: tier4_debug_msgs/msg/Float32Stamped
+
+  - name: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: autoware_utils/ProcessingTimeDetail

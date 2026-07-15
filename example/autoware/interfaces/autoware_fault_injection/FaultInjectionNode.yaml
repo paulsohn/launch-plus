@@ -1,0 +1,10 @@
+connections:
+  - name: ~/input/simulation_events
+    type: subscription
+    msg_type: tier4_simulation_msgs/msg/SimulationEvents
+  - name: ~/input/diagnostics
+    type: subscription
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+  - name: ~/output/diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray

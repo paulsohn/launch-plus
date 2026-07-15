@@ -1,0 +1,6 @@
+# VelodyneMonitor communicates with the sensor via HTTP (not ROS topics/services).
+# It publishes only to /diagnostics via the diagnostic_updater framework.
+connections:
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray

@@ -1,0 +1,6 @@
+connections:
+  - name_expr: "params['topic']"
+    type: subscription
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray

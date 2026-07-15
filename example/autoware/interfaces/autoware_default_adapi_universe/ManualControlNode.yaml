@@ -1,0 +1,55 @@
+connections:
+  - name: /api/operation_mode/state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  # AD API service servers
+  - name_expr: "'/api/manual/' + params['mode'] + '/control_mode/list'"
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/ListManualControlMode
+  - name_expr: "'/api/manual/' + params['mode'] + '/control_mode/select'"
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/SelectManualControlMode
+  - name_expr: "'/api/manual/' + params['mode'] + '/control_mode/status'"
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/ManualControlModeStatus
+  # External operator input subscriptions (created dynamically on mode select)
+  - name_expr: "'/api/manual/' + params['mode'] + '/operator/heartbeat'"
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
+  - name_expr: "'/api/manual/' + params['mode'] + '/command/pedals'"
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
+  - name_expr: "'/api/manual/' + params['mode'] + '/command/steering'"
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
+  - name_expr: "'/api/manual/' + params['mode'] + '/command/gear'"
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/GearCommand
+  - name_expr: "'/api/manual/' + params['mode'] + '/command/turn_indicators'"
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/TurnIndicatorsCommand
+  - name_expr: "'/api/manual/' + params['mode'] + '/command/hazard_lights'"
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/HazardLightsCommand
+  # Internal output publishers
+  - name_expr: "'/external/' + params['mode'] + '/heartbeat'"
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
+  - name_expr: "'/external/' + params['mode'] + '/pedals_cmd'"
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
+  - name_expr: "'/external/' + params['mode'] + '/steering_cmd'"
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
+  - name_expr: "'/external/' + params['mode'] + '/gear_cmd'"
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+  - name_expr: "'/external/' + params['mode'] + '/turn_indicators_cmd'"
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+  - name_expr: "'/external/' + params['mode'] + '/hazard_lights_cmd'"
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray

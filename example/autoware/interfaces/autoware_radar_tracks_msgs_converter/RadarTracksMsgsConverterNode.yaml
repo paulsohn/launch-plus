@@ -1,0 +1,13 @@
+connections:
+  - name: ~/input/radar_objects
+    type: subscription
+    msg_type: radar_msgs/msg/RadarTracks
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/output/radar_tracked_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  - name: ~/output/radar_detected_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects

@@ -1,0 +1,10 @@
+connections:
+  - name: ~/doors/command
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/SetDoorCommand
+  - name: ~/doors/layout
+    type: service_server
+    msg_type: autoware_adapi_v1_msgs/srv/GetDoorLayout
+  - name: ~/doors/status
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/DoorStatusArray

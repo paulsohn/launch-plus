@@ -1,0 +1,7 @@
+connections:
+  - name: /particle_array
+    type: subscription
+    msg_type: yabloc_particle_filter/msg/ParticleArray
+  - name: /marker_array
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray

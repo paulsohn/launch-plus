@@ -1,0 +1,158 @@
+connections:
+  # Inputs — auto (autonomous) commands
+  - name: input/auto/control_cmd
+    type: subscription
+    msg_type: autoware_control_msgs/msg/Control
+
+  - name: input/auto/turn_indicators_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+
+  - name: input/auto/hazard_lights_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+
+  - name: input/auto/gear_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+
+  # Inputs — external (remote) commands
+  - name: input/external/control_cmd
+    type: subscription
+    msg_type: autoware_control_msgs/msg/Control
+
+  - name: input/external/turn_indicators_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+
+  - name: input/external/hazard_lights_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+
+  - name: input/external/gear_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+
+  # Inputs — emergency commands
+  - name: input/emergency/control_cmd
+    type: subscription
+    msg_type: autoware_control_msgs/msg/Control
+
+  - name: input/emergency/turn_indicators_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+
+  - name: input/emergency/hazard_lights_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+
+  - name: input/emergency/gear_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+
+  # Inputs — gate/mode/status
+  - name: input/gate_mode
+    type: subscription
+    msg_type: tier4_control_msgs/msg/GateMode
+
+  - name: input/engage
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/Engage
+
+  - name: input/operation_mode
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+
+  - name: input/mrm_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/MrmState
+
+  - name: input/kinematics
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+
+  - name: input/acceleration
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+
+  - name: input/steering
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+
+  - name: input/external_emergency_stop_heartbeat
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
+
+  # Outputs
+  - name: output/control_cmd
+    type: publisher
+    msg_type: autoware_control_msgs/msg/Control
+
+  - name: output/gear_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+
+  - name: output/turn_indicators_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+
+  - name: output/hazard_lights_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+
+  - name: output/gate_mode
+    type: publisher
+    msg_type: tier4_control_msgs/msg/GateMode
+
+  - name: output/engage
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/Engage
+
+  - name: output/operation_mode
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+
+  - name: output/vehicle_cmd_emergency
+    type: publisher
+    msg_type: tier4_vehicle_msgs/msg/VehicleEmergencyStamped
+
+  - name: output/external_emergency
+    type: publisher
+    msg_type: tier4_external_api_msgs/msg/Emergency
+
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  - name: ~/is_filter_activated
+    type: publisher
+    msg_type: autoware_vehicle_cmd_gate/msg/IsFilterActivated
+
+  - name: ~/is_filter_activated/marker
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  - name: ~/is_filter_activated/marker_raw
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  - name: ~/is_filter_activated/flag
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/BoolStamped
+
+  # Services
+  - name: ~/service/engage
+    type: service_server
+    msg_type: tier4_external_api_msgs/srv/Engage
+
+  - name: ~/service/external_emergency
+    type: service_server
+    msg_type: tier4_external_api_msgs/srv/SetEmergency
+
+  - name: ~/service/external_emergency_stop
+    type: service_server
+    msg_type: std_srvs/srv/Trigger
+
+  - name: ~/service/clear_external_emergency_stop
+    type: service_server
+    msg_type: std_srvs/srv/Trigger

@@ -1,0 +1,10 @@
+connections:
+  - name: input/car_signals
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/TrafficLightArray
+  - name: input/pedestrian_signals
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/TrafficLightArray
+  - name: output/traffic_signals
+    type: publisher
+    msg_type: tier4_perception_msgs/msg/TrafficLightArray

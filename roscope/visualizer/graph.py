@@ -256,12 +256,14 @@ class _GraphBuilder:
         # Connection edges from composable node remaps
         from roscope.plugin import PROTOCOL_FAMILY
 
-        remap_metadata = data.get("remap_metadata", {})
+        remap_metadata = data.get("remap_metadata")
         for remap in data.get("remappings", []):
             if len(remap) == 2 and remap[1]:
                 from_ = remap[0]
                 to = remap[1]
-                meta = remap_metadata.get(from_) or {}
+                meta = (remap_metadata.get(from_) or {}) if remap_metadata is not None else {}
+                if remap_metadata is not None and not meta:
+                    continue
                 conn_type = meta.get("type") if meta else None
                 family = PROTOCOL_FAMILY.get(conn_type) if conn_type else None
                 cid = self._get_or_create_connection(to, cfqn, cns, family)
@@ -405,12 +407,14 @@ class _GraphBuilder:
         from roscope.plugin import PROTOCOL_FAMILY
 
         remaps = getattr(action, "remappings", [])
-        remap_metadata = getattr(action, "remap_metadata", {})
+        remap_metadata = getattr(action, "remap_metadata", None)
         for remap in remaps:
             if len(remap) == 2 and remap[1]:
                 from_ = remap[0]
                 to = remap[1]
-                meta = remap_metadata.get(from_) or {}
+                meta = (remap_metadata.get(from_) or {}) if remap_metadata is not None else {}
+                if remap_metadata is not None and not meta:
+                    continue
                 conn_type = meta.get("type") if meta else None
                 family = PROTOCOL_FAMILY.get(conn_type) if conn_type else None
                 cid = self._get_or_create_connection(to, node_fqn, node_ns, family)

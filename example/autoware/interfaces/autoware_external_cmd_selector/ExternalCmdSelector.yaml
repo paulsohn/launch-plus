@@ -1,0 +1,84 @@
+connections:
+  # Inputs — local source
+  - name: ~/input/local/pedals_cmd
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
+
+  - name: ~/input/local/steering_cmd
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
+
+  - name: ~/input/local/heartbeat
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
+
+  - name: ~/input/local/gear_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+
+  - name: ~/input/local/turn_indicators_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+
+  - name: ~/input/local/hazard_lights_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+
+  # Inputs — remote source
+  - name: ~/input/remote/pedals_cmd
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
+
+  - name: ~/input/remote/steering_cmd
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
+
+  - name: ~/input/remote/heartbeat
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
+
+  - name: ~/input/remote/gear_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+
+  - name: ~/input/remote/turn_indicators_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+
+  - name: ~/input/remote/hazard_lights_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+
+  # Outputs
+  - name: ~/output/current_selector_mode
+    type: publisher
+    msg_type: tier4_control_msgs/msg/ExternalCommandSelectorMode
+
+  - name: ~/output/pedals_cmd
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
+
+  - name: ~/output/steering_cmd
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
+
+  - name: ~/output/heartbeat
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
+
+  - name: ~/output/gear_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+
+  - name: ~/output/turn_indicators_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+
+  - name: ~/output/hazard_lights_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+
+  # Service
+  - name: ~/service/select_external_command
+    type: service_server
+    msg_type: tier4_control_msgs/srv/ExternalCommandSelect

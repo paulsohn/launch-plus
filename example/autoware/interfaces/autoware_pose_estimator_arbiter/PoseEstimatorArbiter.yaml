@@ -1,0 +1,51 @@
+connections:
+  # Inputs (conditional on which estimators are enabled)
+  - name: ~/input/ndt/pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/input/yabloc/image
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/input/eagleye/pose_with_covariance
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/input/artag/image
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/input/pose_with_covariance
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/input/pointcloud_map
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: ~/input/initialization_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/LocalizationInitializationState
+  # Outputs (conditional on which estimators are enabled)
+  - name: ~/output/ndt/pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/output/yabloc/image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/output/eagleye/pose_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/output/artag/image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+  - name: ~/debug/string
+    type: publisher
+    msg_type: std_msgs/msg/String
+  - name: ~/debug/marker_array
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/yabloc_trigger_srv
+    type: service_client
+    msg_type: std_srvs/srv/SetBool

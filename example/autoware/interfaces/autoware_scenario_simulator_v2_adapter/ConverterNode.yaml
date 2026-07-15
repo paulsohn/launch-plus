@@ -1,0 +1,10 @@
+connections:
+  - name: /diagnostics
+    type: subscription
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+  - loop: "to_list(params.get('metric_topic_list', []))"
+    name_expr: "item"
+    type: subscription
+    msg_type: tier4_metric_msgs/msg/MetricArray
+  # Dynamic: publishes UserDefinedValue on per-field topic names derived from metric fields
+  # at runtime — cannot be expressed statically.

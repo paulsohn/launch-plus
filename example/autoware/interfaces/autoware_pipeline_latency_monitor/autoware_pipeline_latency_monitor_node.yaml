@@ -1,0 +1,14 @@
+connections:
+  - loop: "to_list(params.get('processing_steps.sequence', []))"
+    name_expr: "params.get('processing_steps.' + item + '.topic', '')"
+    type: subscription
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+    when: "params.get('processing_steps.' + item + '.topic', '') != ''"
+  - name: ~/output/total_latency_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+  # Debug topics published via DebugPublisher under "pipeline_latency_monitor" namespace
+  # (e.g. ~/debug/<step>_latency_ms, ~/debug/pipeline_total_latency_ms) — omitted as runtime-driven

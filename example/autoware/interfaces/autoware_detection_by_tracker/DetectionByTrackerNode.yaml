@@ -1,0 +1,22 @@
+connections:
+  - name: ~/input/tracked_objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  - name: ~/input/initial_objects
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
+  - name: ~/output
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: ~/debug/initial_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: ~/debug/tracked_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: ~/debug/merged_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: ~/debug/divided_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects

@@ -1,0 +1,38 @@
+connections:
+  # Inputs
+  - name: ~/input/control_cmd
+    type: subscription
+    msg_type: autoware_control_msgs/msg/Control
+
+  - name: ~/input/operational_mode_state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+
+  - name: ~/input/kinematics
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+
+  - name: ~/input/reference_trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+
+  - name: ~/input/predicted_trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+
+  - name: ~/input/measured_acceleration
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+
+  # Outputs
+  - name: ~/output/validation_status
+    type: publisher
+    msg_type: autoware_control_validator/msg/ControlValidatorStatus
+
+  - name: ~/output/markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

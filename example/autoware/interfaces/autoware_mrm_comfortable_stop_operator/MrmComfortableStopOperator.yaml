@@ -1,0 +1,22 @@
+connections:
+  - name: ~/input/mrm/comfortable_stop/operate
+    type: service_server
+    msg_type: tier4_system_msgs/srv/OperateMrm
+  - name: ~/input/driving_mode_request
+    type: subscription
+    msg_type: tier4_system_msgs/msg/DrivingModeRequest
+  - name: ~/input/driving_mode_info
+    type: subscription
+    msg_type: tier4_system_msgs/msg/DrivingModeInfo
+  - name: ~/output/mrm/comfortable_stop/status
+    type: publisher
+    msg_type: tier4_system_msgs/msg/MrmBehaviorStatus
+  - name: ~/output/velocity_limit
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimit
+  - name: ~/output/velocity_limit/clear
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/VelocityLimitClearCommand
+  - name: ~/output/mrm_state
+    type: publisher
+    msg_type: tier4_system_msgs/msg/DrivingModeMrmState

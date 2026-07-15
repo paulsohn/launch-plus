@@ -1,0 +1,13 @@
+connections:
+  - name: /api/planning/velocity_factors
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/VelocityFactorArray
+  - name: /api/planning/steering_factors
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/SteeringFactorArray
+  - name: /visualizer/velocity_factors
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: /visualizer/steering_factors
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray

@@ -1,0 +1,16 @@
+connections:
+  - name: ~/input/pointcloud
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/output/pointcloud
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/debug/pointcloud_noise
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/debug/visibility
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - name: ~/debug/filter_ratio
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped

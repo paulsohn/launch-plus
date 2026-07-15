@@ -1,0 +1,22 @@
+connections:
+  - name: enu_vel
+    type: subscription
+    msg_type: geometry_msgs/msg/Vector3Stamped
+  - name: velocity
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped
+  - name: velocity_status
+    type: subscription
+    msg_type: eagleye_msgs/msg/StatusStamped
+  - name: velocity_scale_factor
+    type: subscription
+    msg_type: eagleye_msgs/msg/VelocityScaleFactor
+  - name: distance
+    type: subscription
+    msg_type: eagleye_msgs/msg/Distance
+  - name: heading_interpolate_3rd
+    type: subscription
+    msg_type: eagleye_msgs/msg/Heading
+  - name: enu_absolute_pos
+    type: publisher
+    msg_type: eagleye_msgs/msg/Position

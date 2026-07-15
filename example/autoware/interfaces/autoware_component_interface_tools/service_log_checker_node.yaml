@@ -1,0 +1,7 @@
+connections:
+  - name: /service_log
+    type: subscription
+    msg_type: tier4_system_msgs/msg/ServiceLog
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray

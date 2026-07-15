@@ -1,0 +1,16 @@
+connections:
+  - name: ~/pointcloud_map
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "params.get('map_height_fitter.fit_target', '') == 'pointcloud_map' and not to_bool(params.get('enable_partial_load', False))"
+  - name: ~/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+    when: "params.get('map_height_fitter.fit_target', '') == 'vector_map'"
+  - name: ~/partial_map_load
+    type: service_client
+    msg_type: autoware_map_msgs/srv/GetPartialPointCloudMap
+    when: "params.get('map_height_fitter.fit_target', '') == 'pointcloud_map' and to_bool(params.get('enable_partial_load', False))"
+  - name: ~/service
+    type: service_server
+    msg_type: autoware_internal_localization_msgs/srv/PoseWithCovarianceStamped

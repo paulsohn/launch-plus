@@ -1,0 +1,30 @@
+connections:
+  # Inputs
+  - name: in/pedals_cmd
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/PedalsCommand
+
+  - name: in/heartbeat
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/ManualOperatorHeartbeat
+
+  - name: in/steering_cmd
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/SteeringCommand
+
+  - name: in/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+
+  - name: in/gear_cmd
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+
+  - name: in/current_gate_mode
+    type: subscription
+    msg_type: tier4_control_msgs/msg/GateMode
+
+  # Outputs
+  - name: out/control_cmd
+    type: publisher
+    msg_type: autoware_control_msgs/msg/Control

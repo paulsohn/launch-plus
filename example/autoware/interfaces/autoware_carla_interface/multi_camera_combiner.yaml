@@ -1,0 +1,25 @@
+# Python node: multi_camera_combiner (multi_camera_combiner_node:main)
+# Camera names are hardcoded in the source (not a runtime parameter).
+# Subscribes to compressed images for 6 fixed cameras.
+connections:
+  - name: /sensing/camera/CAM_FRONT/image_raw/compressed
+    type: subscription
+    msg_type: sensor_msgs/msg/CompressedImage
+  - name: /sensing/camera/CAM_FRONT_LEFT/image_raw/compressed
+    type: subscription
+    msg_type: sensor_msgs/msg/CompressedImage
+  - name: /sensing/camera/CAM_FRONT_RIGHT/image_raw/compressed
+    type: subscription
+    msg_type: sensor_msgs/msg/CompressedImage
+  - name: /sensing/camera/CAM_BACK/image_raw/compressed
+    type: subscription
+    msg_type: sensor_msgs/msg/CompressedImage
+  - name: /sensing/camera/CAM_BACK_LEFT/image_raw/compressed
+    type: subscription
+    msg_type: sensor_msgs/msg/CompressedImage
+  - name: /sensing/camera/CAM_BACK_RIGHT/image_raw/compressed
+    type: subscription
+    msg_type: sensor_msgs/msg/CompressedImage
+  - name: /sensing/camera/all_cameras/image_raw
+    type: publisher
+    msg_type: sensor_msgs/msg/Image

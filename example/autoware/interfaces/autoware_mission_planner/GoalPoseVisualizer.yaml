@@ -1,0 +1,7 @@
+connections:
+  - name: input/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - name: output/goal_pose
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseStamped

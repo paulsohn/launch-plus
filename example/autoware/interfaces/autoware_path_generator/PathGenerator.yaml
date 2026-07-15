@@ -1,0 +1,25 @@
+connections:
+  - name: ~/input/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - name: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/output/path
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/PathWithLaneId
+  - name: ~/output/turn_indicators_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+  - name: ~/output/hazard_lights_cmd
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+  - name: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: autoware_utils_debug/msg/ProcessingTimeDetail
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

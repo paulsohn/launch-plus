@@ -1,0 +1,13 @@
+connections:
+  - name: input
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - name: gyro_bias_input
+    type: subscription
+    msg_type: geometry_msgs/msg/Vector3Stamped
+  - name: gyro_scale_input
+    type: subscription
+    msg_type: geometry_msgs/msg/Vector3Stamped
+  - name: output
+    type: publisher
+    msg_type: sensor_msgs/msg/Imu

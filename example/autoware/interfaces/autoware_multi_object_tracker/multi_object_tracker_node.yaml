@@ -1,0 +1,29 @@
+connections:
+  - loop: "range(1, 13)"
+    name_expr: "params.get('input/detection%02d/objects' % item, '~/input/detection%02d/objects' % item)"
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+    when: "params.get('input/detection%02d/channel' % item, 'none') not in ('none', '')"
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+    when: "params.get('ego_source', 'odometry') == 'odometry'"
+  - name: ~/output/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  - name: ~/output/merged_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+    when: "to_bool(params.get('publish_merged_objects', False))"
+  - name: ~/debug/tentative_objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+    when: "to_bool(params.get('publish_tentative_objects', False))"
+  - name: ~/debug/objects_markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "to_bool(params.get('publish_debug_markers', False))"
+  - name: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: tier4_debug_msgs/msg/Float64Stamped
+    when: "to_bool(params.get('publish_processing_time_detail', False))"

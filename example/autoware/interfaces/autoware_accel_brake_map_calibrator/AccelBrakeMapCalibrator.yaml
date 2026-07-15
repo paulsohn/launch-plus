@@ -1,0 +1,64 @@
+connections:
+  - name: ~/input/steer
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+  - name: ~/input/actuation_status
+    type: subscription
+    msg_type: tier4_vehicle_msgs/msg/ActuationStatusStamped
+  - name: ~/input/actuation_cmd
+    type: subscription
+    msg_type: tier4_vehicle_msgs/msg/ActuationCommandStamped
+  - name: ~/input/velocity
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/VelocityReport
+  - name: ~/output/update_suggest
+    type: publisher
+    msg_type: std_msgs/msg/Bool
+  - name: ~/output/update_raw_map
+    type: publisher
+    msg_type: std_msgs/msg/Float32MultiArray
+  - name: ~/output/debug_values
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
+  - name: ~/output/current_map_error
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - name: ~/output/updated_map_error
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - name: ~/output/map_error_ratio
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32Stamped
+  - name: /accel_brake_map_calibrator/output/calibration_status
+    type: publisher
+    msg_type: tier4_external_api_msgs/msg/CalibrationStatus
+  - name: ~/debug/original_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/update_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/data_average_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/data_std_dev_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/data_count_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/data_count_self_pose_occ_map
+    type: publisher
+    msg_type: nav_msgs/msg/OccupancyGrid
+  - name: ~/debug/occ_index
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/original_raw_map
+    type: publisher
+    msg_type: std_msgs/msg/Float32MultiArray
+  - name: ~/debug/offset_covariance
+    type: publisher
+    msg_type: std_msgs/msg/Float32MultiArray
+  - name: ~/input/update_map_dir
+    type: service_server
+    msg_type: tier4_vehicle_msgs/srv/UpdateAccelBrakeMap

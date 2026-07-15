@@ -1,0 +1,12 @@
+connections:
+  - name: input/odom
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+    when: "to_bool(params.get('use_odom', False))"
+  - name: input/twist
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+    when: "not to_bool(params.get('use_odom', False))"
+  - name: output/accel
+    type: publisher
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped

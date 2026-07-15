@@ -1,0 +1,10 @@
+connections:
+  - name: ~/input/trajectories
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/ScoredCandidateTrajectories
+  - name: ~/output/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - name: ~/debug/processing_time_detail_ms/trajectory_adapter
+    type: publisher
+    msg_type: autoware_utils_debug/msg/ProcessingTimeDetail

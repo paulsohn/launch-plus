@@ -1,0 +1,10 @@
+connections:
+  - name: input/object0
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: input/object1
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/DetectedObjects
+  - name: output/object
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects

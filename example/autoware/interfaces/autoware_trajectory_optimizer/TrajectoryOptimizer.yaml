@@ -1,0 +1,22 @@
+connections:
+  - name: ~/input/trajectories
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+  - name: ~/input/acceleration
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+  - name: ~/output/trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - name: ~/output/trajectories
+    type: publisher
+    msg_type: autoware_internal_planning_msgs/msg/CandidateTrajectories
+  - name: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: autoware_utils_debug/msg/ProcessingTimeDetail
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

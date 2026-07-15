@@ -1,0 +1,25 @@
+connections:
+  - name: ~/input/fixed_goal
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseStamped
+  - name: ~/input/rough_goal
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseStamped
+  - name: ~/input/reroute
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseStamped
+  - name: ~/input/waypoint
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseStamped
+  - name: /api/routing/state
+    type: subscription
+    msg_type: autoware_adapi_v1_msgs/msg/RouteState
+  - name: /api/routing/set_route_points
+    type: service_client
+    msg_type: autoware_adapi_v1_msgs/srv/SetRoutePoints
+  - name: /api/routing/change_route_points
+    type: service_client
+    msg_type: autoware_adapi_v1_msgs/srv/SetRoutePoints
+  - name: /api/routing/clear_route
+    type: service_client
+    msg_type: autoware_adapi_v1_msgs/srv/ClearRoute

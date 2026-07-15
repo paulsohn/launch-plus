@@ -1,0 +1,12 @@
+# This is a lateral controller plugin used by trajectory_follower_node.
+# Topics are created by the plugin within the parent node's namespace.
+connections:
+  - name: ~/debug/markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/ld_outputs
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float32MultiArrayStamped
+  - name: ~/output/predicted_trajectory
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory

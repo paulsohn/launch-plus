@@ -1,0 +1,27 @@
+connections:
+  # subscriptions
+  - name: ~/input/path
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Path
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+
+  # publishers
+  - name: ~/output/traj
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - name: ~/output/path
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Path
+
+  # debug publishers
+  - name: ~/debug/extended_traj
+    type: publisher
+    msg_type: autoware_planning_msgs/msg/Trajectory
+  - name: ~/debug/calculation_time
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/StringStamped
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

@@ -1,0 +1,16 @@
+connections:
+  - name: input/detected_rois
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/DetectedObjectsWithFeature
+  - name: input/rough_rois
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
+  - name: input/expect_rois
+    type: subscription
+    msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
+  - name: input/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: output/traffic_rois
+    type: publisher
+    msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray

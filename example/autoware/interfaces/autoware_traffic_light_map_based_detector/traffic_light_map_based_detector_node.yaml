@@ -1,0 +1,19 @@
+connections:
+  - name: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: ~/input/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: ~/input/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+  - name: ~/output/rois
+    type: publisher
+    msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
+  - name: ~/expect/rois
+    type: publisher
+    msg_type: tier4_perception_msgs/msg/TrafficLightRoiArray
+  - name: ~/debug/markers
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray

@@ -1,0 +1,12 @@
+connections:
+  - loop: "range(params.get('rois_number', 6))"
+    name_expr: "'~/input/camera%d/camera_info' % item"
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - loop: "range(params.get('rois_number', 6))"
+    name_expr: "'~/input/camera%d/image' % item"
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/output/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/DetectedObjects

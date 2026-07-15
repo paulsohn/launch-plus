@@ -1,0 +1,10 @@
+connections:
+  - name: velocity
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped
+  - name: yaw_rate_offset_stop
+    type: subscription
+    msg_type: eagleye_msgs/msg/YawrateOffset
+  - name: imu/data_tf_converted
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu

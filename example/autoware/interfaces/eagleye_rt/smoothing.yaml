@@ -1,0 +1,10 @@
+connections:
+  - name: velocity
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped
+  - name: velocity_status
+    type: subscription
+    msg_type: eagleye_msgs/msg/StatusStamped
+  - name: gnss_smooth_pos_enu
+    type: publisher
+    msg_type: eagleye_msgs/msg/Position

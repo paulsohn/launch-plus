@@ -1,0 +1,47 @@
+connections:
+  # Inputs (InterProcessPollingSubscriber)
+  - name: ~/input/odometry
+    type: subscription
+    msg_type: nav_msgs/msg/Odometry
+
+  - name: ~/input/acceleration
+    type: subscription
+    msg_type: geometry_msgs/msg/AccelWithCovarianceStamped
+
+  - name: ~/input/trajectory
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/Trajectory
+
+  - name: ~/input/route
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/LaneletRoute
+
+  - name: ~/input/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+
+  - name: ~/input/behavior_path
+    type: subscription
+    msg_type: autoware_internal_planning_msgs/msg/PathWithLaneId
+
+  - name: ~/input/steering_status
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+
+  - name: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+
+  - loop: "to_list(params.get('planning_factor_metrics.stop_deviation.module_list', []))"
+    name_expr: "params.get('planning_factor_metrics.topic_prefix', '/planning/planning_factors/') + item"
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/PlanningFactorArray
+
+  # Outputs
+  - name: ~/metrics
+    type: publisher
+    msg_type: tier4_metric_msgs/msg/MetricArray
+
+  - name: ~/debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped

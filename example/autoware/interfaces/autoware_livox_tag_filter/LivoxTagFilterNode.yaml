@@ -1,0 +1,7 @@
+connections:
+  - name: input
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: output
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2

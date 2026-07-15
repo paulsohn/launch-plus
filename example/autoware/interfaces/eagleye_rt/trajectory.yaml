@@ -1,0 +1,37 @@
+connections:
+  - name: imu/data_tf_converted
+    type: subscription
+    msg_type: sensor_msgs/msg/Imu
+  - name: velocity
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistStamped
+  - name: velocity_status
+    type: subscription
+    msg_type: eagleye_msgs/msg/StatusStamped
+  - name: velocity_scale_factor
+    type: subscription
+    msg_type: eagleye_msgs/msg/VelocityScaleFactor
+  - name: heading_interpolate_3rd
+    type: subscription
+    msg_type: eagleye_msgs/msg/Heading
+  - name: yaw_rate_offset_stop
+    type: subscription
+    msg_type: eagleye_msgs/msg/YawrateOffset
+  - name: yaw_rate_offset_2nd
+    type: subscription
+    msg_type: eagleye_msgs/msg/YawrateOffset
+  - name: pitching
+    type: subscription
+    msg_type: eagleye_msgs/msg/Pitching
+  - name: enu_vel
+    type: publisher
+    msg_type: geometry_msgs/msg/Vector3Stamped
+  - name: enu_relative_pos
+    type: publisher
+    msg_type: eagleye_msgs/msg/Position
+  - name: twist
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistStamped
+  - name: twist_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped

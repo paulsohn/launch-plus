@@ -1,0 +1,18 @@
+connections:
+  - name: input
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - loop: "range(params.get('rois_number', 1))"
+    name_expr: "'input/rois%d' % item"
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - loop: "range(params.get('rois_number', 1))"
+    name_expr: "'input/camera_info%d' % item"
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: output
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/debug/mask
+    type: publisher
+    msg_type: sensor_msgs/msg/Image

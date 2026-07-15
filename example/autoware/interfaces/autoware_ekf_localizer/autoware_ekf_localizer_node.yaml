@@ -1,0 +1,58 @@
+connections:
+  # Subscriptions
+  - name: initialpose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+
+  - name: in_pose_with_covariance
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+
+  - name: in_twist_with_covariance
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+
+  # Publishers
+  - name: ekf_pose
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseStamped
+
+  - name: ekf_pose_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+
+  - name: ekf_odom
+    type: publisher
+    msg_type: nav_msgs/msg/Odometry
+
+  - name: ekf_twist
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistStamped
+
+  - name: ekf_twist_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+
+  - name: ekf_biased_pose
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseStamped
+
+  - name: ekf_biased_pose_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+
+  - name: estimated_yaw_bias
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  - name: debug/processing_time_ms
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Float64Stamped
+
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+
+  # Service server
+  - name: trigger_node_srv
+    type: service_server

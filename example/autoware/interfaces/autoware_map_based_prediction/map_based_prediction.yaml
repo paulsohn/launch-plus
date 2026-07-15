@@ -1,0 +1,25 @@
+connections:
+  - name: ~/input/objects
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrackedObjects
+  - name: /vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: /traffic_signals
+    type: subscription
+    msg_type: autoware_perception_msgs/msg/TrafficLightGroupArray
+  - name: ~/output/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/PredictedObjects
+  - name: maneuver
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+    when: "to_bool(params.get('publish_debug_markers', False))"
+  - name: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: tier4_debug_msgs/msg/Float64Stamped
+    when: "to_bool(params.get('publish_processing_time_detail', False))"
+  # NOTE: Some launch configurations add a remap from the relative topic "objects" to an
+  # absolute path. This is a cascade remap artifact (the package launch remaps ~/output/objects
+  # → objects, then an outer launch remaps objects → absolute topic). It is not a separate
+  # subscription or publisher — the actual publisher is ~/output/objects above.

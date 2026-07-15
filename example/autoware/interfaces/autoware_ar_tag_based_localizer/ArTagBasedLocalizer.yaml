@@ -1,0 +1,28 @@
+connections:
+  - name: ~/input/lanelet2_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+  - name: ~/input/image
+    type: subscription
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/input/camera_info
+    type: subscription
+    msg_type: sensor_msgs/msg/CameraInfo
+  - name: ~/input/ekf_pose
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/output/pose_with_covariance
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+  - name: ~/debug/image
+    type: publisher
+    msg_type: sensor_msgs/msg/Image
+  - name: ~/debug/mapped_tag
+    type: publisher
+    msg_type: visualization_msgs/msg/MarkerArray
+  - name: ~/debug/detected_tag
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseArray
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray

@@ -1,0 +1,13 @@
+connections:
+  - name: /joint_states
+    type: subscription
+    msg_type: sensor_msgs/msg/JointState
+  - name: /robot_description
+    type: publisher
+    msg_type: std_msgs/msg/String
+  - name: /tf
+    type: publisher
+    msg_type: tf2_msgs/msg/TFMessage
+  - name: /tf_static
+    type: publisher
+    msg_type: tf2_msgs/msg/TFMessage

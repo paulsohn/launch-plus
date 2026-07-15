@@ -1,0 +1,22 @@
+connections:
+  - name: /vehicle/status/steering_status
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/SteeringReport
+  - name: /vehicle/status/velocity_status
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/VelocityReport
+  - name: /planning/route_state
+    type: subscription
+    msg_type: autoware_planning_msgs/msg/RouteState
+  - name: ~/control
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/Control
+  - name: ~/gear
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/GearCommand
+  - name: ~/turn_indicators
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/TurnIndicatorsCommand
+  - name: ~/hazard_lights
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand

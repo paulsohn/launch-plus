@@ -1,0 +1,10 @@
+connections:
+  - name: input/planning/hazard_lights_command
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+  - name: input/system/hazard_lights_command
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand
+  - name: output/hazard_lights_command
+    type: publisher
+    msg_type: autoware_vehicle_msgs/msg/HazardLightsCommand

@@ -1,0 +1,10 @@
+connections:
+  - name: input
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: output
+    type: publisher
+    msg_type: sensor_msgs/msg/PointCloud2
+  - name: ~/debug/processing_time_detail_ms
+    type: publisher
+    msg_type: autoware_utils_debug/msg/ProcessingTimeDetail

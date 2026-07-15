@@ -1,0 +1,4 @@
+connections:
+  - name: ~/output/objects
+    type: publisher
+    msg_type: autoware_perception_msgs/msg/PredictedObjects

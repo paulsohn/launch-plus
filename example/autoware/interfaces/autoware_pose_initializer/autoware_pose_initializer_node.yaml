@@ -1,0 +1,65 @@
+connections:
+  # Service server — always present
+  - name: /localization/initialize
+    type: service_server
+
+  # Publishers — always present
+  - name: /localization/initialization_state
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/LocalizationInitializationState
+
+  - name: pose_reset
+    type: publisher
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+
+  # Diagnostics published via DiagnosticsInterface
+  - name: /diagnostics
+    type: publisher
+    msg_type: diagnostic_msgs/msg/DiagnosticArray
+
+  # GNSS subscription — only when gnss_enabled=true (GnssModule)
+  - name: gnss_pose_cov
+    type: subscription
+    msg_type: geometry_msgs/msg/PoseWithCovarianceStamped
+    when: "to_bool(params.get('gnss_enabled', False))"
+
+  # Stop check twist subscription — only when stop_check_enabled=true (StopCheckModule)
+  - name: stop_check_twist
+    type: subscription
+    msg_type: geometry_msgs/msg/TwistWithCovarianceStamped
+    when: "to_bool(params.get('stop_check_enabled', False))"
+
+  # EKF trigger service client — only when ekf_enabled=true
+  - name: ekf_trigger_node
+    type: service_client
+    when: "to_bool(params.get('ekf_enabled', False))"
+
+  # NDT trigger service client — only when ndt_enabled=true
+  - name: ndt_trigger_node
+    type: service_client
+    when: "to_bool(params.get('ndt_enabled', False))"
+
+  # NDT align service client — only when ndt_enabled=true (LocalizationModule with "ndt_align")
+  - name: ndt_align
+    type: service_client
+    when: "to_bool(params.get('ndt_enabled', False))"
+
+  # YabLoc align service client — only when yabloc_enabled=true (LocalizationModule with "yabloc_align")
+  - name: yabloc_align
+    type: service_client
+    when: "to_bool(params.get('yabloc_enabled', False))"
+
+  # MapHeightFitter topics (map_height_fitter.cpp) — target selects which map source to use.
+  # NOTE: launch files may contain all three remaps regardless of the active target.
+  - name: ~/pointcloud_map
+    type: subscription
+    msg_type: sensor_msgs/msg/PointCloud2
+    when: "params.get('map_height_fitter.target', '') == 'pointcloud_map'"
+  - name: ~/partial_map_load
+    type: service_client
+    msg_type: autoware_map_msgs/srv/GetPartialPointCloudMap
+    when: "params.get('map_height_fitter.target', '') == 'pointcloud_map'"
+  - name: ~/vector_map
+    type: subscription
+    msg_type: autoware_map_msgs/msg/LaneletMapBin
+    when: "params.get('map_height_fitter.target', '') == 'vector_map'"

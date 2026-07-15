@@ -1,0 +1,33 @@
+connections:
+  # Interface with switcher nodes
+  - name: ~/command_mode/request
+    type: publisher
+    msg_type: tier4_system_msgs/msg/CommandModeRequest
+  - name: ~/command_mode/status
+    type: subscription
+    msg_type: tier4_system_msgs/msg/CommandModeStatus
+  - name: ~/command_mode/availability
+    type: subscription
+    msg_type: tier4_system_msgs/msg/CommandModeAvailability
+  - name: ~/command_mode/transition/available
+    type: subscription
+    msg_type: tier4_system_msgs/msg/ModeChangeAvailable
+  - name: ~/control_mode/report
+    type: subscription
+    msg_type: autoware_vehicle_msgs/msg/ControlModeReport
+  # Interface for API
+  - name: ~/operation_mode/state
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/OperationModeState
+  - name: ~/operation_mode/change_operation_mode
+    type: service_server
+    msg_type: autoware_system_msgs/srv/ChangeOperationMode
+  - name: ~/operation_mode/change_autoware_control
+    type: service_server
+    msg_type: autoware_system_msgs/srv/ChangeAutowareControl
+  - name: ~/mrm/state
+    type: publisher
+    msg_type: autoware_adapi_v1_msgs/msg/MrmState
+  - name: ~/debug
+    type: publisher
+    msg_type: autoware_internal_debug_msgs/msg/Int32MultiArrayStamped

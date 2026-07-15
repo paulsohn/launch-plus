@@ -40,6 +40,7 @@ def get_connections(
     pkg_name: str,
     executable: str | None = None,
     plugin_name: str | None = None,
+    args: list[str] | None = None,
 ) -> dict | None:
     name = executable or (plugin_name.split("::")[-1] if plugin_name else None)
     if not name:

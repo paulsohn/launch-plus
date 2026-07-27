@@ -5,7 +5,9 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from roscope.locator import PackageLocator
+import pytest
+
+from roscope.locator import MultipleLaunchFilesError, PackageLocator, find_share_file
 from roscope.types import Lockfile, PackageLock, RepoLock
 
 
@@ -142,3 +144,36 @@ def test_locate_launch_file_not_found() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         locator = PackageLocator.with_workspace(tmp)
         assert locator.locate_launch_file("nonexistent", "test.launch.xml") is None
+
+
+def test_locate_launch_file_in_subdirectory() -> None:
+    """A launch file nested under a subdirectory of launch/ is still found.
+
+    Matches upstream ros2launch, which searches the whole package share
+    directory rather than only ``launch/`` directly.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        pkg_dir = Path(tmp) / "my_pkg"
+        nested_dir = pkg_dir / "launch" / "components"
+        nested_dir.mkdir(parents=True)
+        (pkg_dir / "package.xml").write_text("<package></package>")
+        (nested_dir / "test.launch.xml").write_text("<launch></launch>")
+        locator = PackageLocator.with_workspace(tmp)
+        result = locator.locate_launch_file("my_pkg", "test.launch.xml")
+        assert result == nested_dir / "test.launch.xml"
+
+
+def test_find_share_file_multiple_matches_raises() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        share_dir = Path(tmp)
+        (share_dir / "a").mkdir()
+        (share_dir / "b").mkdir()
+        (share_dir / "a" / "dup.launch.xml").write_text("<launch></launch>")
+        (share_dir / "b" / "dup.launch.xml").write_text("<launch></launch>")
+        with pytest.raises(MultipleLaunchFilesError):
+            find_share_file(share_dir, "dup.launch.xml")
+
+
+def test_find_share_file_not_found_raises() -> None:
+    with tempfile.TemporaryDirectory() as tmp, pytest.raises(FileNotFoundError):
+        find_share_file(Path(tmp), "missing.launch.xml")

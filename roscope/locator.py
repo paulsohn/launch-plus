@@ -16,6 +16,41 @@ from roscope.types import Lockfile, PackageLock
 logger = logging.getLogger(__name__)
 
 
+class MultipleLaunchFilesError(LookupError):
+    """Raised when a file name matches more than one file in a share directory."""
+
+    def __init__(self, msg: str, paths: list[Path]) -> None:
+        super().__init__(msg)
+        self.paths = paths
+
+
+def find_share_file(share_dir: Path, file_name: str) -> Path:
+    """Search every directory under ``share_dir`` for a file named exactly ``file_name``.
+
+    Mirrors upstream ``ros2launch``'s ``get_share_file_path_from_package``.
+
+    :raises FileNotFoundError: if no file named ``file_name`` exists under ``share_dir``.
+    :raises MultipleLaunchFilesError: if more than one file matches.
+    """
+    matches = [
+        Path(root) / name
+        for root, _dirs, files in os.walk(share_dir)
+        for name in files
+        if name == file_name
+    ]
+    if not matches:
+        raise FileNotFoundError(
+            f"file '{file_name}' was not found in the share directory '{share_dir}'"
+        )
+    if len(matches) > 1:
+        raise MultipleLaunchFilesError(
+            f"file '{file_name}' was found more than once in the share directory "
+            f"'{share_dir}': {[str(p) for p in matches]}",
+            matches,
+        )
+    return matches[0]
+
+
 class PackageLocator:
     """Resolves package names to file system paths."""
 
@@ -198,19 +233,26 @@ class PackageLocator:
         return None
 
     def locate_launch_file(self, package: str, launcher: str) -> Path | None:
-        """Search filesystem for an existing launch file."""
+        """Search the package's share directory for a file named ``launcher``.
+
+        Returns ``None`` if the package itself cannot be located.
+
+        :raises MultipleLaunchFilesError: if ``launcher`` matches more than one file.
+        """
         pkg_share = self.locate_package_share(package)
         if pkg_share is None:
             return None
-        launch_path = pkg_share / "launch" / launcher
-        return launch_path if launch_path.exists() else None
+        try:
+            return find_share_file(pkg_share, launcher)
+        except FileNotFoundError:
+            return None
 
     def locate_launch_file_or_err(self, package: str, launcher: str) -> Path:
         """Like :meth:`locate_launch_file` but raises on failure."""
         result = self.locate_launch_file(package, launcher)
         if result is not None:
             return result
-        raise LookupError(f"launch file not found: {package}/launch/{launcher}")
+        raise FileNotFoundError(f"launch file '{launcher}' not found in package '{package}'")
 
     # ========================================================================
     # Bulk lookups

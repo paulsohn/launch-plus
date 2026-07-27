@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from roscope.fetcher import FetchOptions
-from roscope.locator import PackageLocator
+from roscope.locator import MultipleLaunchFilesError, PackageLocator, find_share_file
 from roscope.types import (
     DependencyKind,
     FileDependency,
@@ -292,7 +292,42 @@ def resolve_launch_recursive(
             "Packages not in the lockfile will not be found via AMENT_PREFIX_PATH."
         )
 
-    share_path = Path("launch") / launcher
+    if workflow_options.preview:
+        if lockfile.packages.get(package) is not None:
+            if not _ensure_package_fetched(
+                lockfile, package, fetch_dir, options, result, fetched_packages, failed_repos
+            ):
+                return result
+            pkg_share = locator.resolve_package_share(package)
+        else:
+            from roscope.fetcher import ensure_package_available
+
+            pkg_share = ensure_package_available(
+                package, None, None, rosdep_fallback=workflow_options.rosdep_fallback
+            )
+        if pkg_share is None:
+            logger.error("package '%s' not found in lockfile or AMENT_PREFIX_PATH", package)
+            return result
+    else:
+        pkg_share = locator.locate_install_share(package)
+        if pkg_share is None:
+            logger.error(
+                "package '%s' not found in AMENT_PREFIX_PATH; "
+                "run 'colcon build' first, or use --preview to resolve from source workspace",
+                package,
+            )
+            return result
+
+    try:
+        file_path = find_share_file(pkg_share, launcher)
+    except FileNotFoundError:
+        logger.error("launch file '%s' not found in package '%s'", launcher, package)
+        return result
+    except MultipleLaunchFilesError as e:
+        logger.error(str(e))
+        return result
+
+    share_path = file_path.relative_to(pkg_share)
     _resolve_python_file_recursive(
         lockfile,
         locator,
